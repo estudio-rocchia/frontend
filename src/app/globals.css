@@ -1,0 +1,64 @@
+@import "tailwindcss";
+
+/* Design tokens from untitled.pen — do not alter hex values */
+:root {
+  --bg-page: #faf8f5;
+  --bg-cream: #f3ede4;
+  --bg-card: #ffffff;
+  --primary: #0f4c5c;
+  --primary-dark: #0a3a47;
+  --primary-soft: #e6f2f4;
+  --text-primary: #1a2b32;
+  --text-secondary: #5c6b73;
+  --text-on-primary: #ffffff;
+  --border: #e2ddd4;
+  --accent-lilac: #c4b5d8;
+  --accent-lilac-bg: #f0ebf7;
+  --accent-sky: #8ecae6;
+  --accent-sky-bg: #e8f6fc;
+  --success: #2d6a4f;
+  --success-bg: #e8f3ed;
+  --warning: #b8860b;
+  --warning-bg: #fbf3e0;
+  --danger: #9b3d3d;
+  --danger-bg: #fbeaea;
+  --nav-muted: #a8bfc6;
+  --nav-subtitle: #a8c5ce;
+  --logo-mark: #ffffff22;
+  --shadow-card: 0 2px 12px #1a2b3214;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+}
+
+@theme inline {
+  --color-bg-page: var(--bg-page);
+  --color-bg-cream: var(--bg-cream);
+  --color-bg-card: var(--bg-card);
+  --color-primary: var(--primary);
+  --color-primary-dark: var(--primary-dark);
+  --color-primary-soft: var(--primary-soft);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-on-primary: var(--text-on-primary);
+  --color-border: var(--border);
+  --color-accent-lilac: var(--accent-lilac);
+  --color-accent-lilac-bg: var(--accent-lilac-bg);
+  --color-accent-sky: var(--accent-sky);
+  --color-accent-sky-bg: var(--accent-sky-bg);
+  --color-success: var(--success);
+  --color-success-bg: var(--success-bg);
+  --color-warning: var(--warning);
+  --color-warning-bg: var(--warning-bg);
+  --color-danger: var(--danger);
+  --color-danger-bg: var(--danger-bg);
+  --color-nav-muted: var(--nav-muted);
+  --font-sans: var(--font-dm-sans);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+}
+
+body {
+  background: var(--bg-page);
+  color: var(--text-primary);
+  font-family: var(--font-dm-sans), system-ui, sans-serif;
+}

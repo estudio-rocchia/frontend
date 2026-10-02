@@ -1,0 +1,136 @@
+import { apiBlob, apiRequest } from "./client";
+import type {
+  CatalogoItem,
+  ContratoDetail,
+  ContratoRecord,
+  CuotaDetail,
+  DashboardResumen,
+  InmuebleFicha,
+  InmuebleRecord,
+  LoginResponse,
+  MeResponse,
+  PagoDetail,
+  PagoRecord,
+  PersonaRecord,
+  ReciboRecord,
+  ServicioContratoRecord,
+} from "./types";
+
+export { ApiError, getApiBaseUrl } from "./client";
+export type * from "./types";
+
+export function login(usernameOrEmail: string, password: string) {
+  return apiRequest<LoginResponse>("/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ usernameOrEmail, password }),
+  });
+}
+
+export function fetchMe(token: string) {
+  return apiRequest<MeResponse>("/auth/me", { token });
+}
+
+export function fetchDashboardResumen(token: string, limit = 20) {
+  return apiRequest<DashboardResumen>(`/dashboard/resumen?limit=${limit}`, { token });
+}
+
+export function fetchContratos(token: string, params?: { estado?: string; limit?: number }) {
+  const query = new URLSearchParams();
+  if (params?.estado) query.set("estado", params.estado);
+  query.set("limit", String(params?.limit ?? 100));
+  return apiRequest<{ items: ContratoRecord[] }>(`/contratos?${query}`, { token });
+}
+
+export function fetchContrato(token: string, id: number) {
+  return apiRequest<ContratoDetail>(`/contratos/${id}`, { token });
+}
+
+export function fetchCuotas(token: string, contratoId: number) {
+  return apiRequest<{ items: CuotaDetail[] }>(`/contratos/${contratoId}/cuotas`, { token });
+}
+
+export function fetchServicios(token: string, contratoId: number) {
+  return apiRequest<{ items: ServicioContratoRecord[] }>(`/contratos/${contratoId}/servicios`, { token });
+}
+
+export function fetchPagos(token: string, contratoId: number) {
+  return apiRequest<{ items: PagoRecord[] }>(`/contratos/${contratoId}/pagos`, { token });
+}
+
+export function fetchPago(token: string, pagoId: number) {
+  return apiRequest<PagoDetail>(`/pagos/${pagoId}`, { token });
+}
+
+export function issueRecibo(token: string, pagoId: number) {
+  return apiRequest<ReciboRecord>(`/pagos/${pagoId}/recibo`, {
+    method: "POST",
+    token,
+    body: JSON.stringify({}),
+  });
+}
+
+export function downloadReciboPdf(token: string, reciboId: number) {
+  return apiBlob(`/recibos/${reciboId}/pdf`, token);
+}
+
+export function fetchInmuebleFicha(token: string, inmuebleId: number) {
+  return apiRequest<InmuebleFicha>(`/inmuebles/${inmuebleId}/ficha`, { token });
+}
+
+export function fetchCatalog<T extends CatalogoItem>(token: string, path: string) {
+  return apiRequest<{ items: T[] }>(path, { token });
+}
+
+export function fetchLocalidades(token: string) {
+  return apiRequest<{ items: Array<{ id: number; name: string; province: string; country: string }> }>(
+    "/localidades",
+    { token },
+  );
+}
+
+export function createPersona(
+  token: string,
+  body: { tipoPersona: "natural" | "juridica"; nombre?: string; apellido?: string | null; razonSocial?: string | null },
+) {
+  return apiRequest<PersonaRecord>("/personas", {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function createLocalidad(token: string, body: { name: string; province: string; country?: string }) {
+  return apiRequest<{ id: number; name: string; province: string; country: string }>("/localidades", {
+    method: "POST",
+    token,
+    body: JSON.stringify({ country: "Argentina", ...body }),
+  });
+}
+
+export function createInmueble(
+  token: string,
+  body: {
+    code: string;
+    tipoInmuebleId: number;
+    localidadId: number;
+    title: string;
+    direccion?: string | null;
+  },
+) {
+  return apiRequest<InmuebleRecord>("/inmuebles", {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function createContrato(
+  token: string,
+  body: Record<string, unknown>,
+) {
+  return apiRequest<ContratoRecord>("/contratos", {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
