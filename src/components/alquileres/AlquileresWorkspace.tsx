@@ -31,7 +31,7 @@ import {
   fetchServicios,
   issueRecibo,
 } from "@/lib/api";
-import { downloadBlob, parsePersonName, personaDisplayName } from "@/lib/format";
+import { downloadBlob, generateInmuebleCode, parsePersonName, personaDisplayName } from "@/lib/format";
 import {
   buildBillingIndex,
   mapContratoDetailToFicha,
@@ -204,9 +204,9 @@ export function AlquileresWorkspace() {
         apellido: ownerParts.apellido,
       });
 
-      const codeSuffix = String(Date.now()).slice(-6);
+      const inmuebleCode = generateInmuebleCode();
       const inmueble = await createInmueble(token, {
-        code: `INM-${codeSuffix}`,
+        code: inmuebleCode,
         tipoInmuebleId: tipoInmueble!.id,
         localidadId: localidad.id,
         title: form.propertyLabel.trim(),
@@ -215,9 +215,17 @@ export function AlquileresWorkspace() {
 
       const today = new Date().toISOString().slice(0, 10);
       const amount = Number(form.amount.replace(/\D/g, ""));
+      if (!Number.isFinite(amount) || amount <= 0) {
+        throw new ApiError(400, {
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Ingresá un monto mensual válido mayor a cero",
+          },
+        });
+      }
 
       const contrato = await createContrato(token, {
-        contratoCode: `ALQ-${codeSuffix}`,
+        contratoCode: `ALQ-${inmuebleCode}`,
         inmuebleId: inmueble.id,
         inquilinoId: inquilino.id,
         fechaInicio: today,

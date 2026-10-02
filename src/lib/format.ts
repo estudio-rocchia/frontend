@@ -49,3 +49,17 @@ export function downloadBlob(blob: Blob, filename: string) {
   anchor.click();
   URL.revokeObjectURL(url);
 }
+
+
+const INMUEBLE_CODE_PATTERN = /^[A-Z]{1,3}\d{2,4}$/;
+
+/** Matches DB check on inmueble.code (e.g. D001, I1234). */
+export function generateInmuebleCode(): string {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const suffix = String(Math.floor(1000 + Math.random() * 9000));
+    const code = `I${suffix}`;
+    if (INMUEBLE_CODE_PATTERN.test(code)) return code;
+  }
+  const fallback = String(Date.now() % 10000).padStart(4, "0");
+  return `I${fallback}`;
+}

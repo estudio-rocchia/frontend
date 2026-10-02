@@ -1,5 +1,6 @@
 "use client";
 
+import { Eye, EyeOff } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -14,6 +15,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("DemoStaff2026!");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     if (!loading && token) {
@@ -66,13 +68,27 @@ export default function LoginPage() {
           </label>
           <label className="flex flex-col gap-1.5">
             <span className="text-[11px] font-semibold text-text-secondary">Contraseña</span>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
-              className="rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] outline-none focus:border-primary"
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+                className="w-full rounded-sm border border-border bg-bg-page py-2.5 pr-10 pl-3 text-[13px] outline-none focus:border-primary"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((visible) => !visible)}
+                className="absolute top-1/2 right-2.5 -translate-y-1/2 rounded-sm p-1 text-text-secondary hover:text-text-primary"
+                aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+              >
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" aria-hidden />
+                ) : (
+                  <Eye className="h-4 w-4" aria-hidden />
+                )}
+              </button>
+            </div>
           </label>
         </div>
 
