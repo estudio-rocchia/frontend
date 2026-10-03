@@ -50,16 +50,22 @@ export function downloadBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url);
 }
 
+const RENTAL_ERROR_MESSAGES: Record<string, string> = {
+  "Property code already exists": "Ese código de inmueble ya existe. Reintentá en un momento.",
+  "Property already has an active contract": "Ese inmueble ya tiene un contrato activo.",
+  "Contract code already exists": "Ese código de contrato ya existe. Reintentá en un momento.",
+  "Property code must be 1–3 letters followed by 2–4 digits (e.g. D001, I1234)":
+    "Código de inmueble inválido (ej. D001, K08).",
+  "Missing required permission: contrato.edit": "No tenés permiso para crear contratos.",
+  "Missing required permission: inmueble.edit": "No tenés permiso para crear inmuebles.",
+  "frecuenciaAjusteMeses requires tipoIndiceId": "Seleccioná un índice de ajuste válido.",
+};
 
-const INMUEBLE_CODE_PATTERN = /^[A-Z]{1,3}\d{2,4}$/;
-
-/** Matches DB check on inmueble.code (e.g. D001, I1234). */
-export function generateInmuebleCode(): string {
-  for (let attempt = 0; attempt < 8; attempt += 1) {
-    const suffix = String(Math.floor(1000 + Math.random() * 9000));
-    const code = `I${suffix}`;
-    if (INMUEBLE_CODE_PATTERN.test(code)) return code;
+export function rentalApiErrorMessage(err: unknown, fallback = "No se pudo crear el contrato"): string {
+  if (err instanceof Error) {
+    return RENTAL_ERROR_MESSAGES[err.message] ?? err.message;
   }
-  const fallback = String(Date.now() % 10000).padStart(4, "0");
-  return `I${fallback}`;
+  return fallback;
 }
+
+

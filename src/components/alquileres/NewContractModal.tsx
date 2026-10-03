@@ -1,13 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import type { AdjustmentIndex } from "@/data/alquileres-contract-details";
+import type { CatalogoItem } from "@/lib/api/types";
+import { nextContratoCode, nextInmuebleCode, prefixForTipoInmueble } from "@/lib/codes";
 
 export type NewContractForm = {
   propertyLabel: string;
   propertyAddress: string;
+  tipoInmuebleCode: string;
   tenant: string;
   owner: string;
   amount: string;
@@ -18,6 +21,7 @@ export type NewContractForm = {
 const emptyForm: NewContractForm = {
   propertyLabel: "",
   propertyAddress: "",
+  tipoInmuebleCode: "house",
   tenant: "",
   owner: "",
   amount: "",
@@ -54,13 +58,27 @@ export function NewContractModal({
   onClose,
   onSubmit,
   submitting = false,
+  tiposInmueble = [],
+  usedInmuebleCodes = [],
+  usedContratoCodes = [],
 }: {
   open: boolean;
   onClose: () => void;
   onSubmit: (form: NewContractForm) => void;
   submitting?: boolean;
+  tiposInmueble?: CatalogoItem[];
+  usedInmuebleCodes?: string[];
+  usedContratoCodes?: Array<string | null>;
 }) {
   const [form, setForm] = useState<NewContractForm>(emptyForm);
+
+  const codePreview = useMemo(
+    () => ({
+      inmueble: nextInmuebleCode(prefixForTipoInmueble(form.tipoInmuebleCode), usedInmuebleCodes),
+      contrato: nextContratoCode(usedContratoCodes),
+    }),
+    [form.tipoInmuebleCode, usedContratoCodes, usedInmuebleCodes],
+  );
 
   function handleClose() {
     setForm(emptyForm);
@@ -110,6 +128,25 @@ export function NewContractModal({
           onChange={(v) => patch({ propertyLabel: v })}
           placeholder="Ej. Depto calle 23"
         />
+        <div className="flex flex-col gap-1.5">
+          <span className="text-[11px] font-semibold text-text-secondary">Tipo de inmueble</span>
+          <select
+            value={form.tipoInmuebleCode}
+            onChange={(e) => patch({ tipoInmuebleCode: e.target.value })}
+            className="rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
+          >
+            {(tiposInmueble.length ? tiposInmueble : [{ id: 0, code: "house", name: "Casa" }]).map((tipo) => (
+              <option key={tipo.code} value={tipo.code}>
+                {tipo.name} ({prefixForTipoInmueble(tipo.code)})
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="rounded-sm border border-border bg-bg-page px-3 py-2 text-[12px] text-text-secondary">
+          Inmueble: <strong className="text-text-primary">{codePreview.inmueble}</strong>
+          {" · "}
+          Contrato: <strong className="text-text-primary">{codePreview.contrato}</strong>
+        </div>
         <Field
           label="Dirección completa"
           value={form.propertyAddress}

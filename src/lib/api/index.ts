@@ -77,6 +77,12 @@ export function fetchInmuebleFicha(token: string, inmuebleId: number) {
   return apiRequest<InmuebleFicha>(`/inmuebles/${inmuebleId}/ficha`, { token });
 }
 
+export function fetchInmuebles(token: string, params?: { limit?: number }) {
+  const query = new URLSearchParams();
+  query.set("limit", String(params?.limit ?? 200));
+  return apiRequest<{ items: InmuebleRecord[] }>(`/inmuebles?${query}`, { token });
+}
+
 export function fetchCatalog<T extends CatalogoItem>(token: string, path: string) {
   return apiRequest<{ items: T[] }>(path, { token });
 }

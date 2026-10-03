@@ -25,13 +25,15 @@ import {
   fetchCuotas,
   fetchDashboardResumen,
   fetchInmuebleFicha,
+  fetchInmuebles,
   fetchLocalidades,
   fetchPagos,
   fetchPago,
   fetchServicios,
   issueRecibo,
 } from "@/lib/api";
-import { downloadBlob, generateInmuebleCode, parsePersonName, personaDisplayName } from "@/lib/format";
+import { nextContratoCode, nextInmuebleCode, prefixForTipoInmueble } from "@/lib/codes";
+import { downloadBlob, parsePersonName, personaDisplayName, rentalApiErrorMessage } from "@/lib/format";
 import {
   buildBillingIndex,
   mapContratoDetailToFicha,
@@ -55,6 +57,11 @@ export function AlquileresWorkspace() {
   const [newModalOpen, setNewModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [codeContext, setCodeContext] = useState<{
+    tiposInmueble: Array<{ id: number; code: string; name: string }>;
+    inmuebleCodes: string[];
+    contratoCodes: Array<string | null>;
+  } | null>(null);
 
   const showToast = useCallback((message: string) => {
     setToast(message);
@@ -168,20 +175,67 @@ export function AlquileresWorkspace() {
     }
   }
 
+  async function openNewContractModal() {
+    if (!token) return;
+    try {
+      const [tiposInmueble, inmueblesRes, contratosRes] = await Promise.all([
+        fetchCatalog(token, "/catalogos/tipos-inmueble"),
+        fetchInmuebles(token, { limit: 200 }),
+        fetchContratos(token, { limit: 200 }),
+      ]);
+      setCodeContext({
+        tiposInmueble: tiposInmueble.items,
+        inmuebleCodes: inmueblesRes.items.map((item) => item.code),
+        contratoCodes: contratosRes.items.map((item) => item.contratoCode),
+      });
+      setNewModalOpen(true);
+    } catch (err) {
+      showToast(err instanceof ApiError ? err.message : "No se pudieron cargar los códigos");
+    }
+  }
+
   async function handleNewContract(form: NewContractForm) {
     if (!token) return;
     setSubmitting(true);
     try {
-      const [indices, moras, tiposInmueble, localidades] = await Promise.all([
+      const [indices, moras, localidades, inmueblesRes, contratosRes] = await Promise.all([
         fetchCatalog(token, "/catalogos/tipos-indice"),
         fetchCatalog(token, "/catalogos/tipos-mora"),
-        fetchCatalog(token, "/catalogos/tipos-inmueble"),
         fetchLocalidades(token),
+        fetchInmuebles(token, { limit: 200 }),
+        fetchContratos(token, { limit: 200 }),
       ]);
 
       const indexItem = indices.items.find((item) => item.code === form.index) ?? indices.items[0];
       const moraItem = moras.items.find((item) => item.code === "daily_percentage") ?? moras.items[0];
-      const tipoInmueble = tiposInmueble.items.find((item) => item.code === "house") ?? tiposInmueble.items[0];
+      const tiposInmueble = codeContext?.tiposInmueble.length
+        ? codeContext.tiposInmueble
+        : (await fetchCatalog(token, "/catalogos/tipos-inmueble")).items;
+      const tipoInmueble =
+        tiposInmueble.find((item) => item.code === form.tipoInmuebleCode) ??
+        tiposInmueble.find((item) => item.code === "house") ??
+        tiposInmueble[0];
+
+      if (!tipoInmueble) {
+        throw new ApiError(400, {
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "No se pudo cargar el catálogo de tipos de inmueble",
+          },
+        });
+      }
+
+      if (!indexItem?.id) {
+        throw new ApiError(400, {
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Seleccioná un índice de ajuste válido",
+          },
+        });
+      }
+
+      const usedInmuebleCodes = inmueblesRes.items.map((item) => item.code);
+      const usedContratoCodes = contratosRes.items.map((item) => item.contratoCode);
 
       let localidad = localidades.items.find((item) => item.name.toLowerCase().includes("bre"));
       if (!localidad) {
@@ -204,15 +258,6 @@ export function AlquileresWorkspace() {
         apellido: ownerParts.apellido,
       });
 
-      const inmuebleCode = generateInmuebleCode();
-      const inmueble = await createInmueble(token, {
-        code: inmuebleCode,
-        tipoInmuebleId: tipoInmueble!.id,
-        localidadId: localidad.id,
-        title: form.propertyLabel.trim(),
-        direccion: form.propertyAddress.trim(),
-      });
-
       const today = new Date().toISOString().slice(0, 10);
       const amount = Number(form.amount.replace(/\D/g, ""));
       if (!Number.isFinite(amount) || amount <= 0) {
@@ -224,29 +269,88 @@ export function AlquileresWorkspace() {
         });
       }
 
-      const contrato = await createContrato(token, {
-        contratoCode: `ALQ-${inmuebleCode}`,
-        inmuebleId: inmueble.id,
-        inquilinoId: inquilino.id,
-        fechaInicio: today,
-        fechaFin: addYears(today, 5),
-        montoAlquiler: amount,
-        codigoMoneda: form.currency,
-        diaVencimientoPago: 10,
-        frecuenciaAjusteMeses: 12,
-        tipoIndiceId: indexItem?.id ?? null,
-        tipoMoraId: moraItem?.id ?? null,
-        tasaMora: 0.025,
-        montoDeposito: amount,
-        codigoMonedaDeposito: form.currency,
-      });
+      const inmueblePrefix = prefixForTipoInmueble(form.tipoInmuebleCode);
+      let inmueble = null as Awaited<ReturnType<typeof createInmueble>> | null;
+      const reservedInmuebleCodes = [...usedInmuebleCodes];
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const inmuebleCode = nextInmuebleCode(inmueblePrefix, reservedInmuebleCodes);
+        try {
+          inmueble = await createInmueble(token, {
+            code: inmuebleCode,
+            tipoInmuebleId: tipoInmueble.id,
+            localidadId: localidad.id,
+            title: form.propertyLabel.trim(),
+            direccion: form.propertyAddress.trim(),
+          });
+          break;
+        } catch (err) {
+          if (err instanceof ApiError && err.status === 409) {
+            reservedInmuebleCodes.push(inmuebleCode);
+            continue;
+          }
+          throw err;
+        }
+      }
+
+      if (!inmueble) {
+        throw new ApiError(409, {
+          error: {
+            code: "CONFLICT",
+            message: "No se pudo reservar un código de inmueble. Reintentá.",
+          },
+        });
+      }
+
+      let contrato = null as Awaited<ReturnType<typeof createContrato>> | null;
+      const reservedContratoCodes = [...usedContratoCodes];
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const contratoCode = nextContratoCode(reservedContratoCodes);
+        try {
+          contrato = await createContrato(token, {
+            contratoCode,
+            inmuebleId: inmueble.id,
+            inquilinoId: inquilino.id,
+            fechaInicio: today,
+            fechaFin: addYears(today, 5),
+            montoAlquiler: amount,
+            codigoMoneda: form.currency,
+            diaVencimientoPago: 10,
+            frecuenciaAjusteMeses: 12,
+            tipoIndiceId: indexItem.id,
+            tipoMoraId: moraItem?.id ?? null,
+            tasaMora: 0.025,
+            montoDeposito: amount,
+            codigoMonedaDeposito: form.currency,
+          });
+          break;
+        } catch (err) {
+          if (err instanceof ApiError && err.status === 409) {
+            reservedContratoCodes.push(contratoCode);
+            continue;
+          }
+          throw err;
+        }
+      }
+
+      if (!contrato) {
+        throw new ApiError(409, {
+          error: {
+            code: "CONFLICT",
+            message: "No se pudo reservar un código de contrato. Reintentá.",
+          },
+        });
+      }
 
       setNewModalOpen(false);
       showToast(`Contrato ${contrato.contratoCode ?? contrato.id} creado.`);
-      await loadRows();
-      void openDrawer(String(contrato.id));
+      try {
+        await loadRows();
+        void openDrawer(String(contrato.id));
+      } catch {
+        showToast("Contrato creado, pero no se pudo refrescar la lista.");
+      }
     } catch (err) {
-      showToast(err instanceof ApiError ? err.message : "No se pudo crear el contrato");
+      showToast(rentalApiErrorMessage(err));
     } finally {
       setSubmitting(false);
     }
@@ -264,7 +368,7 @@ export function AlquileresWorkspace() {
               Seguimiento de mora, ajustes e incidencias por contrato.
             </p>
           </div>
-          <ButtonPrimary type="button" onClick={() => setNewModalOpen(true)} disabled={submitting}>
+          <ButtonPrimary type="button" onClick={() => void openNewContractModal()} disabled={submitting}>
             Nuevo contrato
           </ButtonPrimary>
         </header>
@@ -296,6 +400,9 @@ export function AlquileresWorkspace() {
         onClose={() => setNewModalOpen(false)}
         onSubmit={(form) => void handleNewContract(form)}
         submitting={submitting}
+        tiposInmueble={codeContext?.tiposInmueble ?? []}
+        usedInmuebleCodes={codeContext?.inmuebleCodes ?? []}
+        usedContratoCodes={codeContext?.contratoCodes ?? []}
       />
 
       {toast ? (
