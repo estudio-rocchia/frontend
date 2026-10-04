@@ -44,3 +44,39 @@ export function nextInmuebleCode(prefix: string, usedCodes: Iterable<string>): s
   throw new Error("No hay códigos de inmueble disponibles para este tipo.");
 }
 
+/** Referencia interna del contrato (distinta del código de inmueble K16, G02, …). */
+export const CONTRATO_CODE_PREFIX = "ALQ-";
+
+const ALQ_NUMERIC = /^ALQ-(\d+)$/i;
+const LEGACY_BARE_DIGITS = /^(\d{4,})$/;
+
+function maxAlqSequence(used: Set<string>): number {
+  let max = 0;
+  for (const code of used) {
+    const alq = ALQ_NUMERIC.exec(code);
+    if (alq) {
+      max = Math.max(max, Number.parseInt(alq[1], 10));
+      continue;
+    }
+    const bare = LEGACY_BARE_DIGITS.exec(code);
+    if (bare) {
+      max = Math.max(max, Number.parseInt(bare[1], 10));
+    }
+  }
+  return max;
+}
+
+export function nextContratoCode(existingCodes: Iterable<string | null | undefined>): string {
+  const used = normalizeCodeSet(
+    Array.from(existingCodes).filter((code): code is string => Boolean(code?.trim())),
+  );
+  let candidate = maxAlqSequence(used) + 1;
+
+  for (let attempt = 0; attempt < 10_000; attempt += 1) {
+    const code = `${CONTRATO_CODE_PREFIX}${String(candidate).padStart(4, "0")}`;
+    if (!used.has(code)) return code;
+    candidate += 1;
+  }
+
+  throw new Error("No hay códigos de contrato ALQ disponibles.");
+}

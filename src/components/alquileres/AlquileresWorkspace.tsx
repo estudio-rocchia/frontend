@@ -32,7 +32,7 @@ import {
   fetchServicios,
   issueRecibo,
 } from "@/lib/api";
-import { nextInmuebleCode, prefixForTipoInmueble } from "@/lib/codes";
+import { nextContratoCode, nextInmuebleCode, prefixForTipoInmueble } from "@/lib/codes";
 import { downloadBlob, parsePersonName, personaDisplayName, rentalApiErrorMessage } from "@/lib/format";
 import {
   buildBillingIndex,
@@ -60,6 +60,7 @@ export function AlquileresWorkspace() {
   const [codeContext, setCodeContext] = useState<{
     tiposInmueble: Array<{ id: number; code: string; name: string }>;
     inmuebleCodes: string[];
+    contratoCodes: Array<string | null>;
   } | null>(null);
 
   const showToast = useCallback((message: string) => {
@@ -179,13 +180,15 @@ export function AlquileresWorkspace() {
   async function openNewContractModal() {
     if (!token) return;
     try {
-      const [tiposInmueble, inmueblesRes] = await Promise.all([
+      const [tiposInmueble, inmueblesRes, contratosRes] = await Promise.all([
         fetchCatalog(token, "/catalogos/tipos-inmueble"),
         fetchInmuebles(token, { limit: 200 }),
+        fetchContratos(token, { limit: 200 }),
       ]);
       setCodeContext({
         tiposInmueble: tiposInmueble.items,
         inmuebleCodes: inmueblesRes.items.map((item) => item.code),
+        contratoCodes: contratosRes.items.map((item) => item.contratoCode),
       });
       setNewModalOpen(true);
     } catch (err) {
@@ -197,11 +200,12 @@ export function AlquileresWorkspace() {
     if (!token) return;
     setSubmitting(true);
     try {
-      const [indices, moras, localidades, inmueblesRes] = await Promise.all([
+      const [indices, moras, localidades, inmueblesRes, contratosRes] = await Promise.all([
         fetchCatalog(token, "/catalogos/tipos-indice"),
         fetchCatalog(token, "/catalogos/tipos-mora"),
         fetchLocalidades(token),
         fetchInmuebles(token, { limit: 200 }),
+        fetchContratos(token, { limit: 200 }),
       ]);
 
       const indexItem = indices.items.find((item) => item.code === form.index) ?? indices.items[0];
@@ -233,6 +237,7 @@ export function AlquileresWorkspace() {
       }
 
       const usedInmuebleCodes = inmueblesRes.items.map((item) => item.code);
+      const usedContratoCodes = contratosRes.items.map((item) => item.contratoCode);
 
       let localidad = localidades.items.find((item) => item.name.toLowerCase().includes("bre"));
       if (!localidad) {
@@ -298,22 +303,45 @@ export function AlquileresWorkspace() {
         });
       }
 
-      const contrato = await createContrato(token, {
-        contratoCode: inmueble.code,
-        inmuebleId: inmueble.id,
-        inquilinoId: inquilino.id,
-        fechaInicio: today,
-        fechaFin: addYears(today, 5),
-        montoAlquiler: amount,
-        codigoMoneda: form.currency,
-        diaVencimientoPago: 10,
-        frecuenciaAjusteMeses: 12,
-        tipoIndiceId: indexItem.id,
-        tipoMoraId: moraItem?.id ?? null,
-        tasaMora: 0.025,
-        montoDeposito: amount,
-        codigoMonedaDeposito: form.currency,
-      });
+      let contrato = null as Awaited<ReturnType<typeof createContrato>> | null;
+      const reservedContratoCodes = [...usedContratoCodes];
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const contratoCode = nextContratoCode(reservedContratoCodes);
+        try {
+          contrato = await createContrato(token, {
+            contratoCode,
+            inmuebleId: inmueble.id,
+            inquilinoId: inquilino.id,
+            fechaInicio: today,
+            fechaFin: addYears(today, 5),
+            montoAlquiler: amount,
+            codigoMoneda: form.currency,
+            diaVencimientoPago: 10,
+            frecuenciaAjusteMeses: 12,
+            tipoIndiceId: indexItem.id,
+            tipoMoraId: moraItem?.id ?? null,
+            tasaMora: 0.025,
+            montoDeposito: amount,
+            codigoMonedaDeposito: form.currency,
+          });
+          break;
+        } catch (err) {
+          if (err instanceof ApiError && err.status === 409) {
+            reservedContratoCodes.push(contratoCode);
+            continue;
+          }
+          throw err;
+        }
+      }
+
+      if (!contrato) {
+        throw new ApiError(409, {
+          error: {
+            code: "CONFLICT",
+            message: "No se pudo reservar un código de contrato. Reintentá.",
+          },
+        });
+      }
 
       setNewModalOpen(false);
       showToast(`Alquiler ${inmueble.code} creado.`);
