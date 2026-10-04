@@ -14,10 +14,29 @@ export class ApiError extends Error {
   }
 }
 
+export class NetworkError extends Error {
+  readonly url: string;
+
+  constructor(url: string, cause?: unknown) {
+    super(
+      `No se pudo conectar con el servidor (${url}). Verificá que el backend esté corriendo en el puerto 3000.`,
+    );
+    this.name = "NetworkError";
+    this.url = url;
+    if (cause instanceof Error) {
+      this.cause = cause;
+    }
+  }
+}
+
 export function getApiBaseUrl(): string {
+  // En el navegador usamos el proxy same-origin de Next (/backend → API) para evitar CORS.
+  if (typeof window !== "undefined") {
+    return "/backend";
+  }
   const base = process.env.NEXT_PUBLIC_API_URL?.trim();
   if (!base) {
-    return "http://localhost:3000";
+    return "http://127.0.0.1:3000";
   }
   return base.replace(/\/$/, "");
 }
@@ -29,14 +48,19 @@ export async function apiRequest<T>(
   const { token, headers, ...rest } = options;
   const url = `${getApiBaseUrl()}${path.startsWith("/") ? path : `/${path}`}`;
 
-  const response = await fetch(url, {
-    ...rest,
-    headers: {
-      ...(rest.body ? { "Content-Type": "application/json" } : {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...headers,
-    },
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...rest,
+      headers: {
+        ...(rest.body ? { "Content-Type": "application/json" } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...headers,
+      },
+    });
+  } catch (error) {
+    throw new NetworkError(url, error);
+  }
 
   if (response.status === 204) {
     return undefined as T;
@@ -62,9 +86,14 @@ export async function apiRequest<T>(
 
 export async function apiBlob(path: string, token: string): Promise<Blob> {
   const url = `${getApiBaseUrl()}${path.startsWith("/") ? path : `/${path}`}`;
-  const response = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch (error) {
+    throw new NetworkError(url, error);
+  }
 
   if (!response.ok) {
     const contentType = response.headers.get("content-type") ?? "";

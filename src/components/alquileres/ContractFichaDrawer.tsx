@@ -1,8 +1,13 @@
 "use client";
 
+import { ContractServiciosSection } from "@/components/alquileres/ContractServiciosSection";
+import type { PeriodoFormValues } from "@/components/alquileres/PeriodoServicioModal";
+import type { ServicioFormValues } from "@/components/alquileres/ServicioFormModal";
+import type { RegistrarPagoServicioFormValues } from "@/components/alquileres/RegistrarPagoServicioModal";
 import { DrawerPanel } from "@/components/ui/DrawerPanel";
 import { ButtonOutline } from "@/components/ui/Button";
 import type { ContractDetail } from "@/data/alquileres-contract-details";
+import type { CatalogoItem, PeriodoServicioRecord, ServicioContratoRecord } from "@/lib/api/types";
 
 function FieldBlock({ label, value }: { label: string; value: string }) {
   return (
@@ -16,10 +21,40 @@ function FieldBlock({ label, value }: { label: string; value: string }) {
 export function ContractFichaDrawer({
   open,
   detail,
+  servicios,
+  periodos,
+  tiposServicio,
+  serviciosLoading,
+  serviciosSubmitting,
+  canEditServicios,
+  onCreateServicio,
+  onUpdateServicio,
+  onDeactivateServicio,
+  onCreatePeriodo,
+  onRegisterPago,
+  mediosPago,
+  canRegisterPago,
   onClose,
 }: {
   open: boolean;
   detail: ContractDetail | null;
+  servicios: ServicioContratoRecord[];
+  periodos: PeriodoServicioRecord[];
+  tiposServicio: CatalogoItem[];
+  serviciosLoading?: boolean;
+  serviciosSubmitting?: boolean;
+  canEditServicios?: boolean;
+  onCreateServicio: (values: ServicioFormValues) => Promise<void>;
+  onUpdateServicio: (servicioId: number, values: ServicioFormValues) => Promise<void>;
+  onDeactivateServicio: (servicioId: number) => Promise<void>;
+  onCreatePeriodo: (servicioId: number, values: PeriodoFormValues) => Promise<void>;
+  onRegisterPago: (
+    periodo: PeriodoServicioRecord,
+    servicio: ServicioContratoRecord,
+    values: RegistrarPagoServicioFormValues,
+  ) => Promise<void>;
+  mediosPago: CatalogoItem[];
+  canRegisterPago?: boolean;
   onClose: () => void;
 }) {
   if (!detail) return null;
@@ -63,6 +98,24 @@ export function ContractFichaDrawer({
           <p className="text-[13px] font-semibold text-text-primary">Mora</p>
           <FieldBlock label="Recargo (%)" value={detail.surchargePercent} />
           <FieldBlock label="Observaciones" value={detail.punitiveHint} />
+        </div>
+
+        <div className="border-t border-border pt-5">
+          <ContractServiciosSection
+            servicios={servicios}
+            periodos={periodos}
+            tiposServicio={tiposServicio}
+            canEdit={Boolean(canEditServicios)}
+            loading={serviciosLoading}
+            submitting={serviciosSubmitting}
+            onCreateServicio={onCreateServicio}
+            onUpdateServicio={onUpdateServicio}
+            onDeactivateServicio={onDeactivateServicio}
+            onCreatePeriodo={onCreatePeriodo}
+            onRegisterPago={onRegisterPago}
+            mediosPago={mediosPago}
+            canRegisterPago={canRegisterPago}
+          />
         </div>
       </div>
     </DrawerPanel>

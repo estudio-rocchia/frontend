@@ -1,3 +1,5 @@
+import { NetworkError } from "@/lib/api/client";
+
 const MONTHS_ES = [
   "Ene", "Feb", "Mar", "Abr", "May", "Jun",
   "Jul", "Ago", "Sep", "Oct", "Nov", "Dic",
@@ -17,6 +19,26 @@ export function formatDateDisplay(isoDate: string): string {
   const [year, month, day] = isoDate.split("-");
   if (!year || !month || !day) return isoDate;
   return `${day}/${month}/${year}`;
+}
+
+/** Días calendario desde hoy hasta una fecha ISO (negativo = ya pasó). */
+export function daysUntilDate(isoDate: string, asOf = new Date()): number {
+  const ref = new Date(asOf);
+  ref.setHours(12, 0, 0, 0);
+  const target = new Date(`${isoDate}T12:00:00`);
+  return Math.round((target.getTime() - ref.getTime()) / 86_400_000);
+}
+
+export function contractEndHint(daysUntilEnd: number): string | null {
+  if (daysUntilEnd < 0) {
+    const days = Math.abs(daysUntilEnd);
+    return days === 1 ? "Venció ayer" : `Venció hace ${days} días`;
+  }
+  if (daysUntilEnd === 0) return "Vence hoy";
+  if (daysUntilEnd <= 30) {
+    return daysUntilEnd === 1 ? "Vence mañana" : `Vence en ${daysUntilEnd} días`;
+  }
+  return null;
 }
 
 export function formatMonthYear(anio: number, mes: number): string {
@@ -57,13 +79,19 @@ const RENTAL_ERROR_MESSAGES: Record<string, string> = {
   "Property code must be 1–3 letters followed by 2–4 digits (e.g. D001, I1234)":
     "Código de inmueble inválido (ej. D001, K08).",
   "Missing required permission: contrato.edit": "No tenés permiso para crear contratos.",
+  "Missing required permission: pago.register": "No tenés permiso para registrar pagos.",
+  "Missing required permission: recibo.issue": "No tenés permiso para emitir recibos.",
   "Missing required permission: inmueble.edit": "No tenés permiso para crear inmuebles.",
   "frecuenciaAjusteMeses requires tipoIndiceId": "Seleccioná un índice de ajuste válido.",
+  "Request validation failed": "Datos inválidos. Revisá los campos del formulario.",
 };
 
 const INDEX_VALUE_MISSING_RE = /^No index value for (ICL|IPC|CAC) at /;
 
 export function rentalApiErrorMessage(err: unknown, fallback = "No se pudo crear el contrato"): string {
+  if (err instanceof NetworkError) {
+    return err.message;
+  }
   if (err instanceof Error) {
     const indexMatch = INDEX_VALUE_MISSING_RE.exec(err.message);
     if (indexMatch) {

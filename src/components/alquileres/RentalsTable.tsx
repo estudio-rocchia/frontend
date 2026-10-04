@@ -6,22 +6,44 @@ import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import {
   filterRentals,
+  rentalOperationalCounts,
   type RentalChipId,
   type RentalRow,
 } from "@/data/alquileres-rentals";
+import { contractEndHint } from "@/lib/format";
 
 const PAGE_SIZE = 15;
+
+function ContractEndCell({ row }: { row: RentalRow }) {
+  const hint = contractEndHint(row.daysUntilContractEnd);
+  const hintClass =
+    row.daysUntilContractEnd < 0
+      ? "text-danger"
+      : row.daysUntilContractEnd <= 30
+        ? "text-warning"
+        : "text-text-secondary";
+
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-text-primary">{row.contractEnd}</span>
+      {hint ? <span className={`text-[11px] font-semibold ${hintClass}`}>{hint}</span> : null}
+    </div>
+  );
+}
 
 export function RentalsTable({
   rows,
   onViewFicha,
+  onAdjust,
   onRenew,
 }: {
   rows: RentalRow[];
   onViewFicha: (row: RentalRow) => void;
+  onAdjust: (row: RentalRow) => void;
   onRenew: (row: RentalRow) => void;
 }) {
-  const [activeChip, setActiveChip] = useState<RentalChipId>("todos");
+  const [activeChip, setActiveChip] = useState<RentalChipId>("ajuste_pendiente");
+  const operationalCounts = useMemo(() => rentalOperationalCounts(rows), [rows]);
   const [page, setPage] = useState(1);
 
   const filtered = useMemo(
@@ -50,6 +72,10 @@ export function RentalsTable({
     <div className="flex flex-col gap-4">
       <RentalFilterChips
         active={activeChip}
+        counts={{
+          ajuste_pendiente: operationalCounts.ajustePendiente,
+          renovacion_proxima: operationalCounts.renovacionProxima,
+        }}
         onChange={(chip) => {
           setActiveChip(chip);
           setPage(1);
@@ -68,7 +94,7 @@ export function RentalsTable({
                 <th className="w-[96px] px-4">Días mora</th>
                 <th className="w-[108px] px-4">Estado</th>
                 <th className="w-[104px] whitespace-nowrap px-4">Inicio</th>
-                <th className="w-[104px] whitespace-nowrap px-4">Fin</th>
+                <th className="w-[120px] whitespace-nowrap px-4">Fin contrato</th>
                 <th className="w-[168px] px-4">Luz</th>
                 <th className="w-[1%] whitespace-nowrap px-4 pl-8 text-right">
                   Acciones
@@ -86,7 +112,11 @@ export function RentalsTable({
                   </td>
                 </tr>
               ) : (
-                paginated.map((row) => (
+                paginated.map((row) => {
+                  const showAdjust = row.needsAdjustment && row.canAdjust;
+                  const showRenew = row.needsRenewal;
+
+                  return (
                   <tr
                     key={row.id}
                     className="border-b border-border align-middle [&>td]:py-3"
@@ -115,8 +145,8 @@ export function RentalsTable({
                     <td className="whitespace-nowrap px-4 text-text-primary">
                       {row.contractStart}
                     </td>
-                    <td className="whitespace-nowrap px-4 text-text-primary">
-                      {row.contractEnd}
+                    <td className="whitespace-nowrap px-4">
+                      <ContractEndCell row={row} />
                     </td>
                     <td className="px-4">
                       <div className="flex flex-col gap-1">
@@ -137,13 +167,21 @@ export function RentalsTable({
                         <ButtonOutline type="button" onClick={() => onViewFicha(row)}>
                           Ver ficha
                         </ButtonOutline>
-                        <ButtonPrimary type="button" onClick={() => onRenew(row)}>
-                          Renovar
-                        </ButtonPrimary>
+                        {showAdjust ? (
+                          <ButtonPrimary type="button" onClick={() => onAdjust(row)}>
+                            Ajustar
+                          </ButtonPrimary>
+                        ) : null}
+                        {showRenew ? (
+                          <ButtonPrimary type="button" onClick={() => onRenew(row)}>
+                            Renovar
+                          </ButtonPrimary>
+                        ) : null}
                       </div>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>

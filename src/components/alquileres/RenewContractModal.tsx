@@ -1,21 +1,24 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
-import { ApiError, previewAjusteIndice } from "@/lib/api";
-import type { ContratoDetail, PreviewAjusteResponse } from "@/lib/api/types";
-import { formatDateDisplay, formatMoney, personaDisplayName, rentalApiErrorMessage } from "@/lib/format";
+import type { AdjustmentIndex } from "@/data/alquileres-contract-details";
 import {
-  indiceCodeFromContrato,
-  montoFromApi,
-  renewalAdjustmentWindow,
-} from "@/lib/rental-adjustment";
+  ContractIndexCalculator,
+  buildInitialCalculatorState,
+  type IndexCalculatorState,
+} from "@/components/alquileres/ContractIndexCalculator";
+import type { ContratoDetail, PreviewAjusteResponse } from "@/lib/api/types";
+import { formatDateDisplay, formatMoney, personaDisplayName } from "@/lib/format";
+import { montoFromApi } from "@/lib/rental-adjustment";
 
 export type RenewContractForm = {
   fechaInicio: string;
   fechaFin: string;
   monto: string;
+  tipoIndice: AdjustmentIndex;
+  frecuenciaAjusteMeses: number;
 };
 
 function addDays(isoDate: string, days: number): string {
@@ -41,10 +44,7 @@ function defaultRenewalDates(contrato: ContratoDetail): { fechaInicio: string; f
     Math.round((endMs - startMs) / (365.25 * 24 * 60 * 60 * 1000)),
   );
 
-  return {
-    fechaInicio,
-    fechaFin: addYears(fechaInicio, durationYears),
-  };
+  return { fechaInicio, fechaFin: addYears(fechaInicio, durationYears) };
 }
 
 function Field({
@@ -52,13 +52,11 @@ function Field({
   value,
   onChange,
   type = "text",
-  hint,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   type?: string;
-  hint?: string;
 }) {
   return (
     <label className="flex flex-col gap-1.5">
@@ -69,7 +67,6 @@ function Field({
         onChange={(e) => onChange(e.target.value)}
         className="rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
       />
-      {hint ? <span className="text-[11px] text-text-secondary">{hint}</span> : null}
     </label>
   );
 }
@@ -89,87 +86,48 @@ export function RenewContractModal({
   onSubmit: (form: RenewContractForm) => void;
   submitting?: boolean;
 }) {
-  const defaults = useMemo(
-    () => (contrato ? defaultRenewalDates(contrato) : { fechaInicio: "", fechaFin: "" }),
-    [contrato],
-  );
-
   const [form, setForm] = useState<RenewContractForm>({
-    fechaInicio: defaults.fechaInicio,
-    fechaFin: defaults.fechaFin,
-    monto: contrato?.montoAlquiler ?? "",
+    fechaInicio: "",
+    fechaFin: "",
+    monto: "",
+    tipoIndice: "ICL",
+    frecuenciaAjusteMeses: 12,
   });
-  const [preview, setPreview] = useState<PreviewAjusteResponse | null>(null);
-  const [previewLoading, setPreviewLoading] = useState(false);
-  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [calculator, setCalculator] = useState<IndexCalculatorState | null>(null);
 
-  const indiceCode = useMemo(
-    () => (contrato ? indiceCodeFromContrato(contrato) : null),
-    [contrato],
-  );
-  const adjustmentWindow = useMemo(
-    () => (contrato ? renewalAdjustmentWindow(contrato) : null),
-    [contrato],
-  );
+  const handlePreviewChange = useCallback((next: PreviewAjusteResponse | null) => {
+    if (!next) return;
+    setForm((prev) => ({
+      ...prev,
+      monto: montoFromApi(next.montoNuevo),
+      tipoIndice: next.tipoIndiceCode,
+    }));
+  }, []);
 
   useEffect(() => {
     if (!open || !contrato) return;
     const next = defaultRenewalDates(contrato);
+    const initialCalculator = buildInitialCalculatorState(contrato);
+    setCalculator(initialCalculator);
     setForm({
       fechaInicio: next.fechaInicio,
       fechaFin: next.fechaFin,
       monto: contrato.montoAlquiler,
+      tipoIndice: initialCalculator.tipoIndice,
+      frecuenciaAjusteMeses: initialCalculator.frecuenciaAjusteMeses,
     });
-    setPreview(null);
-    setPreviewError(null);
   }, [contrato, open]);
 
   useEffect(() => {
-    if (!open || !contrato || !token || !indiceCode || !adjustmentWindow) {
-      setPreview(null);
-      setPreviewError(null);
-      setPreviewLoading(false);
-      return;
-    }
+    if (!calculator) return;
+    setForm((prev) => ({
+      ...prev,
+      tipoIndice: calculator.tipoIndice,
+      frecuenciaAjusteMeses: calculator.frecuenciaAjusteMeses,
+    }));
+  }, [calculator]);
 
-    let cancelled = false;
-    setPreviewLoading(true);
-    setPreviewError(null);
-
-    const montoAnterior = Number.parseFloat(contrato.montoAlquiler);
-    void previewAjusteIndice(token, {
-      tipoIndiceCode: indiceCode,
-      montoAnterior,
-      fechaDesde: adjustmentWindow.fechaDesde,
-      fechaHasta: adjustmentWindow.fechaHasta,
-    })
-      .then((result) => {
-        if (cancelled) return;
-        setPreview(result);
-        setForm((prev) => ({
-          ...prev,
-          monto: montoFromApi(result.montoNuevo),
-        }));
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setPreview(null);
-        setPreviewError(
-          err instanceof ApiError
-            ? rentalApiErrorMessage(err, "No se pudo calcular el ajuste por índice")
-            : "No se pudo calcular el ajuste por índice",
-        );
-      })
-      .finally(() => {
-        if (!cancelled) setPreviewLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [open, contrato, token, indiceCode, adjustmentWindow]);
-
-  if (!contrato) return null;
+  if (!contrato || !calculator) return null;
 
   const inmuebleLabel = contrato.inmueble
     ? `${contrato.inmueble.code} · ${contrato.inmueble.title}`
@@ -183,16 +141,12 @@ export function RenewContractModal({
     form.fechaFin > form.fechaInicio &&
     Number.parseFloat(form.monto.replace(/\D/g, "")) > 0;
 
-  const freqLabel = contrato.frecuenciaAjusteMeses
-    ? `cada ${contrato.frecuenciaAjusteMeses} meses`
-    : "sin frecuencia definida";
-
   return (
     <Modal
       open={open}
       onClose={onClose}
       title="Renovar contrato"
-      subtitle="Mismo inmueble e inquilino. El contrato actual se marca como finalizado y se crea uno nuevo."
+      subtitle={`${inmuebleLabel} · ${inquilinoLabel}`}
       maxWidthClass="max-w-lg"
       footer={
         <>
@@ -201,7 +155,7 @@ export function RenewContractModal({
           </ButtonOutline>
           <ButtonPrimary
             type="button"
-            disabled={!canSubmit || submitting || previewLoading}
+            disabled={!canSubmit || submitting}
             onClick={() => onSubmit(form)}
           >
             {submitting ? "Renovando…" : "Confirmar renovación"}
@@ -209,86 +163,46 @@ export function RenewContractModal({
         </>
       }
     >
-      <div className="flex flex-col gap-4">
-        <div className="rounded-sm border border-border bg-bg-page px-3 py-2 text-[12px] text-text-secondary">
-          <p>
-            <strong className="text-text-primary">Propiedad:</strong> {inmuebleLabel}
-          </p>
-          <p className="mt-1">
-            <strong className="text-text-primary">Inquilino:</strong> {inquilinoLabel}
-          </p>
+      <div className="flex flex-col gap-5">
+        <div className="rounded-sm border border-warning/30 bg-warning-bg/40 px-4 py-3 text-[13px] text-text-primary">
+          El contrato vence el <strong>{formatDateDisplay(contrato.fechaFin)}</strong>. Se cerrará
+          y se creará uno nuevo con el mismo inmueble e inquilino.
         </div>
 
-        {indiceCode && adjustmentWindow ? (
-          <div className="rounded-sm border border-border bg-bg-surface px-3 py-2.5 text-[12px]">
-            <p className="font-semibold text-text-primary">
-              Ajuste por {indiceCode} ({freqLabel})
-            </p>
-            <p className="mt-1 text-text-secondary">
-              Período índice: {formatDateDisplay(adjustmentWindow.fechaDesde)} →{" "}
-              {formatDateDisplay(adjustmentWindow.fechaHasta)}
-            </p>
-            {previewLoading ? (
-              <p className="mt-2 text-text-secondary">Calculando monto ajustado…</p>
-            ) : null}
-            {preview ? (
-              <div className="mt-2 space-y-1 text-text-secondary">
-                <p>
-                  Alquiler actual:{" "}
-                  <strong className="text-text-primary">
-                    {formatMoney(preview.montoAnterior, currency)}
-                  </strong>
-                </p>
-                <p>
-                  Variación índice:{" "}
-                  <strong className="text-text-primary">
-                    {Number(preview.variacionPct) >= 0 ? "+" : ""}
-                    {preview.variacionPct}%
-                  </strong>{" "}
-                  (factor {preview.factor})
-                </p>
-                <p>
-                  Monto sugerido:{" "}
-                  <strong className="text-primary">
-                    {formatMoney(preview.montoNuevo, currency)}
-                  </strong>
-                </p>
-              </div>
-            ) : null}
-            {previewError ? (
-              <p className="mt-2 text-danger">{previewError}</p>
-            ) : null}
-          </div>
-        ) : (
-          <p className="rounded-sm border border-border bg-bg-page px-3 py-2 text-[12px] text-text-secondary">
-            Este contrato no tiene índice de ajuste. Ingresá el monto del nuevo período manualmente.
-          </p>
-        )}
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field
-            label="Inicio del nuevo contrato"
-            type="date"
-            value={form.fechaInicio}
-            onChange={(value) => setForm((prev) => ({ ...prev, fechaInicio: value }))}
-          />
-          <Field
-            label="Fin del nuevo contrato"
-            type="date"
-            value={form.fechaFin}
-            onChange={(value) => setForm((prev) => ({ ...prev, fechaFin: value }))}
-          />
-        </div>
-        <Field
-          label={`Monto mensual (${currency})`}
-          value={form.monto}
-          onChange={(value) => setForm((prev) => ({ ...prev, monto: value }))}
-          hint={
-            preview
-              ? "Podés editar el monto sugerido antes de confirmar."
-              : "Monto del nuevo contrato."
-          }
+        <ContractIndexCalculator
+          open={open}
+          contrato={contrato}
+          token={token}
+          value={calculator}
+          onChange={setCalculator}
+          onPreviewChange={(next) => handlePreviewChange(next)}
+          variant="renew"
         />
+
+        <div className="border-t border-border pt-4">
+          <p className="mb-3 text-[13px] font-semibold text-text-primary">Nuevo contrato</p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field
+              label="Inicio"
+              type="date"
+              value={form.fechaInicio}
+              onChange={(value) => setForm((prev) => ({ ...prev, fechaInicio: value }))}
+            />
+            <Field
+              label="Fin"
+              type="date"
+              value={form.fechaFin}
+              onChange={(value) => setForm((prev) => ({ ...prev, fechaFin: value }))}
+            />
+          </div>
+          <div className="mt-4">
+            <Field
+              label={`Monto mensual (${currency})`}
+              value={form.monto}
+              onChange={(value) => setForm((prev) => ({ ...prev, monto: value }))}
+            />
+          </div>
+        </div>
       </div>
     </Modal>
   );

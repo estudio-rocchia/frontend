@@ -6,14 +6,18 @@ import type {
   CuotaDetail,
   DashboardResumen,
   InmuebleFichaPropietario,
+  PeriodoServicioRecord,
   ServicioContratoRecord,
 } from "@/lib/api/types";
 import {
+  daysUntilDate,
   formatDateDisplay,
   formatMoney,
   formatMonthYear,
   personaDisplayName,
 } from "@/lib/format";
+import { contratoSupportsIndexAdjustment } from "@/lib/rental-adjustment";
+import { electricityStatusFromPeriodos } from "@/lib/mappers/servicios";
 
 type BillingSnapshot = {
   diasAtraso: number;
@@ -48,7 +52,10 @@ function latestCuota(cuotas: CuotaDetail[]): CuotaDetail | null {
   })[0] ?? null;
 }
 
-function electricityFromServicios(servicios: ServicioContratoRecord[]): RentalRow["electricity"] {
+function electricityFromServicios(
+  servicios: ServicioContratoRecord[],
+  periodos: PeriodoServicioRecord[],
+): RentalRow["electricity"] {
   const luz = servicios.find((s) => s.tipoServicioCode === "electricity" && s.activo);
   if (!luz) {
     return {
@@ -58,11 +65,12 @@ function electricityFromServicios(servicios: ServicioContratoRecord[]): RentalRo
       status: { label: "N/D", variant: "warning" },
     };
   }
+  const status = electricityStatusFromPeriodos(luz, periodos);
   return {
     provider: luz.provider ?? luz.tipoServicioName,
     accountNumber: luz.numeroMedidor ?? "—",
     holder: luz.provider ?? "—",
-    status: { label: "Activo", variant: "success" },
+    status,
   };
 }
 
@@ -76,7 +84,9 @@ export function buildBillingIndex(resumen: DashboardResumen) {
     });
   }
 
-  const ajusteIds = new Set(resumen.ajustePendiente.map((item) => item.contratoId));
+  const ajusteByContrato = new Map(
+    resumen.ajustePendiente.map((item) => [item.contratoId, item]),
+  );
   const cobrarByContrato = new Map<number, { saldoTotal: string; codigoMoneda: string }>();
   for (const item of resumen.cobrarEsteMes) {
     cobrarByContrato.set(item.contratoId, {
@@ -85,13 +95,14 @@ export function buildBillingIndex(resumen: DashboardResumen) {
     });
   }
 
-  return { moraByContrato, ajusteIds, cobrarByContrato };
+  return { moraByContrato, ajusteByContrato, cobrarByContrato };
 }
 
 export function mapContratoToRentalRow(
   contrato: ContratoRecord,
   cuotas: CuotaDetail[],
   servicios: ServicioContratoRecord[],
+  periodos: PeriodoServicioRecord[],
   inquilinoNombre: string,
   inmuebleTitle: string,
   billing: ReturnType<typeof buildBillingIndex>,
@@ -100,7 +111,8 @@ export function mapContratoToRentalRow(
   const cuota = latestCuota(cuotas);
   const mora = billing.moraByContrato.get(contrato.id);
   const cobrar = billing.cobrarByContrato.get(contrato.id);
-  const ajustePendiente = billing.ajusteIds.has(contrato.id);
+  const ajusteItem = billing.ajusteByContrato.get(contrato.id);
+  const ajustePendiente = Boolean(ajusteItem);
 
   const diasAtraso = mora?.diasAtraso ?? cuota?.mora?.diasAtraso ?? 0;
   const estadoCode = mora ? "late" : (cuota?.estadoCode ?? "pending");
@@ -124,7 +136,12 @@ export function mapContratoToRentalRow(
     filterStatus,
     contractStart: formatDateDisplay(contrato.fechaInicio),
     contractEnd: formatDateDisplay(contrato.fechaFin),
-    electricity: electricityFromServicios(servicios),
+    daysUntilContractEnd: daysUntilDate(contrato.fechaFin),
+    canAdjust: contratoSupportsIndexAdjustment(contrato),
+    needsAdjustment: ajustePendiente,
+    needsRenewal: daysUntilDate(contrato.fechaFin) <= 30,
+    ultimoAjusteEn: ajusteItem?.ultimoAjusteEn ?? null,
+    electricity: electricityFromServicios(servicios, periodos),
   };
 }
 

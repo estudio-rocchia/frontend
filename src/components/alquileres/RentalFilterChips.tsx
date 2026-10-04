@@ -7,15 +7,20 @@ import {
 
 export function RentalFilterChips({
   active,
+  counts,
   onChange,
 }: {
   active: RentalChipId;
+  counts?: Partial<Record<RentalChipId, number>>;
   onChange: (id: RentalChipId) => void;
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
       {rentalFilterChips.map(({ id, label }) => {
         const selected = active === id;
+        const count = counts?.[id];
+        const showCount = count !== undefined && count > 0;
+
         return (
           <button
             key={id}
@@ -28,6 +33,7 @@ export function RentalFilterChips({
             }`}
           >
             {label}
+            {showCount ? ` (${count})` : ""}
           </button>
         );
       })}

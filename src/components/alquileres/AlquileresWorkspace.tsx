@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { AdjustContractModal } from "@/components/alquileres/AdjustContractModal";
 import { ContractFichaDrawer } from "@/components/alquileres/ContractFichaDrawer";
+import type { IndexCalculatorState } from "@/components/alquileres/ContractIndexCalculator";
 import {
   NewContractModal,
   type NewContractForm,
@@ -16,13 +18,21 @@ import { ButtonPrimary } from "@/components/ui/Button";
 import { useAuth } from "@/context/auth-context";
 import type { ContractDetail } from "@/data/alquileres-contract-details";
 import type { RentalRow } from "@/data/alquileres-rentals";
+import type { PeriodoFormValues } from "@/components/alquileres/PeriodoServicioModal";
+import type { ServicioFormValues } from "@/components/alquileres/ServicioFormModal";
+import type { RegistrarPagoServicioFormValues } from "@/components/alquileres/RegistrarPagoServicioModal";
 import {
   ApiError,
+  applyContratoAjuste,
   changeContratoEstado,
   createContrato,
   createInmueble,
   createLocalidad,
+  createPeriodoServicio,
   createPersona,
+  createServicio,
+  deactivateServicio,
+  downloadReciboPdf,
   fetchCatalog,
   fetchContrato,
   fetchContratos,
@@ -32,10 +42,28 @@ import {
   fetchInmuebles,
   fetchLocalidades,
   fetchServicios,
+  fetchServiciosPeriodos,
+  issueRecibo,
+  registerPago,
+  updateServicio,
 } from "@/lib/api";
-import type { ContratoDetail } from "@/lib/api/types";
+import type {
+  CatalogoItem,
+  ContratoDetail,
+  CreatePeriodoInput,
+  PeriodoServicioRecord,
+  PreviewAjusteResponse,
+  ServicioContratoRecord,
+} from "@/lib/api/types";
 import { nextContratoCode, nextInmuebleCode, prefixForTipoInmueble } from "@/lib/codes";
-import { parsePersonName, personaDisplayName, rentalApiErrorMessage } from "@/lib/format";
+import {
+  formatMonthYear,
+  parsePersonName,
+  personaDisplayName,
+  downloadBlob,
+  rentalApiErrorMessage,
+} from "@/lib/format";
+import { fromIsoMonthDate } from "@/lib/rental-adjustment";
 import {
   buildBillingIndex,
   mapContratoDetailToFicha,
@@ -58,6 +86,8 @@ export function AlquileresWorkspace() {
   const [selectedContrato, setSelectedContrato] = useState<ContratoDetail | null>(null);
   const [newModalOpen, setNewModalOpen] = useState(false);
   const [renewModalOpen, setRenewModalOpen] = useState(false);
+  const [adjustModalOpen, setAdjustModalOpen] = useState(false);
+  const [selectedUltimoAjusteEn, setSelectedUltimoAjusteEn] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [codeContext, setCodeContext] = useState<{
@@ -65,6 +95,12 @@ export function AlquileresWorkspace() {
     inmuebleCodes: string[];
     contratoCodes: Array<string | null>;
   } | null>(null);
+  const [drawerServicios, setDrawerServicios] = useState<ServicioContratoRecord[]>([]);
+  const [drawerPeriodos, setDrawerPeriodos] = useState<PeriodoServicioRecord[]>([]);
+  const [tiposServicio, setTiposServicio] = useState<CatalogoItem[]>([]);
+  const [serviciosLoading, setServiciosLoading] = useState(false);
+  const [serviciosSubmitting, setServiciosSubmitting] = useState(false);
+  const [mediosPago, setMediosPago] = useState<CatalogoItem[]>([]);
 
   const showToast = useCallback((message: string) => {
     setToast(message);
@@ -84,10 +120,11 @@ export function AlquileresWorkspace() {
 
       const mapped = await Promise.all(
         contratosRes.items.map(async (contrato) => {
-          const [detailRes, cuotasRes, serviciosRes] = await Promise.all([
+          const [detailRes, cuotasRes, serviciosRes, periodosRes] = await Promise.all([
             fetchContrato(token, contrato.id),
             fetchCuotas(token, contrato.id),
             fetchServicios(token, contrato.id),
+            fetchServiciosPeriodos(token, contrato.id),
           ]);
           const inquilinoNombre = detailRes.inquilino
             ? personaDisplayName(detailRes.inquilino)
@@ -98,6 +135,7 @@ export function AlquileresWorkspace() {
             contrato,
             cuotasRes.items,
             serviciosRes.items,
+            periodosRes.items,
             inquilinoNombre,
             inmuebleTitle,
             billing,
@@ -122,12 +160,46 @@ export function AlquileresWorkspace() {
     void loadRows();
   }, [loadRows]);
 
+  const loadDrawerServicios = useCallback(
+    async (contratoId: number) => {
+      if (!token) return;
+      setServiciosLoading(true);
+      try {
+        const [serviciosRes, periodosRes, tiposRes, mediosRes] = await Promise.all([
+          fetchServicios(token, contratoId),
+          fetchServiciosPeriodos(token, contratoId),
+          tiposServicio.length
+            ? Promise.resolve({ items: tiposServicio })
+            : fetchCatalog(token, "/catalogos/tipos-servicio"),
+          mediosPago.length
+            ? Promise.resolve({ items: mediosPago })
+            : fetchCatalog(token, "/catalogos/medios-pago"),
+        ]);
+        setDrawerServicios(serviciosRes.items);
+        setDrawerPeriodos(periodosRes.items);
+        if (!tiposServicio.length) {
+          setTiposServicio(tiposRes.items);
+        }
+        if (!mediosPago.length) {
+          setMediosPago(mediosRes.items);
+        }
+      } catch (err) {
+        showToast(err instanceof ApiError ? err.message : "No se pudieron cargar los servicios");
+      } finally {
+        setServiciosLoading(false);
+      }
+    },
+    [token, showToast, tiposServicio, mediosPago],
+  );
+
   const openDrawer = useCallback(
     async (id: string) => {
       if (!token) return;
       setDrawerOpen(true);
       setDetail(null);
       setSelectedContrato(null);
+      setDrawerServicios([]);
+      setDrawerPeriodos([]);
       try {
         const contratoId = Number(id);
         const detailRes = await fetchContrato(token, contratoId);
@@ -141,13 +213,175 @@ export function AlquileresWorkspace() {
           }
         }
         setDetail(mapContratoDetailToFicha(detailRes, ficha.propietarios));
+        void loadDrawerServicios(contratoId);
       } catch (err) {
         showToast(err instanceof ApiError ? err.message : "No se pudo cargar la ficha");
         setDrawerOpen(false);
       }
     },
-    [token, showToast],
+    [token, showToast, loadDrawerServicios],
   );
+
+  async function handleCreateServicio(values: ServicioFormValues) {
+    if (!token || !selectedContrato) return;
+    setServiciosSubmitting(true);
+    try {
+      const body =
+        values.modoFacturacion === "fixed"
+          ? {
+              tipoServicioId: values.tipoServicioId,
+              provider: values.provider.trim() || null,
+              numeroMedidor: values.numeroMedidor.trim() || null,
+              modoFacturacion: values.modoFacturacion,
+              montoFijo: Number(values.montoFijo),
+              codigoMoneda: values.codigoMoneda,
+            }
+          : {
+              tipoServicioId: values.tipoServicioId,
+              provider: values.provider.trim() || null,
+              numeroMedidor: values.numeroMedidor.trim() || null,
+              modoFacturacion: values.modoFacturacion,
+            };
+      await createServicio(token, selectedContrato.id, body);
+      showToast("Servicio agregado.");
+      await loadDrawerServicios(selectedContrato.id);
+      await loadRows();
+    } catch (err) {
+      showToast(rentalApiErrorMessage(err, "No se pudo agregar el servicio"));
+    } finally {
+      setServiciosSubmitting(false);
+    }
+  }
+
+  async function handleUpdateServicio(servicioId: number, values: ServicioFormValues) {
+    if (!token || !selectedContrato) return;
+    setServiciosSubmitting(true);
+    try {
+      const patch =
+        values.modoFacturacion === "fixed"
+          ? {
+              provider: values.provider.trim() || null,
+              numeroMedidor: values.numeroMedidor.trim() || null,
+              modoFacturacion: values.modoFacturacion,
+              montoFijo: Number(values.montoFijo),
+              codigoMoneda: values.codigoMoneda,
+            }
+          : {
+              provider: values.provider.trim() || null,
+              numeroMedidor: values.numeroMedidor.trim() || null,
+              modoFacturacion: values.modoFacturacion,
+              montoFijo: null,
+              codigoMoneda: null,
+            };
+      await updateServicio(token, servicioId, patch);
+      showToast("Servicio actualizado.");
+      await loadDrawerServicios(selectedContrato.id);
+      await loadRows();
+    } catch (err) {
+      showToast(rentalApiErrorMessage(err, "No se pudo actualizar el servicio"));
+    } finally {
+      setServiciosSubmitting(false);
+    }
+  }
+
+  async function handleDeactivateServicio(servicioId: number) {
+    if (!token || !selectedContrato) return;
+    setServiciosSubmitting(true);
+    try {
+      await deactivateServicio(token, servicioId);
+      showToast("Servicio desactivado.");
+      await loadDrawerServicios(selectedContrato.id);
+      await loadRows();
+    } catch (err) {
+      showToast(rentalApiErrorMessage(err, "No se pudo desactivar el servicio"));
+    } finally {
+      setServiciosSubmitting(false);
+    }
+  }
+
+  async function handleCreatePeriodo(servicioId: number, values: PeriodoFormValues) {
+    if (!token || !selectedContrato) return;
+    setServiciosSubmitting(true);
+    try {
+      const servicio = drawerServicios.find((s) => s.id === servicioId);
+      const body: CreatePeriodoInput = {
+        inicioPeriodo: values.inicioPeriodo,
+        finPeriodo: values.finPeriodo,
+        fechaVencimiento: values.fechaVencimiento || null,
+        notas: values.notas.trim() || null,
+        ...(servicio?.modoFacturacion === "variable"
+          ? { monto: Number(values.monto), codigoMoneda: values.codigoMoneda }
+          : {}),
+      };
+      await createPeriodoServicio(token, servicioId, body);
+      showToast("Período registrado.");
+      await loadDrawerServicios(selectedContrato.id);
+      await loadRows();
+    } catch (err) {
+      showToast(rentalApiErrorMessage(err, "No se pudo registrar el período"));
+      throw err;
+    } finally {
+      setServiciosSubmitting(false);
+    }
+  }
+
+
+  async function handleRegisterPago(
+    periodo: PeriodoServicioRecord,
+    _servicio: ServicioContratoRecord,
+    values: RegistrarPagoServicioFormValues,
+  ) {
+    if (!token || !selectedContrato) return;
+    const monto = Number(values.monto);
+    if (!Number.isFinite(monto) || monto <= 0) {
+      showToast("Ingresá un monto válido.");
+      return;
+    }
+
+    setServiciosSubmitting(true);
+    try {
+      const result = await registerPago(token, selectedContrato.id, {
+        fechaPago: values.fechaPago,
+        montoTotal: monto,
+        codigoMoneda: periodo.codigoMoneda.trim(),
+        medioPagoId: values.medioPagoId,
+        reference: values.reference.trim() || null,
+        notas: values.notas.trim() || null,
+        imputaciones: [
+          {
+            targetType: "periodo_servicio",
+            targetId: periodo.id,
+            monto,
+          },
+        ],
+      });
+
+      if (values.emitRecibo) {
+        try {
+          const recibo = await issueRecibo(token, result.pago.id);
+          const pdf = await downloadReciboPdf(token, recibo.id);
+          downloadBlob(pdf, `recibo-${recibo.reciboNumber}.pdf`);
+          showToast(`Pago registrado. Recibo ${recibo.reciboNumber} descargado.`);
+        } catch (reciboErr) {
+          showToast(
+            rentalApiErrorMessage(
+              reciboErr,
+              "Pago registrado, pero no se pudo emitir el recibo.",
+            ),
+          );
+        }
+      } else {
+        showToast("Pago de servicio registrado.");
+      }
+
+      await loadDrawerServicios(selectedContrato.id);
+      await loadRows();
+    } catch (err) {
+      showToast(rentalApiErrorMessage(err, "No se pudo registrar el pago"));
+    } finally {
+      setServiciosSubmitting(false);
+    }
+  }
 
   async function handleRenewContract(form: RenewContractForm) {
     if (!token || !selectedContrato) return;
@@ -168,6 +402,18 @@ export function AlquileresWorkspace() {
       const contratosRes = await fetchContratos(token, { limit: 200 });
       const reservedContratoCodes = contratosRes.items.map((item) => item.contratoCode);
 
+      const indices = await fetchCatalog(token, "/catalogos/tipos-indice");
+      const indexItem =
+        indices.items.find((item) => item.code === form.tipoIndice) ?? indices.items[0];
+      if (!indexItem?.id) {
+        throw new ApiError(400, {
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Seleccioná un índice de ajuste válido",
+          },
+        });
+      }
+
       await changeContratoEstado(token, selectedContrato.id, "finished");
 
       let nuevoContrato = null as Awaited<ReturnType<typeof createContrato>> | null;
@@ -183,8 +429,8 @@ export function AlquileresWorkspace() {
             montoAlquiler: amount,
             codigoMoneda: selectedContrato.codigoMoneda.trim(),
             diaVencimientoPago: selectedContrato.diaVencimientoPago,
-            frecuenciaAjusteMeses: selectedContrato.frecuenciaAjusteMeses,
-            tipoIndiceId: selectedContrato.tipoIndice?.id ?? null,
+            frecuenciaAjusteMeses: form.frecuenciaAjusteMeses,
+            tipoIndiceId: indexItem.id,
             tipoMoraId: selectedContrato.tipoMora?.id ?? null,
             tasaMora: selectedContrato.tasaMora ? Number(selectedContrato.tasaMora) : null,
             montoDeposito: amount,
@@ -225,6 +471,10 @@ export function AlquileresWorkspace() {
 
   async function openRenewFromRow(row: RentalRow) {
     if (!token) return;
+    if (!row.needsRenewal) {
+      showToast("Este contrato no está por vencer.");
+      return;
+    }
     try {
       const detailRes = await fetchContrato(token, Number(row.id));
       if (detailRes.estado !== "active") {
@@ -235,6 +485,76 @@ export function AlquileresWorkspace() {
       setRenewModalOpen(true);
     } catch (err) {
       showToast(err instanceof ApiError ? err.message : "No se pudo cargar el contrato");
+    }
+  }
+
+  async function openAdjustFromRow(row: RentalRow) {
+    if (!token) return;
+    if (!row.needsAdjustment) {
+      showToast("Este contrato no tiene ajuste pendiente.");
+      return;
+    }
+    try {
+      const detailRes = await fetchContrato(token, Number(row.id));
+      if (detailRes.estado !== "active") {
+        showToast("Solo se pueden ajustar contratos activos.");
+        return;
+      }
+      setSelectedContrato(detailRes);
+      setSelectedUltimoAjusteEn(row.ultimoAjusteEn);
+      setAdjustModalOpen(true);
+    } catch (err) {
+      showToast(err instanceof ApiError ? err.message : "No se pudo cargar el contrato");
+    }
+  }
+
+  function ajusteSourceLabel(preview: PreviewAjusteResponse): string {
+    const desde = fromIsoMonthDate(preview.periodoDesde);
+    const hasta = fromIsoMonthDate(preview.periodoHasta);
+    return `${preview.tipoIndiceCode} ${formatMonthYear(desde.anio, desde.mes)}-${formatMonthYear(hasta.anio, hasta.mes)}`;
+  }
+
+  async function handleAdjustContract(input: {
+    fechaAjuste: string;
+    preview: PreviewAjusteResponse;
+    calculator: IndexCalculatorState;
+  }) {
+    if (!token || !selectedContrato) return;
+    if (selectedContrato.estado !== "active") {
+      showToast("Solo se pueden ajustar contratos activos.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const indices = await fetchCatalog(token, "/catalogos/tipos-indice");
+      const indexCode =
+        selectedContrato.tipoIndice?.code ?? input.calculator.tipoIndice ?? input.preview.tipoIndiceCode;
+      const indexItem = indices.items.find((item) => item.code === indexCode) ?? indices.items[0];
+      if (!indexItem?.id) {
+        throw new ApiError(400, {
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Seleccioná un índice de ajuste válido",
+          },
+        });
+      }
+
+      await applyContratoAjuste(token, selectedContrato.id, {
+        fechaAjuste: input.fechaAjuste,
+        tipoIndiceId: indexItem.id,
+        factor: input.preview.factor,
+        source: ajusteSourceLabel(input.preview),
+      });
+
+      setAdjustModalOpen(false);
+      const inmuebleCode = selectedContrato.inmueble?.code ?? "inmueble";
+      showToast(`Ajuste aplicado para ${inmuebleCode}.`);
+      await loadRows();
+    } catch (err) {
+      showToast(rentalApiErrorMessage(err, "No se pudo aplicar el ajuste"));
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -428,7 +748,7 @@ export function AlquileresWorkspace() {
           <div className="flex flex-col gap-1">
             <h1 className="text-[22px] font-bold text-text-primary">Gestión de alquileres</h1>
             <p className="text-sm text-text-secondary">
-              Seguimiento de mora, ajustes e incidencias por contrato.
+              Ajustá alquileres pendientes y renová contratos por vencer.
             </p>
           </div>
           <ButtonPrimary type="button" onClick={() => void openNewContractModal()} disabled={submitting}>
@@ -449,6 +769,7 @@ export function AlquileresWorkspace() {
           <RentalsTable
             rows={tableRows}
             onViewFicha={(row) => void openDrawer(row.id)}
+            onAdjust={(row) => void openAdjustFromRow(row)}
             onRenew={(row) => void openRenewFromRow(row)}
           />
         )}
@@ -457,7 +778,30 @@ export function AlquileresWorkspace() {
       <ContractFichaDrawer
         open={drawerOpen}
         detail={detail}
+        servicios={drawerServicios}
+        periodos={drawerPeriodos}
+        tiposServicio={tiposServicio}
+        serviciosLoading={serviciosLoading}
+        serviciosSubmitting={serviciosSubmitting}
+        canEditServicios={selectedContrato?.estado === "active"}
+        onCreateServicio={handleCreateServicio}
+        onUpdateServicio={handleUpdateServicio}
+        onDeactivateServicio={handleDeactivateServicio}
+        onCreatePeriodo={handleCreatePeriodo}
+        onRegisterPago={handleRegisterPago}
+        mediosPago={mediosPago}
+        canRegisterPago={selectedContrato?.estado === "active"}
         onClose={() => setDrawerOpen(false)}
+      />
+
+      <AdjustContractModal
+        open={adjustModalOpen}
+        contrato={selectedContrato}
+        token={token}
+        ultimoAjusteEn={selectedUltimoAjusteEn}
+        onClose={() => setAdjustModalOpen(false)}
+        onSubmit={(input) => void handleAdjustContract(input)}
+        submitting={submitting}
       />
 
       <RenewContractModal
