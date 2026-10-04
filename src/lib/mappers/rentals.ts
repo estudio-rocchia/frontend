@@ -95,6 +95,7 @@ export function mapContratoToRentalRow(
   inquilinoNombre: string,
   inmuebleTitle: string,
   billing: ReturnType<typeof buildBillingIndex>,
+  inmuebleCode?: string | null,
 ): RentalRow {
   const cuota = latestCuota(cuotas);
   const mora = billing.moraByContrato.get(contrato.id);
@@ -109,7 +110,7 @@ export function mapContratoToRentalRow(
   const amountSource = mora?.saldoTotal ?? cobrar?.saldoTotal ?? cuota?.saldoTotal ?? contrato.montoAlquiler;
   const amountCurrency = mora?.codigoMoneda ?? cobrar?.codigoMoneda ?? cuota?.codigoMoneda ?? contrato.codigoMoneda;
 
-  const code = contrato.contratoCode ?? `CTR-${contrato.id}`;
+  const code = inmuebleCode ?? `REF-${contrato.id}`;
 
   return {
     id: String(contrato.id),
@@ -131,7 +132,7 @@ export function mapContratoDetailToFicha(
   detail: ContratoDetail,
   propietarios: InmuebleFichaPropietario[],
 ): ContractDetail {
-  const code = detail.contratoCode ?? `CTR-${detail.id}`;
+  const code = detail.inmueble?.code ?? `REF-${detail.id}`;
   const propertyTitle = detail.inmueble?.title ?? "Inmueble";
   const propertyAddress = detail.inmueble?.direccion ?? propertyTitle;
   const tenant = detail.inquilino ? personaDisplayName(detail.inquilino) : "—";
