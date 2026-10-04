@@ -5,7 +5,7 @@ import { Modal } from "@/components/ui/Modal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import type { AdjustmentIndex } from "@/data/alquileres-contract-details";
 import type { CatalogoItem } from "@/lib/api/types";
-import { nextContratoCode, nextInmuebleCode, prefixForTipoInmueble } from "@/lib/codes";
+import { nextInmuebleCode, prefixForTipoInmueble } from "@/lib/codes";
 
 export type NewContractForm = {
   propertyLabel: string;
@@ -60,7 +60,6 @@ export function NewContractModal({
   submitting = false,
   tiposInmueble = [],
   usedInmuebleCodes = [],
-  usedContratoCodes = [],
 }: {
   open: boolean;
   onClose: () => void;
@@ -68,16 +67,12 @@ export function NewContractModal({
   submitting?: boolean;
   tiposInmueble?: CatalogoItem[];
   usedInmuebleCodes?: string[];
-  usedContratoCodes?: Array<string | null>;
 }) {
   const [form, setForm] = useState<NewContractForm>(emptyForm);
 
-  const codePreview = useMemo(
-    () => ({
-      inmueble: nextInmuebleCode(prefixForTipoInmueble(form.tipoInmuebleCode), usedInmuebleCodes),
-      contrato: nextContratoCode(usedContratoCodes),
-    }),
-    [form.tipoInmuebleCode, usedContratoCodes, usedInmuebleCodes],
+  const inmuebleCodePreview = useMemo(
+    () => nextInmuebleCode(prefixForTipoInmueble(form.tipoInmuebleCode), usedInmuebleCodes),
+    [form.tipoInmuebleCode, usedInmuebleCodes],
   );
 
   function handleClose() {
@@ -143,9 +138,8 @@ export function NewContractModal({
           </select>
         </div>
         <div className="rounded-sm border border-border bg-bg-page px-3 py-2 text-[12px] text-text-secondary">
-          Inmueble: <strong className="text-text-primary">{codePreview.inmueble}</strong>
-          {" · "}
-          Contrato: <strong className="text-text-primary">{codePreview.contrato}</strong>
+          Código de propiedad:{" "}
+          <strong className="text-text-primary">{inmuebleCodePreview}</strong>
         </div>
         <Field
           label="Dirección completa"

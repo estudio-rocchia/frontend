@@ -6,14 +6,18 @@ import type {
   CuotaDetail,
   DashboardResumen,
   InmuebleFichaPropietario,
+  PeriodoServicioRecord,
   ServicioContratoRecord,
 } from "@/lib/api/types";
 import {
+  daysUntilDate,
   formatDateDisplay,
   formatMoney,
   formatMonthYear,
   personaDisplayName,
 } from "@/lib/format";
+import { contratoSupportsIndexAdjustment } from "@/lib/rental-adjustment";
+import { serviciosSummaryFromData } from "@/lib/mappers/servicios";
 
 type BillingSnapshot = {
   diasAtraso: number;
@@ -48,22 +52,11 @@ function latestCuota(cuotas: CuotaDetail[]): CuotaDetail | null {
   })[0] ?? null;
 }
 
-function electricityFromServicios(servicios: ServicioContratoRecord[]): RentalRow["electricity"] {
-  const luz = servicios.find((s) => s.tipoServicioCode === "electricity" && s.activo);
-  if (!luz) {
-    return {
-      provider: "Sin servicio",
-      accountNumber: "—",
-      holder: "—",
-      status: { label: "N/D", variant: "warning" },
-    };
-  }
-  return {
-    provider: luz.provider ?? luz.tipoServicioName,
-    accountNumber: luz.numeroMedidor ?? "—",
-    holder: luz.provider ?? "—",
-    status: { label: "Activo", variant: "success" },
-  };
+function serviciosFromContrato(
+  servicios: ServicioContratoRecord[],
+  periodos: PeriodoServicioRecord[],
+): RentalRow["servicios"] {
+  return serviciosSummaryFromData(servicios, periodos);
 }
 
 export function buildBillingIndex(resumen: DashboardResumen) {
@@ -76,7 +69,9 @@ export function buildBillingIndex(resumen: DashboardResumen) {
     });
   }
 
-  const ajusteIds = new Set(resumen.ajustePendiente.map((item) => item.contratoId));
+  const ajusteByContrato = new Map(
+    resumen.ajustePendiente.map((item) => [item.contratoId, item]),
+  );
   const cobrarByContrato = new Map<number, { saldoTotal: string; codigoMoneda: string }>();
   for (const item of resumen.cobrarEsteMes) {
     cobrarByContrato.set(item.contratoId, {
@@ -85,21 +80,24 @@ export function buildBillingIndex(resumen: DashboardResumen) {
     });
   }
 
-  return { moraByContrato, ajusteIds, cobrarByContrato };
+  return { moraByContrato, ajusteByContrato, cobrarByContrato };
 }
 
 export function mapContratoToRentalRow(
   contrato: ContratoRecord,
   cuotas: CuotaDetail[],
   servicios: ServicioContratoRecord[],
+  periodos: PeriodoServicioRecord[],
   inquilinoNombre: string,
   inmuebleTitle: string,
   billing: ReturnType<typeof buildBillingIndex>,
+  inmuebleCode?: string | null,
 ): RentalRow {
   const cuota = latestCuota(cuotas);
   const mora = billing.moraByContrato.get(contrato.id);
   const cobrar = billing.cobrarByContrato.get(contrato.id);
-  const ajustePendiente = billing.ajusteIds.has(contrato.id);
+  const ajusteItem = billing.ajusteByContrato.get(contrato.id);
+  const ajustePendiente = Boolean(ajusteItem);
 
   const diasAtraso = mora?.diasAtraso ?? cuota?.mora?.diasAtraso ?? 0;
   const estadoCode = mora ? "late" : (cuota?.estadoCode ?? "pending");
@@ -109,7 +107,7 @@ export function mapContratoToRentalRow(
   const amountSource = mora?.saldoTotal ?? cobrar?.saldoTotal ?? cuota?.saldoTotal ?? contrato.montoAlquiler;
   const amountCurrency = mora?.codigoMoneda ?? cobrar?.codigoMoneda ?? cuota?.codigoMoneda ?? contrato.codigoMoneda;
 
-  const code = contrato.contratoCode ?? `CTR-${contrato.id}`;
+  const code = inmuebleCode ?? `REF-${contrato.id}`;
 
   return {
     id: String(contrato.id),
@@ -123,7 +121,12 @@ export function mapContratoToRentalRow(
     filterStatus,
     contractStart: formatDateDisplay(contrato.fechaInicio),
     contractEnd: formatDateDisplay(contrato.fechaFin),
-    electricity: electricityFromServicios(servicios),
+    daysUntilContractEnd: daysUntilDate(contrato.fechaFin),
+    canAdjust: contratoSupportsIndexAdjustment(contrato),
+    needsAdjustment: ajustePendiente,
+    needsRenewal: daysUntilDate(contrato.fechaFin) <= 30,
+    ultimoAjusteEn: ajusteItem?.ultimoAjusteEn ?? null,
+    servicios: serviciosFromContrato(servicios, periodos),
   };
 }
 
@@ -131,7 +134,7 @@ export function mapContratoDetailToFicha(
   detail: ContratoDetail,
   propietarios: InmuebleFichaPropietario[],
 ): ContractDetail {
-  const code = detail.contratoCode ?? `CTR-${detail.id}`;
+  const code = detail.inmueble?.code ?? `REF-${detail.id}`;
   const propertyTitle = detail.inmueble?.title ?? "Inmueble";
   const propertyAddress = detail.inmueble?.direccion ?? propertyTitle;
   const tenant = detail.inquilino ? personaDisplayName(detail.inquilino) : "—";
@@ -143,18 +146,39 @@ export function mapContratoDetailToFicha(
   const indexCode = (detail.tipoIndice?.code?.toUpperCase() ?? "ICL") as AdjustmentIndex;
   const moraPercent = detail.tasaMora ? `${(Number(detail.tasaMora) * 100).toFixed(1).replace(".", ",")}%` : "2,5%";
 
+  const estadoLabel =
+    detail.estado === "active"
+      ? "Activo"
+      : detail.estado === "finished"
+        ? "Finalizado"
+        : detail.estado === "terminated"
+          ? "Rescindido"
+          : detail.estado;
+
+  const ajusteMeses = detail.frecuenciaAjusteMeses
+    ? `Cada ${detail.frecuenciaAjusteMeses} meses`
+    : "Sin ajuste programado";
+
   return {
     id: String(detail.id),
     drawerRef: `${code} · ${propertyTitle}`,
+    propertyCode: code,
+    estado: estadoLabel,
+    contractStart: formatDateDisplay(detail.fechaInicio),
+    contractEnd: formatDateDisplay(detail.fechaFin),
     property: propertyAddress,
     tenant,
     owner,
     guarantors: detail.garantes.length ? `${detail.garantes.length} garante(s)` : "—",
     adjustmentIndex: indexCode,
+    adjustmentFrequency: ajusteMeses,
+    paymentDueDay: `Día ${detail.diaVencimientoPago} de cada mes`,
     previousAmount: formatMoney(detail.montoAlquiler, detail.codigoMoneda),
     calculatedNewAmount: formatMoney(detail.montoAlquiler, detail.codigoMoneda),
     daysSince10: "—",
     surchargePercent: moraPercent,
-    punitiveHint: `Contrato ${detail.estado} · vence ${formatDateDisplay(detail.fechaFin)}`,
+    punitiveHint: detail.tipoIndice?.name
+      ? `Índice: ${detail.tipoIndice.name}`
+      : `Contrato ${estadoLabel}`,
   };
 }

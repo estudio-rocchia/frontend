@@ -12,8 +12,19 @@ import type {
   PagoDetail,
   PagoRecord,
   PersonaRecord,
+  ApplyAjusteResponse,
+  PreviewAjusteInput,
+  PreviewAjusteResponse,
   ReciboRecord,
+  RegisterPagoInput,
+  RegisterPagoResult,
+  CreatePeriodoInput,
+  CreateServicioInput,
+  SecheepImportInput,
+  SecheepImportResult,
+  PeriodoServicioRecord,
   ServicioContratoRecord,
+  UpdateServicioInput,
 } from "./types";
 
 export { ApiError, getApiBaseUrl } from "./client";
@@ -53,8 +64,63 @@ export function fetchServicios(token: string, contratoId: number) {
   return apiRequest<{ items: ServicioContratoRecord[] }>(`/contratos/${contratoId}/servicios`, { token });
 }
 
+export function fetchServiciosPeriodos(token: string, contratoId: number) {
+  return apiRequest<{ items: PeriodoServicioRecord[] }>(
+    `/contratos/${contratoId}/servicios/periodos`,
+    { token },
+  );
+}
+
+export function createServicio(token: string, contratoId: number, body: CreateServicioInput) {
+  return apiRequest<ServicioContratoRecord>(`/contratos/${contratoId}/servicios`, {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function updateServicio(token: string, servicioId: number, body: UpdateServicioInput) {
+  return apiRequest<ServicioContratoRecord>(`/servicios/${servicioId}`, {
+    method: "PATCH",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function deactivateServicio(token: string, servicioId: number) {
+  return apiRequest<ServicioContratoRecord>(`/servicios/${servicioId}/desactivar`, {
+    method: "POST",
+    token,
+    body: JSON.stringify({}),
+  });
+}
+
+export function createPeriodoServicio(token: string, servicioId: number, body: CreatePeriodoInput) {
+  return apiRequest<PeriodoServicioRecord>(`/servicios/${servicioId}/periodos`, {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function importSecheep(token: string, servicioId: number, body: SecheepImportInput) {
+  return apiRequest<SecheepImportResult>(`/servicios/${servicioId}/secheep/import`, {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
 export function fetchPagos(token: string, contratoId: number) {
   return apiRequest<{ items: PagoRecord[] }>(`/contratos/${contratoId}/pagos`, { token });
+}
+
+export function registerPago(token: string, contratoId: number, body: RegisterPagoInput) {
+  return apiRequest<RegisterPagoResult>(`/contratos/${contratoId}/pagos`, {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
 }
 
 export function fetchPago(token: string, pagoId: number) {
@@ -135,6 +201,44 @@ export function createContrato(
   body: Record<string, unknown>,
 ) {
   return apiRequest<ContratoRecord>("/contratos", {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function changeContratoEstado(
+  token: string,
+  contratoId: number,
+  estado: "finished" | "terminated",
+) {
+  return apiRequest<ContratoRecord>(`/contratos/${contratoId}/estado`, {
+    method: "POST",
+    token,
+    body: JSON.stringify({ estado }),
+  });
+}
+
+export function previewAjusteIndice(token: string, body: PreviewAjusteInput) {
+  return apiRequest<PreviewAjusteResponse>("/indices/preview-ajuste", {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function applyContratoAjuste(
+  token: string,
+  contratoId: number,
+  body: {
+    fechaAjuste: string;
+    tipoIndiceId: number;
+    factor: number | string;
+    source?: string | null;
+    nota?: string | null;
+  },
+) {
+  return apiRequest<ApplyAjusteResponse>(`/contratos/${contratoId}/ajustes`, {
     method: "POST",
     token,
     body: JSON.stringify(body),

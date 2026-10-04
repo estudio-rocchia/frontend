@@ -28,6 +28,41 @@ export interface CatalogoItem {
   name: string;
 }
 
+export type IndiceCode = "ICL" | "IPC" | "CAC";
+
+export interface PreviewAjusteInput {
+  tipoIndiceCode: IndiceCode;
+  montoAnterior: number;
+  fechaDesde: string;
+  fechaHasta: string;
+}
+
+export interface PreviewAjusteResponse {
+  tipoIndiceCode: IndiceCode;
+  periodoDesde: string;
+  periodoHasta: string;
+  valorDesde: string;
+  valorHasta: string;
+  factor: string;
+  variacionPct: string;
+  montoAnterior: string;
+  montoNuevo: string;
+  fuenteDesde: string;
+  fuenteHasta: string;
+}
+
+export interface ApplyAjusteResponse {
+  ajuste: {
+    id: number;
+    contratoId: number;
+    fechaAjuste: string;
+    montoAnterior: string;
+    montoNuevo: string;
+    factor: string;
+  };
+  contrato: ContratoRecord;
+}
+
 export interface PersonaRecord {
   id: number;
   tipoPersona: string;
@@ -88,13 +123,142 @@ export interface CuotaDetail {
   saldoTotal: string;
 }
 
+export type ModoFacturacion = "fixed" | "variable";
+
+export interface SecheepSyncSnapshot {
+  consultadoEn: string;
+  titular: string | null;
+  cliSum: string | null;
+  vencidas: number;
+  pendientes: number;
+  pagadas: number;
+  totalVencido: number;
+  totalPendiente: number;
+}
+
 export interface ServicioContratoRecord {
   id: number;
+  contratoId: number;
+  tipoServicioId: number;
   tipoServicioCode: string;
   tipoServicioName: string;
   provider: string | null;
   numeroMedidor: string | null;
+  numeroClienteSecheep: string | null;
+  numeroSuministroSecheep: string | null;
+  secheepConsultadoEn: string | null;
+  secheepSync: SecheepSyncSnapshot | null;
+  modoFacturacion: ModoFacturacion;
+  montoFijo: string | null;
+  codigoMoneda: string | null;
   activo: boolean;
+}
+
+export interface PeriodoServicioRecord {
+  id: number;
+  servicioContratoId: number;
+  contratoId: number;
+  inicioPeriodo: string;
+  finPeriodo: string;
+  monto: string;
+  codigoMoneda: string;
+  estadoId: number;
+  estadoCode: string;
+  fechaVencimiento: string | null;
+  pagadoEn: string | null;
+  notas: string | null;
+  montoPagado: string;
+  saldo: string;
+}
+
+export interface SecheepFacturaInput {
+  nroFactura: string;
+  periodo?: string | null;
+  vencimiento?: string | null;
+  estado: string;
+  importe?: string | null;
+  importeNumero?: number | null;
+}
+
+export interface SecheepImportInput {
+  consultadoEn: string;
+  titular?: string | null;
+  cliSum?: string | null;
+  facturas: SecheepFacturaInput[];
+}
+
+export interface SecheepImportResult {
+  servicio: ServicioContratoRecord;
+  creados: number;
+  actualizados: number;
+  omitidos: number;
+  sync: SecheepSyncSnapshot;
+}
+
+export interface CreateServicioInput {
+  tipoServicioId: number;
+  provider?: string | null;
+  numeroMedidor?: string | null;
+  numeroClienteSecheep?: string | null;
+  numeroSuministroSecheep?: string | null;
+  modoFacturacion: ModoFacturacion;
+  montoFijo?: number | string | null;
+  codigoMoneda?: string | null;
+}
+
+export interface UpdateServicioInput {
+  provider?: string | null;
+  numeroMedidor?: string | null;
+  numeroClienteSecheep?: string | null;
+  numeroSuministroSecheep?: string | null;
+  modoFacturacion?: ModoFacturacion;
+  montoFijo?: number | string | null;
+  codigoMoneda?: string | null;
+}
+
+export interface CreatePeriodoInput {
+  inicioPeriodo: string;
+  finPeriodo: string;
+  monto?: number | string;
+  codigoMoneda?: string;
+  fechaVencimiento?: string | null;
+  notas?: string | null;
+}
+
+export type ImputacionTargetType = "cuota_alquiler" | "mora" | "periodo_servicio";
+
+export interface ImputacionInput {
+  targetType: ImputacionTargetType;
+  targetId: number;
+  monto: number;
+}
+
+export interface RegisterPagoInput {
+  fechaPago: string;
+  montoTotal: number;
+  codigoMoneda: string;
+  medioPagoId: number;
+  reference?: string | null;
+  notas?: string | null;
+  imputaciones: ImputacionInput[];
+}
+
+export interface PeriodoServicioPaymentRecord {
+  id: number;
+  servicioContratoId: number;
+  inicioPeriodo: string;
+  finPeriodo: string;
+  monto: string;
+  codigoMoneda: string;
+  estadoCode: string;
+  montoPagado: string;
+  saldo: string;
+}
+
+export interface RegisterPagoResult {
+  pago: PagoDetail;
+  cuotasActualizadas: CuotaDetail[];
+  periodosActualizados: PeriodoServicioPaymentRecord[];
 }
 
 export interface PagoRecord {
@@ -153,6 +317,7 @@ export interface DashboardResumen {
     inquilinoNombre: string;
     montoAlquiler: string;
     codigoMoneda: string;
+    ultimoAjusteEn: string | null;
   }>;
   renovacionProxima: Array<{
     contratoId: number;
