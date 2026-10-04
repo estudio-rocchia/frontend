@@ -32,6 +32,7 @@ import {
   createPersona,
   createServicio,
   deactivateServicio,
+  importSecheep,
   downloadReciboPdf,
   fetchCatalog,
   fetchContrato,
@@ -51,6 +52,7 @@ import type {
   CatalogoItem,
   ContratoDetail,
   CreatePeriodoInput,
+  SecheepImportInput,
   PeriodoServicioRecord,
   PreviewAjusteResponse,
   ServicioContratoRecord,
@@ -232,6 +234,8 @@ export function AlquileresWorkspace() {
               tipoServicioId: values.tipoServicioId,
               provider: values.provider.trim() || null,
               numeroMedidor: values.numeroMedidor.trim() || null,
+              numeroClienteSecheep: values.numeroClienteSecheep.trim() || null,
+              numeroSuministroSecheep: values.numeroSuministroSecheep.trim() || null,
               modoFacturacion: values.modoFacturacion,
               montoFijo: Number(values.montoFijo),
               codigoMoneda: values.codigoMoneda,
@@ -240,6 +244,8 @@ export function AlquileresWorkspace() {
               tipoServicioId: values.tipoServicioId,
               provider: values.provider.trim() || null,
               numeroMedidor: values.numeroMedidor.trim() || null,
+              numeroClienteSecheep: values.numeroClienteSecheep.trim() || null,
+              numeroSuministroSecheep: values.numeroSuministroSecheep.trim() || null,
               modoFacturacion: values.modoFacturacion,
             };
       await createServicio(token, selectedContrato.id, body);
@@ -262,6 +268,8 @@ export function AlquileresWorkspace() {
           ? {
               provider: values.provider.trim() || null,
               numeroMedidor: values.numeroMedidor.trim() || null,
+              numeroClienteSecheep: values.numeroClienteSecheep.trim() || null,
+              numeroSuministroSecheep: values.numeroSuministroSecheep.trim() || null,
               modoFacturacion: values.modoFacturacion,
               montoFijo: Number(values.montoFijo),
               codigoMoneda: values.codigoMoneda,
@@ -269,6 +277,8 @@ export function AlquileresWorkspace() {
           : {
               provider: values.provider.trim() || null,
               numeroMedidor: values.numeroMedidor.trim() || null,
+              numeroClienteSecheep: values.numeroClienteSecheep.trim() || null,
+              numeroSuministroSecheep: values.numeroSuministroSecheep.trim() || null,
               modoFacturacion: values.modoFacturacion,
               montoFijo: null,
               codigoMoneda: null,
@@ -294,6 +304,24 @@ export function AlquileresWorkspace() {
       await loadRows();
     } catch (err) {
       showToast(rentalApiErrorMessage(err, "No se pudo desactivar el servicio"));
+    } finally {
+      setServiciosSubmitting(false);
+    }
+  }
+
+  async function handleImportSecheep(servicioId: number, payload: SecheepImportInput) {
+    if (!token || !selectedContrato) return;
+    setServiciosSubmitting(true);
+    try {
+      const result = await importSecheep(token, servicioId, payload);
+      showToast(
+        `SECHEEP importado: ${result.creados} nuevo(s), ${result.actualizados} actualizado(s). ${result.sync.vencidas} vencida(s), ${result.sync.pendientes} pendiente(s).`,
+      );
+      await loadDrawerServicios(selectedContrato.id);
+      await loadRows();
+    } catch (err) {
+      showToast(rentalApiErrorMessage(err, "No se pudo importar desde SECHEEP"));
+      throw err;
     } finally {
       setServiciosSubmitting(false);
     }
@@ -788,6 +816,7 @@ export function AlquileresWorkspace() {
         onUpdateServicio={handleUpdateServicio}
         onDeactivateServicio={handleDeactivateServicio}
         onCreatePeriodo={handleCreatePeriodo}
+        onImportSecheep={handleImportSecheep}
         onRegisterPago={handleRegisterPago}
         mediosPago={mediosPago}
         canRegisterPago={selectedContrato?.estado === "active"}

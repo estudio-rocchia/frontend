@@ -20,6 +20,8 @@ import type {
   RegisterPagoResult,
   CreatePeriodoInput,
   CreateServicioInput,
+  SecheepImportInput,
+  SecheepImportResult,
   PeriodoServicioRecord,
   ServicioContratoRecord,
   UpdateServicioInput,
@@ -95,6 +97,14 @@ export function deactivateServicio(token: string, servicioId: number) {
 
 export function createPeriodoServicio(token: string, servicioId: number, body: CreatePeriodoInput) {
   return apiRequest<PeriodoServicioRecord>(`/servicios/${servicioId}/periodos`, {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function importSecheep(token: string, servicioId: number, body: SecheepImportInput) {
+  return apiRequest<SecheepImportResult>(`/servicios/${servicioId}/secheep/import`, {
     method: "POST",
     token,
     body: JSON.stringify(body),

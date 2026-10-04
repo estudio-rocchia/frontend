@@ -7,7 +7,12 @@ import type { RegistrarPagoServicioFormValues } from "@/components/alquileres/Re
 import { DrawerPanel } from "@/components/ui/DrawerPanel";
 import { ButtonOutline } from "@/components/ui/Button";
 import type { ContractDetail } from "@/data/alquileres-contract-details";
-import type { CatalogoItem, PeriodoServicioRecord, ServicioContratoRecord } from "@/lib/api/types";
+import type {
+  CatalogoItem,
+  PeriodoServicioRecord,
+  SecheepImportInput,
+  ServicioContratoRecord,
+} from "@/lib/api/types";
 
 function FieldBlock({ label, value }: { label: string; value: string }) {
   return (
@@ -31,6 +36,7 @@ export function ContractFichaDrawer({
   onUpdateServicio,
   onDeactivateServicio,
   onCreatePeriodo,
+  onImportSecheep,
   onRegisterPago,
   mediosPago,
   canRegisterPago,
@@ -48,6 +54,7 @@ export function ContractFichaDrawer({
   onUpdateServicio: (servicioId: number, values: ServicioFormValues) => Promise<void>;
   onDeactivateServicio: (servicioId: number) => Promise<void>;
   onCreatePeriodo: (servicioId: number, values: PeriodoFormValues) => Promise<void>;
+  onImportSecheep: (servicioId: number, payload: SecheepImportInput) => Promise<void>;
   onRegisterPago: (
     periodo: PeriodoServicioRecord,
     servicio: ServicioContratoRecord,
@@ -112,6 +119,7 @@ export function ContractFichaDrawer({
             onUpdateServicio={onUpdateServicio}
             onDeactivateServicio={onDeactivateServicio}
             onCreatePeriodo={onCreatePeriodo}
+            onImportSecheep={onImportSecheep}
             onRegisterPago={onRegisterPago}
             mediosPago={mediosPago}
             canRegisterPago={canRegisterPago}

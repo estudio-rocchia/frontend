@@ -17,7 +17,7 @@ import {
   personaDisplayName,
 } from "@/lib/format";
 import { contratoSupportsIndexAdjustment } from "@/lib/rental-adjustment";
-import { electricityStatusFromPeriodos } from "@/lib/mappers/servicios";
+import { serviciosSummaryFromData } from "@/lib/mappers/servicios";
 
 type BillingSnapshot = {
   diasAtraso: number;
@@ -52,26 +52,11 @@ function latestCuota(cuotas: CuotaDetail[]): CuotaDetail | null {
   })[0] ?? null;
 }
 
-function electricityFromServicios(
+function serviciosFromContrato(
   servicios: ServicioContratoRecord[],
   periodos: PeriodoServicioRecord[],
-): RentalRow["electricity"] {
-  const luz = servicios.find((s) => s.tipoServicioCode === "electricity" && s.activo);
-  if (!luz) {
-    return {
-      provider: "Sin servicio",
-      accountNumber: "—",
-      holder: "—",
-      status: { label: "N/D", variant: "warning" },
-    };
-  }
-  const status = electricityStatusFromPeriodos(luz, periodos);
-  return {
-    provider: luz.provider ?? luz.tipoServicioName,
-    accountNumber: luz.numeroMedidor ?? "—",
-    holder: luz.provider ?? "—",
-    status,
-  };
+): RentalRow["servicios"] {
+  return serviciosSummaryFromData(servicios, periodos);
 }
 
 export function buildBillingIndex(resumen: DashboardResumen) {
@@ -141,7 +126,7 @@ export function mapContratoToRentalRow(
     needsAdjustment: ajustePendiente,
     needsRenewal: daysUntilDate(contrato.fechaFin) <= 30,
     ultimoAjusteEn: ajusteItem?.ultimoAjusteEn ?? null,
-    electricity: electricityFromServicios(servicios, periodos),
+    servicios: serviciosFromContrato(servicios, periodos),
   };
 }
 

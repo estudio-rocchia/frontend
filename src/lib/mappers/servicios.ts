@@ -1,5 +1,6 @@
 import type { PeriodoServicioRecord, ServicioContratoRecord } from "@/lib/api/types";
 import { formatDateDisplay, formatMoney } from "@/lib/format";
+import { isSecheepElectricity, secheepStatusFromSync } from "@/lib/mappers/secheep";
 
 export type PeriodoEstadoVariant = "success" | "warning" | "danger";
 
@@ -100,4 +101,73 @@ export function electricityStatusFromPeriodos(
 
 export function defaultModoForTipo(code: string): "fixed" | "variable" {
   return code === "water" ? "fixed" : "variable";
+}
+
+
+export type ServiciosTableSummary = {
+  summary: string;
+  detail: string;
+  status: { label: string; variant: "success" | "warning" | "danger" };
+};
+
+export function serviciosSummaryFromData(
+  servicios: ServicioContratoRecord[],
+  periodos: PeriodoServicioRecord[],
+): ServiciosTableSummary {
+  const activos = servicios.filter((s) => s.activo);
+  if (activos.length === 0) {
+    return {
+      summary: "Sin servicios",
+      detail: "—",
+      status: { label: "N/D", variant: "warning" },
+    };
+  }
+
+  const summary = activos.map((s) => s.tipoServicioName).join(" · ");
+  const electricity = activos.find((s) => isSecheepElectricity(s));
+  const secheepStatus = electricity ? secheepStatusFromSync(electricity.secheepSync) : null;
+  const { total, currency } = totalSaldoPendiente(periodos);
+  const hasLate = periodos.some(
+    (p) => p.estadoCode === "late" && Number(p.saldo) > 0,
+  );
+
+  if (secheepStatus && secheepStatus.variant === "danger") {
+    return {
+      summary,
+      detail: secheepStatus.detail,
+      status: { label: `SECHEEP ${secheepStatus.label}`, variant: "danger" },
+    };
+  }
+
+  if (secheepStatus && secheepStatus.variant === "warning") {
+    return {
+      summary,
+      detail: secheepStatus.detail,
+      status: { label: `SECHEEP ${secheepStatus.label}`, variant: "warning" },
+    };
+  }
+
+  if (total > 0 && currency) {
+    return {
+      summary,
+      detail: `Saldo ${formatMoney(String(total), currency)}`,
+      status: hasLate
+        ? { label: "Deuda", variant: "danger" }
+        : { label: "Pendiente", variant: "warning" },
+    };
+  }
+
+  if (periodos.length === 0) {
+    return {
+      summary,
+      detail: "Sin períodos cargados",
+      status: { label: "Sin períodos", variant: "warning" },
+    };
+  }
+
+  return {
+    summary,
+    detail: "Al día",
+    status: { label: "Al día", variant: "success" },
+  };
 }

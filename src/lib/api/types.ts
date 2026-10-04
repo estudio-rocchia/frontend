@@ -125,6 +125,17 @@ export interface CuotaDetail {
 
 export type ModoFacturacion = "fixed" | "variable";
 
+export interface SecheepSyncSnapshot {
+  consultadoEn: string;
+  titular: string | null;
+  cliSum: string | null;
+  vencidas: number;
+  pendientes: number;
+  pagadas: number;
+  totalVencido: number;
+  totalPendiente: number;
+}
+
 export interface ServicioContratoRecord {
   id: number;
   contratoId: number;
@@ -133,6 +144,10 @@ export interface ServicioContratoRecord {
   tipoServicioName: string;
   provider: string | null;
   numeroMedidor: string | null;
+  numeroClienteSecheep: string | null;
+  numeroSuministroSecheep: string | null;
+  secheepConsultadoEn: string | null;
+  secheepSync: SecheepSyncSnapshot | null;
   modoFacturacion: ModoFacturacion;
   montoFijo: string | null;
   codigoMoneda: string | null;
@@ -156,10 +171,36 @@ export interface PeriodoServicioRecord {
   saldo: string;
 }
 
+export interface SecheepFacturaInput {
+  nroFactura: string;
+  periodo?: string | null;
+  vencimiento?: string | null;
+  estado: string;
+  importe?: string | null;
+  importeNumero?: number | null;
+}
+
+export interface SecheepImportInput {
+  consultadoEn: string;
+  titular?: string | null;
+  cliSum?: string | null;
+  facturas: SecheepFacturaInput[];
+}
+
+export interface SecheepImportResult {
+  servicio: ServicioContratoRecord;
+  creados: number;
+  actualizados: number;
+  omitidos: number;
+  sync: SecheepSyncSnapshot;
+}
+
 export interface CreateServicioInput {
   tipoServicioId: number;
   provider?: string | null;
   numeroMedidor?: string | null;
+  numeroClienteSecheep?: string | null;
+  numeroSuministroSecheep?: string | null;
   modoFacturacion: ModoFacturacion;
   montoFijo?: number | string | null;
   codigoMoneda?: string | null;
@@ -168,6 +209,8 @@ export interface CreateServicioInput {
 export interface UpdateServicioInput {
   provider?: string | null;
   numeroMedidor?: string | null;
+  numeroClienteSecheep?: string | null;
+  numeroSuministroSecheep?: string | null;
   modoFacturacion?: ModoFacturacion;
   montoFijo?: number | string | null;
   codigoMoneda?: string | null;

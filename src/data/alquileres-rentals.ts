@@ -4,10 +4,9 @@ export type RentalFilterStatus =
   | "prox_mora"
   | "ajuste_pendiente";
 
-export type ElectricityService = {
-  provider: string;
-  accountNumber: string;
-  holder: string;
+export type ServiciosSummary = {
+  summary: string;
+  detail: string;
   status: { label: string; variant: "success" | "warning" | "danger" };
 };
 
@@ -29,7 +28,7 @@ export type RentalRow = {
   needsAdjustment: boolean;
   needsRenewal: boolean;
   ultimoAjusteEn: string | null;
-  electricity: ElectricityService;
+  servicios: ServiciosSummary;
 };
 
 export const rentalFilterChips = [
@@ -73,12 +72,7 @@ export const alquileresRentals: RentalRow[] = [
     needsAdjustment: false,
     needsRenewal: false,
     ultimoAjusteEn: null,
-    electricity: {
-      provider: "Edenor",
-      accountNumber: "2847193-8",
-      holder: "Lucía Fernández",
-      status: { label: "Al día", variant: "success" },
-    },
+    servicios: { summary: "Luz", detail: "Al día", status: { label: "Al día", variant: "success" } },
   },
   {
     id: "ALQ-0988",
@@ -97,12 +91,7 @@ export const alquileresRentals: RentalRow[] = [
     needsAdjustment: false,
     needsRenewal: true,
     ultimoAjusteEn: null,
-    electricity: {
-      provider: "Edesur",
-      accountNumber: "0193847261",
-      holder: "Grupo Norte SRL",
-      status: { label: "Deuda", variant: "danger" },
-    },
+    servicios: { summary: "Luz", detail: "Al día", status: { label: "Al día", variant: "success" } },
   },
   {
     id: "ALQ-1103",
@@ -121,12 +110,7 @@ export const alquileresRentals: RentalRow[] = [
     needsAdjustment: false,
     needsRenewal: false,
     ultimoAjusteEn: null,
-    electricity: {
-      provider: "Edenor",
-      accountNumber: "5529104-2",
-      holder: "Martín Acosta",
-      status: { label: "Pendiente", variant: "warning" },
-    },
+    servicios: { summary: "Luz", detail: "Al día", status: { label: "Al día", variant: "success" } },
   },
   {
     id: "ALQ-0871",
@@ -145,12 +129,7 @@ export const alquileresRentals: RentalRow[] = [
     needsAdjustment: false,
     needsRenewal: false,
     ultimoAjusteEn: null,
-    electricity: {
-      provider: "Edesur",
-      accountNumber: "8834120-5",
-      holder: "Byte Legal",
-      status: { label: "Al día", variant: "success" },
-    },
+    servicios: { summary: "Luz", detail: "Al día", status: { label: "Al día", variant: "success" } },
   },
   {
     id: "ALQ-1156",
@@ -169,12 +148,7 @@ export const alquileresRentals: RentalRow[] = [
     needsAdjustment: false,
     needsRenewal: true,
     ultimoAjusteEn: null,
-    electricity: {
-      provider: "Eden",
-      accountNumber: "4412098-1",
-      holder: "Fam. Pérez",
-      status: { label: "Al día", variant: "success" },
-    },
+    servicios: { summary: "Luz", detail: "Al día", status: { label: "Al día", variant: "success" } },
   },
   {
     id: "ALQ-1020",
@@ -193,12 +167,7 @@ export const alquileresRentals: RentalRow[] = [
     needsAdjustment: false,
     needsRenewal: false,
     ultimoAjusteEn: null,
-    electricity: {
-      provider: "Edenor",
-      accountNumber: "3301847-6",
-      holder: "Studio Alfa",
-      status: { label: "Pendiente", variant: "warning" },
-    },
+    servicios: { summary: "Luz", detail: "Al día", status: { label: "Al día", variant: "success" } },
   },
 ];
 

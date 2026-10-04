@@ -11,6 +11,8 @@ export type ServicioFormValues = {
   tipoServicioId: number;
   provider: string;
   numeroMedidor: string;
+  numeroClienteSecheep: string;
+  numeroSuministroSecheep: string;
   modoFacturacion: ModoFacturacion;
   montoFijo: string;
   codigoMoneda: "ARS" | "USD";
@@ -20,6 +22,8 @@ const emptyForm: ServicioFormValues = {
   tipoServicioId: 0,
   provider: "",
   numeroMedidor: "",
+  numeroClienteSecheep: "",
+  numeroSuministroSecheep: "",
   modoFacturacion: "variable",
   montoFijo: "",
   codigoMoneda: "ARS",
@@ -85,6 +89,8 @@ export function ServicioFormModal({
         tipoServicioId: editing.tipoServicioId,
         provider: editing.provider ?? "",
         numeroMedidor: editing.numeroMedidor ?? "",
+        numeroClienteSecheep: editing.numeroClienteSecheep ?? "",
+        numeroSuministroSecheep: editing.numeroSuministroSecheep ?? "",
         modoFacturacion: editing.modoFacturacion,
         montoFijo: editing.montoFijo ? String(Number(editing.montoFijo)) : "",
         codigoMoneda: editing.codigoMoneda?.trim() === "USD" ? "USD" : "ARS",
@@ -128,6 +134,7 @@ export function ServicioFormModal({
   const isFixed = form.modoFacturacion === "fixed";
   const title = editing ? "Editar servicio" : "Agregar servicio";
   const selectedTipo = tiposServicio.find((t) => t.id === form.tipoServicioId);
+  const isElectricity = selectedTipo?.code === "electricity";
 
   return (
     <Modal
@@ -174,12 +181,29 @@ export function ServicioFormModal({
           onChange={(v) => setForm((prev) => ({ ...prev, provider: v }))}
           placeholder="Ej. Aguas Chaqueñas, Cooperativa"
         />
-        <Field
-          label="Nº medidor / cuenta"
-          value={form.numeroMedidor}
-          onChange={(v) => setForm((prev) => ({ ...prev, numeroMedidor: v }))}
-          placeholder="Ej. SECH-99882"
-        />
+        {!isElectricity ? (
+          <Field
+            label="Nº medidor / cuenta"
+            value={form.numeroMedidor}
+            onChange={(v) => setForm((prev) => ({ ...prev, numeroMedidor: v }))}
+            placeholder="Ej. medidor agua"
+          />
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field
+              label="Nº cliente SECHEEP"
+              value={form.numeroClienteSecheep}
+              onChange={(v) => setForm((prev) => ({ ...prev, numeroClienteSecheep: v }))}
+              placeholder="Ej. 189424"
+            />
+            <Field
+              label="Nº suministro SECHEEP"
+              value={form.numeroSuministroSecheep}
+              onChange={(v) => setForm((prev) => ({ ...prev, numeroSuministroSecheep: v }))}
+              placeholder="Ej. 4"
+            />
+          </div>
+        )}
 
         <label className="flex flex-col gap-1.5">
           <span className="text-[11px] font-semibold text-text-secondary">Modo de facturación</span>

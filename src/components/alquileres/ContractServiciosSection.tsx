@@ -7,10 +7,18 @@ import {
   RegistrarPagoServicioModal,
   type RegistrarPagoServicioFormValues,
 } from "@/components/alquileres/RegistrarPagoServicioModal";
+import { SecheepImportModal } from "@/components/alquileres/SecheepImportModal";
 import { ServicioFormModal, type ServicioFormValues } from "@/components/alquileres/ServicioFormModal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import type { CatalogoItem, PeriodoServicioRecord, ServicioContratoRecord } from "@/lib/api/types";
+import type {
+  CatalogoItem,
+  PeriodoServicioRecord,
+  SecheepImportInput,
+  ServicioContratoRecord,
+} from "@/lib/api/types";
+import { formatDateDisplay } from "@/lib/format";
+import { isSecheepElectricity, secheepConfigured, secheepStatusForServicio } from "@/lib/mappers/secheep";
 import { formatMoney } from "@/lib/format";
 import {
   modoFacturacionLabel,
@@ -34,6 +42,7 @@ export function ContractServiciosSection({
   onUpdateServicio,
   onDeactivateServicio,
   onCreatePeriodo,
+  onImportSecheep,
   onRegisterPago,
   mediosPago,
   canRegisterPago,
@@ -48,6 +57,7 @@ export function ContractServiciosSection({
   onUpdateServicio: (servicioId: number, values: ServicioFormValues) => Promise<void>;
   onDeactivateServicio: (servicioId: number) => Promise<void>;
   onCreatePeriodo: (servicioId: number, values: PeriodoFormValues) => Promise<void>;
+  onImportSecheep: (servicioId: number, payload: SecheepImportInput) => Promise<void>;
   onRegisterPago: (
     periodo: PeriodoServicioRecord,
     servicio: ServicioContratoRecord,
@@ -63,6 +73,8 @@ export function ContractServiciosSection({
   const [pagoModalOpen, setPagoModalOpen] = useState(false);
   const [pagoPeriodo, setPagoPeriodo] = useState<PeriodoServicioRecord | null>(null);
   const [pagoServicio, setPagoServicio] = useState<ServicioContratoRecord | null>(null);
+  const [secheepModalOpen, setSecheepModalOpen] = useState(false);
+  const [secheepServicio, setSecheepServicio] = useState<ServicioContratoRecord | null>(null);
 
   const activeServicios = useMemo(
     () => servicios.filter((s) => s.activo),
@@ -139,6 +151,8 @@ export function ContractServiciosSection({
           {activeServicios.map((servicio) => {
             const servicioPeriodos = periodosForServicio(periodos, servicio.id);
             const saldo = servicioSaldoPendiente(periodos, servicio.id);
+            const secheepStatus = secheepStatusForServicio(servicio);
+            const showSecheepImport = isSecheepElectricity(servicio) && secheepConfigured(servicio);
 
             return (
               <article
@@ -153,17 +167,32 @@ export function ContractServiciosSection({
                     <span className="text-[12px] text-text-secondary">
                       {servicio.provider ?? "Sin proveedor"}
                       {servicio.numeroMedidor ? ` · Medidor ${servicio.numeroMedidor}` : ""}
+                      {servicio.numeroClienteSecheep && servicio.numeroSuministroSecheep
+                        ? ` · SECHEEP ${servicio.numeroClienteSecheep}/${servicio.numeroSuministroSecheep}`
+                        : ""}
                     </span>
+                    {servicio.secheepConsultadoEn ? (
+                      <span className="text-[11px] text-text-secondary">
+                        Última consulta SECHEEP: {formatDateDisplay(servicio.secheepConsultadoEn.slice(0, 10))}
+                      </span>
+                    ) : null}
                     <span className="text-[11px] text-text-secondary">
                       {modoFacturacionLabel(servicio.modoFacturacion)} · {servicioBillingSummary(servicio)}
                     </span>
                   </div>
-                  {saldo > 0 ? (
-                    <StatusBadge label="Con saldo" variant="danger" />
-                  ) : (
-                    <StatusBadge label="Al día" variant="success" />
-                  )}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {secheepStatus ? (
+                      <StatusBadge label={secheepStatus.label} variant={secheepStatus.variant} />
+                    ) : saldo > 0 ? (
+                      <StatusBadge label="Con saldo" variant="danger" />
+                    ) : (
+                      <StatusBadge label="Al día" variant="success" />
+                    )}
+                  </div>
                 </div>
+                {secheepStatus ? (
+                  <p className="text-[11px] text-text-secondary">{secheepStatus.detail}</p>
+                ) : null}
 
                 {canEdit ? (
                   <div className="flex flex-wrap gap-2">
@@ -177,6 +206,18 @@ export function ContractServiciosSection({
                     >
                       Registrar período
                     </ButtonOutline>
+                    {showSecheepImport ? (
+                      <ButtonOutline
+                        type="button"
+                        onClick={() => {
+                          setSecheepServicio(servicio);
+                          setSecheepModalOpen(true);
+                        }}
+                        disabled={submitting}
+                      >
+                        Actualizar SECHEEP
+                      </ButtonOutline>
+                    ) : null}
                     <ButtonOutline
                       type="button"
                       onClick={() => {
@@ -286,6 +327,20 @@ export function ContractServiciosSection({
         onSubmit={(values) => void handlePeriodoSubmit(values)}
         submitting={submitting}
         servicio={periodoServicio}
+      />
+
+      <SecheepImportModal
+        open={secheepModalOpen}
+        onClose={() => {
+          setSecheepModalOpen(false);
+          setSecheepServicio(null);
+        }}
+        onSubmit={async (payload) => {
+          if (!secheepServicio) return;
+          await onImportSecheep(secheepServicio.id, payload);
+        }}
+        submitting={submitting}
+        servicio={secheepServicio}
       />
 
       <RegistrarPagoServicioModal

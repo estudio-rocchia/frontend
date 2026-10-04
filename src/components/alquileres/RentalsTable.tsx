@@ -95,7 +95,7 @@ export function RentalsTable({
                 <th className="w-[108px] px-4">Estado</th>
                 <th className="w-[104px] whitespace-nowrap px-4">Inicio</th>
                 <th className="w-[120px] whitespace-nowrap px-4">Fin contrato</th>
-                <th className="w-[168px] px-4">Luz</th>
+                <th className="w-[168px] px-4">Servicios</th>
                 <th className="w-[1%] whitespace-nowrap px-4 pl-8 text-right">
                   Acciones
                 </th>
@@ -151,14 +151,14 @@ export function RentalsTable({
                     <td className="px-4">
                       <div className="flex flex-col gap-1">
                         <span className="font-semibold text-text-primary">
-                          {row.electricity.provider}
+                          {row.servicios.summary}
                         </span>
                         <span className="text-[12px] text-text-secondary">
-                          Nº {row.electricity.accountNumber}
+                          {row.servicios.detail}
                         </span>
                         <StatusBadge
-                          label={row.electricity.status.label}
-                          variant={row.electricity.status.variant}
+                          label={row.servicios.status.label}
+                          variant={row.servicios.status.variant}
                         />
                       </div>
                     </td>
