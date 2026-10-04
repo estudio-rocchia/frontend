@@ -61,8 +61,14 @@ const RENTAL_ERROR_MESSAGES: Record<string, string> = {
   "frecuenciaAjusteMeses requires tipoIndiceId": "Seleccioná un índice de ajuste válido.",
 };
 
+const INDEX_VALUE_MISSING_RE = /^No index value for (ICL|IPC|CAC) at /;
+
 export function rentalApiErrorMessage(err: unknown, fallback = "No se pudo crear el contrato"): string {
   if (err instanceof Error) {
+    const indexMatch = INDEX_VALUE_MISSING_RE.exec(err.message);
+    if (indexMatch) {
+      return `No hay valor ${indexMatch[1]} para ese período. Ejecutá sync de índices o cargá el monto manualmente.`;
+    }
     return RENTAL_ERROR_MESSAGES[err.message] ?? err.message;
   }
   return fallback;

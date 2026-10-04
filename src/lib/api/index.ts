@@ -12,6 +12,8 @@ import type {
   PagoDetail,
   PagoRecord,
   PersonaRecord,
+  PreviewAjusteInput,
+  PreviewAjusteResponse,
   ReciboRecord,
   ServicioContratoRecord,
 } from "./types";
@@ -150,5 +152,13 @@ export function changeContratoEstado(
     method: "POST",
     token,
     body: JSON.stringify({ estado }),
+  });
+}
+
+export function previewAjusteIndice(token: string, body: PreviewAjusteInput) {
+  return apiRequest<PreviewAjusteResponse>("/indices/preview-ajuste", {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
   });
 }

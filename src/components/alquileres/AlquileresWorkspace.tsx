@@ -463,6 +463,7 @@ export function AlquileresWorkspace() {
       <RenewContractModal
         open={renewModalOpen}
         contrato={selectedContrato}
+        token={token}
         onClose={() => setRenewModalOpen(false)}
         onSubmit={(form) => void handleRenewContract(form)}
         submitting={submitting}

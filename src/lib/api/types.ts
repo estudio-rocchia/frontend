@@ -28,6 +28,29 @@ export interface CatalogoItem {
   name: string;
 }
 
+export type IndiceCode = "ICL" | "IPC" | "CAC";
+
+export interface PreviewAjusteInput {
+  tipoIndiceCode: IndiceCode;
+  montoAnterior: number;
+  fechaDesde: string;
+  fechaHasta: string;
+}
+
+export interface PreviewAjusteResponse {
+  tipoIndiceCode: IndiceCode;
+  periodoDesde: string;
+  periodoHasta: string;
+  valorDesde: string;
+  valorHasta: string;
+  factor: string;
+  variacionPct: string;
+  montoAnterior: string;
+  montoNuevo: string;
+  fuenteDesde: string;
+  fuenteHasta: string;
+}
+
 export interface PersonaRecord {
   id: number;
   tipoPersona: string;
