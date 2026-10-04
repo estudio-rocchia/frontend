@@ -3,11 +3,17 @@ export type AdjustmentIndex = "ICL" | "IPC" | "CAC";
 export type ContractDetail = {
   id: string;
   drawerRef: string;
+  propertyCode: string;
+  estado: string;
+  contractStart: string;
+  contractEnd: string;
   property: string;
   tenant: string;
   owner: string;
   guarantors: string;
   adjustmentIndex: AdjustmentIndex;
+  adjustmentFrequency: string;
+  paymentDueDay: string;
   previousAmount: string;
   calculatedNewAmount: string;
   daysSince10: string;
@@ -15,10 +21,23 @@ export type ContractDetail = {
   punitiveHint: string;
 };
 
+const mockMeta: Pick<
+  ContractDetail,
+  "propertyCode" | "estado" | "contractStart" | "contractEnd" | "adjustmentFrequency" | "paymentDueDay"
+> = {
+  propertyCode: "—",
+  estado: "Activo",
+  contractStart: "—",
+  contractEnd: "—",
+  adjustmentFrequency: "—",
+  paymentDueDay: "—",
+};
+
 const details: Record<string, ContractDetail> = {
   "ALQ-1042": {
     id: "ALQ-1042",
     drawerRef: "ALQ-1042 · Depto Palermo 4°A",
+    ...mockMeta,
     property: "Departamento · Jerónimo Salguero 1120, Palermo",
     tenant: "Lucía Fernández · DNI 32.456.789",
     owner: "Estudio Rocchia SA · CUIT 30-65432109-1",
@@ -34,6 +53,7 @@ const details: Record<string, ContractDetail> = {
   "ALQ-0988": {
     id: "ALQ-0988",
     drawerRef: "ALQ-0988 · Local San Isidro",
+    ...mockMeta,
     property: "Local comercial · Av. Centenario 1204, San Isidro",
     tenant: "Grupo Norte SRL · CUIT 30-71234567-8",
     owner: "Estudio Rocchia SA · CUIT 30-65432109-1",
@@ -49,6 +69,7 @@ const details: Record<string, ContractDetail> = {
   "ALQ-1103": {
     id: "ALQ-1103",
     drawerRef: "ALQ-1103 · PH Belgrano",
+    ...mockMeta,
     property: "PH · Moldes 1842, Belgrano",
     tenant: "Martín Acosta · DNI 28.901.234",
     owner: "Inversora Delta · CUIT 30-70111222-3",
@@ -64,6 +85,7 @@ const details: Record<string, ContractDetail> = {
   "ALQ-0871": {
     id: "ALQ-0871",
     drawerRef: "ALQ-0871 · Oficina Microcentro",
+    ...mockMeta,
     property: "Oficina · Reconquista 656, Microcentro",
     tenant: "Byte Legal · CUIT 30-99887766-1",
     owner: "Estudio Rocchia SA · CUIT 30-65432109-1",
@@ -78,6 +100,7 @@ const details: Record<string, ContractDetail> = {
   "ALQ-1156": {
     id: "ALQ-1156",
     drawerRef: "ALQ-1156 · Casa Nordelta",
+    ...mockMeta,
     property: "Casa · Av. de los Lagos 450, Nordelta",
     tenant: "Fam. Pérez · DNI titular 25.443.210",
     owner: "Inmob. Sur · CUIT 30-61234567-0",
@@ -93,6 +116,7 @@ const details: Record<string, ContractDetail> = {
   "ALQ-1020": {
     id: "ALQ-1020",
     drawerRef: "ALQ-1020 · Depto Recoleta",
+    ...mockMeta,
     property: "Departamento · Av. Callao 1200, Recoleta",
     tenant: "Studio Alfa · CUIT 30-55443322-7",
     owner: "Fam. Rocchia · CUIT 27-11223344-5",
@@ -122,6 +146,7 @@ export function buildNewContractDetail(input: {
   return {
     id: input.id,
     drawerRef: `${input.id} · ${input.propertyLabel}`,
+    ...mockMeta,
     property: input.propertyAddress,
     tenant: input.tenant,
     owner: input.owner,

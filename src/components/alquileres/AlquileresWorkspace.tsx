@@ -7,6 +7,10 @@ import {
   NewContractModal,
   type NewContractForm,
 } from "@/components/alquileres/NewContractModal";
+import {
+  RenewContractModal,
+  type RenewContractForm,
+} from "@/components/alquileres/RenewContractModal";
 import { RentalsTable } from "@/components/alquileres/RentalsTable";
 import { ButtonPrimary } from "@/components/ui/Button";
 import { useAuth } from "@/context/auth-context";
@@ -14,11 +18,11 @@ import type { ContractDetail } from "@/data/alquileres-contract-details";
 import type { RentalRow } from "@/data/alquileres-rentals";
 import {
   ApiError,
+  changeContratoEstado,
   createContrato,
   createInmueble,
   createLocalidad,
   createPersona,
-  downloadReciboPdf,
   fetchCatalog,
   fetchContrato,
   fetchContratos,
@@ -27,13 +31,11 @@ import {
   fetchInmuebleFicha,
   fetchInmuebles,
   fetchLocalidades,
-  fetchPagos,
-  fetchPago,
   fetchServicios,
-  issueRecibo,
 } from "@/lib/api";
+import type { ContratoDetail } from "@/lib/api/types";
 import { nextContratoCode, nextInmuebleCode, prefixForTipoInmueble } from "@/lib/codes";
-import { downloadBlob, parsePersonName, personaDisplayName, rentalApiErrorMessage } from "@/lib/format";
+import { parsePersonName, personaDisplayName, rentalApiErrorMessage } from "@/lib/format";
 import {
   buildBillingIndex,
   mapContratoDetailToFicha,
@@ -52,9 +54,10 @@ export function AlquileresWorkspace() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<ContractDetail | null>(null);
+  const [selectedContrato, setSelectedContrato] = useState<ContratoDetail | null>(null);
   const [newModalOpen, setNewModalOpen] = useState(false);
+  const [renewModalOpen, setRenewModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [codeContext, setCodeContext] = useState<{
@@ -122,12 +125,13 @@ export function AlquileresWorkspace() {
   const openDrawer = useCallback(
     async (id: string) => {
       if (!token) return;
-      setSelectedId(id);
       setDrawerOpen(true);
       setDetail(null);
+      setSelectedContrato(null);
       try {
         const contratoId = Number(id);
         const detailRes = await fetchContrato(token, contratoId);
+        setSelectedContrato(detailRes);
         let ficha = { propietarios: [] as Array<{ personaId: number; nombre?: string | null; apellido?: string | null; razonSocial?: string | null }> };
         if (detailRes.inmueble?.id) {
           try {
@@ -145,35 +149,92 @@ export function AlquileresWorkspace() {
     [token, showToast],
   );
 
-  async function handleEmitReceipt() {
-    if (!token || !selectedId) return;
+  async function handleRenewContract(form: RenewContractForm) {
+    if (!token || !selectedContrato) return;
+    if (selectedContrato.estado !== "active") {
+      showToast("Solo se pueden renovar contratos activos.");
+      return;
+    }
+
+    setSubmitting(true);
     try {
-      const contratoId = Number(selectedId);
-      const pagos = await fetchPagos(token, contratoId);
-      if (!pagos.items.length) {
-        showToast("No hay pagos registrados para emitir recibo.");
-        return;
+      const amount = Number(form.monto.replace(/\D/g, ""));
+      if (!Number.isFinite(amount) || amount <= 0) {
+        throw new ApiError(400, {
+          error: { code: "VALIDATION_ERROR", message: "Ingresá un monto mensual válido" },
+        });
       }
 
-      let reciboId: number | null = null;
-      for (const pago of pagos.items) {
-        const detail = await fetchPago(token, pago.id);
-        if (detail.recibo) {
-          reciboId = detail.recibo.id;
+      const contratosRes = await fetchContratos(token, { limit: 200 });
+      const reservedContratoCodes = contratosRes.items.map((item) => item.contratoCode);
+
+      await changeContratoEstado(token, selectedContrato.id, "finished");
+
+      let nuevoContrato = null as Awaited<ReturnType<typeof createContrato>> | null;
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const contratoCode = nextContratoCode(reservedContratoCodes);
+        try {
+          nuevoContrato = await createContrato(token, {
+            contratoCode,
+            inmuebleId: selectedContrato.inmuebleId,
+            inquilinoId: selectedContrato.inquilinoId,
+            fechaInicio: form.fechaInicio,
+            fechaFin: form.fechaFin,
+            montoAlquiler: amount,
+            codigoMoneda: selectedContrato.codigoMoneda.trim(),
+            diaVencimientoPago: selectedContrato.diaVencimientoPago,
+            frecuenciaAjusteMeses: selectedContrato.frecuenciaAjusteMeses,
+            tipoIndiceId: selectedContrato.tipoIndice?.id ?? null,
+            tipoMoraId: selectedContrato.tipoMora?.id ?? null,
+            tasaMora: selectedContrato.tasaMora ? Number(selectedContrato.tasaMora) : null,
+            montoDeposito: amount,
+            codigoMonedaDeposito: selectedContrato.codigoMoneda.trim(),
+            enAdministracion: false,
+            renewalOfContratoId: selectedContrato.id,
+            notas: `Renovación del contrato #${selectedContrato.id}.`,
+          });
           break;
+        } catch (err) {
+          if (err instanceof ApiError && err.status === 409) {
+            reservedContratoCodes.push(contratoCode);
+            continue;
+          }
+          throw err;
         }
       }
 
-      if (!reciboId) {
-        const issued = await issueRecibo(token, pagos.items[0]!.id);
-        reciboId = issued.id;
+      if (!nuevoContrato) {
+        throw new ApiError(409, {
+          error: {
+            code: "CONFLICT",
+            message: "No se pudo reservar un código para el contrato renovado.",
+          },
+        });
       }
 
-      const blob = await downloadReciboPdf(token, reciboId);
-      downloadBlob(blob, `recibo-${reciboId}.pdf`);
-      showToast("Recibo PDF descargado.");
+      setRenewModalOpen(false);
+      const inmuebleCode = selectedContrato.inmueble?.code ?? "inmueble";
+      showToast(`Renovación registrada para ${inmuebleCode}.`);
+      await loadRows();
     } catch (err) {
-      showToast(err instanceof ApiError ? err.message : "No se pudo emitir el recibo");
+      showToast(rentalApiErrorMessage(err, "No se pudo renovar el contrato"));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function openRenewFromRow(row: RentalRow) {
+    if (!token) return;
+    try {
+      const detailRes = await fetchContrato(token, Number(row.id));
+      if (detailRes.estado !== "active") {
+        showToast("Solo se pueden renovar contratos activos.");
+        return;
+      }
+      setSelectedContrato(detailRes);
+      setRenewModalOpen(true);
+    } catch (err) {
+      showToast(err instanceof ApiError ? err.message : "No se pudo cargar el contrato");
     }
   }
 
@@ -385,16 +446,26 @@ export function AlquileresWorkspace() {
             </button>
           </div>
         ) : (
-          <RentalsTable rows={tableRows} onViewFicha={(row) => void openDrawer(row.id)} />
+          <RentalsTable
+            rows={tableRows}
+            onViewFicha={(row) => void openDrawer(row.id)}
+            onRenew={(row) => void openRenewFromRow(row)}
+          />
         )}
       </div>
 
       <ContractFichaDrawer
         open={drawerOpen}
         detail={detail}
-        intent="ficha"
         onClose={() => setDrawerOpen(false)}
-        onEmitReceipt={() => void handleEmitReceipt()}
+      />
+
+      <RenewContractModal
+        open={renewModalOpen}
+        contrato={selectedContrato}
+        onClose={() => setRenewModalOpen(false)}
+        onSubmit={(form) => void handleRenewContract(form)}
+        submitting={submitting}
       />
 
       <NewContractModal

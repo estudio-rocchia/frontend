@@ -140,3 +140,15 @@ export function createContrato(
     body: JSON.stringify(body),
   });
 }
+
+export function changeContratoEstado(
+  token: string,
+  contratoId: number,
+  estado: "finished" | "terminated",
+) {
+  return apiRequest<ContratoRecord>(`/contratos/${contratoId}/estado`, {
+    method: "POST",
+    token,
+    body: JSON.stringify({ estado }),
+  });
+}

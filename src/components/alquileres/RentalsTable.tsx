@@ -15,9 +15,11 @@ const PAGE_SIZE = 15;
 export function RentalsTable({
   rows,
   onViewFicha,
+  onRenew,
 }: {
   rows: RentalRow[];
   onViewFicha: (row: RentalRow) => void;
+  onRenew: (row: RentalRow) => void;
 }) {
   const [activeChip, setActiveChip] = useState<RentalChipId>("todos");
   const [page, setPage] = useState(1);
@@ -131,12 +133,14 @@ export function RentalsTable({
                       </div>
                     </td>
                     <td className="whitespace-nowrap px-4 pl-8 text-right">
-                      <ButtonPrimary
-                        type="button"
-                        onClick={() => onViewFicha(row)}
-                      >
-                        Ver ficha
-                      </ButtonPrimary>
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        <ButtonOutline type="button" onClick={() => onViewFicha(row)}>
+                          Ver ficha
+                        </ButtonOutline>
+                        <ButtonPrimary type="button" onClick={() => onRenew(row)}>
+                          Renovar
+                        </ButtonPrimary>
+                      </div>
                     </td>
                   </tr>
                 ))

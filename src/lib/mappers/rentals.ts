@@ -144,18 +144,39 @@ export function mapContratoDetailToFicha(
   const indexCode = (detail.tipoIndice?.code?.toUpperCase() ?? "ICL") as AdjustmentIndex;
   const moraPercent = detail.tasaMora ? `${(Number(detail.tasaMora) * 100).toFixed(1).replace(".", ",")}%` : "2,5%";
 
+  const estadoLabel =
+    detail.estado === "active"
+      ? "Activo"
+      : detail.estado === "finished"
+        ? "Finalizado"
+        : detail.estado === "terminated"
+          ? "Rescindido"
+          : detail.estado;
+
+  const ajusteMeses = detail.frecuenciaAjusteMeses
+    ? `Cada ${detail.frecuenciaAjusteMeses} meses`
+    : "Sin ajuste programado";
+
   return {
     id: String(detail.id),
     drawerRef: `${code} · ${propertyTitle}`,
+    propertyCode: code,
+    estado: estadoLabel,
+    contractStart: formatDateDisplay(detail.fechaInicio),
+    contractEnd: formatDateDisplay(detail.fechaFin),
     property: propertyAddress,
     tenant,
     owner,
     guarantors: detail.garantes.length ? `${detail.garantes.length} garante(s)` : "—",
     adjustmentIndex: indexCode,
+    adjustmentFrequency: ajusteMeses,
+    paymentDueDay: `Día ${detail.diaVencimientoPago} de cada mes`,
     previousAmount: formatMoney(detail.montoAlquiler, detail.codigoMoneda),
     calculatedNewAmount: formatMoney(detail.montoAlquiler, detail.codigoMoneda),
     daysSince10: "—",
     surchargePercent: moraPercent,
-    punitiveHint: `Contrato ${detail.estado} · vence ${formatDateDisplay(detail.fechaFin)}`,
+    punitiveHint: detail.tipoIndice?.name
+      ? `Índice: ${detail.tipoIndice.name}`
+      : `Contrato ${estadoLabel}`,
   };
 }
