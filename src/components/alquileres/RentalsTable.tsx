@@ -95,7 +95,7 @@ export function RentalsTable({
       </section>
 
       <section className="flex min-h-[400px] flex-1 flex-col overflow-hidden rounded-md border border-border bg-bg-card shadow-[var(--shadow-card)]">
-        <div className="border-b border-border px-5 py-4">
+        <div className="border-b border-border px-4 py-4 sm:px-5">
           <h2 className="text-[15px] font-semibold text-text-primary">Listado de contratos</h2>
           <p className="text-xs text-text-secondary">
             {query.trim()
@@ -105,19 +105,19 @@ export function RentalsTable({
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1100px] text-left text-[13px]">
+          <table className="w-full min-w-[880px] text-left text-[13px]">
             <thead>
               <tr className="h-11 bg-bg-cream text-xs font-semibold text-text-secondary">
-                <th className="px-5">Contrato / Propiedad</th>
-                <th className="px-5">Inquilino</th>
-                <th className="px-5">Mes</th>
-                <th className="px-5 text-right">Monto</th>
-                <th className="px-5 text-right">Días mora</th>
-                <th className="px-5 text-center">Estado</th>
-                <th className="whitespace-nowrap px-5">Inicio</th>
-                <th className="whitespace-nowrap px-5">Fin</th>
-                <th className="px-5 text-center">Servicios</th>
-                <th className="whitespace-nowrap px-5 text-right">Acciones</th>
+                <th className="px-3 sm:px-5">Contrato / Propiedad</th>
+                <th className="px-3 sm:px-5">Inquilino</th>
+                <th className="hidden px-3 sm:px-5 2xl:table-cell">Mes</th>
+                <th className="px-3 text-right sm:px-5">Monto</th>
+                <th className="hidden px-3 text-right sm:px-5 lg:table-cell">Días mora</th>
+                <th className="px-3 text-center sm:px-5">Estado</th>
+                <th className="hidden whitespace-nowrap px-3 sm:px-5 xl:table-cell">Inicio</th>
+                <th className="whitespace-nowrap px-3 sm:px-5">Fin</th>
+                <th className="hidden px-3 text-center sm:px-5 lg:table-cell">Servicios</th>
+                <th className="whitespace-nowrap px-3 text-right sm:px-5">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -137,29 +137,29 @@ export function RentalsTable({
                       key={row.id}
                       className="border-b border-border align-middle transition-colors hover:bg-bg-page/70 [&>td]:py-4"
                     >
-                      <td className="px-5 font-medium text-text-primary">{row.contractProperty}</td>
-                      <td className="px-5 text-text-primary">{row.tenant}</td>
-                      <td className="px-5 text-text-secondary">{row.month}</td>
-                      <td className={`px-5 text-right text-[15px] font-bold text-primary ${moneyClassName}`}>
+                      <td className="px-3 font-medium text-text-primary sm:px-5">{row.contractProperty}</td>
+                      <td className="px-3 text-text-primary sm:px-5">{row.tenant}</td>
+                      <td className="hidden px-3 text-text-secondary sm:px-5 2xl:table-cell">{row.month}</td>
+                      <td className={`px-3 text-right text-[15px] font-bold text-primary sm:px-5 ${moneyClassName}`}>
                         {row.amount}
                       </td>
                       <td
-                        className={`px-5 text-right font-semibold ${
+                        className={`hidden px-3 text-right font-semibold sm:px-5 lg:table-cell ${
                           row.daysOverdue > 0 ? "text-danger" : "text-text-primary"
                         }`}
                       >
                         {row.daysOverdue}
                       </td>
-                      <td className="px-5 text-center">
+                      <td className="px-3 text-center sm:px-5">
                         <StatusBadge label={row.status.label} variant={row.status.variant} />
                       </td>
-                      <td className="whitespace-nowrap px-5 text-text-secondary">
+                      <td className="hidden whitespace-nowrap px-3 text-text-secondary sm:px-5 xl:table-cell">
                         {row.contractStart}
                       </td>
-                      <td className="whitespace-nowrap px-5">
+                      <td className="whitespace-nowrap px-3 sm:px-5">
                         <ContractEndCell row={row} />
                       </td>
-                      <td className="px-5 text-center">
+                      <td className="hidden px-3 text-center sm:px-5 lg:table-cell">
                         <div className="flex flex-col items-center gap-1">
                           <span className="font-medium text-text-primary">{row.servicios.summary}</span>
                           <StatusBadge
@@ -168,9 +168,9 @@ export function RentalsTable({
                           />
                         </div>
                       </td>
-                      <td className="whitespace-nowrap px-5 text-right">
-                        <div className="flex flex-wrap items-center justify-end gap-2">
-                          <ButtonOutline type="button" onClick={() => onViewFicha(row)}>
+                      <td className="whitespace-nowrap px-3 text-right sm:px-5">
+                        <div className="flex flex-wrap items-center justify-end gap-1.5 sm:gap-2">
+                          <ButtonOutline type="button" onClick={() => onViewFicha(row)} className="px-2.5 py-1.5 text-xs sm:px-[18px] sm:py-2 sm:text-sm">
                             Ver ficha
                           </ButtonOutline>
                           {showAdjust ? (
@@ -193,7 +193,7 @@ export function RentalsTable({
           </table>
         </div>
 
-        <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3">
+        <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3 sm:px-5">
           <p className="text-[12px] text-text-secondary">
             {filtered.length === 0
               ? "0 contratos"

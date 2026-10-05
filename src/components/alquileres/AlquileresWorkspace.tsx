@@ -66,6 +66,7 @@ import {
   downloadBlob,
   rentalApiErrorMessage,
 } from "@/lib/format";
+import { pagePaddingClass } from "@/lib/layout";
 import { fromIsoMonthDate } from "@/lib/rental-adjustment";
 import {
   buildBillingIndex,
@@ -773,7 +774,7 @@ export function AlquileresWorkspace() {
 
   return (
     <>
-      <div className="flex flex-col gap-8 px-7 py-6">
+      <div className={`flex flex-col gap-6 sm:gap-8 ${pagePaddingClass}`}>
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex max-w-2xl flex-col gap-1">
             <h1 className="text-[22px] font-bold text-text-primary">Gestión de alquileres</h1>

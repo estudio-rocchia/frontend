@@ -1,7 +1,9 @@
 "use client";
 
 import { X } from "lucide-react";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
+
+import { useScrollLock } from "@/lib/use-scroll-lock";
 
 export function DrawerPanel({
   open,
@@ -20,10 +22,21 @@ export function DrawerPanel({
   banner?: ReactNode;
   children: ReactNode;
 }) {
+  useScrollLock(open);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open, onClose]);
+
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
+    <div className="fixed inset-0 z-50 flex justify-end overflow-hidden">
       <button
         type="button"
         className="absolute inset-0 bg-[#1a2b3266]"
@@ -31,12 +44,12 @@ export function DrawerPanel({
         onClick={onClose}
       />
       <aside
-        className="relative flex h-full w-full max-w-[520px] flex-col border-l border-border bg-bg-card shadow-[-4px_0_24px_#1a2b3228]"
+        className="relative flex h-full max-h-[100dvh] w-full max-w-full flex-col overflow-hidden border-l border-border bg-bg-card shadow-[-4px_0_24px_#1a2b3228] sm:max-w-[min(520px,100vw)]"
         role="dialog"
         aria-modal="true"
         aria-labelledby="drawer-title"
       >
-        <header className="flex shrink-0 items-center justify-between border-b border-border px-6 py-5">
+        <header className="flex shrink-0 items-center justify-between border-b border-border px-4 py-4 sm:px-6 sm:py-5">
           <div className="flex flex-col gap-1">
             <h2
               id="drawer-title"
@@ -58,12 +71,13 @@ export function DrawerPanel({
           </button>
         </header>
 
-        {banner ? <div className="shrink-0 px-6 pt-4">{banner}</div> : null}
-
-        <div className="flex-1 overflow-y-auto px-6 py-5">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5">
+          {banner ? <div className="mb-6">{banner}</div> : null}
+          {children}
+        </div>
 
         {footer ? (
-          <footer className="flex shrink-0 justify-end gap-3 border-t border-border px-6 py-6">
+          <footer className="flex shrink-0 flex-wrap justify-end gap-3 border-t border-border px-4 py-4 sm:px-6 sm:py-6">
             {footer}
           </footer>
         ) : null}

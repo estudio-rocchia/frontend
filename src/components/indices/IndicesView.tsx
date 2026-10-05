@@ -8,6 +8,7 @@ import { useAuth } from "@/context/auth-context";
 import { ApiError, fetchIndiceValores } from "@/lib/api";
 import type { IndiceCode, ValorIndiceRecord } from "@/lib/api/types";
 import { formatIndexValue, formatPeriodoIndice } from "@/lib/format";
+import { pagePaddingClass } from "@/lib/layout";
 import { ADJUSTMENT_INDICES } from "@/lib/rental-adjustment";
 
 const INDEX_LABELS: Record<IndiceCode, string> = {
@@ -110,7 +111,7 @@ export function IndicesView() {
   }, [rows]);
 
   return (
-    <div className="flex flex-col gap-8 px-7 py-6">
+    <div className={`flex flex-col gap-6 sm:gap-8 ${pagePaddingClass}`}>
       <header className="flex flex-col gap-1">
         <h1 className="text-[22px] font-bold text-text-primary">Índices de ajuste</h1>
         <p className="max-w-2xl text-sm text-text-secondary">
