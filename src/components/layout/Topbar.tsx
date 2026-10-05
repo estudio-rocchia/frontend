@@ -22,7 +22,7 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
   }, [searchEnabled, clearQuery]);
 
   return (
-    <header className="flex min-h-16 shrink-0 flex-wrap items-center gap-3 border-b border-border bg-bg-card px-4 py-3 sm:px-5 xl:px-6">
+    <header className="flex min-h-16 shrink-0 items-center gap-2 border-b border-border bg-bg-card px-4 py-3 sm:gap-3 sm:px-5 xl:px-6">
       <button
         type="button"
         onClick={onMenuClick}
@@ -32,7 +32,7 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
         <Menu className="h-5 w-5" />
       </button>
 
-      <label className="order-3 flex w-full min-w-0 items-center gap-2.5 rounded-sm border border-border bg-bg-page px-3 py-2.5 focus-within:border-primary sm:order-none sm:w-auto sm:flex-1 sm:max-w-md xl:max-w-[360px]">
+      <label className="flex min-w-0 flex-1 items-center gap-2.5 rounded-sm border border-border bg-bg-page px-3 py-2.5 focus-within:border-primary sm:max-w-md xl:max-w-[360px]">
         <Search className="h-[18px] w-[18px] shrink-0 text-text-secondary" aria-hidden />
         <input
           type="search"
@@ -45,7 +45,7 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
         />
       </label>
 
-      <div className="flex items-center gap-2 sm:gap-3">
+      <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
         <button
           type="button"
           className="text-text-secondary hover:text-text-primary"
