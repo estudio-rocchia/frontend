@@ -9,7 +9,13 @@ import {
   type IndexCalculatorState,
 } from "@/components/alquileres/ContractIndexCalculator";
 import type { ContratoDetail, PreviewAjusteResponse } from "@/lib/api/types";
-import { formatIndexValue, formatMoney, formatMonthYear, personaDisplayName } from "@/lib/format";
+import {
+  formatIndexValue,
+  formatMoney,
+  formatMonthYear,
+  moneyClassName,
+  personaDisplayName,
+} from "@/lib/format";
 import {
   adjustmentRecordDate,
   contractualAdjustmentEnd,
@@ -162,7 +168,7 @@ export function AdjustContractModal({
           <p className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
             Alquiler actual
           </p>
-          <p className="mt-2 text-xl font-semibold text-text-primary">
+          <p className={`mt-2 text-xl font-semibold text-text-primary ${moneyClassName}`}>
             {formatMoney(contrato.montoAlquiler, currency)}
           </p>
 
@@ -175,7 +181,7 @@ export function AdjustContractModal({
               <p className="mt-6 text-[11px] font-semibold uppercase tracking-wide text-primary">
                 Nuevo alquiler
               </p>
-              <p className="mt-2 text-[32px] font-bold leading-none text-primary">
+              <p className={`mt-2 text-[32px] font-bold leading-none text-primary ${moneyClassName}`}>
                 {formatMoney(preview.montoNuevo, currency)}
               </p>
               <p className="mt-3 text-[15px] font-semibold text-text-primary">

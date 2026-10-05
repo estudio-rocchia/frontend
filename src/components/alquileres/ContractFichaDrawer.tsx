@@ -9,6 +9,7 @@ import { FieldBlock, FormSection } from "@/components/ui/FormLayout";
 import { ButtonOutline } from "@/components/ui/Button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import type { ContractDetail } from "@/data/alquileres-contract-details";
+import { moneyClassName } from "@/lib/format";
 import type {
   CatalogoItem,
   PeriodoServicioRecord,
@@ -74,7 +75,9 @@ export function ContractFichaDrawer({
           <p className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
             Alquiler mensual
           </p>
-          <p className="mt-1 text-[28px] font-bold leading-none text-primary">{detail.previousAmount}</p>
+          <p className={`mt-1 text-[28px] font-bold leading-none text-primary ${moneyClassName}`}>
+            {detail.previousAmount}
+          </p>
           <p className="mt-3 text-sm text-text-secondary">{detail.property}</p>
           <div className="mt-3">
             <StatusBadge

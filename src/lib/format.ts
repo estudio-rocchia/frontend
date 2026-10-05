@@ -5,6 +5,8 @@ const MONTHS_ES = [
   "Jul", "Ago", "Sep", "Oct", "Nov", "Dic",
 ];
 
+const MONEY_NBSP = "\u00A0";
+
 export function formatMoney(amount: string, currency: string): string {
   const value = Number(amount);
   if (Number.isNaN(value)) return amount;
@@ -12,8 +14,11 @@ export function formatMoney(amount: string, currency: string): string {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   });
-  return currency === "USD" ? `USD ${formatted}` : `$ ${formatted}`;
+  return currency === "USD" ? `USD${MONEY_NBSP}${formatted}` : `$${MONEY_NBSP}${formatted}`;
 }
+
+/** Evita que el símbolo y el monto se partan en dos líneas en tablas y tarjetas. */
+export const moneyClassName = "whitespace-nowrap tabular-nums";
 
 export function formatDateDisplay(isoDate: string): string {
   const [year, month, day] = isoDate.split("-");

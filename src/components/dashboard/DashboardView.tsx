@@ -6,6 +6,7 @@ import { KpiCard } from "@/components/ui/KpiCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useAuth } from "@/context/auth-context";
 import { ApiError, fetchDashboardResumen } from "@/lib/api";
+import { moneyClassName } from "@/lib/format";
 import { mapDashboardContracts, mapDashboardKpis } from "@/lib/mappers/dashboard";
 
 export function DashboardView() {
@@ -87,7 +88,7 @@ export function DashboardView() {
                   <th className="px-4">Monto actual</th>
                   <th className="px-4">Índice</th>
                   <th className="px-4">Vencimiento</th>
-                  <th className="px-4">Estado</th>
+                  <th className="px-4 text-center">Estado</th>
                   <th className="px-4">Acciones</th>
                 </tr>
               </thead>
@@ -97,10 +98,10 @@ export function DashboardView() {
                     <td className="px-4 text-text-primary">{row.property}</td>
                     <td className="px-4 text-text-primary">{row.tenant}</td>
                     <td className="px-4 text-text-primary">{row.owner}</td>
-                    <td className="px-4 font-semibold text-primary">{row.amount}</td>
+                    <td className={`px-4 font-semibold text-primary ${moneyClassName}`}>{row.amount}</td>
                     <td className="px-4 text-text-primary">{row.index}</td>
                     <td className="px-4 text-text-primary">{row.dueDate}</td>
-                    <td className="px-4">
+                    <td className="px-4 text-center">
                       <StatusBadge label={row.status.label} variant={row.status.variant} />
                     </td>
                     <td className="px-4">

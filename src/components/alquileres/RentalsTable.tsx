@@ -12,7 +12,7 @@ import {
   type RentalChipId,
   type RentalRow,
 } from "@/data/alquileres-rentals";
-import { contractEndHint } from "@/lib/format";
+import { contractEndHint, moneyClassName } from "@/lib/format";
 
 const PAGE_SIZE = 15;
 
@@ -113,10 +113,10 @@ export function RentalsTable({
                 <th className="px-5">Mes</th>
                 <th className="px-5 text-right">Monto</th>
                 <th className="px-5 text-right">Días mora</th>
-                <th className="px-5">Estado</th>
+                <th className="px-5 text-center">Estado</th>
                 <th className="whitespace-nowrap px-5">Inicio</th>
                 <th className="whitespace-nowrap px-5">Fin</th>
-                <th className="px-5">Servicios</th>
+                <th className="px-5 text-center">Servicios</th>
                 <th className="whitespace-nowrap px-5 text-right">Acciones</th>
               </tr>
             </thead>
@@ -140,7 +140,7 @@ export function RentalsTable({
                       <td className="px-5 font-medium text-text-primary">{row.contractProperty}</td>
                       <td className="px-5 text-text-primary">{row.tenant}</td>
                       <td className="px-5 text-text-secondary">{row.month}</td>
-                      <td className="px-5 text-right text-[15px] font-bold text-primary">
+                      <td className={`px-5 text-right text-[15px] font-bold text-primary ${moneyClassName}`}>
                         {row.amount}
                       </td>
                       <td
@@ -150,7 +150,7 @@ export function RentalsTable({
                       >
                         {row.daysOverdue}
                       </td>
-                      <td className="px-5">
+                      <td className="px-5 text-center">
                         <StatusBadge label={row.status.label} variant={row.status.variant} />
                       </td>
                       <td className="whitespace-nowrap px-5 text-text-secondary">
@@ -159,8 +159,8 @@ export function RentalsTable({
                       <td className="whitespace-nowrap px-5">
                         <ContractEndCell row={row} />
                       </td>
-                      <td className="px-5">
-                        <div className="flex flex-col gap-1">
+                      <td className="px-5 text-center">
+                        <div className="flex flex-col items-center gap-1">
                           <span className="font-medium text-text-primary">{row.servicios.summary}</span>
                           <StatusBadge
                             label={row.servicios.status.label}

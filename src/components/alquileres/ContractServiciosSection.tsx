@@ -18,7 +18,7 @@ import type {
   SecheepImportInput,
   ServicioContratoRecord,
 } from "@/lib/api/types";
-import { formatDateDisplay, formatMoney } from "@/lib/format";
+import { formatDateDisplay, formatMoney, moneyClassName } from "@/lib/format";
 import { isSecheepElectricity, secheepConfigured, secheepStatusForServicio } from "@/lib/mappers/secheep";
 import {
   canAddMoreServicios,
@@ -114,7 +114,7 @@ export function ContractServiciosSection({
               Saldo pendiente
             </p>
             <p
-              className={`mt-1 text-xl font-bold ${
+              className={`mt-1 text-xl font-bold tabular-nums whitespace-nowrap ${
                 saldoTotal.total > 0 ? "text-danger" : "text-primary"
               }`}
             >
@@ -249,7 +249,7 @@ export function ContractServiciosSection({
                             ) : null}
                           </div>
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-[15px] font-bold text-primary">
+                            <span className={`text-[15px] font-bold text-primary ${moneyClassName}`}>
                               {formatMoney(periodo.monto, periodo.codigoMoneda)}
                             </span>
                             <StatusBadge
