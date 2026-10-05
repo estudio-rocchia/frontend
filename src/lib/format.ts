@@ -41,6 +41,23 @@ export function contractEndHint(daysUntilEnd: number): string | null {
   return null;
 }
 
+export function formatIndexValue(value: string): string {
+  const num = Number.parseFloat(value);
+  if (!Number.isFinite(num)) return value;
+  if (num >= 1000) {
+    return num.toLocaleString("es-AR", { maximumFractionDigits: 1 });
+  }
+  return num.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+export function formatPeriodoIndice(periodo: string): string {
+  const match = /^(\d{4})-(\d{2})/.exec(periodo);
+  if (!match) return periodo;
+  const anio = Number.parseInt(match[1], 10);
+  const mes = Number.parseInt(match[2], 10);
+  return formatMonthYear(anio, mes);
+}
+
 export function formatMonthYear(anio: number, mes: number): string {
   const label = MONTHS_ES[mes - 1] ?? String(mes);
   return `${label} ${anio}`;

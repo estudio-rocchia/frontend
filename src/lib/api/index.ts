@@ -13,8 +13,10 @@ import type {
   PagoRecord,
   PersonaRecord,
   ApplyAjusteResponse,
+  IndiceCode,
   PreviewAjusteInput,
   PreviewAjusteResponse,
+  ValorIndiceRecord,
   ReciboRecord,
   RegisterPagoInput,
   RegisterPagoResult,
@@ -216,6 +218,18 @@ export function changeContratoEstado(
     method: "POST",
     token,
     body: JSON.stringify({ estado }),
+  });
+}
+
+export function fetchIndiceValores(
+  token: string,
+  code: IndiceCode,
+  desde: string,
+  hasta: string,
+) {
+  const query = new URLSearchParams({ desde, hasta });
+  return apiRequest<{ items: ValorIndiceRecord[] }>(`/indices/${code}/valores?${query}`, {
+    token,
   });
 }
 

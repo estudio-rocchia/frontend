@@ -5,7 +5,9 @@ import type { PeriodoFormValues } from "@/components/alquileres/PeriodoServicioM
 import type { ServicioFormValues } from "@/components/alquileres/ServicioFormModal";
 import type { RegistrarPagoServicioFormValues } from "@/components/alquileres/RegistrarPagoServicioModal";
 import { DrawerPanel } from "@/components/ui/DrawerPanel";
+import { FieldBlock, FormSection } from "@/components/ui/FormLayout";
 import { ButtonOutline } from "@/components/ui/Button";
+import { StatusBadge } from "@/components/ui/StatusBadge";
 import type { ContractDetail } from "@/data/alquileres-contract-details";
 import type {
   CatalogoItem,
@@ -13,15 +15,6 @@ import type {
   SecheepImportInput,
   ServicioContratoRecord,
 } from "@/lib/api/types";
-
-function FieldBlock({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-col gap-1 rounded-sm bg-bg-page px-3.5 py-3">
-      <span className="text-[11px] font-semibold text-text-secondary">{label}</span>
-      <span className="text-[13px] text-text-primary">{value}</span>
-    </div>
-  );
-}
 
 export function ContractFichaDrawer({
   open,
@@ -72,42 +65,69 @@ export function ContractFichaDrawer({
       onClose={onClose}
       title="Ficha de contrato"
       subtitle={detail.drawerRef}
+      banner={
+        <div className="rounded-md border border-border bg-primary-soft px-5 py-5">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">
+            Inquilino
+          </p>
+          <p className="mt-1 text-lg font-bold text-text-primary">{detail.tenant}</p>
+          <p className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
+            Alquiler mensual
+          </p>
+          <p className="mt-1 text-[28px] font-bold leading-none text-primary">{detail.previousAmount}</p>
+          <p className="mt-3 text-sm text-text-secondary">{detail.property}</p>
+          <div className="mt-3">
+            <StatusBadge
+              label={detail.estado}
+              variant={
+                detail.estado === "Activo"
+                  ? "success"
+                  : detail.estado === "Rescindido"
+                    ? "danger"
+                    : "warning"
+              }
+            />
+          </div>
+        </div>
+      }
       footer={
         <ButtonOutline type="button" onClick={onClose}>
           Cerrar
         </ButtonOutline>
       }
     >
-      <div className="flex flex-col gap-5">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <FieldBlock label="Código de propiedad" value={detail.propertyCode} />
-          <FieldBlock label="Estado" value={detail.estado} />
-          <FieldBlock label="Inicio" value={detail.contractStart} />
-          <FieldBlock label="Fin" value={detail.contractEnd} />
-        </div>
+      <div className="flex flex-col gap-8">
+        <FormSection title="Identificación">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FieldBlock label="Código de propiedad" value={detail.propertyCode} />
+            <FieldBlock label="Propietario" value={detail.owner} />
+            <FieldBlock label="Inicio" value={detail.contractStart} />
+            <FieldBlock label="Fin" value={detail.contractEnd} />
+          </div>
+        </FormSection>
 
-        <div className="flex flex-col gap-3">
-          <FieldBlock label="Propiedad" value={detail.property} />
-          <FieldBlock label="Inquilino" value={detail.tenant} />
-          <FieldBlock label="Propietario" value={detail.owner} />
-          <FieldBlock label="Garantes" value={detail.guarantors} />
-        </div>
+        <FormSection title="Partes">
+          <div className="grid gap-4">
+            <FieldBlock label="Garantes" value={detail.guarantors} />
+          </div>
+        </FormSection>
 
-        <div className="flex flex-col gap-3">
-          <p className="text-[13px] font-semibold text-text-primary">Condiciones económicas</p>
-          <FieldBlock label="Monto mensual" value={detail.previousAmount} />
-          <FieldBlock label="Índice de ajuste" value={detail.adjustmentIndex} />
-          <FieldBlock label="Frecuencia de ajuste" value={detail.adjustmentFrequency} />
-          <FieldBlock label="Día de vencimiento" value={detail.paymentDueDay} />
-        </div>
+        <FormSection title="Condiciones económicas">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FieldBlock label="Índice de ajuste" value={detail.adjustmentIndex} />
+            <FieldBlock label="Frecuencia de ajuste" value={detail.adjustmentFrequency} />
+            <FieldBlock label="Día de vencimiento" value={detail.paymentDueDay} />
+          </div>
+        </FormSection>
 
-        <div className="flex flex-col gap-3">
-          <p className="text-[13px] font-semibold text-text-primary">Mora</p>
-          <FieldBlock label="Recargo (%)" value={detail.surchargePercent} />
-          <FieldBlock label="Observaciones" value={detail.punitiveHint} />
-        </div>
+        <FormSection title="Mora">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FieldBlock label="Recargo (%)" value={detail.surchargePercent} />
+            <FieldBlock label="Observaciones" value={detail.punitiveHint} />
+          </div>
+        </FormSection>
 
-        <div className="border-t border-border pt-5">
+        <div className="border-t border-border pt-2">
           <ContractServiciosSection
             servicios={servicios}
             periodos={periodos}

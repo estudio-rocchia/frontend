@@ -52,6 +52,15 @@ export function rentalOperationalCounts(rows: RentalRow[]) {
   };
 }
 
+export function rentalSummaryStats(rows: RentalRow[]) {
+  return {
+    total: rows.length,
+    enMora: countRentalsByChip(rows, "en_mora"),
+    ajustePendiente: countRentalsByChip(rows, "ajuste_pendiente"),
+    renovacionProxima: countRentalsByChip(rows, "renovacion_proxima"),
+  };
+}
+
 export type RentalChipId = (typeof rentalFilterChips)[number]["id"];
 
 export const alquileresRentals: RentalRow[] = [
@@ -170,6 +179,26 @@ export const alquileresRentals: RentalRow[] = [
     servicios: { summary: "Luz", detail: "Al día", status: { label: "Al día", variant: "success" } },
   },
 ];
+
+function normalizeSearchText(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .trim();
+}
+
+export function searchRentals(rows: RentalRow[], query: string): RentalRow[] {
+  const needle = normalizeSearchText(query);
+  if (!needle) return rows;
+
+  return rows.filter((row) => {
+    const haystack = normalizeSearchText(
+      [row.id, row.contractProperty, row.tenant, row.month, row.amount].join(" "),
+    );
+    return haystack.includes(needle);
+  });
+}
 
 export function filterRentals(
   rows: RentalRow[],

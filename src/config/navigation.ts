@@ -7,6 +7,7 @@ import {
   Scale,
   ShieldCheck,
   Stamp,
+  TrendingUp,
   Users,
 } from "lucide-react";
 
@@ -19,6 +20,7 @@ export type NavItem = {
 export const mainNav: NavItem[] = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
   { label: "Alquileres", href: "/alquileres", icon: KeyRound },
+  { label: "Índices", href: "/indices", icon: TrendingUp },
   { label: "Loteos", href: "/loteos", icon: Map },
   { label: "Jurídico", href: "/juridico", icon: Scale },
   { label: "Visas", href: "/visas", icon: Stamp },

@@ -10,6 +10,7 @@ import {
 import { SecheepImportModal } from "@/components/alquileres/SecheepImportModal";
 import { ServicioFormModal, type ServicioFormValues } from "@/components/alquileres/ServicioFormModal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
+import { FormSection } from "@/components/ui/FormLayout";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import type {
   CatalogoItem,
@@ -17,10 +18,10 @@ import type {
   SecheepImportInput,
   ServicioContratoRecord,
 } from "@/lib/api/types";
-import { formatDateDisplay } from "@/lib/format";
+import { formatDateDisplay, formatMoney } from "@/lib/format";
 import { isSecheepElectricity, secheepConfigured, secheepStatusForServicio } from "@/lib/mappers/secheep";
-import { formatMoney } from "@/lib/format";
 import {
+  canAddMoreServicios,
   modoFacturacionLabel,
   periodoEstadoLabel,
   periodoEstadoVariant,
@@ -76,19 +77,13 @@ export function ContractServiciosSection({
   const [secheepModalOpen, setSecheepModalOpen] = useState(false);
   const [secheepServicio, setSecheepServicio] = useState<ServicioContratoRecord | null>(null);
 
-  const activeServicios = useMemo(
-    () => servicios.filter((s) => s.activo),
-    [servicios],
-  );
-  const inactiveServicios = useMemo(
-    () => servicios.filter((s) => !s.activo),
-    [servicios],
-  );
-  const usedTipoIds = useMemo(
-    () => activeServicios.map((s) => s.tipoServicioId),
-    [activeServicios],
-  );
+  const activeServicios = useMemo(() => servicios.filter((s) => s.activo), [servicios]);
+  const inactiveServicios = useMemo(() => servicios.filter((s) => !s.activo), [servicios]);
   const saldoTotal = useMemo(() => totalSaldoPendiente(periodos), [periodos]);
+  const canAddServicio = useMemo(
+    () => canAddMoreServicios(tiposServicio, activeServicios),
+    [tiposServicio, activeServicios],
+  );
 
   async function handleServicioSubmit(values: ServicioFormValues) {
     if (editingServicio) {
@@ -108,79 +103,77 @@ export function ContractServiciosSection({
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex flex-col gap-1">
-          <p className="text-[13px] font-semibold text-text-primary">Servicios (agua, luz)</p>
-          {saldoTotal.total > 0 && saldoTotal.currency ? (
-            <p className="text-[12px] font-semibold text-danger">
-              Saldo pendiente: {formatMoney(String(saldoTotal.total), saldoTotal.currency)}
+    <FormSection
+      title="Servicios"
+      description="Agua, luz y otros cargos asociados al contrato."
+    >
+      <div className="flex flex-col gap-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="rounded-md border border-border bg-bg-page px-4 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
+              Saldo pendiente
             </p>
-          ) : (
-            <p className="text-[12px] text-text-secondary">Sin deuda registrada en servicios.</p>
-          )}
-          <p className="text-[11px] leading-snug text-text-secondary">
-            <span className="font-semibold text-text-primary">Registrar período</span> carga un mes o
-            boleta a cobrar aparte del alquiler.{" "}
-            <span className="font-semibold text-text-primary">Registrar pago</span> marca que el inquilino
-            abonó ese cargo.
-          </p>
+            <p
+              className={`mt-1 text-xl font-bold ${
+                saldoTotal.total > 0 ? "text-danger" : "text-primary"
+              }`}
+            >
+              {saldoTotal.total > 0 && saldoTotal.currency
+                ? formatMoney(String(saldoTotal.total), saldoTotal.currency)
+                : "Al día"}
+            </p>
+          </div>
+          {canEdit ? (
+            <ButtonPrimary
+              type="button"
+              onClick={() => {
+                setEditingServicio(null);
+                setServicioModalOpen(true);
+              }}
+              disabled={submitting || !canAddServicio}
+            >
+              Agregar servicio
+            </ButtonPrimary>
+          ) : null}
         </div>
-        {canEdit ? (
-          <ButtonPrimary
-            type="button"
-            onClick={() => {
-              setEditingServicio(null);
-              setServicioModalOpen(true);
-            }}
-            disabled={submitting || usedTipoIds.length >= tiposServicio.length}
-          >
-            Agregar servicio
-          </ButtonPrimary>
-        ) : null}
-      </div>
 
-      {loading ? (
-        <p className="text-[12px] text-text-secondary">Cargando servicios…</p>
-      ) : activeServicios.length === 0 ? (
-        <p className="rounded-sm border border-dashed border-border px-3 py-4 text-[12px] text-text-secondary">
-          Este contrato no tiene servicios activos. Agregá agua o luz si corresponde.
-        </p>
-      ) : (
-        <div className="flex flex-col gap-4">
-          {activeServicios.map((servicio) => {
-            const servicioPeriodos = periodosForServicio(periodos, servicio.id);
-            const saldo = servicioSaldoPendiente(periodos, servicio.id);
-            const secheepStatus = secheepStatusForServicio(servicio);
-            const showSecheepImport = isSecheepElectricity(servicio) && secheepConfigured(servicio);
+        {loading ? (
+          <p className="text-sm text-text-secondary">Cargando servicios…</p>
+        ) : activeServicios.length === 0 ? (
+          <p className="rounded-md border border-dashed border-border px-4 py-8 text-center text-sm text-text-secondary">
+            Este contrato no tiene servicios activos.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-4">
+            {activeServicios.map((servicio) => {
+              const servicioPeriodos = periodosForServicio(periodos, servicio.id);
+              const saldo = servicioSaldoPendiente(periodos, servicio.id);
+              const secheepStatus = secheepStatusForServicio(servicio);
+              const showSecheepImport = isSecheepElectricity(servicio) && secheepConfigured(servicio);
 
-            return (
-              <article
-                key={servicio.id}
-                className="flex flex-col gap-3 rounded-sm border border-border bg-bg-page p-3.5"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[13px] font-semibold text-text-primary">
-                      {servicio.tipoServicioName}
-                    </span>
-                    <span className="text-[12px] text-text-secondary">
-                      {servicio.provider ?? "Sin proveedor"}
-                      {servicio.numeroMedidor ? ` · Medidor ${servicio.numeroMedidor}` : ""}
-                      {servicio.numeroClienteSecheep && servicio.numeroSuministroSecheep
-                        ? ` · SECHEEP ${servicio.numeroClienteSecheep}/${servicio.numeroSuministroSecheep}`
-                        : ""}
-                    </span>
-                    {servicio.secheepConsultadoEn ? (
-                      <span className="text-[11px] text-text-secondary">
-                        Última consulta SECHEEP: {formatDateDisplay(servicio.secheepConsultadoEn.slice(0, 10))}
+              return (
+                <article
+                  key={servicio.id}
+                  className="flex flex-col gap-4 rounded-md border border-border bg-bg-card p-4 shadow-[var(--shadow-card)]"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[15px] font-semibold text-text-primary">
+                        {servicio.tipoServicioName}
                       </span>
-                    ) : null}
-                    <span className="text-[11px] text-text-secondary">
-                      {modoFacturacionLabel(servicio.modoFacturacion)} · {servicioBillingSummary(servicio)}
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm text-text-secondary">
+                        {servicio.provider ?? "Sin proveedor"}
+                        {servicio.numeroMedidor ? ` · Medidor ${servicio.numeroMedidor}` : ""}
+                      </span>
+                      <span className="text-xs text-text-secondary">
+                        {modoFacturacionLabel(servicio.modoFacturacion)} · {servicioBillingSummary(servicio)}
+                      </span>
+                      {servicio.secheepConsultadoEn ? (
+                        <span className="text-xs text-text-secondary">
+                          SECHEEP: {formatDateDisplay(servicio.secheepConsultadoEn.slice(0, 10))}
+                        </span>
+                      ) : null}
+                    </div>
                     {secheepStatus ? (
                       <StatusBadge label={secheepStatus.label} variant={secheepStatus.variant} />
                     ) : saldo > 0 ? (
@@ -189,179 +182,177 @@ export function ContractServiciosSection({
                       <StatusBadge label="Al día" variant="success" />
                     )}
                   </div>
-                </div>
-                {secheepStatus ? (
-                  <p className="text-[11px] text-text-secondary">{secheepStatus.detail}</p>
-                ) : null}
 
-                {canEdit ? (
-                  <div className="flex flex-wrap gap-2">
-                    <ButtonOutline
-                      type="button"
-                      onClick={() => {
-                        setPeriodoServicio(servicio);
-                        setPeriodoModalOpen(true);
-                      }}
-                      disabled={submitting}
-                    >
-                      Registrar período
-                    </ButtonOutline>
-                    {showSecheepImport ? (
+                  {secheepStatus?.detail ? (
+                    <p className="text-xs text-text-secondary">{secheepStatus.detail}</p>
+                  ) : null}
+
+                  {canEdit ? (
+                    <div className="flex flex-wrap gap-2 border-t border-border pt-3">
                       <ButtonOutline
                         type="button"
                         onClick={() => {
-                          setSecheepServicio(servicio);
-                          setSecheepModalOpen(true);
+                          setPeriodoServicio(servicio);
+                          setPeriodoModalOpen(true);
                         }}
                         disabled={submitting}
                       >
-                        Actualizar SECHEEP
+                        Registrar período
                       </ButtonOutline>
-                    ) : null}
-                    <ButtonOutline
-                      type="button"
-                      onClick={() => {
-                        setEditingServicio(servicio);
-                        setServicioModalOpen(true);
-                      }}
-                      disabled={submitting}
-                    >
-                      Editar
-                    </ButtonOutline>
-                    <ButtonOutline
-                      type="button"
-                      onClick={() => void onDeactivateServicio(servicio.id)}
-                      disabled={submitting}
-                    >
-                      Desactivar
-                    </ButtonOutline>
-                  </div>
-                ) : null}
+                      {showSecheepImport ? (
+                        <ButtonOutline
+                          type="button"
+                          onClick={() => {
+                            setSecheepServicio(servicio);
+                            setSecheepModalOpen(true);
+                          }}
+                          disabled={submitting}
+                        >
+                          Actualizar SECHEEP
+                        </ButtonOutline>
+                      ) : null}
+                      <ButtonOutline
+                        type="button"
+                        onClick={() => {
+                          setEditingServicio(servicio);
+                          setServicioModalOpen(true);
+                        }}
+                        disabled={submitting}
+                      >
+                        Editar
+                      </ButtonOutline>
+                      <ButtonOutline
+                        type="button"
+                        onClick={() => void onDeactivateServicio(servicio.id)}
+                        disabled={submitting}
+                      >
+                        Desactivar
+                      </ButtonOutline>
+                    </div>
+                  ) : null}
 
-                {servicioPeriodos.length > 0 ? (
-                  <div className="flex flex-col gap-2">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
-                      Períodos
-                    </p>
+                  {servicioPeriodos.length > 0 ? (
                     <ul className="flex flex-col gap-2">
                       {servicioPeriodos.map((periodo) => (
                         <li
                           key={periodo.id}
-                          className="flex flex-col gap-2 rounded-sm border border-border bg-bg-card px-3 py-2"
+                          className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-border bg-bg-page px-3 py-3"
                         >
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="flex min-w-0 flex-col gap-0.5">
-                              <span className="text-[12px] font-medium text-text-primary">
-                                {periodoRangeLabel(periodo)}
+                          <div className="flex min-w-0 flex-col gap-0.5">
+                            <span className="text-sm font-medium text-text-primary">
+                              {periodoRangeLabel(periodo)}
+                            </span>
+                            {Number(periodo.saldo) > 0 ? (
+                              <span className="text-xs text-danger">
+                                Saldo {formatMoney(periodo.saldo, periodo.codigoMoneda)}
                               </span>
-                              <span className="text-[11px] text-text-secondary">
-                                {formatMoney(periodo.monto, periodo.codigoMoneda)}
-                                {Number(periodo.saldo) > 0
-                                  ? ` · Saldo ${formatMoney(periodo.saldo, periodo.codigoMoneda)}`
-                                  : ""}
-                              </span>
-                            </div>
+                            ) : null}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-[15px] font-bold text-primary">
+                              {formatMoney(periodo.monto, periodo.codigoMoneda)}
+                            </span>
                             <StatusBadge
                               label={periodoEstadoLabel(periodo.estadoCode)}
                               variant={periodoEstadoVariant(periodo.estadoCode)}
                             />
+                            {canRegisterPago && Number(periodo.saldo) > 0 ? (
+                              <ButtonPrimary
+                                type="button"
+                                onClick={() => {
+                                  setPagoPeriodo(periodo);
+                                  setPagoServicio(servicio);
+                                  setPagoModalOpen(true);
+                                }}
+                                disabled={submitting}
+                              >
+                                Registrar pago
+                              </ButtonPrimary>
+                            ) : null}
                           </div>
-                          {canRegisterPago && Number(periodo.saldo) > 0 ? (
-                            <ButtonPrimary
-                              type="button"
-                              onClick={() => {
-                                setPagoPeriodo(periodo);
-                                setPagoServicio(servicio);
-                                setPagoModalOpen(true);
-                              }}
-                              disabled={submitting}
-                            >
-                              Registrar pago
-                            </ButtonPrimary>
-                          ) : null}
                         </li>
                       ))}
                     </ul>
-                  </div>
-                ) : (
-                  <p className="text-[11px] text-text-secondary">Sin períodos cargados.</p>
-                )}
-              </article>
-            );
-          })}
-        </div>
-      )}
+                  ) : (
+                    <p className="text-xs text-text-secondary">Sin períodos cargados.</p>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+        )}
 
-      {inactiveServicios.length > 0 ? (
-        <div className="flex flex-col gap-2">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
-            Servicios inactivos
-          </p>
-          <ul className="flex flex-col gap-1 text-[12px] text-text-secondary">
-            {inactiveServicios.map((s) => (
-              <li key={s.id}>{s.tipoServicioName}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
+        {inactiveServicios.length > 0 ? (
+          <div className="flex flex-col gap-2 border-t border-border pt-4">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
+              Inactivos
+            </p>
+            <ul className="flex flex-col gap-1 text-sm text-text-secondary">
+              {inactiveServicios.map((s) => (
+                <li key={s.id}>{s.tipoServicioName}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
 
-      <ServicioFormModal
-        open={servicioModalOpen}
-        onClose={() => {
-          setServicioModalOpen(false);
-          setEditingServicio(null);
-        }}
-        onSubmit={(values) => void handleServicioSubmit(values)}
-        submitting={submitting}
-        tiposServicio={tiposServicio}
-        usedTipoIds={usedTipoIds}
-        editing={editingServicio}
-      />
+        <ServicioFormModal
+          open={servicioModalOpen}
+          onClose={() => {
+            setServicioModalOpen(false);
+            setEditingServicio(null);
+          }}
+          onSubmit={(values) => void handleServicioSubmit(values)}
+          submitting={submitting}
+          tiposServicio={tiposServicio}
+          activeServicios={activeServicios}
+          editing={editingServicio}
+        />
 
-      <PeriodoServicioModal
-        open={periodoModalOpen}
-        onClose={() => {
-          setPeriodoModalOpen(false);
-          setPeriodoServicio(null);
-        }}
-        onSubmit={(values) => void handlePeriodoSubmit(values)}
-        submitting={submitting}
-        servicio={periodoServicio}
-      />
+        <PeriodoServicioModal
+          open={periodoModalOpen}
+          onClose={() => {
+            setPeriodoModalOpen(false);
+            setPeriodoServicio(null);
+          }}
+          onSubmit={(values) => void handlePeriodoSubmit(values)}
+          submitting={submitting}
+          servicio={periodoServicio}
+        />
 
-      <SecheepImportModal
-        open={secheepModalOpen}
-        onClose={() => {
-          setSecheepModalOpen(false);
-          setSecheepServicio(null);
-        }}
-        onSubmit={async (payload) => {
-          if (!secheepServicio) return;
-          await onImportSecheep(secheepServicio.id, payload);
-        }}
-        submitting={submitting}
-        servicio={secheepServicio}
-      />
+        <SecheepImportModal
+          open={secheepModalOpen}
+          onClose={() => {
+            setSecheepModalOpen(false);
+            setSecheepServicio(null);
+          }}
+          onSubmit={async (payload) => {
+            if (!secheepServicio) return;
+            await onImportSecheep(secheepServicio.id, payload);
+          }}
+          submitting={submitting}
+          servicio={secheepServicio}
+        />
 
-      <RegistrarPagoServicioModal
-        open={pagoModalOpen}
-        onClose={() => {
-          setPagoModalOpen(false);
-          setPagoPeriodo(null);
-          setPagoServicio(null);
-        }}
-        onSubmit={async (values) => {
-          if (!pagoPeriodo || !pagoServicio) return;
-          await onRegisterPago(pagoPeriodo, pagoServicio, values);
-          setPagoModalOpen(false);
-          setPagoPeriodo(null);
-          setPagoServicio(null);
-        }}
-        submitting={submitting}
-        periodo={pagoPeriodo}
-        servicioLabel={pagoServicio?.tipoServicioName ?? "Servicio"}
-        mediosPago={mediosPago}
-      />
-    </div>
+        <RegistrarPagoServicioModal
+          open={pagoModalOpen}
+          onClose={() => {
+            setPagoModalOpen(false);
+            setPagoPeriodo(null);
+            setPagoServicio(null);
+          }}
+          onSubmit={async (values) => {
+            if (!pagoPeriodo || !pagoServicio) return;
+            await onRegisterPago(pagoPeriodo, pagoServicio, values);
+            setPagoModalOpen(false);
+            setPagoPeriodo(null);
+            setPagoServicio(null);
+          }}
+          submitting={submitting}
+          periodo={pagoPeriodo}
+          servicioLabel={pagoServicio?.tipoServicioName ?? "Servicio"}
+          mediosPago={mediosPago}
+        />
+      </div>
+    </FormSection>
   );
 }

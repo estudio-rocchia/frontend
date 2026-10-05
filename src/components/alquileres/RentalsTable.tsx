@@ -2,10 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { RentalFilterChips } from "@/components/alquileres/RentalFilterChips";
+import { useSearch } from "@/context/search-context";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import {
   filterRentals,
+  searchRentals,
   rentalOperationalCounts,
   type RentalChipId,
   type RentalRow,
@@ -42,14 +44,19 @@ export function RentalsTable({
   onAdjust: (row: RentalRow) => void;
   onRenew: (row: RentalRow) => void;
 }) {
+  const { query } = useSearch();
   const [activeChip, setActiveChip] = useState<RentalChipId>("ajuste_pendiente");
   const operationalCounts = useMemo(() => rentalOperationalCounts(rows), [rows]);
   const [page, setPage] = useState(1);
 
-  const filtered = useMemo(
-    () => filterRentals(rows, activeChip),
-    [rows, activeChip],
-  );
+  const filtered = useMemo(() => {
+    const scopedRows = query.trim() ? rows : filterRentals(rows, activeChip);
+    return searchRentals(scopedRows, query);
+  }, [rows, activeChip, query]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [query, activeChip]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -69,45 +76,54 @@ export function RentalsTable({
   const rangeEnd = Math.min(currentPage * PAGE_SIZE, filtered.length);
 
   return (
-    <div className="flex flex-col gap-4">
-      <RentalFilterChips
-        active={activeChip}
-        counts={{
-          ajuste_pendiente: operationalCounts.ajustePendiente,
-          renovacion_proxima: operationalCounts.renovacionProxima,
-        }}
-        onChange={(chip) => {
-          setActiveChip(chip);
-          setPage(1);
-        }}
-      />
+    <div className="flex flex-col gap-5">
+      <section className="flex flex-col gap-3">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
+          Filtrar contratos
+        </p>
+        <RentalFilterChips
+          active={activeChip}
+          counts={{
+            ajuste_pendiente: operationalCounts.ajustePendiente,
+            renovacion_proxima: operationalCounts.renovacionProxima,
+          }}
+          onChange={(chip) => {
+            setActiveChip(chip);
+            setPage(1);
+          }}
+        />
+      </section>
 
-      <section className="flex min-h-[400px] flex-1 flex-col overflow-hidden rounded-md border border-border bg-bg-card">
+      <section className="flex min-h-[400px] flex-1 flex-col overflow-hidden rounded-md border border-border bg-bg-card shadow-[var(--shadow-card)]">
+        <div className="border-b border-border px-5 py-4">
+          <h2 className="text-[15px] font-semibold text-text-primary">Listado de contratos</h2>
+          <p className="text-xs text-text-secondary">
+            {query.trim()
+              ? `Resultados de búsqueda · ${filtered.length} contrato${filtered.length === 1 ? "" : "s"}`
+              : `${filtered.length} contrato${filtered.length === 1 ? "" : "s"} en el filtro actual`}
+          </p>
+        </div>
+
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1280px] text-left text-[13px]">
+          <table className="w-full min-w-[1100px] text-left text-[13px]">
             <thead>
               <tr className="h-11 bg-bg-cream text-xs font-semibold text-text-secondary">
-                <th className="w-[200px] px-4">Contrato / Propiedad</th>
-                <th className="w-[140px] px-4">Inquilino</th>
-                <th className="w-[88px] px-4">Mes</th>
-                <th className="w-[110px] px-4">Monto</th>
-                <th className="w-[96px] px-4">Días mora</th>
-                <th className="w-[108px] px-4">Estado</th>
-                <th className="w-[104px] whitespace-nowrap px-4">Inicio</th>
-                <th className="w-[120px] whitespace-nowrap px-4">Fin contrato</th>
-                <th className="w-[168px] px-4">Servicios</th>
-                <th className="w-[1%] whitespace-nowrap px-4 pl-8 text-right">
-                  Acciones
-                </th>
+                <th className="px-5">Contrato / Propiedad</th>
+                <th className="px-5">Inquilino</th>
+                <th className="px-5">Mes</th>
+                <th className="px-5 text-right">Monto</th>
+                <th className="px-5 text-right">Días mora</th>
+                <th className="px-5">Estado</th>
+                <th className="whitespace-nowrap px-5">Inicio</th>
+                <th className="whitespace-nowrap px-5">Fin</th>
+                <th className="px-5">Servicios</th>
+                <th className="whitespace-nowrap px-5 text-right">Acciones</th>
               </tr>
             </thead>
             <tbody>
               {paginated.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan={10}
-                    className="px-4 py-12 text-center text-sm text-text-secondary"
-                  >
+                  <td colSpan={10} className="px-5 py-14 text-center text-sm text-text-secondary">
                     No hay contratos para mostrar con este filtro.
                   </td>
                 </tr>
@@ -117,69 +133,59 @@ export function RentalsTable({
                   const showRenew = row.needsRenewal;
 
                   return (
-                  <tr
-                    key={row.id}
-                    className="border-b border-border align-middle [&>td]:py-3"
-                  >
-                    <td className="px-4 text-text-primary">
-                      {row.contractProperty}
-                    </td>
-                    <td className="px-4 text-text-primary">{row.tenant}</td>
-                    <td className="px-4 text-text-primary">{row.month}</td>
-                    <td className="px-4 font-semibold text-primary">
-                      {row.amount}
-                    </td>
-                    <td
-                      className={`px-4 font-semibold ${
-                        row.daysOverdue > 0 ? "text-danger" : "text-text-primary"
-                      }`}
+                    <tr
+                      key={row.id}
+                      className="border-b border-border align-middle transition-colors hover:bg-bg-page/70 [&>td]:py-4"
                     >
-                      {row.daysOverdue}
-                    </td>
-                    <td className="px-4">
-                      <StatusBadge
-                        label={row.status.label}
-                        variant={row.status.variant}
-                      />
-                    </td>
-                    <td className="whitespace-nowrap px-4 text-text-primary">
-                      {row.contractStart}
-                    </td>
-                    <td className="whitespace-nowrap px-4">
-                      <ContractEndCell row={row} />
-                    </td>
-                    <td className="px-4">
-                      <div className="flex flex-col gap-1">
-                        <span className="font-semibold text-text-primary">
-                          {row.servicios.summary}
-                        </span>
-                        <span className="text-[12px] text-text-secondary">
-                          {row.servicios.detail}
-                        </span>
-                        <StatusBadge
-                          label={row.servicios.status.label}
-                          variant={row.servicios.status.variant}
-                        />
-                      </div>
-                    </td>
-                    <td className="whitespace-nowrap px-4 pl-8 text-right">
-                      <div className="flex flex-wrap items-center justify-end gap-2">
-                        <ButtonOutline type="button" onClick={() => onViewFicha(row)}>
-                          Ver ficha
-                        </ButtonOutline>
-                        {showAdjust ? (
-                          <ButtonPrimary type="button" onClick={() => onAdjust(row)}>
-                            Ajustar
-                          </ButtonPrimary>
-                        ) : null}
-                        {showRenew ? (
-                          <ButtonPrimary type="button" onClick={() => onRenew(row)}>
-                            Renovar
-                          </ButtonPrimary>
-                        ) : null}
-                      </div>
-                    </td>
-                  </tr>
+                      <td className="px-5 font-medium text-text-primary">{row.contractProperty}</td>
+                      <td className="px-5 text-text-primary">{row.tenant}</td>
+                      <td className="px-5 text-text-secondary">{row.month}</td>
+                      <td className="px-5 text-right text-[15px] font-bold text-primary">
+                        {row.amount}
+                      </td>
+                      <td
+                        className={`px-5 text-right font-semibold ${
+                          row.daysOverdue > 0 ? "text-danger" : "text-text-primary"
+                        }`}
+                      >
+                        {row.daysOverdue}
+                      </td>
+                      <td className="px-5">
+                        <StatusBadge label={row.status.label} variant={row.status.variant} />
+                      </td>
+                      <td className="whitespace-nowrap px-5 text-text-secondary">
+                        {row.contractStart}
+                      </td>
+                      <td className="whitespace-nowrap px-5">
+                        <ContractEndCell row={row} />
+                      </td>
+                      <td className="px-5">
+                        <div className="flex flex-col gap-1">
+                          <span className="font-medium text-text-primary">{row.servicios.summary}</span>
+                          <StatusBadge
+                            label={row.servicios.status.label}
+                            variant={row.servicios.status.variant}
+                          />
+                        </div>
+                      </td>
+                      <td className="whitespace-nowrap px-5 text-right">
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                          <ButtonOutline type="button" onClick={() => onViewFicha(row)}>
+                            Ver ficha
+                          </ButtonOutline>
+                          {showAdjust ? (
+                            <ButtonPrimary type="button" onClick={() => onAdjust(row)}>
+                              Ajustar
+                            </ButtonPrimary>
+                          ) : null}
+                          {showRenew ? (
+                            <ButtonPrimary type="button" onClick={() => onRenew(row)}>
+                              Renovar
+                            </ButtonPrimary>
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
                   );
                 })
               )}
@@ -187,7 +193,7 @@ export function RentalsTable({
           </table>
         </div>
 
-        <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">
+        <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3">
           <p className="text-[12px] text-text-secondary">
             {filtered.length === 0
               ? "0 contratos"

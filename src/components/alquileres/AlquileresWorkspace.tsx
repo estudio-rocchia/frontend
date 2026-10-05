@@ -15,9 +15,10 @@ import {
 } from "@/components/alquileres/RenewContractModal";
 import { RentalsTable } from "@/components/alquileres/RentalsTable";
 import { ButtonPrimary } from "@/components/ui/Button";
+import { KpiCard } from "@/components/ui/KpiCard";
 import { useAuth } from "@/context/auth-context";
 import type { ContractDetail } from "@/data/alquileres-contract-details";
-import type { RentalRow } from "@/data/alquileres-rentals";
+import { rentalSummaryStats, type RentalRow } from "@/data/alquileres-rentals";
 import type { PeriodoFormValues } from "@/components/alquileres/PeriodoServicioModal";
 import type { ServicioFormValues } from "@/components/alquileres/ServicioFormModal";
 import type { RegistrarPagoServicioFormValues } from "@/components/alquileres/RegistrarPagoServicioModal";
@@ -768,21 +769,39 @@ export function AlquileresWorkspace() {
   }
 
   const tableRows = useMemo(() => rows, [rows]);
+  const stats = useMemo(() => rentalSummaryStats(rows), [rows]);
 
   return (
     <>
-      <div className="flex flex-col gap-4 px-7 py-6">
+      <div className="flex flex-col gap-8 px-7 py-6">
         <header className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex flex-col gap-1">
+          <div className="flex max-w-2xl flex-col gap-1">
             <h1 className="text-[22px] font-bold text-text-primary">Gestión de alquileres</h1>
             <p className="text-sm text-text-secondary">
-              Ajustá alquileres pendientes y renová contratos por vencer.
+              Operá contratos activos, ajustes por índice y renovaciones.
             </p>
           </div>
           <ButtonPrimary type="button" onClick={() => void openNewContractModal()} disabled={submitting}>
             Nuevo contrato
           </ButtonPrimary>
         </header>
+
+        {!loading && !error && rows.length > 0 ? (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <KpiCard label="Contratos activos" value={String(stats.total)} hint="En esta vista" />
+            <KpiCard
+              label="Ajuste pendiente"
+              value={String(stats.ajustePendiente)}
+              hint="Requieren actualización de monto"
+            />
+            <KpiCard
+              label="Por vencer"
+              value={String(stats.renovacionProxima)}
+              hint="Renovación próxima"
+            />
+            <KpiCard label="En mora" value={String(stats.enMora)} hint="Con días de atraso" />
+          </div>
+        ) : null}
 
         {loading ? (
           <p className="text-sm text-text-secondary">Cargando contratos…</p>
