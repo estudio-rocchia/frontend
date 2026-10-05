@@ -7,6 +7,7 @@ import { ChipToggle, FormField, FormSection } from "@/components/ui/FormLayout";
 import type { AdjustmentIndex } from "@/data/alquileres-contract-details";
 import type { CatalogoItem } from "@/lib/api/types";
 import { nextInmuebleCode, prefixForTipoInmueble } from "@/lib/codes";
+import { FRECUENCIAS_AJUSTE } from "@/lib/rental-adjustment";
 
 export type NewContractForm = {
   propertyLabel: string;
@@ -17,6 +18,7 @@ export type NewContractForm = {
   amount: string;
   currency: "ARS" | "USD";
   index: AdjustmentIndex;
+  frecuenciaAjusteMeses: number;
 };
 
 const emptyForm: NewContractForm = {
@@ -28,6 +30,7 @@ const emptyForm: NewContractForm = {
   amount: "",
   currency: "ARS",
   index: "ICL",
+  frecuenciaAjusteMeses: 12,
 };
 
 export function NewContractModal({
@@ -162,6 +165,18 @@ export function NewContractModal({
                 options={["ICL", "IPC", "CAC"]}
                 value={form.index}
                 onChange={(idx) => patch({ index: idx as AdjustmentIndex })}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[11px] font-semibold text-text-secondary">
+                Frecuencia de ajuste
+              </span>
+              <ChipToggle
+                options={FRECUENCIAS_AJUSTE.map((meses) => `${meses} meses`)}
+                value={`${form.frecuenciaAjusteMeses} meses`}
+                onChange={(label) =>
+                  patch({ frecuenciaAjusteMeses: Number.parseInt(label, 10) })
+                }
               />
             </div>
           </div>

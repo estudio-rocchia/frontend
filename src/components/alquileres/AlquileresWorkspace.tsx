@@ -728,7 +728,7 @@ export function AlquileresWorkspace() {
             montoAlquiler: amount,
             codigoMoneda: form.currency,
             diaVencimientoPago: 10,
-            frecuenciaAjusteMeses: 12,
+            frecuenciaAjusteMeses: form.frecuenciaAjusteMeses,
             tipoIndiceId: indexItem.id,
             tipoMoraId: moraItem?.id ?? null,
             tasaMora: 0.025,
