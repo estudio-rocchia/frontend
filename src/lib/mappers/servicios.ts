@@ -99,6 +99,40 @@ export function electricityStatusFromPeriodos(
     : { label: "Sin períodos", variant: "warning" };
 }
 
+export const ADDABLE_SERVICIO_CODES = new Set(["water", "electricity", "other"]);
+
+export function isAddableServicioCode(code: string): boolean {
+  return ADDABLE_SERVICIO_CODES.has(code);
+}
+
+export function filterAddableTiposServicio(
+  tipos: Array<{ id: number; code: string; name: string }>,
+  activeServicios: Array<{ tipoServicioCode: string }>,
+  editing?: { tipoServicioId: number } | null,
+): Array<{ id: number; code: string; name: string }> {
+  if (editing) {
+    return tipos.filter((tipo) => tipo.id === editing.tipoServicioId);
+  }
+
+  const hasCode = (code: string) =>
+    activeServicios.some((servicio) => servicio.tipoServicioCode === code);
+
+  return tipos.filter((tipo) => {
+    if (!isAddableServicioCode(tipo.code)) return false;
+    if (tipo.code === "other") return true;
+    if (tipo.code === "water") return !hasCode("water");
+    if (tipo.code === "electricity") return !hasCode("electricity");
+    return true;
+  });
+}
+
+export function canAddMoreServicios(
+  tipos: Array<{ id: number; code: string; name: string }>,
+  activeServicios: Array<{ tipoServicioCode: string }>,
+): boolean {
+  return filterAddableTiposServicio(tipos, activeServicios).length > 0;
+}
+
 export function defaultModoForTipo(code: string): "fixed" | "variable" {
   return code === "water" ? "fixed" : "variable";
 }

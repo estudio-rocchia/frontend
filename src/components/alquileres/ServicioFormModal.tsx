@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import type { CatalogoItem, ModoFacturacion, ServicioContratoRecord } from "@/lib/api/types";
-import { defaultModoForTipo } from "@/lib/mappers/servicios";
+import { defaultModoForTipo, filterAddableTiposServicio } from "@/lib/mappers/servicios";
 
 export type ServicioFormValues = {
   tipoServicioId: number;
@@ -62,7 +62,7 @@ export function ServicioFormModal({
   onSubmit,
   submitting = false,
   tiposServicio,
-  usedTipoIds,
+  activeServicios,
   editing,
   defaultCurrency = "ARS",
 }: {
@@ -71,16 +71,16 @@ export function ServicioFormModal({
   onSubmit: (values: ServicioFormValues) => void;
   submitting?: boolean;
   tiposServicio: CatalogoItem[];
-  usedTipoIds: number[];
+  activeServicios: ServicioContratoRecord[];
   editing?: ServicioContratoRecord | null;
   defaultCurrency?: "ARS" | "USD";
 }) {
   const [form, setForm] = useState<ServicioFormValues>(emptyForm);
 
-  const availableTipos = useMemo(() => {
-    if (editing) return tiposServicio;
-    return tiposServicio.filter((t) => !usedTipoIds.includes(t.id));
-  }, [tiposServicio, usedTipoIds, editing]);
+  const availableTipos = useMemo(
+    () => filterAddableTiposServicio(tiposServicio, activeServicios, editing),
+    [tiposServicio, activeServicios, editing],
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -135,6 +135,7 @@ export function ServicioFormModal({
   const title = editing ? "Editar servicio" : "Agregar servicio";
   const selectedTipo = tiposServicio.find((t) => t.id === form.tipoServicioId);
   const isElectricity = selectedTipo?.code === "electricity";
+  const isWater = selectedTipo?.code === "water";
 
   return (
     <Modal
@@ -181,14 +182,14 @@ export function ServicioFormModal({
           onChange={(v) => setForm((prev) => ({ ...prev, provider: v }))}
           placeholder="Ej. Aguas Chaqueñas, Cooperativa"
         />
-        {!isElectricity ? (
+        {isWater ? (
           <Field
             label="Nº medidor / cuenta"
             value={form.numeroMedidor}
             onChange={(v) => setForm((prev) => ({ ...prev, numeroMedidor: v }))}
             placeholder="Ej. medidor agua"
           />
-        ) : (
+        ) : isElectricity ? (
           <div className="grid gap-3 sm:grid-cols-2">
             <Field
               label="Nº cliente SECHEEP"
@@ -203,6 +204,13 @@ export function ServicioFormModal({
               placeholder="Ej. 4"
             />
           </div>
+        ) : (
+          <Field
+            label="Referencia / cuenta"
+            value={form.numeroMedidor}
+            onChange={(v) => setForm((prev) => ({ ...prev, numeroMedidor: v }))}
+            placeholder="Nº de cuenta, contrato u otro dato"
+          />
         )}
 
         <label className="flex flex-col gap-1.5">
@@ -217,8 +225,8 @@ export function ServicioFormModal({
             }
             className="rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
           >
-            <option value="fixed">Monto fijo mensual (agua)</option>
-            <option value="variable">Por boleta (luz)</option>
+            <option value="fixed">Monto fijo mensual</option>
+            <option value="variable">Por boleta / período</option>
           </select>
         </label>
 

@@ -30,6 +30,13 @@ export interface CatalogoItem {
 
 export type IndiceCode = "ICL" | "IPC" | "CAC";
 
+export interface ValorIndiceRecord {
+  periodo: string;
+  valor: string;
+  fuente: string;
+  obtenidoEn: string;
+}
+
 export interface PreviewAjusteInput {
   tipoIndiceCode: IndiceCode;
   montoAnterior: number;

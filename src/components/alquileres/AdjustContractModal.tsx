@@ -9,7 +9,13 @@ import {
   type IndexCalculatorState,
 } from "@/components/alquileres/ContractIndexCalculator";
 import type { ContratoDetail, PreviewAjusteResponse } from "@/lib/api/types";
-import { formatMoney, formatMonthYear, personaDisplayName } from "@/lib/format";
+import {
+  formatIndexValue,
+  formatMoney,
+  formatMonthYear,
+  moneyClassName,
+  personaDisplayName,
+} from "@/lib/format";
 import {
   adjustmentRecordDate,
   contractualAdjustmentEnd,
@@ -26,15 +32,6 @@ const MONTHS = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
-
-function formatIndexValue(value: string): string {
-  const num = Number.parseFloat(value);
-  if (!Number.isFinite(num)) return value;
-  if (num >= 1000) {
-    return num.toLocaleString("es-AR", { maximumFractionDigits: 1 });
-  }
-  return num.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
 
 function MonthYearSelect({
   value,
@@ -120,7 +117,6 @@ export function AdjustContractModal({
   const inquilinoLabel = contrato.inquilino ? personaDisplayName(contrato.inquilino) : "—";
   const currency = contrato.codigoMoneda.trim();
   const indiceCode = contrato.tipoIndice?.code ?? calculator.tipoIndice;
-  const indiceLabel = indiceCode;
   const freq = contrato.frecuenciaAjusteMeses ?? 12;
   const fechaAjuste = adjustmentRecordDate(contrato, ultimoAjusteEn);
   const years = indexYearRange(contrato);
@@ -130,7 +126,7 @@ export function AdjustContractModal({
   const overdue = isAdjustmentOverdue(contrato, ultimoAjusteEn);
 
   const detailsNote = overdue
-    ? `El ajuste debía aplicarse en ${formatMonthYear(contractualEnd.anio, contractualEnd.mes)}. Se usa el último ${indiceLabel} publicado (${formatMonthYear(maxPublished.anio, maxPublished.mes)}).`
+    ? `El ajuste debía aplicarse en ${formatMonthYear(contractualEnd.anio, contractualEnd.mes)}. Se usa el último ${indiceCode} publicado (${formatMonthYear(maxPublished.anio, maxPublished.mes)}).`
     : `Período de ${freq} meses desde ${formatMonthYear(vigenteDesde.anio, vigenteDesde.mes)}.`;
 
   function resetSuggested() {
@@ -143,7 +139,7 @@ export function AdjustContractModal({
       onClose={onClose}
       title="Ajustar alquiler"
       subtitle={`${inmuebleLabel} · ${inquilinoLabel}`}
-      maxWidthClass="max-w-md"
+      maxWidthClass="max-w-lg"
       footer={
         <>
           <ButtonOutline type="button" onClick={onClose} disabled={submitting}>
@@ -162,48 +158,53 @@ export function AdjustContractModal({
         </>
       }
     >
-      <div className="flex flex-col gap-4">
-        <p className="text-[13px] text-text-secondary">
-          {indiceLabel} · cada {freq} meses
+      <div className="flex flex-col gap-6">
+        <p className="text-sm text-text-secondary">
+          Índice <span className="font-semibold text-text-primary">{indiceCode}</span> · cada{" "}
+          {freq} meses
         </p>
 
-        <div className="rounded-sm border border-border bg-bg-page px-4 py-5 text-center">
-          <p className="text-[12px] text-text-secondary">Alquiler actual</p>
-          <p className="mt-1 text-lg font-semibold text-text-primary">
+        <div className="rounded-md border border-border bg-primary-soft px-5 py-6 text-center shadow-[var(--shadow-card)]">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
+            Alquiler actual
+          </p>
+          <p className={`mt-2 text-xl font-semibold text-text-primary ${moneyClassName}`}>
             {formatMoney(contrato.montoAlquiler, currency)}
           </p>
 
           {loading ? (
-            <p className="mt-5 text-[13px] text-text-secondary">Calculando nuevo alquiler…</p>
+            <p className="mt-6 text-sm text-text-secondary">Calculando nuevo alquiler…</p>
           ) : error ? (
-            <p className="mt-5 text-[13px] text-danger">{error}</p>
+            <p className="mt-6 text-sm text-danger">{error}</p>
           ) : preview ? (
             <>
-              <p className="mt-5 text-[12px] text-text-secondary">Nuevo alquiler</p>
-              <p className="mt-1 text-3xl font-bold text-primary">
+              <p className="mt-6 text-[11px] font-semibold uppercase tracking-wide text-primary">
+                Nuevo alquiler
+              </p>
+              <p className={`mt-2 text-[32px] font-bold leading-none text-primary ${moneyClassName}`}>
                 {formatMoney(preview.montoNuevo, currency)}
               </p>
-              <p className="mt-2 text-[14px] font-semibold text-text-primary">
+              <p className="mt-3 text-[15px] font-semibold text-text-primary">
                 {Number.parseFloat(preview.variacionPct) >= 0 ? "+" : ""}
-                {preview.variacionPct}% según {indiceLabel}
+                {preview.variacionPct}% según {indiceCode}
               </p>
             </>
           ) : null}
         </div>
 
-        <div className="border-t border-border pt-3">
+        <div className="border-t border-border pt-4">
           <button
             type="button"
             onClick={() => setShowDetails((v) => !v)}
-            className="flex w-full items-center justify-between text-left text-[13px] font-medium text-text-secondary hover:text-text-primary"
+            className="flex w-full items-center justify-between text-left text-sm font-medium text-text-secondary hover:text-text-primary"
           >
             <span>{showDetails ? "Ocultar cálculo" : "Ver cómo se calculó"}</span>
             <span className="text-lg leading-none">{showDetails ? "▾" : "▸"}</span>
           </button>
 
           {showDetails ? (
-            <div className="mt-3 flex flex-col gap-4 rounded-sm border border-border bg-bg-page px-4 py-4">
-              <p className="text-[12px] leading-relaxed text-text-secondary">{detailsNote}</p>
+            <div className="mt-4 flex flex-col gap-4 rounded-md border border-border bg-bg-page px-4 py-4">
+              <p className="text-xs leading-relaxed text-text-secondary">{detailsNote}</p>
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="flex flex-col gap-1.5">
@@ -221,7 +222,7 @@ export function AdjustContractModal({
                   />
                   {preview?.valorDesde ? (
                     <span className="text-[11px] font-semibold text-primary">
-                      {indiceLabel}: {formatIndexValue(preview.valorDesde)}
+                      {indiceCode}: {formatIndexValue(preview.valorDesde)}
                     </span>
                   ) : null}
                 </div>
@@ -236,28 +237,30 @@ export function AdjustContractModal({
                   />
                   {preview?.valorHasta ? (
                     <span className="text-[11px] font-semibold text-primary">
-                      {indiceLabel}: {formatIndexValue(preview.valorHasta)}
+                      {indiceCode}: {formatIndexValue(preview.valorHasta)}
                     </span>
                   ) : null}
                 </div>
               </div>
 
               {preview ? (
-                <p className="border-t border-border pt-3 text-center text-[12px] text-text-secondary">
+                <p className="border-t border-border pt-3 text-center text-xs text-text-secondary">
                   {formatMoney(preview.montoAnterior, currency)} ×{" "}
                   {Number.parseFloat(preview.factor).toLocaleString("es-AR", {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 4,
                   })}
                   {" = "}
-                  {formatMoney(preview.montoNuevo, currency)}
+                  <span className="font-semibold text-primary">
+                    {formatMoney(preview.montoNuevo, currency)}
+                  </span>
                 </p>
               ) : null}
 
               <button
                 type="button"
                 onClick={resetSuggested}
-                className="text-[12px] font-semibold text-primary underline-offset-2 hover:underline"
+                className="text-xs font-semibold text-primary underline-offset-2 hover:underline"
               >
                 Restaurar valores sugeridos
               </button>

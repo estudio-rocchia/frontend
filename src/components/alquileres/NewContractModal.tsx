@@ -3,9 +3,11 @@
 import { useMemo, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
+import { ChipToggle, FormField, FormSection } from "@/components/ui/FormLayout";
 import type { AdjustmentIndex } from "@/data/alquileres-contract-details";
 import type { CatalogoItem } from "@/lib/api/types";
 import { nextInmuebleCode, prefixForTipoInmueble } from "@/lib/codes";
+import { FRECUENCIAS_AJUSTE } from "@/lib/rental-adjustment";
 
 export type NewContractForm = {
   propertyLabel: string;
@@ -16,6 +18,7 @@ export type NewContractForm = {
   amount: string;
   currency: "ARS" | "USD";
   index: AdjustmentIndex;
+  frecuenciaAjusteMeses: number;
 };
 
 const emptyForm: NewContractForm = {
@@ -27,31 +30,8 @@ const emptyForm: NewContractForm = {
   amount: "",
   currency: "ARS",
   index: "ICL",
+  frecuenciaAjusteMeses: 12,
 };
-
-function Field({
-  label,
-  value,
-  onChange,
-  placeholder,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-}) {
-  return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-[11px] font-semibold text-text-secondary">{label}</span>
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
-      />
-    </label>
-  );
-}
 
 export function NewContractModal({
   open,
@@ -96,7 +76,7 @@ export function NewContractModal({
       open={open}
       onClose={handleClose}
       title="Nuevo contrato"
-      subtitle="Alta operativa conectada al backend (persona, inmueble y contrato)."
+      subtitle="Completá los datos para dar de alta el inmueble y el contrato."
       maxWidthClass="max-w-xl"
       footer={
         <>
@@ -116,85 +96,91 @@ export function NewContractModal({
         </>
       }
     >
-      <div className="flex flex-col gap-4">
-        <Field
-          label="Nombre corto propiedad"
-          value={form.propertyLabel}
-          onChange={(v) => patch({ propertyLabel: v })}
-          placeholder="Ej. Depto calle 23"
-        />
-        <div className="flex flex-col gap-1.5">
-          <span className="text-[11px] font-semibold text-text-secondary">Tipo de inmueble</span>
-          <select
-            value={form.tipoInmuebleCode}
-            onChange={(e) => patch({ tipoInmuebleCode: e.target.value })}
-            className="rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
-          >
-            {(tiposInmueble.length ? tiposInmueble : [{ id: 0, code: "house", name: "Casa" }]).map((tipo) => (
-              <option key={tipo.code} value={tipo.code}>
-                {tipo.name} ({prefixForTipoInmueble(tipo.code)})
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="rounded-sm border border-border bg-bg-page px-3 py-2 text-[12px] text-text-secondary">
-          Código de propiedad:{" "}
-          <strong className="text-text-primary">{inmuebleCodePreview}</strong>
-        </div>
-        <Field
-          label="Dirección completa"
-          value={form.propertyAddress}
-          onChange={(v) => patch({ propertyAddress: v })}
-          placeholder="Calle, número, localidad"
-        />
-        <Field label="Inquilino" value={form.tenant} onChange={(v) => patch({ tenant: v })} />
-        <Field label="Propietario" value={form.owner} onChange={(v) => patch({ owner: v })} />
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field
-            label="Monto mensual"
-            value={form.amount}
-            onChange={(v) => patch({ amount: v })}
-            placeholder="485000 o 1200"
-          />
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-semibold text-text-secondary">Moneda</span>
-            <div className="flex gap-2">
-              {(["ARS", "USD"] as const).map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => patch({ currency: c })}
-                  className={`flex-1 rounded-full border border-border py-2 text-[13px] font-semibold ${
-                    form.currency === c
-                      ? "bg-primary-soft text-primary"
-                      : "bg-bg-page text-text-secondary"
-                  }`}
-                >
-                  {c}
-                </button>
-              ))}
+      <div className="flex flex-col gap-8">
+        <FormSection title="Propiedad">
+          <div className="flex flex-col gap-4">
+            <FormField
+              label="Nombre corto"
+              value={form.propertyLabel}
+              onChange={(v) => patch({ propertyLabel: v })}
+              placeholder="Ej. Depto calle 23"
+            />
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[11px] font-semibold text-text-secondary">Tipo de inmueble</span>
+              <select
+                value={form.tipoInmuebleCode}
+                onChange={(e) => patch({ tipoInmuebleCode: e.target.value })}
+                className="rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
+              >
+                {(tiposInmueble.length ? tiposInmueble : [{ id: 0, code: "house", name: "Casa" }]).map(
+                  (tipo) => (
+                    <option key={tipo.code} value={tipo.code}>
+                      {tipo.name} ({prefixForTipoInmueble(tipo.code)})
+                    </option>
+                  ),
+                )}
+              </select>
+            </div>
+            <div className="rounded-sm border border-border bg-bg-page px-4 py-3">
+              <p className="text-[11px] font-semibold text-text-secondary">Código asignado</p>
+              <p className="mt-1 text-lg font-bold text-primary">{inmuebleCodePreview}</p>
+            </div>
+            <FormField
+              label="Dirección completa"
+              value={form.propertyAddress}
+              onChange={(v) => patch({ propertyAddress: v })}
+              placeholder="Calle, número, localidad"
+            />
+          </div>
+        </FormSection>
+
+        <FormSection title="Partes">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FormField label="Inquilino" value={form.tenant} onChange={(v) => patch({ tenant: v })} />
+            <FormField label="Propietario" value={form.owner} onChange={(v) => patch({ owner: v })} />
+          </div>
+        </FormSection>
+
+        <FormSection title="Condiciones económicas">
+          <div className="flex flex-col gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField
+                label="Monto mensual"
+                value={form.amount}
+                onChange={(v) => patch({ amount: v })}
+                placeholder="485000 o 1200"
+              />
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[11px] font-semibold text-text-secondary">Moneda</span>
+                <ChipToggle
+                  options={["ARS", "USD"]}
+                  value={form.currency}
+                  onChange={(c) => patch({ currency: c as "ARS" | "USD" })}
+                />
+              </div>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[11px] font-semibold text-text-secondary">Índice de ajuste</span>
+              <ChipToggle
+                options={["ICL", "IPC", "CAC"]}
+                value={form.index}
+                onChange={(idx) => patch({ index: idx as AdjustmentIndex })}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[11px] font-semibold text-text-secondary">
+                Frecuencia de ajuste
+              </span>
+              <ChipToggle
+                options={FRECUENCIAS_AJUSTE.map((meses) => `${meses} meses`)}
+                value={`${form.frecuenciaAjusteMeses} meses`}
+                onChange={(label) =>
+                  patch({ frecuenciaAjusteMeses: Number.parseInt(label, 10) })
+                }
+              />
             </div>
           </div>
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <span className="text-[11px] font-semibold text-text-secondary">Índice de ajuste</span>
-          <div className="flex flex-wrap gap-2">
-            {(["ICL", "IPC", "CAC"] as const).map((idx) => (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => patch({ index: idx })}
-                className={`rounded-full border border-border px-4 py-2 text-[13px] font-semibold ${
-                  form.index === idx
-                    ? "bg-primary text-text-on-primary"
-                    : "bg-bg-page text-text-secondary"
-                }`}
-              >
-                {idx}
-              </button>
-            ))}
-          </div>
-        </div>
+        </FormSection>
       </div>
     </Modal>
   );

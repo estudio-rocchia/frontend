@@ -6,6 +6,8 @@ import { KpiCard } from "@/components/ui/KpiCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useAuth } from "@/context/auth-context";
 import { ApiError, fetchDashboardResumen } from "@/lib/api";
+import { moneyClassName } from "@/lib/format";
+import { pagePaddingClass } from "@/lib/layout";
 import { mapDashboardContracts, mapDashboardKpis } from "@/lib/mappers/dashboard";
 
 export function DashboardView() {
@@ -39,12 +41,12 @@ export function DashboardView() {
   }, [load]);
 
   if (loading) {
-    return <p className="px-7 py-6 text-sm text-text-secondary">Cargando dashboard…</p>;
+    return <p className={`${pagePaddingClass} text-sm text-text-secondary`}>Cargando dashboard…</p>;
   }
 
   if (error) {
     return (
-      <div className="px-7 py-6">
+      <div className={pagePaddingClass}>
         <p className="rounded-sm border border-danger bg-danger-bg px-3 py-2 text-sm text-danger">{error}</p>
         <button type="button" onClick={() => void load()} className="mt-3 text-sm font-semibold text-primary">
           Reintentar
@@ -54,7 +56,7 @@ export function DashboardView() {
   }
 
   return (
-    <div className="flex flex-col gap-5 px-7 py-6">
+    <div className={`flex flex-col gap-5 ${pagePaddingClass}`}>
       <header className="flex flex-col gap-1">
         <h1 className="text-[22px] font-bold text-text-primary">Dashboard principal</h1>
         <p className="text-sm text-text-secondary">
@@ -69,7 +71,7 @@ export function DashboardView() {
       </div>
 
       <section className="flex min-h-[320px] flex-1 flex-col overflow-hidden rounded-md border border-border bg-bg-card">
-        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+        <div className="border-b border-border px-4 py-4 sm:px-5">
           <h2 className="text-[15px] font-semibold text-text-primary">
             Alertas operativas — mora, cobranzas y renovaciones
           </h2>
@@ -78,32 +80,32 @@ export function DashboardView() {
           {rows.length === 0 ? (
             <p className="px-5 py-8 text-sm text-text-secondary">No hay alertas para mostrar.</p>
           ) : (
-            <table className="w-full min-w-[900px] text-left text-[13px]">
+            <table className="w-full min-w-[640px] text-left text-[13px]">
               <thead>
                 <tr className="h-11 bg-bg-cream text-xs font-semibold text-text-secondary">
-                  <th className="px-4">Propiedad</th>
-                  <th className="px-4">Inquilino</th>
-                  <th className="px-4">Propietario</th>
-                  <th className="px-4">Monto actual</th>
-                  <th className="px-4">Índice</th>
-                  <th className="px-4">Vencimiento</th>
-                  <th className="px-4">Estado</th>
-                  <th className="px-4">Acciones</th>
+                  <th className="px-3 sm:px-4">Propiedad</th>
+                  <th className="px-3 sm:px-4">Inquilino</th>
+                  <th className="hidden px-3 sm:px-4 lg:table-cell">Propietario</th>
+                  <th className="px-3 sm:px-4">Monto actual</th>
+                  <th className="hidden px-3 sm:px-4 xl:table-cell">Índice</th>
+                  <th className="px-3 sm:px-4">Vencimiento</th>
+                  <th className="px-3 text-center sm:px-4">Estado</th>
+                  <th className="hidden px-3 sm:px-4 md:table-cell">Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((row, index) => (
                   <tr key={`${row.property}-${row.tenant}-${index}`} className="h-[52px] border-b border-border">
-                    <td className="px-4 text-text-primary">{row.property}</td>
-                    <td className="px-4 text-text-primary">{row.tenant}</td>
-                    <td className="px-4 text-text-primary">{row.owner}</td>
-                    <td className="px-4 font-semibold text-primary">{row.amount}</td>
-                    <td className="px-4 text-text-primary">{row.index}</td>
-                    <td className="px-4 text-text-primary">{row.dueDate}</td>
-                    <td className="px-4">
+                    <td className="px-3 sm:px-4 text-text-primary">{row.property}</td>
+                    <td className="px-3 sm:px-4 text-text-primary">{row.tenant}</td>
+                    <td className="hidden px-3 sm:px-4 text-text-primary lg:table-cell">{row.owner}</td>
+                    <td className={`px-3 font-semibold text-primary sm:px-4 ${moneyClassName}`}>{row.amount}</td>
+                    <td className="hidden px-3 sm:px-4 text-text-primary xl:table-cell">{row.index}</td>
+                    <td className="px-3 sm:px-4 text-text-primary">{row.dueDate}</td>
+                    <td className="px-3 text-center sm:px-4">
                       <StatusBadge label={row.status.label} variant={row.status.variant} />
                     </td>
-                    <td className="px-4">
+                    <td className="hidden px-3 sm:px-4 md:table-cell">
                       <span className="text-sm text-text-secondary">{row.action}</span>
                     </td>
                   </tr>

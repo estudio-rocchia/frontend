@@ -1,14 +1,27 @@
+"use client";
+
+import { useState } from "react";
+
+import { SearchProvider } from "@/context/search-context";
+
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
   return (
-    <div className="flex min-h-screen">
-      <Sidebar />
-      <div className="flex min-h-screen min-w-0 flex-1 flex-col">
-        <Topbar />
-        <main className="flex-1 bg-bg-page">{children}</main>
+    <SearchProvider>
+      <div className="flex min-h-screen overflow-x-hidden">
+        <Sidebar
+          mobileOpen={mobileNavOpen}
+          onMobileClose={() => setMobileNavOpen(false)}
+        />
+        <div className="flex min-h-screen min-w-0 flex-1 flex-col">
+          <Topbar onMenuClick={() => setMobileNavOpen(true)} />
+          <main className="min-w-0 flex-1 overflow-x-hidden bg-bg-page">{children}</main>
+        </div>
       </div>
-    </div>
+    </SearchProvider>
   );
 }

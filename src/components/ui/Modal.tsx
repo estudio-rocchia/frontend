@@ -3,6 +3,8 @@
 import { X } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { useScrollLock } from "@/lib/use-scroll-lock";
+
 export function Modal({
   open,
   onClose,
@@ -20,10 +22,12 @@ export function Modal({
   children: ReactNode;
   maxWidthClass?: string;
 }) {
+  useScrollLock(open);
+
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden p-4">
       <button
         type="button"
         className="absolute inset-0 bg-[#1a2b3266]"
@@ -54,7 +58,7 @@ export function Modal({
             <X className="h-5 w-5" />
           </button>
         </header>
-        <div className="flex-1 overflow-y-auto px-6 py-5">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5">{children}</div>
         {footer ? (
           <footer className="flex shrink-0 justify-end gap-3 border-t border-border px-6 py-5">
             {footer}

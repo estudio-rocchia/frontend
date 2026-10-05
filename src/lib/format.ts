@@ -5,6 +5,8 @@ const MONTHS_ES = [
   "Jul", "Ago", "Sep", "Oct", "Nov", "Dic",
 ];
 
+const MONEY_NBSP = "\u00A0";
+
 export function formatMoney(amount: string, currency: string): string {
   const value = Number(amount);
   if (Number.isNaN(value)) return amount;
@@ -12,8 +14,11 @@ export function formatMoney(amount: string, currency: string): string {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   });
-  return currency === "USD" ? `USD ${formatted}` : `$ ${formatted}`;
+  return currency === "USD" ? `USD${MONEY_NBSP}${formatted}` : `$${MONEY_NBSP}${formatted}`;
 }
+
+/** Evita que el símbolo y el monto se partan en dos líneas en tablas y tarjetas. */
+export const moneyClassName = "whitespace-nowrap tabular-nums";
 
 export function formatDateDisplay(isoDate: string): string {
   const [year, month, day] = isoDate.split("-");
@@ -39,6 +44,23 @@ export function contractEndHint(daysUntilEnd: number): string | null {
     return daysUntilEnd === 1 ? "Vence mañana" : `Vence en ${daysUntilEnd} días`;
   }
   return null;
+}
+
+export function formatIndexValue(value: string): string {
+  const num = Number.parseFloat(value);
+  if (!Number.isFinite(num)) return value;
+  if (num >= 1000) {
+    return num.toLocaleString("es-AR", { maximumFractionDigits: 1 });
+  }
+  return num.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+export function formatPeriodoIndice(periodo: string): string {
+  const match = /^(\d{4})-(\d{2})/.exec(periodo);
+  if (!match) return periodo;
+  const anio = Number.parseInt(match[1], 10);
+  const mes = Number.parseInt(match[2], 10);
+  return formatMonthYear(anio, mes);
 }
 
 export function formatMonthYear(anio: number, mes: number): string {
