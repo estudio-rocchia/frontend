@@ -37,6 +37,7 @@ import {
   fetchCatalog,
   fetchContrato,
   fetchContratos,
+  fetchContratosTableSummary,
   fetchDashboardResumen,
   fetchInmuebleFicha,
   fetchInmuebles,
@@ -63,16 +64,12 @@ import {
   rentalApiErrorMessage,
 } from "@/lib/format";
 import { pagePaddingClass } from "@/lib/layout";
-import { serviciosSummaryFromData } from "@/lib/mappers/servicios";
-import type { ContratoListItem } from "@/lib/api/types";
 import {
   buildBillingIndex,
   buildDashboardContractMeta,
   mapContratoDetailToFicha,
-  mapContratoListItemToRentalRow,
+  mapContratoTableItemToRentalRow,
 } from "@/lib/mappers/rentals";
-
-const SERVICIOS_ENRICH_BATCH = 5;
 
 function addYears(isoDate: string, years: number): string {
   const date = new Date(`${isoDate}T12:00:00`);
@@ -111,60 +108,22 @@ export function AlquileresWorkspace() {
     window.setTimeout(() => setToast(null), 3200);
   }, []);
 
-  const enrichServicios = useCallback(
-    async (contratos: ContratoListItem[]) => {
-      if (!token || contratos.length === 0) return;
-
-      for (let offset = 0; offset < contratos.length; offset += SERVICIOS_ENRICH_BATCH) {
-        const batch = contratos.slice(offset, offset + SERVICIOS_ENRICH_BATCH);
-        const updates = await Promise.all(
-          batch.map(async (contrato) => {
-            try {
-              const [serviciosRes, periodosRes] = await Promise.all([
-                fetchServicios(token, contrato.id),
-                fetchServiciosPeriodos(token, contrato.id),
-              ]);
-              return {
-                id: contrato.id,
-                servicios: serviciosSummaryFromData(serviciosRes.items, periodosRes.items),
-              };
-            } catch {
-              return null;
-            }
-          }),
-        );
-
-        const applied = updates.filter((item): item is NonNullable<typeof item> => item !== null);
-        if (!applied.length) continue;
-
-        setRows((prev) =>
-          prev.map((row) => {
-            const update = applied.find((item) => item.id === Number(row.id));
-            return update ? { ...row, servicios: update.servicios } : row;
-          }),
-        );
-      }
-    },
-    [token],
-  );
-
   const loadRows = useCallback(async () => {
     if (!token) return;
     setLoading(true);
     setError(null);
     try {
       const [contratosRes, resumen] = await Promise.all([
-        fetchContratos(token, { estado: "active", limit: 100 }),
+        fetchContratosTableSummary(token, { estado: "active", limit: 100 }),
         fetchDashboardResumen(token, 100),
       ]);
       const billing = buildBillingIndex(resumen);
       const dashboardMeta = buildDashboardContractMeta(resumen);
       const mapped = contratosRes.items.map((contrato) =>
-        mapContratoListItemToRentalRow(contrato, billing, dashboardMeta),
+        mapContratoTableItemToRentalRow(contrato, billing, dashboardMeta),
       );
 
       setRows(mapped);
-      void enrichServicios(contratosRes.items);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         logout();
@@ -174,7 +133,7 @@ export function AlquileresWorkspace() {
     } finally {
       setLoading(false);
     }
-  }, [token, logout, enrichServicios]);
+  }, [token, logout]);
 
   useEffect(() => {
     void loadRows();

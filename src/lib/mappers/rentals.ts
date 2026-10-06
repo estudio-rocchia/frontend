@@ -4,11 +4,13 @@ import type {
   ContratoDetail,
   ContratoListItem,
   ContratoRecord,
+  ContratoTableItem,
   CuotaDetail,
   DashboardResumen,
   InmuebleFichaPropietario,
   PeriodoServicioRecord,
   ServicioContratoRecord,
+  ServiciosTableSummary,
 } from "@/lib/api/types";
 import {
   daysUntilDate,
@@ -99,11 +101,22 @@ function monthLabelFromIsoDate(isoDate: string | undefined): string {
   return formatMonthYear(anio, mes);
 }
 
-const emptyServiciosSummary = (): RentalRow["servicios"] => ({
-  summary: "Sin servicios",
-  detail: "—",
-  status: { label: "N/D", variant: "warning" },
-});
+function mapServiciosResumen(resumen: ServiciosTableSummary): RentalRow["servicios"] {
+  return {
+    summary: resumen.summary,
+    detail: resumen.detail,
+    status: resumen.status,
+  };
+}
+
+export function mapContratoTableItemToRentalRow(
+  contrato: ContratoTableItem,
+  billing: ReturnType<typeof buildBillingIndex>,
+  dashboardMeta: Map<number, DashboardContractMeta>,
+): RentalRow {
+  const row = mapContratoListItemToRentalRow(contrato, billing, dashboardMeta);
+  return { ...row, servicios: mapServiciosResumen(contrato.serviciosResumen) };
+}
 
 export function mapContratoListItemToRentalRow(
   contrato: ContratoListItem,
@@ -143,10 +156,7 @@ export function mapContratoListItemToRentalRow(
     needsAdjustment: ajustePendiente,
     needsRenewal: daysUntilDate(contrato.fechaFin) <= 30,
     ultimoAjusteEn: ajusteItem?.ultimoAjusteEn ?? meta?.ultimoAjusteEn ?? null,
-    servicios:
-      servicios.length > 0 || periodos.length > 0
-        ? serviciosFromContrato(servicios, periodos)
-        : emptyServiciosSummary(),
+    servicios: serviciosFromContrato(servicios, periodos),
   };
 }
 
