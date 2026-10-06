@@ -58,6 +58,11 @@ export interface PreviewAjusteResponse {
   fuenteHasta: string;
 }
 
+export interface ApplyAjusteInput {
+  fechaAjuste: string;
+  nota?: string | null;
+}
+
 export interface ApplyAjusteResponse {
   ajuste: {
     id: number;
@@ -103,6 +108,12 @@ export interface ContratoRecord {
   tipoIndiceId: number | null;
   tasaMora: string | null;
   estado: "active" | "finished" | "terminated";
+}
+
+export interface ContratoListItem extends ContratoRecord {
+  inmuebleCode: string;
+  inmuebleTitle: string;
+  inquilinoNombre: string;
 }
 
 export interface ContratoDetail extends ContratoRecord {

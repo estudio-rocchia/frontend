@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { AdjustContractModal } from "@/components/alquileres/AdjustContractModal";
 import { ContractFichaDrawer } from "@/components/alquileres/ContractFichaDrawer";
-import type { IndexCalculatorState } from "@/components/alquileres/ContractIndexCalculator";
 import {
   NewContractModal,
   type NewContractForm,
@@ -38,7 +37,6 @@ import {
   fetchCatalog,
   fetchContrato,
   fetchContratos,
-  fetchCuotas,
   fetchDashboardResumen,
   fetchInmuebleFicha,
   fetchInmuebles,
@@ -55,24 +53,26 @@ import type {
   CreatePeriodoInput,
   SecheepImportInput,
   PeriodoServicioRecord,
-  PreviewAjusteResponse,
   ServicioContratoRecord,
 } from "@/lib/api/types";
 import { nextContratoCode, nextInmuebleCode, prefixForTipoInmueble } from "@/lib/codes";
 import {
-  formatMonthYear,
   parsePersonName,
   personaDisplayName,
   downloadBlob,
   rentalApiErrorMessage,
 } from "@/lib/format";
 import { pagePaddingClass } from "@/lib/layout";
-import { fromIsoMonthDate } from "@/lib/rental-adjustment";
+import { serviciosSummaryFromData } from "@/lib/mappers/servicios";
+import type { ContratoListItem } from "@/lib/api/types";
 import {
   buildBillingIndex,
+  buildDashboardContractMeta,
   mapContratoDetailToFicha,
-  mapContratoToRentalRow,
+  mapContratoListItemToRentalRow,
 } from "@/lib/mappers/rentals";
+
+const SERVICIOS_ENRICH_BATCH = 5;
 
 function addYears(isoDate: string, years: number): string {
   const date = new Date(`${isoDate}T12:00:00`);
@@ -111,6 +111,43 @@ export function AlquileresWorkspace() {
     window.setTimeout(() => setToast(null), 3200);
   }, []);
 
+  const enrichServicios = useCallback(
+    async (contratos: ContratoListItem[]) => {
+      if (!token || contratos.length === 0) return;
+
+      for (let offset = 0; offset < contratos.length; offset += SERVICIOS_ENRICH_BATCH) {
+        const batch = contratos.slice(offset, offset + SERVICIOS_ENRICH_BATCH);
+        const updates = await Promise.all(
+          batch.map(async (contrato) => {
+            try {
+              const [serviciosRes, periodosRes] = await Promise.all([
+                fetchServicios(token, contrato.id),
+                fetchServiciosPeriodos(token, contrato.id),
+              ]);
+              return {
+                id: contrato.id,
+                servicios: serviciosSummaryFromData(serviciosRes.items, periodosRes.items),
+              };
+            } catch {
+              return null;
+            }
+          }),
+        );
+
+        const applied = updates.filter((item): item is NonNullable<typeof item> => item !== null);
+        if (!applied.length) continue;
+
+        setRows((prev) =>
+          prev.map((row) => {
+            const update = applied.find((item) => item.id === Number(row.id));
+            return update ? { ...row, servicios: update.servicios } : row;
+          }),
+        );
+      }
+    },
+    [token],
+  );
+
   const loadRows = useCallback(async () => {
     if (!token) return;
     setLoading(true);
@@ -121,34 +158,13 @@ export function AlquileresWorkspace() {
         fetchDashboardResumen(token, 100),
       ]);
       const billing = buildBillingIndex(resumen);
-
-      const mapped = await Promise.all(
-        contratosRes.items.map(async (contrato) => {
-          const [detailRes, cuotasRes, serviciosRes, periodosRes] = await Promise.all([
-            fetchContrato(token, contrato.id),
-            fetchCuotas(token, contrato.id),
-            fetchServicios(token, contrato.id),
-            fetchServiciosPeriodos(token, contrato.id),
-          ]);
-          const inquilinoNombre = detailRes.inquilino
-            ? personaDisplayName(detailRes.inquilino)
-            : "—";
-          const inmuebleTitle = detailRes.inmueble?.title ?? "Inmueble";
-          const inmuebleCode = detailRes.inmueble?.code ?? null;
-          return mapContratoToRentalRow(
-            contrato,
-            cuotasRes.items,
-            serviciosRes.items,
-            periodosRes.items,
-            inquilinoNombre,
-            inmuebleTitle,
-            billing,
-            inmuebleCode,
-          );
-        }),
+      const dashboardMeta = buildDashboardContractMeta(resumen);
+      const mapped = contratosRes.items.map((contrato) =>
+        mapContratoListItemToRentalRow(contrato, billing, dashboardMeta),
       );
 
       setRows(mapped);
+      void enrichServicios(contratosRes.items);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         logout();
@@ -158,7 +174,7 @@ export function AlquileresWorkspace() {
     } finally {
       setLoading(false);
     }
-  }, [token, logout]);
+  }, [token, logout, enrichServicios]);
 
   useEffect(() => {
     void loadRows();
@@ -538,17 +554,7 @@ export function AlquileresWorkspace() {
     }
   }
 
-  function ajusteSourceLabel(preview: PreviewAjusteResponse): string {
-    const desde = fromIsoMonthDate(preview.periodoDesde);
-    const hasta = fromIsoMonthDate(preview.periodoHasta);
-    return `${preview.tipoIndiceCode} ${formatMonthYear(desde.anio, desde.mes)}-${formatMonthYear(hasta.anio, hasta.mes)}`;
-  }
-
-  async function handleAdjustContract(input: {
-    fechaAjuste: string;
-    preview: PreviewAjusteResponse;
-    calculator: IndexCalculatorState;
-  }) {
+  async function handleAdjustContract(input: { fechaAjuste: string }) {
     if (!token || !selectedContrato) return;
     if (selectedContrato.estado !== "active") {
       showToast("Solo se pueden ajustar contratos activos.");
@@ -557,24 +563,8 @@ export function AlquileresWorkspace() {
 
     setSubmitting(true);
     try {
-      const indices = await fetchCatalog(token, "/catalogos/tipos-indice");
-      const indexCode =
-        selectedContrato.tipoIndice?.code ?? input.calculator.tipoIndice ?? input.preview.tipoIndiceCode;
-      const indexItem = indices.items.find((item) => item.code === indexCode) ?? indices.items[0];
-      if (!indexItem?.id) {
-        throw new ApiError(400, {
-          error: {
-            code: "VALIDATION_ERROR",
-            message: "Seleccioná un índice de ajuste válido",
-          },
-        });
-      }
-
       await applyContratoAjuste(token, selectedContrato.id, {
         fechaAjuste: input.fechaAjuste,
-        tipoIndiceId: indexItem.id,
-        factor: input.preview.factor,
-        source: ajusteSourceLabel(input.preview),
       });
 
       setAdjustModalOpen(false);

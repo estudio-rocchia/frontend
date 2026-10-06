@@ -2,6 +2,7 @@ import { apiBlob, apiRequest } from "./client";
 import type {
   CatalogoItem,
   ContratoDetail,
+  ContratoListItem,
   ContratoRecord,
   CuotaDetail,
   DashboardResumen,
@@ -12,6 +13,7 @@ import type {
   PagoDetail,
   PagoRecord,
   PersonaRecord,
+  ApplyAjusteInput,
   ApplyAjusteResponse,
   IndiceCode,
   PreviewAjusteInput,
@@ -51,7 +53,7 @@ export function fetchContratos(token: string, params?: { estado?: string; limit?
   const query = new URLSearchParams();
   if (params?.estado) query.set("estado", params.estado);
   query.set("limit", String(params?.limit ?? 100));
-  return apiRequest<{ items: ContratoRecord[] }>(`/contratos?${query}`, { token });
+  return apiRequest<{ items: ContratoListItem[] }>(`/contratos?${query}`, { token });
 }
 
 export function fetchContrato(token: string, id: number) {
@@ -244,13 +246,7 @@ export function previewAjusteIndice(token: string, body: PreviewAjusteInput) {
 export function applyContratoAjuste(
   token: string,
   contratoId: number,
-  body: {
-    fechaAjuste: string;
-    tipoIndiceId: number;
-    factor: number | string;
-    source?: string | null;
-    nota?: string | null;
-  },
+  body: ApplyAjusteInput,
 ) {
   return apiRequest<ApplyAjusteResponse>(`/contratos/${contratoId}/ajustes`, {
     method: "POST",

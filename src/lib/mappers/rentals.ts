@@ -2,6 +2,7 @@ import type { AdjustmentIndex, ContractDetail } from "@/data/alquileres-contract
 import type { RentalFilterStatus, RentalRow } from "@/data/alquileres-rentals";
 import type {
   ContratoDetail,
+  ContratoListItem,
   ContratoRecord,
   CuotaDetail,
   DashboardResumen,
@@ -57,6 +58,96 @@ function serviciosFromContrato(
   periodos: PeriodoServicioRecord[],
 ): RentalRow["servicios"] {
   return serviciosSummaryFromData(servicios, periodos);
+}
+
+export type DashboardContractMeta = {
+  fechaVencimiento?: string;
+  ultimoAjusteEn?: string | null;
+};
+
+export function buildDashboardContractMeta(resumen: DashboardResumen): Map<number, DashboardContractMeta> {
+  const map = new Map<number, DashboardContractMeta>();
+
+  for (const item of resumen.cobrarEsteMes) {
+    map.set(item.contratoId, {
+      ...map.get(item.contratoId),
+      fechaVencimiento: item.fechaVencimiento,
+    });
+  }
+  for (const item of resumen.enMora) {
+    map.set(item.contratoId, {
+      ...map.get(item.contratoId),
+      fechaVencimiento: item.fechaVencimiento,
+    });
+  }
+  for (const item of resumen.ajustePendiente) {
+    map.set(item.contratoId, {
+      ...map.get(item.contratoId),
+      ultimoAjusteEn: item.ultimoAjusteEn,
+    });
+  }
+
+  return map;
+}
+
+function monthLabelFromIsoDate(isoDate: string | undefined): string {
+  if (!isoDate) return "—";
+  const [year, month] = isoDate.split("-");
+  const anio = Number(year);
+  const mes = Number(month);
+  if (!Number.isFinite(anio) || !Number.isFinite(mes)) return "—";
+  return formatMonthYear(anio, mes);
+}
+
+const emptyServiciosSummary = (): RentalRow["servicios"] => ({
+  summary: "Sin servicios",
+  detail: "—",
+  status: { label: "N/D", variant: "warning" },
+});
+
+export function mapContratoListItemToRentalRow(
+  contrato: ContratoListItem,
+  billing: ReturnType<typeof buildBillingIndex>,
+  dashboardMeta: Map<number, DashboardContractMeta>,
+  servicios: ServicioContratoRecord[] = [],
+  periodos: PeriodoServicioRecord[] = [],
+): RentalRow {
+  const mora = billing.moraByContrato.get(contrato.id);
+  const cobrar = billing.cobrarByContrato.get(contrato.id);
+  const ajusteItem = billing.ajusteByContrato.get(contrato.id);
+  const meta = dashboardMeta.get(contrato.id);
+  const ajustePendiente = Boolean(ajusteItem);
+
+  const diasAtraso = mora?.diasAtraso ?? 0;
+  const estadoCode = mora ? "late" : "pending";
+  const { status, filterStatus } = mapEstado(estadoCode, diasAtraso, ajustePendiente);
+
+  const currency = (contrato.codigoMoneda === "USD" ? "USD" : "ARS") as "ARS" | "USD";
+  const amountSource = mora?.saldoTotal ?? cobrar?.saldoTotal ?? contrato.montoAlquiler;
+  const amountCurrency = mora?.codigoMoneda ?? cobrar?.codigoMoneda ?? contrato.codigoMoneda;
+
+  return {
+    id: String(contrato.id),
+    contractProperty: `${contrato.inmuebleCode} · ${contrato.inmuebleTitle}`,
+    tenant: contrato.inquilinoNombre,
+    month: monthLabelFromIsoDate(meta?.fechaVencimiento),
+    amount: formatMoney(amountSource, amountCurrency),
+    currency,
+    daysOverdue: diasAtraso,
+    status,
+    filterStatus,
+    contractStart: formatDateDisplay(contrato.fechaInicio),
+    contractEnd: formatDateDisplay(contrato.fechaFin),
+    daysUntilContractEnd: daysUntilDate(contrato.fechaFin),
+    canAdjust: contratoSupportsIndexAdjustment(contrato),
+    needsAdjustment: ajustePendiente,
+    needsRenewal: daysUntilDate(contrato.fechaFin) <= 30,
+    ultimoAjusteEn: ajusteItem?.ultimoAjusteEn ?? meta?.ultimoAjusteEn ?? null,
+    servicios:
+      servicios.length > 0 || periodos.length > 0
+        ? serviciosFromContrato(servicios, periodos)
+        : emptyServiciosSummary(),
+  };
 }
 
 export function buildBillingIndex(resumen: DashboardResumen) {
