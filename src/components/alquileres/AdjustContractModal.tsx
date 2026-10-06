@@ -8,7 +8,7 @@ import {
   buildAdjustmentCalculatorState,
   type IndexCalculatorState,
 } from "@/components/alquileres/ContractIndexCalculator";
-import type { ContratoDetail, PreviewAjusteResponse } from "@/lib/api/types";
+import type { ContratoDetail } from "@/lib/api/types";
 import {
   formatIndexValue,
   formatMoney,
@@ -83,11 +83,7 @@ export function AdjustContractModal({
   token: string | null;
   ultimoAjusteEn?: string | null;
   onClose: () => void;
-  onSubmit: (input: {
-    fechaAjuste: string;
-    preview: PreviewAjusteResponse;
-    calculator: IndexCalculatorState;
-  }) => void;
+  onSubmit: (input: { fechaAjuste: string }) => void;
   submitting?: boolean;
 }) {
   const [calculator, setCalculator] = useState<IndexCalculatorState | null>(null);
@@ -150,7 +146,7 @@ export function AdjustContractModal({
             disabled={!preview || Boolean(error) || loading || submitting}
             onClick={() => {
               if (!preview) return;
-              onSubmit({ fechaAjuste, preview, calculator });
+              onSubmit({ fechaAjuste });
             }}
           >
             {submitting ? "Aplicando…" : "Confirmar ajuste"}

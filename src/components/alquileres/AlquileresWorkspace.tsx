@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { AdjustContractModal } from "@/components/alquileres/AdjustContractModal";
 import { ContractFichaDrawer } from "@/components/alquileres/ContractFichaDrawer";
-import type { IndexCalculatorState } from "@/components/alquileres/ContractIndexCalculator";
 import {
   NewContractModal,
   type NewContractForm,
@@ -55,19 +54,16 @@ import type {
   CreatePeriodoInput,
   SecheepImportInput,
   PeriodoServicioRecord,
-  PreviewAjusteResponse,
   ServicioContratoRecord,
 } from "@/lib/api/types";
 import { nextContratoCode, nextInmuebleCode, prefixForTipoInmueble } from "@/lib/codes";
 import {
-  formatMonthYear,
   parsePersonName,
   personaDisplayName,
   downloadBlob,
   rentalApiErrorMessage,
 } from "@/lib/format";
 import { pagePaddingClass } from "@/lib/layout";
-import { fromIsoMonthDate } from "@/lib/rental-adjustment";
 import {
   buildBillingIndex,
   mapContratoDetailToFicha,
@@ -538,17 +534,7 @@ export function AlquileresWorkspace() {
     }
   }
 
-  function ajusteSourceLabel(preview: PreviewAjusteResponse): string {
-    const desde = fromIsoMonthDate(preview.periodoDesde);
-    const hasta = fromIsoMonthDate(preview.periodoHasta);
-    return `${preview.tipoIndiceCode} ${formatMonthYear(desde.anio, desde.mes)}-${formatMonthYear(hasta.anio, hasta.mes)}`;
-  }
-
-  async function handleAdjustContract(input: {
-    fechaAjuste: string;
-    preview: PreviewAjusteResponse;
-    calculator: IndexCalculatorState;
-  }) {
+  async function handleAdjustContract(input: { fechaAjuste: string }) {
     if (!token || !selectedContrato) return;
     if (selectedContrato.estado !== "active") {
       showToast("Solo se pueden ajustar contratos activos.");
@@ -557,24 +543,8 @@ export function AlquileresWorkspace() {
 
     setSubmitting(true);
     try {
-      const indices = await fetchCatalog(token, "/catalogos/tipos-indice");
-      const indexCode =
-        selectedContrato.tipoIndice?.code ?? input.calculator.tipoIndice ?? input.preview.tipoIndiceCode;
-      const indexItem = indices.items.find((item) => item.code === indexCode) ?? indices.items[0];
-      if (!indexItem?.id) {
-        throw new ApiError(400, {
-          error: {
-            code: "VALIDATION_ERROR",
-            message: "Seleccioná un índice de ajuste válido",
-          },
-        });
-      }
-
       await applyContratoAjuste(token, selectedContrato.id, {
         fechaAjuste: input.fechaAjuste,
-        tipoIndiceId: indexItem.id,
-        factor: input.preview.factor,
-        source: ajusteSourceLabel(input.preview),
       });
 
       setAdjustModalOpen(false);

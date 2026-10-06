@@ -12,6 +12,7 @@ import type {
   PagoDetail,
   PagoRecord,
   PersonaRecord,
+  ApplyAjusteInput,
   ApplyAjusteResponse,
   IndiceCode,
   PreviewAjusteInput,
@@ -244,13 +245,7 @@ export function previewAjusteIndice(token: string, body: PreviewAjusteInput) {
 export function applyContratoAjuste(
   token: string,
   contratoId: number,
-  body: {
-    fechaAjuste: string;
-    tipoIndiceId: number;
-    factor: number | string;
-    source?: string | null;
-    nota?: string | null;
-  },
+  body: ApplyAjusteInput,
 ) {
   return apiRequest<ApplyAjusteResponse>(`/contratos/${contratoId}/ajustes`, {
     method: "POST",

@@ -58,6 +58,11 @@ export interface PreviewAjusteResponse {
   fuenteHasta: string;
 }
 
+export interface ApplyAjusteInput {
+  fechaAjuste: string;
+  nota?: string | null;
+}
+
 export interface ApplyAjusteResponse {
   ajuste: {
     id: number;
