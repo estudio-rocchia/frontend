@@ -116,6 +116,16 @@ export interface ContratoListItem extends ContratoRecord {
   inquilinoNombre: string;
 }
 
+export interface ServiciosTableSummary {
+  summary: string;
+  detail: string;
+  status: { label: string; variant: "success" | "warning" | "danger" };
+}
+
+export interface ContratoTableItem extends ContratoListItem {
+  serviciosResumen: ServiciosTableSummary;
+}
+
 export interface ContratoDetail extends ContratoRecord {
   inmueble: InmuebleRecord | null;
   inquilino: PersonaRecord | null;

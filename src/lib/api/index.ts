@@ -4,6 +4,7 @@ import type {
   ContratoDetail,
   ContratoListItem,
   ContratoRecord,
+  ContratoTableItem,
   CuotaDetail,
   DashboardResumen,
   InmuebleFicha,
@@ -54,6 +55,13 @@ export function fetchContratos(token: string, params?: { estado?: string; limit?
   if (params?.estado) query.set("estado", params.estado);
   query.set("limit", String(params?.limit ?? 100));
   return apiRequest<{ items: ContratoListItem[] }>(`/contratos?${query}`, { token });
+}
+
+export function fetchContratosTableSummary(token: string, params?: { estado?: string; limit?: number }) {
+  const query = new URLSearchParams();
+  if (params?.estado) query.set("estado", params.estado);
+  query.set("limit", String(params?.limit ?? 100));
+  return apiRequest<{ items: ContratoTableItem[] }>(`/contratos/table-summary?${query}`, { token });
 }
 
 export function fetchContrato(token: string, id: number) {
