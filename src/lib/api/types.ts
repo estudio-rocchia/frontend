@@ -110,6 +110,12 @@ export interface ContratoRecord {
   estado: "active" | "finished" | "terminated";
 }
 
+export interface ContratoListItem extends ContratoRecord {
+  inmuebleCode: string;
+  inmuebleTitle: string;
+  inquilinoNombre: string;
+}
+
 export interface ContratoDetail extends ContratoRecord {
   inmueble: InmuebleRecord | null;
   inquilino: PersonaRecord | null;

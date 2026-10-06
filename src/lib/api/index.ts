@@ -2,6 +2,7 @@ import { apiBlob, apiRequest } from "./client";
 import type {
   CatalogoItem,
   ContratoDetail,
+  ContratoListItem,
   ContratoRecord,
   CuotaDetail,
   DashboardResumen,
@@ -52,7 +53,7 @@ export function fetchContratos(token: string, params?: { estado?: string; limit?
   const query = new URLSearchParams();
   if (params?.estado) query.set("estado", params.estado);
   query.set("limit", String(params?.limit ?? 100));
-  return apiRequest<{ items: ContratoRecord[] }>(`/contratos?${query}`, { token });
+  return apiRequest<{ items: ContratoListItem[] }>(`/contratos?${query}`, { token });
 }
 
 export function fetchContrato(token: string, id: number) {
