@@ -1,3 +1,5 @@
+import { isRentCollectionWindow } from "@/lib/rental-collection";
+
 export type RentalFilterStatus =
   | "al_dia"
   | "en_mora"
@@ -27,11 +29,16 @@ export type RentalRow = {
   canAdjust: boolean;
   needsAdjustment: boolean;
   needsRenewal: boolean;
+  /** Cuota del mes con saldo (sin estar en mora). */
+  needsCollection: boolean;
   ultimoAjusteEn: string | null;
   servicios: ServiciosSummary;
 };
 
+export const rentalCollectionChip = { id: "a_cobrar", label: "A cobrar" } as const;
+
 export const rentalFilterChips = [
+  rentalCollectionChip,
   { id: "ajuste_pendiente", label: "Ajuste pendiente" },
   { id: "renovacion_proxima", label: "Por vencer" },
   { id: "todos", label: "Todos" },
@@ -47,6 +54,7 @@ export function countRentalsByChip(rows: RentalRow[], chip: RentalChipId): numbe
 
 export function rentalOperationalCounts(rows: RentalRow[]) {
   return {
+    aCobrar: countRentalsByChip(rows, "a_cobrar"),
     ajustePendiente: countRentalsByChip(rows, "ajuste_pendiente"),
     renovacionProxima: countRentalsByChip(rows, "renovacion_proxima"),
   };
@@ -55,10 +63,24 @@ export function rentalOperationalCounts(rows: RentalRow[]) {
 export function rentalSummaryStats(rows: RentalRow[]) {
   return {
     total: rows.length,
+    aCobrar: countRentalsByChip(rows, "a_cobrar"),
     enMora: countRentalsByChip(rows, "en_mora"),
     ajustePendiente: countRentalsByChip(rows, "ajuste_pendiente"),
     renovacionProxima: countRentalsByChip(rows, "renovacion_proxima"),
   };
+}
+
+/** Mostrar acción Cobrar: ventana del 1 al 10, o si ya está en mora. */
+export function canCollectRent(row: RentalRow): boolean {
+  if (row.needsRenewal) return false;
+  if (row.filterStatus === "en_mora" || row.daysOverdue > 0) return true;
+  return row.needsCollection && isRentCollectionWindow();
+}
+
+export function visibleFilterChips() {
+  return rentalFilterChips.filter(
+    (chip) => chip.id !== "a_cobrar" || isRentCollectionWindow(),
+  );
 }
 
 export type RentalChipId = (typeof rentalFilterChips)[number]["id"];
@@ -80,6 +102,7 @@ export const alquileresRentals: RentalRow[] = [
     canAdjust: true,
     needsAdjustment: false,
     needsRenewal: false,
+    needsCollection: false,
     ultimoAjusteEn: null,
     servicios: { summary: "Luz", detail: "Al día", status: { label: "Al día", variant: "success" } },
   },
@@ -99,6 +122,7 @@ export const alquileresRentals: RentalRow[] = [
     canAdjust: true,
     needsAdjustment: false,
     needsRenewal: true,
+    needsCollection: false,
     ultimoAjusteEn: null,
     servicios: { summary: "Luz", detail: "Al día", status: { label: "Al día", variant: "success" } },
   },
@@ -118,6 +142,7 @@ export const alquileresRentals: RentalRow[] = [
     canAdjust: true,
     needsAdjustment: false,
     needsRenewal: false,
+    needsCollection: false,
     ultimoAjusteEn: null,
     servicios: { summary: "Luz", detail: "Al día", status: { label: "Al día", variant: "success" } },
   },
@@ -137,6 +162,7 @@ export const alquileresRentals: RentalRow[] = [
     canAdjust: true,
     needsAdjustment: false,
     needsRenewal: false,
+    needsCollection: false,
     ultimoAjusteEn: null,
     servicios: { summary: "Luz", detail: "Al día", status: { label: "Al día", variant: "success" } },
   },
@@ -156,6 +182,7 @@ export const alquileresRentals: RentalRow[] = [
     canAdjust: true,
     needsAdjustment: false,
     needsRenewal: true,
+    needsCollection: false,
     ultimoAjusteEn: null,
     servicios: { summary: "Luz", detail: "Al día", status: { label: "Al día", variant: "success" } },
   },
@@ -175,6 +202,7 @@ export const alquileresRentals: RentalRow[] = [
     canAdjust: true,
     needsAdjustment: false,
     needsRenewal: false,
+    needsCollection: false,
     ultimoAjusteEn: null,
     servicios: { summary: "Luz", detail: "Al día", status: { label: "Al día", variant: "success" } },
   },
@@ -205,6 +233,8 @@ export function filterRentals(
   chip: RentalChipId,
 ): RentalRow[] {
   switch (chip) {
+    case "a_cobrar":
+      return rows.filter((r) => r.needsCollection && !r.needsRenewal);
     case "todos":
       return rows;
     case "en_mora":

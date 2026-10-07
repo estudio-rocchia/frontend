@@ -106,6 +106,8 @@ const RENTAL_ERROR_MESSAGES: Record<string, string> = {
   "Missing required permission: inmueble.edit": "No tenés permiso para crear inmuebles.",
   "frecuenciaAjusteMeses requires tipoIndiceId": "Seleccioná un índice de ajuste válido.",
   "Request validation failed": "Datos inválidos. Revisá los campos del formulario.",
+  "Rent imputacion must cover the full outstanding balance for the installment":
+    "El alquiler se cobra siempre por el total de la cuota.",
 };
 
 const INDEX_VALUE_MISSING_RE = /^No index value for (ICL|IPC|CAC) at /;

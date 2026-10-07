@@ -7,6 +7,8 @@ import { ChipToggle, FormField, FormSection } from "@/components/ui/FormLayout";
 import type { AdjustmentIndex } from "@/data/alquileres-contract-details";
 import type { CatalogoItem } from "@/lib/api/types";
 import { nextInmuebleCode, prefixForTipoInmueble } from "@/lib/codes";
+import { MoraPunitoriaFields } from "@/components/alquileres/MoraPunitoriaFields";
+import { DEFAULT_MORA_PUNITORIA, type MoraPunitoriaForm, isMoraPunitoriaValid } from "@/lib/mora-punitoria";
 import { FRECUENCIAS_AJUSTE } from "@/lib/rental-adjustment";
 
 export type NewContractForm = {
@@ -20,6 +22,7 @@ export type NewContractForm = {
   currency: "ARS" | "USD";
   index: AdjustmentIndex;
   frecuenciaAjusteMeses: number;
+  mora: MoraPunitoriaForm;
 };
 
 const emptyForm: NewContractForm = {
@@ -33,6 +36,7 @@ const emptyForm: NewContractForm = {
   currency: "ARS",
   index: "ICL",
   frecuenciaAjusteMeses: 12,
+  mora: DEFAULT_MORA_PUNITORIA,
 };
 
 export function NewContractModal({
@@ -72,7 +76,8 @@ export function NewContractModal({
     form.tenant.trim() &&
     form.owner.trim() &&
     form.amount.trim() &&
-    form.depositAmount.trim();
+    form.depositAmount.trim() &&
+    isMoraPunitoriaValid(form.mora);
 
   return (
     <Modal
@@ -190,6 +195,8 @@ export function NewContractModal({
             </div>
           </div>
         </FormSection>
+
+        <MoraPunitoriaFields value={form.mora} onChange={(mora) => patch({ mora })} />
       </div>
     </Modal>
   );

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { AdjustContractModal } from "@/components/alquileres/AdjustContractModal";
+import { CobrarAlquilerModal } from "@/components/alquileres/CobrarAlquilerModal";
 import { ContractFichaDrawer } from "@/components/alquileres/ContractFichaDrawer";
 import {
   NewContractModal,
@@ -64,6 +65,8 @@ import {
   rentalApiErrorMessage,
 } from "@/lib/format";
 import { pagePaddingClass } from "@/lib/layout";
+import { isRentCollectionWindow } from "@/lib/rental-collection";
+import { resolveMoraPunitoriaPayload } from "@/lib/mora-punitoria";
 import {
   buildBillingIndex,
   buildDashboardContractMeta,
@@ -96,6 +99,8 @@ export function AlquileresWorkspace() {
     inmuebleCodes: string[];
     contratoCodes: Array<string | null>;
   } | null>(null);
+  const [cobrarModalOpen, setCobrarModalOpen] = useState(false);
+  const [cobrarRow, setCobrarRow] = useState<RentalRow | null>(null);
   const [drawerServicios, setDrawerServicios] = useState<ServicioContratoRecord[]>([]);
   const [drawerPeriodos, setDrawerPeriodos] = useState<PeriodoServicioRecord[]>([]);
   const [tiposServicio, setTiposServicio] = useState<CatalogoItem[]>([]);
@@ -199,6 +204,24 @@ export function AlquileresWorkspace() {
       }
     },
     [token, showToast, loadDrawerServicios],
+  );
+
+  const openCollectFromRow = useCallback(
+    async (row: RentalRow) => {
+      if (!token) return;
+      if (mediosPago.length === 0) {
+        try {
+          const res = await fetchCatalog(token, "/catalogos/medios-pago");
+          setMediosPago(res.items);
+        } catch (err) {
+          showToast(err instanceof ApiError ? err.message : "No se pudieron cargar los medios de pago");
+          return;
+        }
+      }
+      setCobrarRow(row);
+      setCobrarModalOpen(true);
+    },
+    [token, mediosPago.length, showToast],
   );
 
   async function handleCreateServicio(values: ServicioFormValues) {
@@ -397,24 +420,49 @@ export function AlquileresWorkspace() {
 
     setSubmitting(true);
     try {
-      const amount = Number(form.monto.replace(/\D/g, ""));
+      const amount = Number(form.amount.replace(/\D/g, ""));
       if (!Number.isFinite(amount) || amount <= 0) {
         throw new ApiError(400, {
           error: { code: "VALIDATION_ERROR", message: "Ingresá un monto mensual válido" },
         });
       }
 
+      const depositAmount = Number(form.depositAmount.replace(/\D/g, ""));
+      if (!Number.isFinite(depositAmount) || depositAmount <= 0) {
+        throw new ApiError(400, {
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Ingresá un depósito de garantía válido mayor a cero",
+          },
+        });
+      }
+
       const contratosRes = await fetchContratos(token, { limit: 200 });
       const reservedContratoCodes = contratosRes.items.map((item) => item.contratoCode);
 
-      const indices = await fetchCatalog(token, "/catalogos/tipos-indice");
+      const [indices, moras] = await Promise.all([
+        fetchCatalog(token, "/catalogos/tipos-indice"),
+        fetchCatalog(token, "/catalogos/tipos-mora"),
+      ]);
       const indexItem =
-        indices.items.find((item) => item.code === form.tipoIndice) ?? indices.items[0];
+        indices.items.find((item) => item.code === form.index) ?? indices.items[0];
       if (!indexItem?.id) {
         throw new ApiError(400, {
           error: {
             code: "VALIDATION_ERROR",
             message: "Seleccioná un índice de ajuste válido",
+          },
+        });
+      }
+
+      let moraPayload;
+      try {
+        moraPayload = resolveMoraPunitoriaPayload(form.mora, moras.items);
+      } catch (err) {
+        throw new ApiError(400, {
+          error: {
+            code: "VALIDATION_ERROR",
+            message: err instanceof Error ? err.message : "Configuración de mora inválida",
           },
         });
       }
@@ -432,14 +480,15 @@ export function AlquileresWorkspace() {
             fechaInicio: form.fechaInicio,
             fechaFin: form.fechaFin,
             montoAlquiler: amount,
-            codigoMoneda: selectedContrato.codigoMoneda.trim(),
-            diaVencimientoPago: selectedContrato.diaVencimientoPago,
+            codigoMoneda: form.currency,
+            diaVencimientoPago: moraPayload.diaVencimientoPago,
             frecuenciaAjusteMeses: form.frecuenciaAjusteMeses,
             tipoIndiceId: indexItem.id,
-            tipoMoraId: selectedContrato.tipoMora?.id ?? null,
-            tasaMora: selectedContrato.tasaMora ? Number(selectedContrato.tasaMora) : null,
-            montoDeposito: amount,
-            codigoMonedaDeposito: selectedContrato.codigoMoneda.trim(),
+            tipoMoraId: moraPayload.tipoMoraId,
+            tasaMora: moraPayload.tasaMora,
+            montoMoraFijo: moraPayload.montoMoraFijo,
+            montoDeposito: depositAmount,
+            codigoMonedaDeposito: form.currency,
             enAdministracion: false,
             renewalOfContratoId: selectedContrato.id,
             notas: `Renovación del contrato #${selectedContrato.id}.`,
@@ -495,6 +544,10 @@ export function AlquileresWorkspace() {
 
   async function openAdjustFromRow(row: RentalRow) {
     if (!token) return;
+    if (row.needsRenewal) {
+      showToast("Este contrato está por vencer. Usá Renovar en lugar de Ajustar.");
+      return;
+    }
     if (!row.needsAdjustment) {
       showToast("Este contrato no tiene ajuste pendiente.");
       return;
@@ -569,7 +622,6 @@ export function AlquileresWorkspace() {
       ]);
 
       const indexItem = indices.items.find((item) => item.code === form.index) ?? indices.items[0];
-      const moraItem = moras.items.find((item) => item.code === "daily_percentage") ?? moras.items[0];
       const tiposInmueble = codeContext?.tiposInmueble.length
         ? codeContext.tiposInmueble
         : (await fetchCatalog(token, "/catalogos/tipos-inmueble")).items;
@@ -641,6 +693,18 @@ export function AlquileresWorkspace() {
         });
       }
 
+      let moraPayload;
+      try {
+        moraPayload = resolveMoraPunitoriaPayload(form.mora, moras.items);
+      } catch (err) {
+        throw new ApiError(400, {
+          error: {
+            code: "VALIDATION_ERROR",
+            message: err instanceof Error ? err.message : "Configuración de mora inválida",
+          },
+        });
+      }
+
       const inmueblePrefix = prefixForTipoInmueble(form.tipoInmuebleCode);
       let inmueble = null as Awaited<ReturnType<typeof createInmueble>> | null;
       const reservedInmuebleCodes = [...usedInmuebleCodes];
@@ -686,11 +750,12 @@ export function AlquileresWorkspace() {
             fechaFin: addYears(today, 5),
             montoAlquiler: amount,
             codigoMoneda: form.currency,
-            diaVencimientoPago: 10,
+            diaVencimientoPago: moraPayload.diaVencimientoPago,
             frecuenciaAjusteMeses: form.frecuenciaAjusteMeses,
             tipoIndiceId: indexItem.id,
-            tipoMoraId: moraItem?.id ?? null,
-            tasaMora: 0.025,
+            tipoMoraId: moraPayload.tipoMoraId,
+            tasaMora: moraPayload.tasaMora,
+            montoMoraFijo: moraPayload.montoMoraFijo,
             montoDeposito: depositAmount,
             codigoMonedaDeposito: form.currency,
           });
@@ -730,6 +795,7 @@ export function AlquileresWorkspace() {
 
   const tableRows = useMemo(() => rows, [rows]);
   const stats = useMemo(() => rentalSummaryStats(rows), [rows]);
+  const inCollectionWindow = isRentCollectionWindow();
 
   return (
     <>
@@ -749,6 +815,15 @@ export function AlquileresWorkspace() {
         {!loading && !error && rows.length > 0 ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <KpiCard label="Contratos activos" value={String(stats.total)} hint="En esta vista" />
+            {inCollectionWindow ? (
+              <KpiCard
+                label="A cobrar"
+                value={String(stats.aCobrar)}
+                hint="Cuota del mes (días 1 al 10)"
+              />
+            ) : (
+              <KpiCard label="En mora" value={String(stats.enMora)} hint="Con días de atraso" />
+            )}
             <KpiCard
               label="Ajuste pendiente"
               value={String(stats.ajustePendiente)}
@@ -759,7 +834,6 @@ export function AlquileresWorkspace() {
               value={String(stats.renovacionProxima)}
               hint="Renovación próxima"
             />
-            <KpiCard label="En mora" value={String(stats.enMora)} hint="Con días de atraso" />
           </div>
         ) : null}
 
@@ -776,11 +850,28 @@ export function AlquileresWorkspace() {
           <RentalsTable
             rows={tableRows}
             onViewFicha={(row) => void openDrawer(row.id)}
+            onCollect={(row) => void openCollectFromRow(row)}
             onAdjust={(row) => void openAdjustFromRow(row)}
             onRenew={(row) => void openRenewFromRow(row)}
           />
         )}
       </div>
+
+      <CobrarAlquilerModal
+        open={cobrarModalOpen}
+        onClose={() => {
+          setCobrarModalOpen(false);
+          setCobrarRow(null);
+        }}
+        row={cobrarRow}
+        contratoId={cobrarRow ? Number(cobrarRow.id) : null}
+        token={token}
+        mediosPago={mediosPago}
+        onSuccess={() => {
+          showToast("Cobro registrado.");
+          void loadRows();
+        }}
+      />
 
       <ContractFichaDrawer
         open={drawerOpen}

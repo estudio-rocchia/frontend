@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  rentalFilterChips,
+  visibleFilterChips,
   type RentalChipId,
 } from "@/data/alquileres-rentals";
 
@@ -14,9 +14,11 @@ export function RentalFilterChips({
   counts?: Partial<Record<RentalChipId, number>>;
   onChange: (id: RentalChipId) => void;
 }) {
+  const chips = visibleFilterChips();
+
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {rentalFilterChips.map(({ id, label }) => {
+      {chips.map(({ id, label }) => {
         const selected = active === id;
         const count = counts?.[id];
         const showCount = count !== undefined && count > 0;

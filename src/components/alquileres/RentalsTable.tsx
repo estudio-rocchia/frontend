@@ -6,6 +6,7 @@ import { useSearch } from "@/context/search-context";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import {
+  canCollectRent,
   filterRentals,
   searchRentals,
   rentalOperationalCounts,
@@ -13,6 +14,7 @@ import {
   type RentalRow,
 } from "@/data/alquileres-rentals";
 import { contractEndHint, moneyClassName } from "@/lib/format";
+import { isRentCollectionWindow, rentCollectionWindowHint } from "@/lib/rental-collection";
 
 const PAGE_SIZE = 15;
 
@@ -33,20 +35,29 @@ function ContractEndCell({ row }: { row: RentalRow }) {
   );
 }
 
+function defaultActiveChip(counts: ReturnType<typeof rentalOperationalCounts>): RentalChipId {
+  if (isRentCollectionWindow() && counts.aCobrar > 0) return "a_cobrar";
+  if (counts.ajustePendiente > 0) return "ajuste_pendiente";
+  return "todos";
+}
+
 export function RentalsTable({
   rows,
   onViewFicha,
+  onCollect,
   onAdjust,
   onRenew,
 }: {
   rows: RentalRow[];
   onViewFicha: (row: RentalRow) => void;
+  onCollect: (row: RentalRow) => void;
   onAdjust: (row: RentalRow) => void;
   onRenew: (row: RentalRow) => void;
 }) {
   const { query } = useSearch();
-  const [activeChip, setActiveChip] = useState<RentalChipId>("ajuste_pendiente");
   const operationalCounts = useMemo(() => rentalOperationalCounts(rows), [rows]);
+  const [activeChip, setActiveChip] = useState<RentalChipId>(() => defaultActiveChip(operationalCounts));
+  const inCollectionWindow = isRentCollectionWindow();
   const [page, setPage] = useState(1);
 
   const filtered = useMemo(() => {
@@ -81,9 +92,13 @@ export function RentalsTable({
         <p className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
           Filtrar contratos
         </p>
+        {inCollectionWindow ? (
+          <p className="text-xs text-text-secondary">{rentCollectionWindowHint()}</p>
+        ) : null}
         <RentalFilterChips
           active={activeChip}
           counts={{
+            a_cobrar: operationalCounts.aCobrar,
             ajuste_pendiente: operationalCounts.ajustePendiente,
             renovacion_proxima: operationalCounts.renovacionProxima,
           }}
@@ -129,8 +144,9 @@ export function RentalsTable({
                 </tr>
               ) : (
                 paginated.map((row) => {
-                  const showAdjust = row.needsAdjustment && row.canAdjust;
                   const showRenew = row.needsRenewal;
+                  const showAdjust = row.needsAdjustment && row.canAdjust && !showRenew;
+                  const showCollect = canCollectRent(row);
 
                   return (
                     <tr
@@ -170,6 +186,11 @@ export function RentalsTable({
                       </td>
                       <td className="whitespace-nowrap px-3 text-right sm:px-5">
                         <div className="flex flex-wrap items-center justify-end gap-1.5 sm:gap-2">
+                          {showCollect ? (
+                            <ButtonPrimary type="button" onClick={() => onCollect(row)}>
+                              Cobrar
+                            </ButtonPrimary>
+                          ) : null}
                           <ButtonOutline type="button" onClick={() => onViewFicha(row)} className="px-2.5 py-1.5 text-xs sm:px-[18px] sm:py-2 sm:text-sm">
                             Ver ficha
                           </ButtonOutline>

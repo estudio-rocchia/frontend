@@ -19,6 +19,7 @@ import {
   formatMonthYear,
   personaDisplayName,
 } from "@/lib/format";
+import { isRentCollectionWindow } from "@/lib/rental-collection";
 import { contratoSupportsIndexAdjustment } from "@/lib/rental-adjustment";
 import { serviciosSummaryFromData } from "@/lib/mappers/servicios";
 
@@ -34,12 +35,16 @@ function mapEstado(
   estadoCode: string,
   diasAtraso: number,
   ajustePendiente: boolean,
+  cobrarPendiente: boolean,
 ): { status: RentalRow["status"]; filterStatus: RentalFilterStatus } {
   if (ajustePendiente) {
     return { status: { label: "Ajuste pendiente", variant: "warning" }, filterStatus: "ajuste_pendiente" };
   }
   if (estadoCode === "late" || diasAtraso > 0) {
     return { status: { label: "En mora", variant: "danger" }, filterStatus: "en_mora" };
+  }
+  if (cobrarPendiente && isRentCollectionWindow()) {
+    return { status: { label: "A cobrar", variant: "warning" }, filterStatus: "al_dia" };
   }
   if (estadoCode === "partial") {
     return { status: { label: "Parcial", variant: "warning" }, filterStatus: "prox_mora" };
@@ -129,11 +134,14 @@ export function mapContratoListItemToRentalRow(
   const cobrar = billing.cobrarByContrato.get(contrato.id);
   const ajusteItem = billing.ajusteByContrato.get(contrato.id);
   const meta = dashboardMeta.get(contrato.id);
-  const ajustePendiente = Boolean(ajusteItem);
+  const daysUntilContractEnd = daysUntilDate(contrato.fechaFin);
+  const needsRenewal = daysUntilContractEnd <= 30;
+  const ajustePendiente = Boolean(ajusteItem) && !needsRenewal;
+  const needsCollection = Boolean(cobrar) && !mora;
 
   const diasAtraso = mora?.diasAtraso ?? 0;
   const estadoCode = mora ? "late" : "pending";
-  const { status, filterStatus } = mapEstado(estadoCode, diasAtraso, ajustePendiente);
+  const { status, filterStatus } = mapEstado(estadoCode, diasAtraso, ajustePendiente, needsCollection);
 
   const currency = (contrato.codigoMoneda === "USD" ? "USD" : "ARS") as "ARS" | "USD";
   const amountSource = mora?.saldoTotal ?? cobrar?.saldoTotal ?? contrato.montoAlquiler;
@@ -151,10 +159,11 @@ export function mapContratoListItemToRentalRow(
     filterStatus,
     contractStart: formatDateDisplay(contrato.fechaInicio),
     contractEnd: formatDateDisplay(contrato.fechaFin),
-    daysUntilContractEnd: daysUntilDate(contrato.fechaFin),
+    daysUntilContractEnd,
     canAdjust: contratoSupportsIndexAdjustment(contrato),
     needsAdjustment: ajustePendiente,
-    needsRenewal: daysUntilDate(contrato.fechaFin) <= 30,
+    needsRenewal,
+    needsCollection,
     ultimoAjusteEn: ajusteItem?.ultimoAjusteEn ?? meta?.ultimoAjusteEn ?? null,
     servicios: serviciosFromContrato(servicios, periodos),
   };
@@ -198,11 +207,14 @@ export function mapContratoToRentalRow(
   const mora = billing.moraByContrato.get(contrato.id);
   const cobrar = billing.cobrarByContrato.get(contrato.id);
   const ajusteItem = billing.ajusteByContrato.get(contrato.id);
-  const ajustePendiente = Boolean(ajusteItem);
+  const daysUntilContractEnd = daysUntilDate(contrato.fechaFin);
+  const needsRenewal = daysUntilContractEnd <= 30;
+  const ajustePendiente = Boolean(ajusteItem) && !needsRenewal;
+  const needsCollection = Boolean(cobrar) && !mora;
 
   const diasAtraso = mora?.diasAtraso ?? cuota?.mora?.diasAtraso ?? 0;
   const estadoCode = mora ? "late" : (cuota?.estadoCode ?? "pending");
-  const { status, filterStatus } = mapEstado(estadoCode, diasAtraso, ajustePendiente);
+  const { status, filterStatus } = mapEstado(estadoCode, diasAtraso, ajustePendiente, needsCollection);
 
   const currency = (contrato.codigoMoneda === "USD" ? "USD" : "ARS") as "ARS" | "USD";
   const amountSource = mora?.saldoTotal ?? cobrar?.saldoTotal ?? cuota?.saldoTotal ?? contrato.montoAlquiler;
@@ -222,10 +234,11 @@ export function mapContratoToRentalRow(
     filterStatus,
     contractStart: formatDateDisplay(contrato.fechaInicio),
     contractEnd: formatDateDisplay(contrato.fechaFin),
-    daysUntilContractEnd: daysUntilDate(contrato.fechaFin),
+    daysUntilContractEnd,
     canAdjust: contratoSupportsIndexAdjustment(contrato),
     needsAdjustment: ajustePendiente,
-    needsRenewal: daysUntilDate(contrato.fechaFin) <= 30,
+    needsRenewal,
+    needsCollection,
     ultimoAjusteEn: ajusteItem?.ultimoAjusteEn ?? null,
     servicios: serviciosFromContrato(servicios, periodos),
   };
