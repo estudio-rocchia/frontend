@@ -117,6 +117,7 @@ export function ContractFichaDrawer({
 
         <FormSection title="Condiciones económicas">
           <div className="grid gap-4 sm:grid-cols-2">
+            <FieldBlock label="Depósito de garantía" value={detail.depositAmount} />
             <FieldBlock label="Índice de ajuste" value={detail.adjustmentIndex} />
             <FieldBlock label="Frecuencia de ajuste" value={detail.adjustmentFrequency} />
             <FieldBlock label="Día de vencimiento" value={detail.paymentDueDay} />

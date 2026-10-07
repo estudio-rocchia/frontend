@@ -107,7 +107,19 @@ export interface ContratoRecord {
   frecuenciaAjusteMeses: number | null;
   tipoIndiceId: number | null;
   tasaMora: string | null;
+  montoDeposito: string | null;
+  codigoMonedaDeposito: string | null;
   estado: "active" | "finished" | "terminated";
+}
+
+export interface MovimientoDepositoRecord {
+  id: number;
+  contratoId: number;
+  tipoMovimiento: string;
+  monto: string;
+  codigoMoneda: string;
+  ocurridoEn: string;
+  reason: string | null;
 }
 
 export interface ContratoListItem extends ContratoRecord {
@@ -136,6 +148,11 @@ export interface ContratoDetail extends ContratoRecord {
     personaId: number;
     relacionInquilino: string | null;
   }>;
+  deposito: {
+    monto: string | null;
+    codigoMoneda: string | null;
+    movimientos: MovimientoDepositoRecord[];
+  };
 }
 
 export interface CuotaDetail {

@@ -631,6 +631,16 @@ export function AlquileresWorkspace() {
         });
       }
 
+      const depositAmount = Number(form.depositAmount.replace(/\D/g, ""));
+      if (!Number.isFinite(depositAmount) || depositAmount <= 0) {
+        throw new ApiError(400, {
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Ingresá un depósito de garantía válido mayor a cero",
+          },
+        });
+      }
+
       const inmueblePrefix = prefixForTipoInmueble(form.tipoInmuebleCode);
       let inmueble = null as Awaited<ReturnType<typeof createInmueble>> | null;
       const reservedInmuebleCodes = [...usedInmuebleCodes];
@@ -681,7 +691,7 @@ export function AlquileresWorkspace() {
             tipoIndiceId: indexItem.id,
             tipoMoraId: moraItem?.id ?? null,
             tasaMora: 0.025,
-            montoDeposito: amount,
+            montoDeposito: depositAmount,
             codigoMonedaDeposito: form.currency,
           });
           break;
