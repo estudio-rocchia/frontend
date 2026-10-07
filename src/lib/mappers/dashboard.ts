@@ -4,7 +4,6 @@ import { formatDateDisplay, formatMoney } from "@/lib/format";
 
 function statusFromCode(code: string | undefined): ContractRow["status"] {
   if (code === "late") return { label: "En mora", variant: "danger" };
-  if (code === "partial") return { label: "Parcial", variant: "warning" };
   if (code === "paid") return { label: "Al día", variant: "success" };
   return { label: "Pendiente", variant: "warning" };
 }

@@ -175,6 +175,13 @@ export interface ContratoDetail extends ContratoRecord {
   };
 }
 
+export interface MoraDetail {
+  id: number;
+  diasAtraso: number;
+  montoAplicado: string;
+  montoPagado: string;
+}
+
 export interface CuotaDetail {
   id: number;
   contratoId: number;
@@ -184,8 +191,21 @@ export interface CuotaDetail {
   codigoMoneda: string;
   fechaVencimiento: string;
   estadoCode: string;
-  mora: { diasAtraso: number } | null;
+  montoPagado: string | null;
+  mora: MoraDetail | null;
+  saldoAlquiler: string;
+  saldoMora: string;
   saldoTotal: string;
+}
+
+export interface GenerateCuotaInput {
+  anioPeriodo: number;
+  mesPeriodo: number;
+}
+
+export interface ApplyMoraResult {
+  cuota: CuotaDetail;
+  mora: MoraDetail & { cuotaAlquilerId: number };
 }
 
 export type ModoFacturacion = "fixed" | "variable";
@@ -359,6 +379,7 @@ export interface DashboardResumen {
   cobrarEsteMes: Array<{
     contratoId: number;
     contratoCode: string | null;
+    cuotaId: number;
     inmuebleTitle: string;
     inquilinoNombre: string;
     saldoTotal: string;
@@ -368,6 +389,7 @@ export interface DashboardResumen {
   enMora: Array<{
     contratoId: number;
     contratoCode: string | null;
+    cuotaId: number;
     inmuebleTitle: string;
     inquilinoNombre: string;
     diasAtraso: number;

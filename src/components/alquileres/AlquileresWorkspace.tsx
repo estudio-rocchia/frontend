@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { AdjustContractModal } from "@/components/alquileres/AdjustContractModal";
+import { CobrarAlquilerModal } from "@/components/alquileres/CobrarAlquilerModal";
 import { ContractFichaDrawer } from "@/components/alquileres/ContractFichaDrawer";
 import {
   NewContractModal,
@@ -64,6 +65,7 @@ import {
   rentalApiErrorMessage,
 } from "@/lib/format";
 import { pagePaddingClass } from "@/lib/layout";
+import { isRentCollectionWindow } from "@/lib/rental-collection";
 import { resolveMoraPunitoriaPayload } from "@/lib/mora-punitoria";
 import {
   buildBillingIndex,
@@ -97,6 +99,8 @@ export function AlquileresWorkspace() {
     inmuebleCodes: string[];
     contratoCodes: Array<string | null>;
   } | null>(null);
+  const [cobrarModalOpen, setCobrarModalOpen] = useState(false);
+  const [cobrarRow, setCobrarRow] = useState<RentalRow | null>(null);
   const [drawerServicios, setDrawerServicios] = useState<ServicioContratoRecord[]>([]);
   const [drawerPeriodos, setDrawerPeriodos] = useState<PeriodoServicioRecord[]>([]);
   const [tiposServicio, setTiposServicio] = useState<CatalogoItem[]>([]);
@@ -200,6 +204,24 @@ export function AlquileresWorkspace() {
       }
     },
     [token, showToast, loadDrawerServicios],
+  );
+
+  const openCollectFromRow = useCallback(
+    async (row: RentalRow) => {
+      if (!token) return;
+      if (mediosPago.length === 0) {
+        try {
+          const res = await fetchCatalog(token, "/catalogos/medios-pago");
+          setMediosPago(res.items);
+        } catch (err) {
+          showToast(err instanceof ApiError ? err.message : "No se pudieron cargar los medios de pago");
+          return;
+        }
+      }
+      setCobrarRow(row);
+      setCobrarModalOpen(true);
+    },
+    [token, mediosPago.length, showToast],
   );
 
   async function handleCreateServicio(values: ServicioFormValues) {
@@ -773,6 +795,7 @@ export function AlquileresWorkspace() {
 
   const tableRows = useMemo(() => rows, [rows]);
   const stats = useMemo(() => rentalSummaryStats(rows), [rows]);
+  const inCollectionWindow = isRentCollectionWindow();
 
   return (
     <>
@@ -792,6 +815,15 @@ export function AlquileresWorkspace() {
         {!loading && !error && rows.length > 0 ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <KpiCard label="Contratos activos" value={String(stats.total)} hint="En esta vista" />
+            {inCollectionWindow ? (
+              <KpiCard
+                label="A cobrar"
+                value={String(stats.aCobrar)}
+                hint="Cuota del mes (días 1 al 10)"
+              />
+            ) : (
+              <KpiCard label="En mora" value={String(stats.enMora)} hint="Con días de atraso" />
+            )}
             <KpiCard
               label="Ajuste pendiente"
               value={String(stats.ajustePendiente)}
@@ -802,7 +834,6 @@ export function AlquileresWorkspace() {
               value={String(stats.renovacionProxima)}
               hint="Renovación próxima"
             />
-            <KpiCard label="En mora" value={String(stats.enMora)} hint="Con días de atraso" />
           </div>
         ) : null}
 
@@ -819,11 +850,28 @@ export function AlquileresWorkspace() {
           <RentalsTable
             rows={tableRows}
             onViewFicha={(row) => void openDrawer(row.id)}
+            onCollect={(row) => void openCollectFromRow(row)}
             onAdjust={(row) => void openAdjustFromRow(row)}
             onRenew={(row) => void openRenewFromRow(row)}
           />
         )}
       </div>
+
+      <CobrarAlquilerModal
+        open={cobrarModalOpen}
+        onClose={() => {
+          setCobrarModalOpen(false);
+          setCobrarRow(null);
+        }}
+        row={cobrarRow}
+        contratoId={cobrarRow ? Number(cobrarRow.id) : null}
+        token={token}
+        mediosPago={mediosPago}
+        onSuccess={() => {
+          showToast("Cobro registrado.");
+          void loadRows();
+        }}
+      />
 
       <ContractFichaDrawer
         open={drawerOpen}

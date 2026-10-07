@@ -5,7 +5,9 @@ import type {
   ContratoListItem,
   ContratoRecord,
   ContratoTableItem,
+  ApplyMoraResult,
   CuotaDetail,
+  GenerateCuotaInput,
   DashboardResumen,
   InmuebleFicha,
   InmuebleRecord,
@@ -71,6 +73,27 @@ export function fetchContrato(token: string, id: number) {
 
 export function fetchCuotas(token: string, contratoId: number) {
   return apiRequest<{ items: CuotaDetail[] }>(`/contratos/${contratoId}/cuotas`, { token });
+}
+
+export function generateCuota(token: string, contratoId: number, body: GenerateCuotaInput) {
+  return apiRequest<CuotaDetail>(`/contratos/${contratoId}/cuotas`, {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function applyMora(
+  token: string,
+  contratoId: number,
+  cuotaId: number,
+  body?: { asOfDate?: string },
+) {
+  return apiRequest<ApplyMoraResult>(`/contratos/${contratoId}/cuotas/${cuotaId}/mora`, {
+    method: "POST",
+    token,
+    body: JSON.stringify(body ?? {}),
+  });
 }
 
 export function fetchServicios(token: string, contratoId: number) {
