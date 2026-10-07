@@ -1,13 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
-import { useIndexAdjustmentPreview } from "@/components/alquileres/useIndexAdjustmentPreview";
-import {
-  buildAdjustmentCalculatorState,
-  type IndexCalculatorState,
-} from "@/components/alquileres/ContractIndexCalculator";
+import { useContratoAdjustmentPreview } from "@/components/alquileres/useContratoAdjustmentPreview";
 import type { ContratoDetail } from "@/lib/api/types";
 import {
   formatIndexValue,
@@ -17,13 +13,14 @@ import {
   personaDisplayName,
 } from "@/lib/format";
 import {
-  adjustmentRecordDate,
   contractualAdjustmentEnd,
-  defaultAdjustmentHastaForDesde,
+  defaultAdjustmentHasta,
+  fromIsoMonthDate,
   indexYearRange,
   isAdjustmentOverdue,
   latestPublishedIndexMonth,
   rentVigenteDesde,
+  toIsoMonthDate,
   vigenteDesdeLabel,
   type MonthYear,
 } from "@/lib/rental-adjustment";
@@ -69,6 +66,13 @@ function MonthYearSelect({
   );
 }
 
+function defaultFechaAjusteMonth(
+  contrato: ContratoDetail,
+  ultimoAjusteEn?: string | null,
+): MonthYear {
+  return defaultAdjustmentHasta(contrato, ultimoAjusteEn);
+}
+
 export function AdjustContractModal({
   open,
   contrato,
@@ -86,35 +90,38 @@ export function AdjustContractModal({
   onSubmit: (input: { fechaAjuste: string }) => void;
   submitting?: boolean;
 }) {
-  const [calculator, setCalculator] = useState<IndexCalculatorState | null>(null);
+  const [fechaAjusteMonth, setFechaAjusteMonth] = useState<MonthYear | null>(null);
   const [showDetails, setShowDetails] = useState(false);
 
   useEffect(() => {
     if (!open || !contrato) return;
-    setCalculator(buildAdjustmentCalculatorState(contrato, ultimoAjusteEn));
+    setFechaAjusteMonth(defaultFechaAjusteMonth(contrato, ultimoAjusteEn));
     setShowDetails(false);
   }, [contrato, open, ultimoAjusteEn]);
 
-  const { preview, loading, error } = useIndexAdjustmentPreview({
+  const fechaAjuste = fechaAjusteMonth ? toIsoMonthDate(fechaAjusteMonth) : null;
+
+  const { preview, loading, error } = useContratoAdjustmentPreview({
     open,
-    contrato,
+    contratoId: contrato?.id ?? null,
     token,
-    periodoDesde: calculator?.periodoDesde ?? { mes: 1, anio: new Date().getFullYear() },
-    periodoHasta: calculator?.periodoHasta ?? { mes: 1, anio: new Date().getFullYear() },
-    tipoIndice: calculator?.tipoIndice ?? "ICL",
-    lockToContractIndex: true,
+    fechaAjuste,
   });
 
-  if (!contrato || !calculator) return null;
+  const periodoDesde = useMemo(
+    () => (preview ? fromIsoMonthDate(preview.periodoDesde) : null),
+    [preview],
+  );
+
+  if (!contrato || !fechaAjusteMonth) return null;
 
   const inmuebleLabel = contrato.inmueble
     ? `${contrato.inmueble.code} · ${contrato.inmueble.title}`
     : "Inmueble";
   const inquilinoLabel = contrato.inquilino ? personaDisplayName(contrato.inquilino) : "—";
   const currency = contrato.codigoMoneda.trim();
-  const indiceCode = contrato.tipoIndice?.code ?? calculator.tipoIndice;
+  const indiceCode = contrato.tipoIndice?.code ?? "ICL";
   const freq = contrato.frecuenciaAjusteMeses ?? 12;
-  const fechaAjuste = adjustmentRecordDate(contrato, ultimoAjusteEn);
   const years = indexYearRange(contrato);
   const vigenteDesde = rentVigenteDesde(contrato, ultimoAjusteEn);
   const contractualEnd = contractualAdjustmentEnd(contrato, ultimoAjusteEn);
@@ -122,11 +129,11 @@ export function AdjustContractModal({
   const overdue = isAdjustmentOverdue(contrato, ultimoAjusteEn);
 
   const detailsNote = overdue
-    ? `El ajuste debía aplicarse en ${formatMonthYear(contractualEnd.anio, contractualEnd.mes)}. Se usa el último ${indiceCode} publicado (${formatMonthYear(maxPublished.anio, maxPublished.mes)}).`
+    ? `El ajuste debía aplicarse en ${formatMonthYear(contractualEnd.anio, contractualEnd.mes)}. Podés usar el último ${indiceCode} publicado (${formatMonthYear(maxPublished.anio, maxPublished.mes)}).`
     : `Período de ${freq} meses desde ${formatMonthYear(vigenteDesde.anio, vigenteDesde.mes)}.`;
 
   function resetSuggested() {
-    setCalculator(buildAdjustmentCalculatorState(contrato!, ultimoAjusteEn));
+    setFechaAjusteMonth(defaultFechaAjusteMonth(contrato!, ultimoAjusteEn));
   }
 
   return (
@@ -143,10 +150,10 @@ export function AdjustContractModal({
           </ButtonOutline>
           <ButtonPrimary
             type="button"
-            disabled={!preview || Boolean(error) || loading || submitting}
+            disabled={!preview || Boolean(error) || loading || submitting || !fechaAjuste}
             onClick={() => {
-              if (!preview) return;
-              onSubmit({ fechaAjuste });
+              if (!preview || !fechaAjuste) return;
+              onSubmit({ fechaAjuste: preview.fechaAjuste });
             }}
           >
             {submitting ? "Aplicando…" : "Confirmar ajuste"}
@@ -207,15 +214,10 @@ export function AdjustContractModal({
                   <span className="text-[11px] font-semibold text-text-secondary">Desde</span>
                   <span className="text-[11px] text-text-secondary">
                     {vigenteDesdeLabel(ultimoAjusteEn)}
+                    {periodoDesde
+                      ? ` · ${formatMonthYear(periodoDesde.anio, periodoDesde.mes)}`
+                      : null}
                   </span>
-                  <MonthYearSelect
-                    value={calculator.periodoDesde}
-                    years={years}
-                    onChange={(periodoDesde) => {
-                      const periodoHasta = defaultAdjustmentHastaForDesde(contrato, periodoDesde);
-                      setCalculator({ ...calculator, periodoDesde, periodoHasta });
-                    }}
-                  />
                   {preview?.valorDesde ? (
                     <span className="text-[11px] font-semibold text-primary">
                       {indiceCode}: {formatIndexValue(preview.valorDesde)}
@@ -227,9 +229,9 @@ export function AdjustContractModal({
                   <span className="text-[11px] font-semibold text-text-secondary">Hasta</span>
                   <span className="text-[11px] text-text-secondary">Mes a actualizar</span>
                   <MonthYearSelect
-                    value={calculator.periodoHasta}
+                    value={fechaAjusteMonth}
                     years={years}
-                    onChange={(periodoHasta) => setCalculator({ ...calculator, periodoHasta })}
+                    onChange={setFechaAjusteMonth}
                   />
                   {preview?.valorHasta ? (
                     <span className="text-[11px] font-semibold text-primary">

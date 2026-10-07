@@ -58,6 +58,25 @@ export interface PreviewAjusteResponse {
   fuenteHasta: string;
 }
 
+/** Read-only preview from GET /contratos/:id/ajustes/preview (same math as apply). */
+export interface ContratoAjustePreviewResponse {
+  contratoId: number;
+  fechaAjuste: string;
+  fechaBase: string;
+  tipoIndiceId: number;
+  periodoDesde: string;
+  periodoHasta: string;
+  valorDesde: string;
+  valorHasta: string;
+  fuente: string;
+  factor: string;
+  montoAnterior: string;
+  montoNuevo: string;
+  variacionPct: string;
+  frecuenciaAjusteMeses: number | null;
+  mesesDesdeBase: number;
+}
+
 export interface ApplyAjusteInput {
   fechaAjuste: string;
   nota?: string | null;

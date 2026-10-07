@@ -16,6 +16,7 @@ import type {
   PersonaRecord,
   ApplyAjusteInput,
   ApplyAjusteResponse,
+  ContratoAjustePreviewResponse,
   IndiceCode,
   PreviewAjusteInput,
   PreviewAjusteResponse,
@@ -249,6 +250,14 @@ export function previewAjusteIndice(token: string, body: PreviewAjusteInput) {
     token,
     body: JSON.stringify(body),
   });
+}
+
+export function previewContratoAjuste(token: string, contratoId: number, fechaAjuste: string) {
+  const query = new URLSearchParams({ fechaAjuste });
+  return apiRequest<ContratoAjustePreviewResponse>(
+    `/contratos/${contratoId}/ajustes/preview?${query}`,
+    { token },
+  );
 }
 
 export function applyContratoAjuste(
