@@ -64,6 +64,7 @@ import {
   rentalApiErrorMessage,
 } from "@/lib/format";
 import { pagePaddingClass } from "@/lib/layout";
+import { resolveMoraPunitoriaPayload } from "@/lib/mora-punitoria";
 import {
   buildBillingIndex,
   buildDashboardContractMeta,
@@ -397,24 +398,49 @@ export function AlquileresWorkspace() {
 
     setSubmitting(true);
     try {
-      const amount = Number(form.monto.replace(/\D/g, ""));
+      const amount = Number(form.amount.replace(/\D/g, ""));
       if (!Number.isFinite(amount) || amount <= 0) {
         throw new ApiError(400, {
           error: { code: "VALIDATION_ERROR", message: "Ingresá un monto mensual válido" },
         });
       }
 
+      const depositAmount = Number(form.depositAmount.replace(/\D/g, ""));
+      if (!Number.isFinite(depositAmount) || depositAmount <= 0) {
+        throw new ApiError(400, {
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Ingresá un depósito de garantía válido mayor a cero",
+          },
+        });
+      }
+
       const contratosRes = await fetchContratos(token, { limit: 200 });
       const reservedContratoCodes = contratosRes.items.map((item) => item.contratoCode);
 
-      const indices = await fetchCatalog(token, "/catalogos/tipos-indice");
+      const [indices, moras] = await Promise.all([
+        fetchCatalog(token, "/catalogos/tipos-indice"),
+        fetchCatalog(token, "/catalogos/tipos-mora"),
+      ]);
       const indexItem =
-        indices.items.find((item) => item.code === form.tipoIndice) ?? indices.items[0];
+        indices.items.find((item) => item.code === form.index) ?? indices.items[0];
       if (!indexItem?.id) {
         throw new ApiError(400, {
           error: {
             code: "VALIDATION_ERROR",
             message: "Seleccioná un índice de ajuste válido",
+          },
+        });
+      }
+
+      let moraPayload;
+      try {
+        moraPayload = resolveMoraPunitoriaPayload(form.mora, moras.items);
+      } catch (err) {
+        throw new ApiError(400, {
+          error: {
+            code: "VALIDATION_ERROR",
+            message: err instanceof Error ? err.message : "Configuración de mora inválida",
           },
         });
       }
@@ -432,14 +458,15 @@ export function AlquileresWorkspace() {
             fechaInicio: form.fechaInicio,
             fechaFin: form.fechaFin,
             montoAlquiler: amount,
-            codigoMoneda: selectedContrato.codigoMoneda.trim(),
-            diaVencimientoPago: selectedContrato.diaVencimientoPago,
+            codigoMoneda: form.currency,
+            diaVencimientoPago: moraPayload.diaVencimientoPago,
             frecuenciaAjusteMeses: form.frecuenciaAjusteMeses,
             tipoIndiceId: indexItem.id,
-            tipoMoraId: selectedContrato.tipoMora?.id ?? null,
-            tasaMora: selectedContrato.tasaMora ? Number(selectedContrato.tasaMora) : null,
-            montoDeposito: amount,
-            codigoMonedaDeposito: selectedContrato.codigoMoneda.trim(),
+            tipoMoraId: moraPayload.tipoMoraId,
+            tasaMora: moraPayload.tasaMora,
+            montoMoraFijo: moraPayload.montoMoraFijo,
+            montoDeposito: depositAmount,
+            codigoMonedaDeposito: form.currency,
             enAdministracion: false,
             renewalOfContratoId: selectedContrato.id,
             notas: `Renovación del contrato #${selectedContrato.id}.`,
@@ -495,6 +522,10 @@ export function AlquileresWorkspace() {
 
   async function openAdjustFromRow(row: RentalRow) {
     if (!token) return;
+    if (row.needsRenewal) {
+      showToast("Este contrato está por vencer. Usá Renovar en lugar de Ajustar.");
+      return;
+    }
     if (!row.needsAdjustment) {
       showToast("Este contrato no tiene ajuste pendiente.");
       return;
@@ -569,7 +600,6 @@ export function AlquileresWorkspace() {
       ]);
 
       const indexItem = indices.items.find((item) => item.code === form.index) ?? indices.items[0];
-      const moraItem = moras.items.find((item) => item.code === "daily_percentage") ?? moras.items[0];
       const tiposInmueble = codeContext?.tiposInmueble.length
         ? codeContext.tiposInmueble
         : (await fetchCatalog(token, "/catalogos/tipos-inmueble")).items;
@@ -641,6 +671,18 @@ export function AlquileresWorkspace() {
         });
       }
 
+      let moraPayload;
+      try {
+        moraPayload = resolveMoraPunitoriaPayload(form.mora, moras.items);
+      } catch (err) {
+        throw new ApiError(400, {
+          error: {
+            code: "VALIDATION_ERROR",
+            message: err instanceof Error ? err.message : "Configuración de mora inválida",
+          },
+        });
+      }
+
       const inmueblePrefix = prefixForTipoInmueble(form.tipoInmuebleCode);
       let inmueble = null as Awaited<ReturnType<typeof createInmueble>> | null;
       const reservedInmuebleCodes = [...usedInmuebleCodes];
@@ -686,11 +728,12 @@ export function AlquileresWorkspace() {
             fechaFin: addYears(today, 5),
             montoAlquiler: amount,
             codigoMoneda: form.currency,
-            diaVencimientoPago: 10,
+            diaVencimientoPago: moraPayload.diaVencimientoPago,
             frecuenciaAjusteMeses: form.frecuenciaAjusteMeses,
             tipoIndiceId: indexItem.id,
-            tipoMoraId: moraItem?.id ?? null,
-            tasaMora: 0.025,
+            tipoMoraId: moraPayload.tipoMoraId,
+            tasaMora: moraPayload.tasaMora,
+            montoMoraFijo: moraPayload.montoMoraFijo,
             montoDeposito: depositAmount,
             codigoMonedaDeposito: form.currency,
           });

@@ -126,6 +126,7 @@ export interface ContratoRecord {
   frecuenciaAjusteMeses: number | null;
   tipoIndiceId: number | null;
   tasaMora: string | null;
+  montoMoraFijo: string | null;
   montoDeposito: string | null;
   codigoMonedaDeposito: string | null;
   estado: "active" | "finished" | "terminated";
