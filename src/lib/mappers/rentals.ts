@@ -246,6 +246,10 @@ export function mapContratoDetailToFicha(
       .join(" · ") || "—";
   const indexCode = (detail.tipoIndice?.code?.toUpperCase() ?? "ICL") as AdjustmentIndex;
   const moraPercent = detail.tasaMora ? `${(Number(detail.tasaMora) * 100).toFixed(1).replace(".", ",")}%` : "2,5%";
+  const depositMonto = detail.deposito?.monto ?? detail.montoDeposito;
+  const depositMoneda = detail.deposito?.codigoMoneda ?? detail.codigoMonedaDeposito;
+  const depositAmount =
+    depositMonto && depositMoneda ? formatMoney(depositMonto, depositMoneda) : "—";
 
   const estadoLabel =
     detail.estado === "active"
@@ -275,6 +279,7 @@ export function mapContratoDetailToFicha(
     adjustmentFrequency: ajusteMeses,
     paymentDueDay: `Día ${detail.diaVencimientoPago} de cada mes`,
     previousAmount: formatMoney(detail.montoAlquiler, detail.codigoMoneda),
+    depositAmount,
     calculatedNewAmount: formatMoney(detail.montoAlquiler, detail.codigoMoneda),
     daysSince10: "—",
     surchargePercent: moraPercent,

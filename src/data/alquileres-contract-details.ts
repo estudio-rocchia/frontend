@@ -15,6 +15,8 @@ export type ContractDetail = {
   adjustmentFrequency: string;
   paymentDueDay: string;
   previousAmount: string;
+  /** Depósito de garantía constituido al crear el contrato. */
+  depositAmount: string;
   calculatedNewAmount: string;
   daysSince10: string;
   surchargePercent: string;
@@ -44,6 +46,7 @@ const details: Record<string, ContractDetail> = {
     guarantors: "Carlos Fernández (PF) · Fianza solidaria",
     adjustmentIndex: "ICL",
     previousAmount: "$ 485.000",
+    depositAmount: "$ 485.000",
     calculatedNewAmount: "$ 512.400",
     daysSince10: "0 días",
     surchargePercent: "2,5%",
@@ -60,6 +63,7 @@ const details: Record<string, ContractDetail> = {
     guarantors: "María López (PF) · Fianza solidaria",
     adjustmentIndex: "IPC",
     previousAmount: "USD 1.200",
+    depositAmount: "USD 1.200",
     calculatedNewAmount: "USD 1.268",
     daysSince10: "14 días",
     surchargePercent: "2,5%",
@@ -76,6 +80,7 @@ const details: Record<string, ContractDetail> = {
     guarantors: "Ana Acosta (PF) · Fianza solidaria",
     adjustmentIndex: "CAC",
     previousAmount: "$ 620.000",
+    depositAmount: "$ 620.000",
     calculatedNewAmount: "$ 658.200",
     daysSince10: "35 días",
     surchargePercent: "3,0%",
@@ -92,6 +97,7 @@ const details: Record<string, ContractDetail> = {
     guarantors: "—",
     adjustmentIndex: "ICL",
     previousAmount: "$ 890.000",
+    depositAmount: "$ 890.000",
     calculatedNewAmount: "$ 941.500",
     daysSince10: "0 días",
     surchargePercent: "2,5%",
@@ -107,6 +113,7 @@ const details: Record<string, ContractDetail> = {
     guarantors: "Roberto Pérez · Garantía propietaria",
     adjustmentIndex: "IPC",
     previousAmount: "USD 2.800",
+    depositAmount: "USD 2.800",
     calculatedNewAmount: "USD 2.956",
     daysSince10: "5 días",
     surchargePercent: "2,5%",
@@ -123,6 +130,7 @@ const details: Record<string, ContractDetail> = {
     guarantors: "—",
     adjustmentIndex: "ICL",
     previousAmount: "$ 410.000",
+    depositAmount: "$ 410.000",
     calculatedNewAmount: "$ 433.600",
     daysSince10: "0 días",
     surchargePercent: "2,5%",
@@ -141,6 +149,7 @@ export function buildNewContractDetail(input: {
   tenant: string;
   owner: string;
   amount: string;
+  depositAmount?: string;
   index: AdjustmentIndex;
 }): ContractDetail {
   return {
@@ -153,6 +162,7 @@ export function buildNewContractDetail(input: {
     guarantors: "—",
     adjustmentIndex: input.index,
     previousAmount: input.amount,
+    depositAmount: input.depositAmount ?? input.amount,
     calculatedNewAmount: input.amount,
     daysSince10: "0 días",
     surchargePercent: "2,5%",

@@ -16,6 +16,7 @@ export type NewContractForm = {
   tenant: string;
   owner: string;
   amount: string;
+  depositAmount: string;
   currency: "ARS" | "USD";
   index: AdjustmentIndex;
   frecuenciaAjusteMeses: number;
@@ -28,6 +29,7 @@ const emptyForm: NewContractForm = {
   tenant: "",
   owner: "",
   amount: "",
+  depositAmount: "",
   currency: "ARS",
   index: "ICL",
   frecuenciaAjusteMeses: 12,
@@ -69,7 +71,8 @@ export function NewContractModal({
     form.propertyAddress.trim() &&
     form.tenant.trim() &&
     form.owner.trim() &&
-    form.amount.trim();
+    form.amount.trim() &&
+    form.depositAmount.trim();
 
   return (
     <Modal
@@ -149,6 +152,12 @@ export function NewContractModal({
                 value={form.amount}
                 onChange={(v) => patch({ amount: v })}
                 placeholder="485000 o 1200"
+              />
+              <FormField
+                label="Depósito de garantía"
+                value={form.depositAmount}
+                onChange={(v) => patch({ depositAmount: v })}
+                placeholder="Ej. 970000"
               />
               <div className="flex flex-col gap-1.5">
                 <span className="text-[11px] font-semibold text-text-secondary">Moneda</span>
