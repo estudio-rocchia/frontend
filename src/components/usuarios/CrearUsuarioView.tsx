@@ -57,9 +57,14 @@ function RoleCard({
   const Icon = role === "administrador" ? ShieldCheck : UserCog;
 
   return (
-    <article
-      className={`flex flex-col gap-3 rounded-md bg-bg-card p-6 ${
-        selected ? "border-2 border-primary" : "border border-border"
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={selected}
+      className={`flex w-full flex-col gap-3 rounded-md bg-bg-card p-6 text-left transition-colors ${
+        selected
+          ? "border-2 border-primary"
+          : "border border-border hover:border-primary/50 hover:bg-bg-page"
       }`}
     >
       <div className="flex items-start justify-between gap-3">
@@ -72,13 +77,7 @@ function RoleCard({
             {definition.name}
           </h3>
         </div>
-        {selected ? (
-          <StatusBadge label="Seleccionado" variant="success" />
-        ) : (
-          <ButtonOutline onClick={onSelect} className="px-[18px] py-2.5">
-            Elegir
-          </ButtonOutline>
-        )}
+        {selected ? <StatusBadge label="Seleccionado" variant="success" /> : null}
       </div>
 
       <p className="text-[13px] text-text-secondary">{definition.description}</p>
@@ -92,7 +91,7 @@ function RoleCard({
           </li>
         ))}
       </ul>
-    </article>
+    </button>
   );
 }
 
