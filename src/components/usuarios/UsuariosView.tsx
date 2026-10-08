@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Lock } from "lucide-react";
 
 import { UsuarioFichaDrawer } from "@/components/usuarios/UsuarioFichaDrawer";
@@ -16,6 +16,14 @@ import { mapUsuarioToPermissionRow, mapUsuariosKpis } from "@/lib/mappers/usuari
 import { pagePaddingClass } from "@/lib/layout";
 
 const tableHeaders = ["Rol / Usuario", "Contratos", "Precios netos", "Plazos", "Clientes", "Estado"];
+
+type ActivityFilter = "activos" | "inactivos" | "todos";
+
+const activityFilters: { id: ActivityFilter; label: string }[] = [
+  { id: "activos", label: "Activos" },
+  { id: "inactivos", label: "Inactivos" },
+  { id: "todos", label: "Todos" },
+];
 
 function permissionClassName(value: PermissionValue) {
   if (value === "Total") return "font-semibold text-primary";
@@ -40,6 +48,7 @@ export function UsuariosView() {
   const [users, setUsers] = useState<UsuarioRecord[]>([]);
   const [roles, setRoles] = useState<SistemaRolRecord[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+  const [activityFilter, setActivityFilter] = useState<ActivityFilter>("activos");
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -81,6 +90,21 @@ export function UsuariosView() {
 
   const selectedUser = users.find((user) => user.id === selectedUserId) ?? null;
   const assignableRoles = roles.filter((role) => role.code !== "read_only");
+
+  const activityCounts = useMemo(
+    () => ({
+      activos: users.filter((user) => user.activo).length,
+      inactivos: users.filter((user) => !user.activo).length,
+      todos: users.length,
+    }),
+    [users],
+  );
+
+  const filteredUsers = useMemo(() => {
+    if (activityFilter === "activos") return users.filter((user) => user.activo);
+    if (activityFilter === "inactivos") return users.filter((user) => !user.activo);
+    return users;
+  }, [users, activityFilter]);
 
   if (loading) {
     return <p className={`${pagePaddingClass} text-sm text-text-secondary`}>Cargando usuarios…</p>;
@@ -136,9 +160,30 @@ export function UsuariosView() {
         </div>
 
         <section className="overflow-hidden rounded-md border border-border bg-bg-card">
-          <div className="flex flex-col gap-3 border-b border-border px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="text-base font-semibold text-text-primary">Matriz de permisos por rol</h2>
-            <ButtonOutline className="self-start sm:self-auto">Exportar auditoría</ButtonOutline>
+          <div className="flex flex-col gap-4 border-b border-border px-5 py-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="text-base font-semibold text-text-primary">Matriz de permisos por rol</h2>
+              <ButtonOutline className="self-start sm:self-auto">Exportar auditoría</ButtonOutline>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {activityFilters.map(({ id, label }) => {
+                const selected = activityFilter === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setActivityFilter(id)}
+                    className={`rounded-full border border-border px-3.5 py-2 text-[13px] transition-colors ${
+                      selected
+                        ? "bg-primary-soft font-semibold text-primary"
+                        : "bg-bg-card font-normal text-text-secondary hover:text-text-primary"
+                    }`}
+                  >
+                    {label} ({activityCounts[id]})
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -153,19 +198,23 @@ export function UsuariosView() {
                 </tr>
               </thead>
               <tbody>
-                {users.length === 0 ? (
+                {filteredUsers.length === 0 ? (
                   <tr>
                     <td colSpan={tableHeaders.length} className="px-5 py-8 text-sm text-text-secondary">
-                      No hay usuarios registrados.
+                      {users.length === 0
+                        ? "No hay usuarios registrados."
+                        : "No hay usuarios para este filtro."}
                     </td>
                   </tr>
                 ) : (
-                  users.map((user) => {
+                  filteredUsers.map((user) => {
                     const row = mapUsuarioToPermissionRow(user);
                     return (
                       <tr
                         key={user.id}
-                        className="cursor-pointer border-t border-border transition-colors hover:bg-bg-page"
+                        className={`cursor-pointer border-t border-border transition-colors hover:bg-bg-page ${
+                          !user.activo ? "opacity-70" : ""
+                        }`}
                         onClick={() => setSelectedUserId(user.id)}
                       >
                         <td className="h-[52px] px-5 text-[13px] font-semibold text-text-primary">

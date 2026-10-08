@@ -35,26 +35,25 @@ export function UsuarioFichaDrawer({
 }) {
   const { token, user: currentUser, logout } = useAuth();
   const [email, setEmail] = useState("");
-  const [activo, setActivo] = useState(true);
   const [roleId, setRoleId] = useState<number | null>(null);
   const [newPassword, setNewPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [resetting, setResetting] = useState(false);
-  const [confirmDeactivate, setConfirmDeactivate] = useState(false);
+  const [togglingStatus, setTogglingStatus] = useState(false);
+  const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false);
 
   const isSelf = user !== null && currentUser?.id === user.id;
 
   useEffect(() => {
     if (!user) return;
     setEmail(user.email);
-    setActivo(user.activo);
     setRoleId(primaryRoleId(user) ?? null);
     setNewPassword("");
     setError(null);
     setSuccess(null);
-    setConfirmDeactivate(false);
+    setShowDeactivateConfirm(false);
   }, [user]);
 
   if (!user) return null;
@@ -72,32 +71,21 @@ export function UsuarioFichaDrawer({
 
     try {
       const emailChanged = email.trim() !== activeUser.email;
-      const activoChanged = activo !== activeUser.activo;
       const currentRoleId = primaryRoleId(activeUser);
       const roleChanged = roleId !== null && roleId !== currentRoleId;
 
-      if (activoChanged && !activo && !confirmDeactivate) {
-        setConfirmDeactivate(true);
-        setSaving(false);
-        return;
-      }
-
-      if (emailChanged || activoChanged) {
-        await updateUsuario(token, activeUser.id, {
-          ...(emailChanged ? { email: email.trim() } : {}),
-          ...(activoChanged ? { activo } : {}),
-        });
+      if (emailChanged) {
+        await updateUsuario(token, activeUser.id, { email: email.trim() });
       }
 
       if (roleChanged && roleId !== null) {
         await setUsuarioRoles(token, activeUser.id, { roleIds: [roleId] });
       }
 
-      if (!emailChanged && !activoChanged && !roleChanged) {
+      if (!emailChanged && !roleChanged) {
         setSuccess("No hay cambios para guardar.");
       } else {
         setSuccess("Usuario actualizado correctamente.");
-        setConfirmDeactivate(false);
         onUpdated();
       }
     } catch (err) {
@@ -108,6 +96,32 @@ export function UsuarioFichaDrawer({
       setError(usuarioApiErrorMessage(err));
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleToggleStatus(nextActivo: boolean) {
+    if (!token) return;
+    setTogglingStatus(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      await updateUsuario(token, activeUser.id, { activo: nextActivo });
+      setShowDeactivateConfirm(false);
+      setSuccess(
+        nextActivo
+          ? "Usuario reactivado correctamente."
+          : "Usuario dado de baja. Ya no podrá ingresar al sistema.",
+      );
+      onUpdated();
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        logout();
+        return;
+      }
+      setError(usuarioApiErrorMessage(err));
+    } finally {
+      setTogglingStatus(false);
     }
   }
 
@@ -145,7 +159,7 @@ export function UsuarioFichaDrawer({
       footer={
         <>
           <ButtonOutline onClick={onClose}>Cerrar</ButtonOutline>
-          <ButtonPrimary onClick={() => void handleSave()} disabled={saving}>
+          <ButtonPrimary onClick={() => void handleSave()} disabled={saving || togglingStatus}>
             {saving ? "Guardando…" : "Guardar cambios"}
           </ButtonPrimary>
         </>
@@ -219,31 +233,56 @@ export function UsuarioFichaDrawer({
           </div>
         </section>
 
-        <section className="flex flex-col gap-3">
-          <SectionTitle>Cuenta activa</SectionTitle>
-          <label className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              checked={activo}
-              disabled={isSelf}
-              onChange={(event) => {
-                setActivo(event.target.checked);
-                setConfirmDeactivate(false);
-              }}
-              className="h-4 w-4 rounded border-border text-primary"
-            />
-            <span className="text-sm text-text-primary">
-              {activo ? "Usuario habilitado para ingresar" : "Usuario deshabilitado"}
-            </span>
-          </label>
+        <section className="flex flex-col gap-3 rounded-md border border-border bg-bg-page p-4">
+          <SectionTitle>Estado de la cuenta</SectionTitle>
+          <p className="text-[13px] text-text-secondary">
+            {activeUser.activo
+              ? "El usuario puede ingresar al sistema con su correo y contraseña."
+              : "El usuario no puede ingresar. Su historial y auditoría se conservan en el sistema."}
+          </p>
+
           {isSelf ? (
-            <p className="text-xs text-text-secondary">No podés desactivar tu propia cuenta.</p>
-          ) : null}
-          {confirmDeactivate ? (
-            <div className="rounded-sm border border-warning bg-warning-bg px-3 py-2 text-sm text-warning">
-              ¿Confirmás desactivar esta cuenta? Volvé a guardar para aplicar el cambio.
+            <p className="text-xs text-text-secondary">No podés dar de baja tu propia cuenta.</p>
+          ) : showDeactivateConfirm ? (
+            <div className="flex flex-col gap-3 rounded-sm border border-warning bg-warning-bg p-3">
+              <p className="text-sm text-warning">
+                ¿Confirmás dar de baja a <strong>{activeUser.username}</strong>? No podrá volver a
+                ingresar hasta que lo reactives.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <ButtonOutline
+                  onClick={() => setShowDeactivateConfirm(false)}
+                  disabled={togglingStatus}
+                >
+                  Cancelar
+                </ButtonOutline>
+                <button
+                  type="button"
+                  onClick={() => void handleToggleStatus(false)}
+                  disabled={togglingStatus}
+                  className="inline-flex items-center justify-center rounded-sm border border-danger bg-danger-bg px-[18px] py-2.5 text-sm font-semibold text-danger transition-colors hover:bg-danger/10 disabled:opacity-50"
+                >
+                  {togglingStatus ? "Procesando…" : "Confirmar baja"}
+                </button>
+              </div>
             </div>
-          ) : null}
+          ) : activeUser.activo ? (
+            <ButtonOutline
+              onClick={() => setShowDeactivateConfirm(true)}
+              disabled={isSelf || togglingStatus}
+              className="self-start border-danger text-danger hover:bg-danger-bg"
+            >
+              Dar de baja
+            </ButtonOutline>
+          ) : (
+            <ButtonPrimary
+              onClick={() => void handleToggleStatus(true)}
+              disabled={togglingStatus}
+              className="self-start"
+            >
+              {togglingStatus ? "Procesando…" : "Reactivar usuario"}
+            </ButtonPrimary>
+          )}
         </section>
 
         <section className="flex flex-col gap-3">
