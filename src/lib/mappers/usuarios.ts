@@ -43,7 +43,7 @@ export function mapUsuarioToPermissionRow(user: UsuarioRecord): UserPermissionRo
   const permissions = rolePermissions[roleCode] ?? rolePermissions.read_only;
 
   return {
-    user: `${user.username} · ${primaryRole?.name ?? roleCode}`,
+    user: `${primaryRole?.name ?? roleCode} · ${user.username}`,
     ...permissions,
     status: statusForUser(user, roleCode),
   };
