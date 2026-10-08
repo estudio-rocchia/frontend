@@ -68,12 +68,30 @@ export function formatMonthYear(anio: number, mes: number): string {
   return `${label} ${anio}`;
 }
 
+const E164_PHONE_REGEX = /^\+[1-9]\d{6,14}$/;
+
 export function parsePersonName(full: string): { nombre: string; apellido: string | null } {
   const trimmed = full.trim();
   if (!trimmed) return { nombre: "Sin nombre", apellido: null };
   const parts = trimmed.split(/\s+/);
   if (parts.length === 1) return { nombre: parts[0], apellido: null };
   return { nombre: parts[0], apellido: parts.slice(1).join(" ") };
+}
+
+export function normalizePhoneToE164(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  if (E164_PHONE_REGEX.test(trimmed)) return trimmed;
+
+  const digits = trimmed.replace(/\D/g, "");
+  if (!digits) return null;
+
+  const withoutLeadingZero = digits.startsWith("0") ? digits.slice(1) : digits;
+  const candidates = withoutLeadingZero.startsWith("54")
+    ? [`+${withoutLeadingZero}`]
+    : [`+54${withoutLeadingZero}`];
+
+  return candidates.find((candidate) => E164_PHONE_REGEX.test(candidate)) ?? null;
 }
 
 export function personaDisplayName(persona: {

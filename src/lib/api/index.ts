@@ -248,7 +248,14 @@ export function fetchLocalidades(token: string) {
 
 export function createPersona(
   token: string,
-  body: { tipoPersona: "natural" | "juridica"; nombre?: string; apellido?: string | null; razonSocial?: string | null },
+  body: {
+    tipoPersona: "natural" | "juridica";
+    nombre?: string;
+    apellido?: string | null;
+    razonSocial?: string | null;
+    email?: string | null;
+    phone?: string | null;
+  },
 ) {
   return apiRequest<PersonaRecord>("/personas", {
     method: "POST",

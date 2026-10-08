@@ -2,14 +2,15 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Check, ShieldCheck, UserCog } from "lucide-react";
+import { Check, Eye, EyeOff, ShieldCheck, UserCog } from "lucide-react";
 
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useAuth } from "@/context/auth-context";
 import { type UserRole, roleDefinitions } from "@/data/usuarios";
-import { ApiError, createUsuario, fetchSistemaRoles } from "@/lib/api";
+import { ApiError, createPersona, createUsuario, fetchSistemaRoles } from "@/lib/api";
 import type { SistemaRolRecord } from "@/lib/api/types";
+import { normalizePhoneToE164 } from "@/lib/format";
 import {
   findRoleId,
   mapUiRoleToApiCode,
@@ -96,18 +97,15 @@ function RoleCard({
   );
 }
 
-function temporaryPassword(): string {
-  const suffix = Math.random().toString(36).slice(2, 10);
-  return `Rocchia${suffix}!`;
-}
-
 export function CrearUsuarioView() {
   const router = useRouter();
   const { token, logout } = useAuth();
   const [nombre, setNombre] = useState("");
+  const [apellido, setApellido] = useState("");
   const [correo, setCorreo] = useState("");
   const [telefono, setTelefono] = useState("");
-  const [area, setArea] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [selectedRole, setSelectedRole] = useState<UserRole>("administrador");
   const [roles, setRoles] = useState<SistemaRolRecord[]>([]);
   const [loadingRoles, setLoadingRoles] = useState(true);
@@ -135,9 +133,32 @@ export function CrearUsuarioView() {
 
   async function handleCreate() {
     if (!token) return;
+    const firstName = nombre.trim();
+    const lastName = apellido.trim();
+    if (!firstName) {
+      setError("Ingresá el nombre.");
+      return;
+    }
+    if (!lastName) {
+      setError("Ingresá el apellido.");
+      return;
+    }
+
     const email = correo.trim();
     if (!email) {
       setError("Ingresá el correo corporativo.");
+      return;
+    }
+
+    if (password.length < 8) {
+      setError("La contraseña debe tener al menos 8 caracteres.");
+      return;
+    }
+
+    const phoneRaw = telefono.trim();
+    const phone = phoneRaw ? normalizePhoneToE164(phoneRaw) : null;
+    if (phoneRaw && !phone) {
+      setError("El teléfono debe estar en formato internacional, por ejemplo +5491112345678.");
       return;
     }
 
@@ -153,11 +174,20 @@ export function CrearUsuarioView() {
     setSubmitting(true);
     setError(null);
     try {
+      const persona = await createPersona(token, {
+        tipoPersona: "natural",
+        nombre: firstName,
+        apellido: lastName,
+        email,
+        phone,
+      });
+
       await createUsuario(token, {
         username,
         email,
-        password: temporaryPassword(),
+        password,
         roleIds: [roleId],
+        personaId: persona.id,
       });
       router.push(`/usuarios?creado=${encodeURIComponent(username)}`);
     } catch (err) {
@@ -201,12 +231,20 @@ export function CrearUsuarioView() {
         <div className="flex w-full max-w-[520px] shrink-0 flex-col gap-4">
           <section className="flex flex-col gap-4 rounded-md bg-bg-card p-6">
             <h2 className="text-base font-semibold text-text-primary">Datos del empleado</h2>
-            <FormInput
-              label="Nombre completo"
-              placeholder="Ej. Lucas Pérez"
-              value={nombre}
-              onChange={setNombre}
-            />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormInput
+                label="Nombre"
+                placeholder="Ej. Lucas"
+                value={nombre}
+                onChange={setNombre}
+              />
+              <FormInput
+                label="Apellido"
+                placeholder="Ej. Pérez"
+                value={apellido}
+                onChange={setApellido}
+              />
+            </div>
             <FormInput
               label="Correo corporativo"
               placeholder="lucas.perez@rocchia.com"
@@ -216,17 +254,36 @@ export function CrearUsuarioView() {
             />
             <FormInput
               label="Teléfono"
-              placeholder="+54 11 …"
+              placeholder="+5491112345678"
               value={telefono}
               onChange={setTelefono}
               type="tel"
             />
-            <FormInput
-              label="Área / puesto"
-              placeholder="Operaciones inmobiliarias"
-              value={area}
-              onChange={setArea}
-            />
+            <label className="flex flex-col gap-1.5">
+              <span className="text-[13px] font-medium text-text-primary">Contraseña inicial</span>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="Mínimo 8 caracteres"
+                  autoComplete="new-password"
+                  className="w-full rounded-sm bg-bg-page py-2.5 pr-10 pl-3.5 text-sm text-text-primary outline-none placeholder:text-text-secondary focus:ring-2 focus:ring-primary/20"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((visible) => !visible)}
+                  className="absolute top-1/2 right-2.5 -translate-y-1/2 rounded-sm p-1 text-text-secondary hover:text-text-primary"
+                  aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" aria-hidden />
+                  ) : (
+                    <Eye className="h-4 w-4" aria-hidden />
+                  )}
+                </button>
+              </div>
+            </label>
           </section>
         </div>
 
