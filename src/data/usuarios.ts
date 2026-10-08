@@ -11,7 +11,7 @@ export type UserPermissionRow = {
   status: UserStatus;
 };
 
-export type UserRole = "administrador" | "operador";
+export type UserRole = "administrador" | "operador" | "consulta";
 
 export const roleDefinitions = {
   administrador: {
@@ -36,6 +36,18 @@ export const roleDefinitions = {
       "Registrar mora y alertas",
       "Consultar personas vinculadas",
       "Sin acceso a precios netos ni roles",
+    ],
+  },
+  consulta: {
+    name: "Consulta (solo lectura)",
+    description:
+      "Perfil de consulta del catálogo interno. Puede ver contratos y clientes sin modificar datos sensibles.",
+    permissions: [
+      "Ver contratos y alquileres",
+      "Consultar clientes vinculados",
+      "Sin edición ni cobranzas",
+      "Sin acceso a precios netos",
+      "Sin gestión de usuarios ni roles",
     ],
   },
 } as const;

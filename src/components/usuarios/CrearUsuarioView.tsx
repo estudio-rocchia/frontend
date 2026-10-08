@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Check, Mail, ShieldCheck, UserCog } from "lucide-react";
+import { Check, Eye, Mail, ShieldCheck, UserCog } from "lucide-react";
 
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -14,6 +14,7 @@ import {
   findRoleId,
   mapUiRoleToApiCode,
   usernameFromEmail,
+  usuarioApiErrorMessage,
 } from "@/lib/mappers/usuarios";
 import { pagePaddingClass } from "@/lib/layout";
 
@@ -54,7 +55,8 @@ function RoleCard({
   onSelect: () => void;
 }) {
   const definition = roleDefinitions[role];
-  const Icon = role === "administrador" ? ShieldCheck : UserCog;
+  const Icon =
+    role === "administrador" ? ShieldCheck : role === "operador" ? UserCog : Eye;
 
   return (
     <button
@@ -147,22 +149,24 @@ export function CrearUsuarioView() {
       return;
     }
 
+    const username = usernameFromEmail(email);
+
     setSubmitting(true);
     setError(null);
     try {
       await createUsuario(token, {
-        username: usernameFromEmail(email),
+        username,
         email,
         password: temporaryPassword(),
         roleIds: [roleId],
       });
-      router.push("/usuarios");
+      router.push(`/usuarios?creado=${encodeURIComponent(username)}`);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         logout();
         return;
       }
-      setError(err instanceof ApiError ? err.message : "No se pudo crear el usuario");
+      setError(usuarioApiErrorMessage(err, "No se pudo crear el usuario"));
     } finally {
       setSubmitting(false);
     }
@@ -179,7 +183,7 @@ export function CrearUsuarioView() {
           <p className="text-[13px] text-text-secondary">Usuarios y roles / Nuevo usuario</p>
           <h1 className="text-[26px] font-bold text-primary">Crear usuario y asignar rol</h1>
           <p className="text-sm text-text-secondary">
-            Alta de empleados con perfil Administrador u Operador según responsabilidades
+            Alta de empleados con perfil Administrador, Operador o Consulta según responsabilidades
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap gap-3">
@@ -243,7 +247,7 @@ export function CrearUsuarioView() {
             </p>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
             <RoleCard
               role="administrador"
               selected={selectedRole === "administrador"}
@@ -253,6 +257,11 @@ export function CrearUsuarioView() {
               role="operador"
               selected={selectedRole === "operador"}
               onSelect={() => setSelectedRole("operador")}
+            />
+            <RoleCard
+              role="consulta"
+              selected={selectedRole === "consulta"}
+              onSelect={() => setSelectedRole("consulta")}
             />
           </div>
         </section>

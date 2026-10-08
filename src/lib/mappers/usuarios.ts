@@ -66,8 +66,13 @@ export function usernameFromEmail(email: string): string {
   return normalized.length >= 3 ? normalized : `user.${normalized || "nuevo"}`;
 }
 
-export function mapUiRoleToApiCode(role: "administrador" | "operador"): string {
-  return role === "administrador" ? "admin" : "staff";
+export function mapUiRoleToApiCode(role: "administrador" | "operador" | "consulta"): string {
+  const map = {
+    administrador: "admin",
+    operador: "staff",
+    consulta: "read_only",
+  } as const;
+  return map[role];
 }
 
 export function findRoleId(roles: SistemaRolRecord[], code: string): number | undefined {
@@ -87,6 +92,10 @@ const USUARIO_ERROR_MESSAGES: Record<string, string> = {
   "Email already exists": "Ese correo ya está registrado.",
   "At least one role is required": "Debés asignar al menos un rol.",
   "One or more roles do not exist": "Uno o más roles no existen.",
+  "username must be 3-50 characters (letters, digits, ., _, -)":
+    "El usuario debe tener entre 3 y 50 caracteres (letras, números, ., _, -).",
+  "email must be a valid address": "Ingresá un correo válido.",
+  "password must be at least 8 characters": "La contraseña debe tener al menos 8 caracteres.",
 };
 
 export function usuarioApiErrorMessage(err: unknown, fallback = "No se pudo guardar los cambios"): string {

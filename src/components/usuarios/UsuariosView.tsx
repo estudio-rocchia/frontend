@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { Lock } from "lucide-react";
 
@@ -31,9 +31,11 @@ function statusVariant(status: UserStatus) {
 
 export function UsuariosView() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { token, logout } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [kpis, setKpis] = useState<ReturnType<typeof mapUsuariosKpis>>([]);
   const [users, setUsers] = useState<UsuarioRecord[]>([]);
   const [roles, setRoles] = useState<SistemaRolRecord[]>([]);
@@ -70,6 +72,13 @@ export function UsuariosView() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    const creado = searchParams.get("creado");
+    if (!creado) return;
+    setSuccessMessage(`El usuario ${creado} fue creado correctamente.`);
+    router.replace("/usuarios");
+  }, [searchParams, router]);
+
   const selectedUser = users.find((user) => user.id === selectedUserId) ?? null;
 
   if (loading) {
@@ -90,6 +99,12 @@ export function UsuariosView() {
   return (
     <>
       <div className={`flex flex-col gap-6 ${pagePaddingClass}`}>
+        {successMessage ? (
+          <p className="rounded-sm border border-success bg-success-bg px-3 py-2 text-sm text-success">
+            {successMessage}
+          </p>
+        ) : null}
+
         <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-col gap-1">
             <h1 className="text-[26px] font-bold text-primary">Usuarios y roles</h1>
