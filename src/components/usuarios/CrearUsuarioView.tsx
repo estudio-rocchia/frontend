@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Check, Mail, ShieldCheck, UserCog } from "lucide-react";
+import { Check, ShieldCheck, UserCog } from "lucide-react";
 
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -228,14 +228,6 @@ export function CrearUsuarioView() {
               onChange={setArea}
             />
           </section>
-
-          <div className="flex items-start gap-2.5 rounded-sm bg-primary-soft p-3.5">
-            <Mail className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden />
-            <p className="text-[13px] text-text-secondary">
-              Se enviará un enlace de activación al correo. La contraseña se define en el primer
-              ingreso.
-            </p>
-          </div>
         </div>
 
         <section className="flex min-w-0 flex-1 flex-col gap-4">
