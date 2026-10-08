@@ -1,6 +1,6 @@
 export type PermissionValue = "Total" | "Editar" | "Oculto" | "Solicitud" | "Ver";
 
-export type UserStatus = "Activo" | "Restringido";
+export type UserStatus = "Activo" | "Restringido" | "Inactivo";
 
 export type UserPermissionRow = {
   user: string;

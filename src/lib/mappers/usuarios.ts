@@ -33,7 +33,7 @@ function primaryRoleCode(user: UsuarioRecord): string {
 }
 
 function statusForUser(user: UsuarioRecord, roleCode: string): UserStatus {
-  if (!user.activo) return "Restringido";
+  if (!user.activo) return "Inactivo";
   return roleCode === "read_only" ? "Restringido" : "Activo";
 }
 
@@ -72,4 +72,26 @@ export function mapUiRoleToApiCode(role: "administrador" | "operador"): string {
 
 export function findRoleId(roles: SistemaRolRecord[], code: string): number | undefined {
   return roles.find((role) => role.code === code)?.id;
+}
+
+export function primaryRoleId(user: UsuarioRecord): number | undefined {
+  const code = primaryRoleCode(user);
+  return user.roles.find((role) => role.code === code)?.id ?? user.roles[0]?.id;
+}
+
+const USUARIO_ERROR_MESSAGES: Record<string, string> = {
+  "You cannot deactivate your own account": "No podés desactivar tu propia cuenta.",
+  "Cannot remove or deactivate the only active administrator":
+    "No se puede quitar o desactivar al único administrador activo.",
+  "Username already exists": "Ese nombre de usuario ya existe.",
+  "Email already exists": "Ese correo ya está registrado.",
+  "At least one role is required": "Debés asignar al menos un rol.",
+  "One or more roles do not exist": "Uno o más roles no existen.",
+};
+
+export function usuarioApiErrorMessage(err: unknown, fallback = "No se pudo guardar los cambios"): string {
+  if (err instanceof Error) {
+    return USUARIO_ERROR_MESSAGES[err.message] ?? err.message;
+  }
+  return fallback;
 }

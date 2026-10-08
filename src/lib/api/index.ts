@@ -29,7 +29,10 @@ import type {
   CreatePeriodoInput,
   CreateServicioInput,
   CreateUsuarioInput,
+  ResetUsuarioPasswordInput,
+  SetUsuarioRolesInput,
   SistemaRolRecord,
+  UpdateUsuarioInput,
   UsuarioRecord,
   SecheepImportInput,
   SecheepImportResult,
@@ -62,6 +65,34 @@ export function fetchSistemaRoles(token: string) {
 
 export function createUsuario(token: string, body: CreateUsuarioInput) {
   return apiRequest<UsuarioRecord>("/usuarios", {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function fetchUsuario(token: string, id: number) {
+  return apiRequest<UsuarioRecord>(`/usuarios/${id}`, { token });
+}
+
+export function updateUsuario(token: string, id: number, body: UpdateUsuarioInput) {
+  return apiRequest<UsuarioRecord>(`/usuarios/${id}`, {
+    method: "PATCH",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function setUsuarioRoles(token: string, id: number, body: SetUsuarioRolesInput) {
+  return apiRequest<UsuarioRecord>(`/usuarios/${id}/roles`, {
+    method: "PUT",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function resetUsuarioPassword(token: string, id: number, body: ResetUsuarioPasswordInput) {
+  return apiRequest<UsuarioRecord>(`/usuarios/${id}/reset-password`, {
     method: "POST",
     token,
     body: JSON.stringify(body),

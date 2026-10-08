@@ -56,6 +56,20 @@ export interface CreateUsuarioInput {
   personaId?: number | null;
 }
 
+export interface UpdateUsuarioInput {
+  email?: string;
+  activo?: boolean;
+  personaId?: number | null;
+}
+
+export interface SetUsuarioRolesInput {
+  roleIds: number[];
+}
+
+export interface ResetUsuarioPasswordInput {
+  password: string;
+}
+
 export interface CatalogoItem {
   id: number;
   code: string;
