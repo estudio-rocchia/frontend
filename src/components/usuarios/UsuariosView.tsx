@@ -80,6 +80,7 @@ export function UsuariosView() {
   }, [searchParams, router]);
 
   const selectedUser = users.find((user) => user.id === selectedUserId) ?? null;
+  const assignableRoles = roles.filter((role) => role.code !== "read_only");
 
   if (loading) {
     return <p className={`${pagePaddingClass} text-sm text-text-secondary`}>Cargando usuarios…</p>;
@@ -128,7 +129,7 @@ export function UsuariosView() {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2">
           {kpis.map((kpi) => (
             <KpiCard key={kpi.label} {...kpi} />
           ))}
@@ -200,7 +201,7 @@ export function UsuariosView() {
       <UsuarioFichaDrawer
         open={selectedUserId !== null}
         user={selectedUser}
-        roles={roles}
+        roles={assignableRoles}
         onClose={() => setSelectedUserId(null)}
         onUpdated={() => void load()}
       />

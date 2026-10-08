@@ -56,7 +56,6 @@ export function mapUsuariosKpis(users: UsuarioRecord[]) {
   return [
     { label: "Administradores", value: String(countByRole("admin")), hint: "Acceso total" },
     { label: "Operadores", value: String(countByRole("staff")), hint: "Acceso parcial" },
-    { label: "Solo lectura", value: String(countByRole("read_only")), hint: "Consulta" },
   ];
 }
 
@@ -66,13 +65,8 @@ export function usernameFromEmail(email: string): string {
   return normalized.length >= 3 ? normalized : `user.${normalized || "nuevo"}`;
 }
 
-export function mapUiRoleToApiCode(role: "administrador" | "operador" | "consulta"): string {
-  const map = {
-    administrador: "admin",
-    operador: "staff",
-    consulta: "read_only",
-  } as const;
-  return map[role];
+export function mapUiRoleToApiCode(role: "administrador" | "operador"): string {
+  return role === "administrador" ? "admin" : "staff";
 }
 
 export function findRoleId(roles: SistemaRolRecord[], code: string): number | undefined {

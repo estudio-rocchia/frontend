@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Check, Eye, Mail, ShieldCheck, UserCog } from "lucide-react";
+import { Check, Mail, ShieldCheck, UserCog } from "lucide-react";
 
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -55,8 +55,7 @@ function RoleCard({
   onSelect: () => void;
 }) {
   const definition = roleDefinitions[role];
-  const Icon =
-    role === "administrador" ? ShieldCheck : role === "operador" ? UserCog : Eye;
+  const Icon = role === "administrador" ? ShieldCheck : UserCog;
 
   return (
     <button
@@ -183,7 +182,7 @@ export function CrearUsuarioView() {
           <p className="text-[13px] text-text-secondary">Usuarios y roles / Nuevo usuario</p>
           <h1 className="text-[26px] font-bold text-primary">Crear usuario y asignar rol</h1>
           <p className="text-sm text-text-secondary">
-            Alta de empleados con perfil Administrador, Operador o Consulta según responsabilidades
+            Alta de empleados con perfil Administrador u Operador según responsabilidades
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap gap-3">
@@ -247,7 +246,7 @@ export function CrearUsuarioView() {
             </p>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-4 lg:grid-cols-2">
             <RoleCard
               role="administrador"
               selected={selectedRole === "administrador"}
@@ -257,11 +256,6 @@ export function CrearUsuarioView() {
               role="operador"
               selected={selectedRole === "operador"}
               onSelect={() => setSelectedRole("operador")}
-            />
-            <RoleCard
-              role="consulta"
-              selected={selectedRole === "consulta"}
-              onSelect={() => setSelectedRole("consulta")}
             />
           </div>
         </section>
