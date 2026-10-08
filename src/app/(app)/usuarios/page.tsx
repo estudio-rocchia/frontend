@@ -1,5 +1,10 @@
-import { PlaceholderPage } from "@/components/PlaceholderPage";
+import { AdminGate } from "@/components/auth/AdminGate";
+import { UsuariosView } from "@/components/usuarios/UsuariosView";
 
 export default function UsuariosPage() {
-  return <PlaceholderPage title="Usuarios y roles" />;
+  return (
+    <AdminGate>
+      <UsuariosView />
+    </AdminGate>
+  );
 }

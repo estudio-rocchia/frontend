@@ -1,0 +1,162 @@
+"use client";
+
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
+import { Lock } from "lucide-react";
+
+import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
+import { KpiCard } from "@/components/ui/KpiCard";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { useAuth } from "@/context/auth-context";
+import { type PermissionValue, type UserStatus } from "@/data/usuarios";
+import { ApiError, fetchUsuarios } from "@/lib/api";
+import { mapUsuarioToPermissionRow, mapUsuariosKpis } from "@/lib/mappers/usuarios";
+import { pagePaddingClass } from "@/lib/layout";
+
+const tableHeaders = ["Rol / Usuario", "Contratos", "Precios netos", "Plazos", "Clientes", "Estado"];
+
+function permissionClassName(value: PermissionValue) {
+  if (value === "Total") return "font-semibold text-primary";
+  if (value === "Oculto") return "font-semibold text-danger";
+  return "text-text-primary";
+}
+
+function statusVariant(status: UserStatus) {
+  return status === "Activo" ? "success" : "warning";
+}
+
+export function UsuariosView() {
+  const router = useRouter();
+  const { token, logout } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [kpis, setKpis] = useState<ReturnType<typeof mapUsuariosKpis>>([]);
+  const [rows, setRows] = useState<ReturnType<typeof mapUsuarioToPermissionRow>[]>([]);
+
+  const load = useCallback(async () => {
+    if (!token) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetchUsuarios(token);
+      setKpis(mapUsuariosKpis(response.items));
+      setRows(response.items.map(mapUsuarioToPermissionRow));
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        logout();
+        return;
+      }
+      if (err instanceof ApiError && err.status === 403) {
+        router.replace("/");
+        return;
+      }
+      setError(err instanceof ApiError ? err.message : "No se pudieron cargar los usuarios");
+    } finally {
+      setLoading(false);
+    }
+  }, [token, logout, router]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  if (loading) {
+    return <p className={`${pagePaddingClass} text-sm text-text-secondary`}>Cargando usuarios…</p>;
+  }
+
+  if (error) {
+    return (
+      <div className={pagePaddingClass}>
+        <p className="rounded-sm border border-danger bg-danger-bg px-3 py-2 text-sm text-danger">{error}</p>
+        <button type="button" onClick={() => void load()} className="mt-3 text-sm font-semibold text-primary">
+          Reintentar
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`flex flex-col gap-6 ${pagePaddingClass}`}>
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-[26px] font-bold text-primary">Usuarios y roles</h1>
+          <p className="text-sm text-text-secondary">
+            Control de accesos, permisos y protección de datos sensibles
+          </p>
+        </div>
+        <ButtonPrimary className="shrink-0" onClick={() => router.push("/usuarios/nuevo")}>
+          Crear usuario
+        </ButtonPrimary>
+      </header>
+
+      <div className="flex items-center gap-3.5 rounded-md border border-primary bg-primary-soft p-4">
+        <Lock className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+        <div className="flex flex-col gap-1">
+          <p className="text-sm font-semibold text-primary">Zona restringida — datos confidenciales</p>
+          <p className="text-[13px] text-text-secondary">
+            El acceso a contratos, precios netos y edición de plazos queda limitado por rol. Toda
+            modificación queda registrada en auditoría.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        {kpis.map((kpi) => (
+          <KpiCard key={kpi.label} {...kpi} />
+        ))}
+      </div>
+
+      <section className="overflow-hidden rounded-md border border-border bg-bg-card">
+        <div className="flex flex-col gap-3 border-b border-border px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="text-base font-semibold text-text-primary">Matriz de permisos por rol</h2>
+          <ButtonOutline className="self-start sm:self-auto">Exportar auditoría</ButtonOutline>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px] border-collapse text-left">
+            <thead>
+              <tr className="bg-bg-cream">
+                {tableHeaders.map((header) => (
+                  <th key={header} className="h-11 px-5 text-xs font-semibold text-text-secondary">
+                    {header}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length === 0 ? (
+                <tr>
+                  <td colSpan={tableHeaders.length} className="px-5 py-8 text-sm text-text-secondary">
+                    No hay usuarios registrados.
+                  </td>
+                </tr>
+              ) : (
+                rows.map((row) => (
+                  <tr key={row.user} className="border-t border-border">
+                    <td className="h-[52px] px-5 text-[13px] font-semibold text-text-primary">{row.user}</td>
+                    <td className={`h-[52px] px-5 text-[13px] ${permissionClassName(row.contratos)}`}>
+                      {row.contratos}
+                    </td>
+                    <td className={`h-[52px] px-5 text-[13px] ${permissionClassName(row.preciosNetos)}`}>
+                      {row.preciosNetos}
+                    </td>
+                    <td className={`h-[52px] px-5 text-[13px] ${permissionClassName(row.plazos)}`}>
+                      {row.plazos}
+                    </td>
+                    <td className={`h-[52px] px-5 text-[13px] ${permissionClassName(row.clientes)}`}>
+                      {row.clientes}
+                    </td>
+                    <td className="h-[52px] px-5">
+                      <StatusBadge label={row.status} variant={statusVariant(row.status)} />
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  );
+}

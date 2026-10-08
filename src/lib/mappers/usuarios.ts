@@ -1,0 +1,75 @@
+import type { PermissionValue, UserPermissionRow, UserStatus } from "@/data/usuarios";
+import type { SistemaRolRecord, UsuarioRecord } from "@/lib/api/types";
+
+const rolePermissions: Record<string, Omit<UserPermissionRow, "user" | "status">> = {
+  admin: {
+    contratos: "Total",
+    preciosNetos: "Total",
+    plazos: "Total",
+    clientes: "Total",
+  },
+  staff: {
+    contratos: "Editar",
+    preciosNetos: "Oculto",
+    plazos: "Solicitud",
+    clientes: "Ver",
+  },
+  read_only: {
+    contratos: "Ver",
+    preciosNetos: "Oculto",
+    plazos: "Ver",
+    clientes: "Ver",
+  },
+};
+
+function primaryRoleCode(user: UsuarioRecord): string {
+  const priority = ["admin", "staff", "read_only"];
+  for (const code of priority) {
+    if (user.roles.some((role) => role.code === code)) {
+      return code;
+    }
+  }
+  return user.roles[0]?.code ?? "read_only";
+}
+
+function statusForUser(user: UsuarioRecord, roleCode: string): UserStatus {
+  if (!user.activo) return "Restringido";
+  return roleCode === "read_only" ? "Restringido" : "Activo";
+}
+
+export function mapUsuarioToPermissionRow(user: UsuarioRecord): UserPermissionRow {
+  const roleCode = primaryRoleCode(user);
+  const primaryRole = user.roles.find((role) => role.code === roleCode) ?? user.roles[0];
+  const permissions = rolePermissions[roleCode] ?? rolePermissions.read_only;
+
+  return {
+    user: `${user.username} · ${primaryRole?.name ?? roleCode}`,
+    ...permissions,
+    status: statusForUser(user, roleCode),
+  };
+}
+
+export function mapUsuariosKpis(users: UsuarioRecord[]) {
+  const countByRole = (code: string) =>
+    users.filter((user) => user.activo && user.roles.some((role) => role.code === code)).length;
+
+  return [
+    { label: "Administradores", value: String(countByRole("admin")), hint: "Acceso total" },
+    { label: "Operadores", value: String(countByRole("staff")), hint: "Acceso parcial" },
+    { label: "Solo lectura", value: String(countByRole("read_only")), hint: "Consulta" },
+  ];
+}
+
+export function usernameFromEmail(email: string): string {
+  const local = email.trim().split("@")[0] ?? "usuario";
+  const normalized = local.toLowerCase().replace(/[^a-z0-9._-]/g, "");
+  return normalized.length >= 3 ? normalized : `user.${normalized || "nuevo"}`;
+}
+
+export function mapUiRoleToApiCode(role: "administrador" | "operador"): string {
+  return role === "administrador" ? "admin" : "staff";
+}
+
+export function findRoleId(roles: SistemaRolRecord[], code: string): number | undefined {
+  return roles.find((role) => role.code === code)?.id;
+}

@@ -28,6 +28,9 @@ import type {
   RegisterPagoResult,
   CreatePeriodoInput,
   CreateServicioInput,
+  CreateUsuarioInput,
+  SistemaRolRecord,
+  UsuarioRecord,
   SecheepImportInput,
   SecheepImportResult,
   PeriodoServicioRecord,
@@ -47,6 +50,22 @@ export function login(usernameOrEmail: string, password: string) {
 
 export function fetchMe(token: string) {
   return apiRequest<MeResponse>("/auth/me", { token });
+}
+
+export function fetchUsuarios(token: string) {
+  return apiRequest<{ items: UsuarioRecord[] }>("/usuarios", { token });
+}
+
+export function fetchSistemaRoles(token: string) {
+  return apiRequest<{ items: SistemaRolRecord[] }>("/catalogos/roles", { token });
+}
+
+export function createUsuario(token: string, body: CreateUsuarioInput) {
+  return apiRequest<UsuarioRecord>("/usuarios", {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
 }
 
 export function fetchDashboardResumen(token: string, limit = 20) {
