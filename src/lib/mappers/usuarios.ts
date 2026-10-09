@@ -59,6 +59,25 @@ export function mapUsuariosKpis(users: UsuarioRecord[]) {
   ];
 }
 
+function normalizeSearchText(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .trim();
+}
+
+export function searchUsuarios(users: UsuarioRecord[], query: string): UsuarioRecord[] {
+  const needle = normalizeSearchText(query);
+  if (!needle) return users;
+
+  return users.filter((user) => {
+    const roleText = user.roles.map((role) => `${role.name} ${role.code}`).join(" ");
+    const haystack = normalizeSearchText([user.username, user.email, roleText].join(" "));
+    return haystack.includes(needle);
+  });
+}
+
 const USERNAME_PATTERN = /^[a-zA-Z0-9._-]{3,50}$/;
 
 export function isValidUsername(username: string): boolean {

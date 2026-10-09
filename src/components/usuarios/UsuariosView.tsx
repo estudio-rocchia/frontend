@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Lock } from "lucide-react";
+import { Lock, Search } from "lucide-react";
 
 import { UsuarioFichaDrawer } from "@/components/usuarios/UsuarioFichaDrawer";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
@@ -12,7 +12,7 @@ import { useAuth } from "@/context/auth-context";
 import { type PermissionValue, type UserStatus } from "@/data/usuarios";
 import { ApiError, fetchSistemaRoles, fetchUsuarios } from "@/lib/api";
 import type { SistemaRolRecord, UsuarioRecord } from "@/lib/api/types";
-import { mapUsuarioToPermissionRow, mapUsuariosKpis } from "@/lib/mappers/usuarios";
+import { mapUsuarioToPermissionRow, mapUsuariosKpis, searchUsuarios } from "@/lib/mappers/usuarios";
 import { pagePaddingClass } from "@/lib/layout";
 
 const tableHeaders = ["Rol / Usuario", "Contratos", "Precios netos", "Plazos", "Clientes", "Estado"];
@@ -49,6 +49,7 @@ export function UsuariosView() {
   const [roles, setRoles] = useState<SistemaRolRecord[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>("activos");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -101,10 +102,17 @@ export function UsuariosView() {
   );
 
   const filteredUsers = useMemo(() => {
-    if (activityFilter === "activos") return users.filter((user) => user.activo);
-    if (activityFilter === "inactivos") return users.filter((user) => !user.activo);
-    return users;
-  }, [users, activityFilter]);
+    const byActivity =
+      activityFilter === "activos"
+        ? users.filter((user) => user.activo)
+        : activityFilter === "inactivos"
+          ? users.filter((user) => !user.activo)
+          : users;
+
+    return searchUsuarios(byActivity, searchQuery);
+  }, [users, activityFilter, searchQuery]);
+
+  const hasSearch = searchQuery.trim().length > 0;
 
   if (loading) {
     return <p className={`${pagePaddingClass} text-sm text-text-secondary`}>Cargando usuarios…</p>;
@@ -165,6 +173,17 @@ export function UsuariosView() {
               <h2 className="text-base font-semibold text-text-primary">Matriz de permisos por rol</h2>
               <ButtonOutline className="self-start sm:self-auto">Exportar auditoría</ButtonOutline>
             </div>
+            <label className="flex w-full items-center gap-2.5 rounded-sm border border-border bg-bg-page px-3 py-2.5 focus-within:border-primary sm:max-w-md">
+              <Search className="h-4 w-4 shrink-0 text-text-secondary" aria-hidden />
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Buscar por usuario, correo o rol…"
+                aria-label="Buscar usuarios por nombre, correo o rol"
+                className="min-w-0 flex-1 bg-transparent text-sm text-text-primary outline-none placeholder:text-text-secondary"
+              />
+            </label>
             <div className="flex flex-wrap items-center gap-2">
               {activityFilters.map(({ id, label }) => {
                 const selected = activityFilter === id;
@@ -184,6 +203,13 @@ export function UsuariosView() {
                 );
               })}
             </div>
+            {hasSearch ? (
+              <p className="text-[13px] text-text-secondary">
+                {filteredUsers.length === 0
+                  ? "Sin resultados para la búsqueda actual"
+                  : `${filteredUsers.length} usuario${filteredUsers.length === 1 ? "" : "s"} encontrado${filteredUsers.length === 1 ? "" : "s"}`}
+              </p>
+            ) : null}
           </div>
 
           <div className="overflow-x-auto">
@@ -203,7 +229,9 @@ export function UsuariosView() {
                     <td colSpan={tableHeaders.length} className="px-5 py-8 text-sm text-text-secondary">
                       {users.length === 0
                         ? "No hay usuarios registrados."
-                        : "No hay usuarios para este filtro."}
+                        : hasSearch
+                          ? "No hay usuarios que coincidan con la búsqueda."
+                          : "No hay usuarios para este filtro."}
                     </td>
                   </tr>
                 ) : (
