@@ -264,6 +264,10 @@ export function createPersona(
   });
 }
 
+export function fetchPersona(token: string, id: number) {
+  return apiRequest<PersonaRecord>(`/personas/${id}`, { token });
+}
+
 export function createLocalidad(token: string, body: { name: string; province: string; country?: string }) {
   return apiRequest<{ id: number; name: string; province: string; country: string }>("/localidades", {
     method: "POST",

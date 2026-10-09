@@ -7,9 +7,9 @@ import { DrawerPanel } from "@/components/ui/DrawerPanel";
 import { FieldBlock } from "@/components/ui/FormLayout";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useAuth } from "@/context/auth-context";
-import { ApiError, resetUsuarioPassword, setUsuarioRoles, updateUsuario } from "@/lib/api";
-import type { SistemaRolRecord, UsuarioRecord } from "@/lib/api/types";
-import { formatDateDisplay } from "@/lib/format";
+import { ApiError, fetchPersona, resetUsuarioPassword, setUsuarioRoles, updateUsuario } from "@/lib/api";
+import type { PersonaRecord, SistemaRolRecord, UsuarioRecord } from "@/lib/api/types";
+import { formatDateDisplay, personaDisplayName } from "@/lib/format";
 import { primaryRoleId, usuarioApiErrorMessage } from "@/lib/mappers/usuarios";
 
 function SectionTitle({ children }: { children: string }) {
@@ -43,6 +43,9 @@ export function UsuarioFichaDrawer({
   const [resetting, setResetting] = useState(false);
   const [togglingStatus, setTogglingStatus] = useState(false);
   const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false);
+  const [persona, setPersona] = useState<PersonaRecord | null>(null);
+  const [loadingPersona, setLoadingPersona] = useState(false);
+  const [personaError, setPersonaError] = useState(false);
 
   const isSelf = user !== null && currentUser?.id === user.id;
 
@@ -54,7 +57,32 @@ export function UsuarioFichaDrawer({
     setError(null);
     setSuccess(null);
     setShowDeactivateConfirm(false);
+    setPersona(null);
+    setPersonaError(false);
   }, [user]);
+
+  useEffect(() => {
+    if (!open || !user?.personaId || !token) {
+      setPersona(null);
+      setPersonaError(false);
+      setLoadingPersona(false);
+      return;
+    }
+
+    setLoadingPersona(true);
+    setPersonaError(false);
+    void fetchPersona(token, user.personaId)
+      .then((record) => setPersona(record))
+      .catch((err) => {
+        if (err instanceof ApiError && err.status === 401) {
+          logout();
+          return;
+        }
+        setPersona(null);
+        setPersonaError(true);
+      })
+      .finally(() => setLoadingPersona(false));
+  }, [open, user?.personaId, user?.id, token, logout]);
 
   if (!user) return null;
 
@@ -175,6 +203,32 @@ export function UsuarioFichaDrawer({
           <p className="rounded-sm border border-success bg-success-bg px-3 py-2 text-sm text-success">
             {success}
           </p>
+        ) : null}
+
+        {activeUser.personaId ? (
+          <section className="flex flex-col gap-3 rounded-md border border-border bg-bg-page p-4">
+            <SectionTitle>Datos personales</SectionTitle>
+            {loadingPersona ? (
+              <p className="text-[13px] text-text-secondary">Cargando datos personales…</p>
+            ) : personaError ? (
+              <p className="text-[13px] text-text-secondary">
+                No se pudieron cargar los datos personales vinculados.
+              </p>
+            ) : persona ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                {persona.tipoPersona === "natural" ? (
+                  <>
+                    <FieldBlock label="Nombre" value={persona.nombre?.trim() || "—"} />
+                    <FieldBlock label="Apellido" value={persona.apellido?.trim() || "—"} />
+                  </>
+                ) : (
+                  <FieldBlock label="Razón social" value={personaDisplayName(persona)} />
+                )}
+                <FieldBlock label="Correo" value={persona.email?.trim() || "—"} />
+                <FieldBlock label="Teléfono" value={persona.phone?.trim() || "—"} />
+              </div>
+            ) : null}
+          </section>
         ) : null}
 
         <section className="flex flex-col gap-3">
