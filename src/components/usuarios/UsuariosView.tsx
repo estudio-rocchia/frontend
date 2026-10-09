@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Lock, Search } from "lucide-react";
 
 import { UsuarioFichaDrawer } from "@/components/usuarios/UsuarioFichaDrawer";
-import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
+import { ButtonPrimary } from "@/components/ui/Button";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useAuth } from "@/context/auth-context";
@@ -181,12 +181,9 @@ export function UsuariosView() {
 
         <section className="overflow-hidden rounded-md border border-border bg-bg-card">
           <div className="flex flex-col gap-5 border-b border-border px-5 py-5">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div className="flex flex-col gap-1">
-                <h2 className="text-base font-semibold text-text-primary">Matriz de permisos por rol</h2>
-                <p className="text-xs text-text-secondary">{resultSummary}</p>
-              </div>
-              <ButtonOutline className="self-start sm:self-auto">Exportar auditoría</ButtonOutline>
+            <div className="flex flex-col gap-1">
+              <h2 className="text-base font-semibold text-text-primary">Matriz de permisos por rol</h2>
+              <p className="text-xs text-text-secondary">{resultSummary}</p>
             </div>
 
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
