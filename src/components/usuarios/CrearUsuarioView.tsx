@@ -448,7 +448,7 @@ export function CrearUsuarioView() {
               autoComplete="email"
             />
             <FormInput
-              label="Teléfono"
+              label="Teléfono (opcional)"
               placeholder="+5491112345678"
               value={telefono}
               onChange={(value) => {
