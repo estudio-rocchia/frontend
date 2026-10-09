@@ -98,9 +98,56 @@ const USUARIO_ERROR_MESSAGES: Record<string, string> = {
   "password must be at least 8 characters": "La contraseña debe tener al menos 8 caracteres.",
 };
 
+export type UsuarioCreateField = "nombre" | "apellido" | "username" | "correo" | "telefono" | "password";
+
+export interface UsuarioCreateFieldError {
+  field?: UsuarioCreateField;
+  message: string;
+  hint?: string;
+  suggestUsersList?: boolean;
+}
+
+const USUARIO_CREATE_FIELD_ERRORS: Record<string, UsuarioCreateFieldError> = {
+  "Username already exists": {
+    field: "username",
+    message: "Este usuario ya está en uso",
+    hint: "Elegí otro nombre de usuario para el acceso al sistema.",
+  },
+  "Email already exists": {
+    field: "correo",
+    message: "Este correo ya está registrado",
+    hint: "Usá otro correo corporativo o editá la cuenta existente desde el listado.",
+    suggestUsersList: true,
+  },
+  "username must be 3-50 characters (letters, digits, ., _, -)": {
+    field: "username",
+    message: "El usuario debe tener entre 3 y 50 caracteres (letras, números, ., _, -).",
+  },
+  "email must be a valid address": {
+    field: "correo",
+    message: "Ingresá un correo válido.",
+  },
+  "password must be at least 8 characters": {
+    field: "password",
+    message: "La contraseña debe tener al menos 8 caracteres.",
+  },
+};
+
 export function usuarioApiErrorMessage(err: unknown, fallback = "No se pudo guardar los cambios"): string {
   if (err instanceof Error) {
     return USUARIO_ERROR_MESSAGES[err.message] ?? err.message;
   }
   return fallback;
+}
+
+export function parseUsuarioCreateError(
+  err: unknown,
+  fallback = "No se pudo crear el usuario",
+): UsuarioCreateFieldError {
+  if (err instanceof Error) {
+    const mapped = USUARIO_CREATE_FIELD_ERRORS[err.message];
+    if (mapped) return mapped;
+  }
+
+  return { message: usuarioApiErrorMessage(err, fallback) };
 }
