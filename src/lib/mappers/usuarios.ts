@@ -59,6 +59,12 @@ export function mapUsuariosKpis(users: UsuarioRecord[]) {
   ];
 }
 
+const USERNAME_PATTERN = /^[a-zA-Z0-9._-]{3,50}$/;
+
+export function isValidUsername(username: string): boolean {
+  return USERNAME_PATTERN.test(username.trim());
+}
+
 export function usernameFromEmail(email: string): string {
   const local = email.trim().split("@")[0] ?? "usuario";
   const normalized = local.toLowerCase().replace(/[^a-z0-9._-]/g, "");

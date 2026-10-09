@@ -13,8 +13,8 @@ import type { SistemaRolRecord } from "@/lib/api/types";
 import { normalizePhoneToE164 } from "@/lib/format";
 import {
   findRoleId,
+  isValidUsername,
   mapUiRoleToApiCode,
-  usernameFromEmail,
   usuarioApiErrorMessage,
 } from "@/lib/mappers/usuarios";
 import { pagePaddingClass } from "@/lib/layout";
@@ -102,6 +102,7 @@ export function CrearUsuarioView() {
   const { token, logout } = useAuth();
   const [nombre, setNombre] = useState("");
   const [apellido, setApellido] = useState("");
+  const [username, setUsername] = useState("");
   const [correo, setCorreo] = useState("");
   const [telefono, setTelefono] = useState("");
   const [password, setPassword] = useState("");
@@ -144,6 +145,16 @@ export function CrearUsuarioView() {
       return;
     }
 
+    const loginUsername = username.trim();
+    if (!loginUsername) {
+      setError("Ingresá el nombre de usuario.");
+      return;
+    }
+    if (!isValidUsername(loginUsername)) {
+      setError("El usuario debe tener entre 3 y 50 caracteres (letras, números, ., _, -).");
+      return;
+    }
+
     const email = correo.trim();
     if (!email) {
       setError("Ingresá el correo corporativo.");
@@ -169,8 +180,6 @@ export function CrearUsuarioView() {
       return;
     }
 
-    const username = usernameFromEmail(email);
-
     setSubmitting(true);
     setError(null);
     try {
@@ -183,13 +192,13 @@ export function CrearUsuarioView() {
       });
 
       await createUsuario(token, {
-        username,
+        username: loginUsername,
         email,
         password,
         roleIds: [roleId],
         personaId: persona.id,
       });
-      router.push(`/usuarios?creado=${encodeURIComponent(username)}`);
+      router.push(`/usuarios?creado=${encodeURIComponent(loginUsername)}`);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         logout();
@@ -245,6 +254,12 @@ export function CrearUsuarioView() {
                 onChange={setApellido}
               />
             </div>
+            <FormInput
+              label="Usuario"
+              placeholder="Ej. lucas.perez"
+              value={username}
+              onChange={setUsername}
+            />
             <FormInput
               label="Correo corporativo"
               placeholder="lucas.perez@rocchia.com"
