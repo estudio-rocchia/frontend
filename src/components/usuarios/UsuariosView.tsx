@@ -114,6 +114,18 @@ export function UsuariosView() {
 
   const hasSearch = searchQuery.trim().length > 0;
 
+  const resultSummary = useMemo(() => {
+    const count = filteredUsers.length;
+    const countLabel = `${count} usuario${count === 1 ? "" : "s"}`;
+    const activityLabel = activityFilters.find((filter) => filter.id === activityFilter)?.label ?? "";
+
+    if (hasSearch) {
+      return `${countLabel} encontrado${count === 1 ? "" : "s"} · ${activityLabel}`;
+    }
+
+    return `${countLabel} · ${activityLabel}`;
+  }, [filteredUsers.length, hasSearch, activityFilter]);
+
   if (loading) {
     return <p className={`${pagePaddingClass} text-sm text-text-secondary`}>Cargando usuarios…</p>;
   }
@@ -168,48 +180,58 @@ export function UsuariosView() {
         </div>
 
         <section className="overflow-hidden rounded-md border border-border bg-bg-card">
-          <div className="flex flex-col gap-4 border-b border-border px-5 py-5">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <h2 className="text-base font-semibold text-text-primary">Matriz de permisos por rol</h2>
+          <div className="flex flex-col gap-5 border-b border-border px-5 py-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex flex-col gap-1">
+                <h2 className="text-base font-semibold text-text-primary">Matriz de permisos por rol</h2>
+                <p className="text-xs text-text-secondary">{resultSummary}</p>
+              </div>
               <ButtonOutline className="self-start sm:self-auto">Exportar auditoría</ButtonOutline>
             </div>
-            <label className="flex w-full items-center gap-2.5 rounded-sm border border-border bg-bg-page px-3 py-2.5 focus-within:border-primary sm:max-w-md">
-              <Search className="h-4 w-4 shrink-0 text-text-secondary" aria-hidden />
-              <input
-                type="search"
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="Buscar por usuario, correo o rol…"
-                aria-label="Buscar usuarios por nombre, correo o rol"
-                className="min-w-0 flex-1 bg-transparent text-sm text-text-primary outline-none placeholder:text-text-secondary"
-              />
-            </label>
-            <div className="flex flex-wrap items-center gap-2">
-              {activityFilters.map(({ id, label }) => {
-                const selected = activityFilter === id;
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => setActivityFilter(id)}
-                    className={`rounded-full border border-border px-3.5 py-2 text-[13px] transition-colors ${
-                      selected
-                        ? "bg-primary-soft font-semibold text-primary"
-                        : "bg-bg-card font-normal text-text-secondary hover:text-text-primary"
-                    }`}
-                  >
-                    {label} ({activityCounts[id]})
-                  </button>
-                );
-              })}
+
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div className="flex min-w-0 flex-1 flex-col gap-2 lg:max-w-md">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
+                  Buscar
+                </span>
+                <label className="flex items-center gap-2.5 rounded-sm border border-border bg-bg-page px-3 py-2.5 focus-within:border-primary">
+                  <Search className="h-4 w-4 shrink-0 text-text-secondary" aria-hidden />
+                  <input
+                    type="search"
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    placeholder="Usuario, correo o rol…"
+                    aria-label="Buscar usuarios por nombre, correo o rol"
+                    className="min-w-0 flex-1 bg-transparent text-sm text-text-primary outline-none placeholder:text-text-secondary"
+                  />
+                </label>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
+                  Estado
+                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  {activityFilters.map(({ id, label }) => {
+                    const selected = activityFilter === id;
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => setActivityFilter(id)}
+                        className={`rounded-full border border-border px-3.5 py-2 text-[13px] transition-colors ${
+                          selected
+                            ? "bg-primary-soft font-semibold text-primary"
+                            : "bg-bg-card font-normal text-text-secondary hover:text-text-primary"
+                        }`}
+                      >
+                        {label} ({activityCounts[id]})
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
-            {hasSearch ? (
-              <p className="text-[13px] text-text-secondary">
-                {filteredUsers.length === 0
-                  ? "Sin resultados para la búsqueda actual"
-                  : `${filteredUsers.length} usuario${filteredUsers.length === 1 ? "" : "s"} encontrado${filteredUsers.length === 1 ? "" : "s"}`}
-              </p>
-            ) : null}
           </div>
 
           <div className="overflow-x-auto">
