@@ -32,18 +32,19 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
         <Menu className="h-5 w-5" />
       </button>
 
-      <label className="flex min-w-0 flex-1 items-center gap-2.5 rounded-sm border border-border bg-bg-page px-3 py-2.5 focus-within:border-primary sm:max-w-md xl:max-w-[360px]">
-        <Search className="h-[18px] w-[18px] shrink-0 text-text-secondary" aria-hidden />
-        <input
-          type="search"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Buscar contratos, clientes…"
-          disabled={!searchEnabled}
-          aria-label="Buscar contratos y clientes"
-          className="min-w-0 flex-1 bg-transparent text-sm text-text-primary outline-none placeholder:text-text-secondary disabled:cursor-not-allowed disabled:opacity-60"
-        />
-      </label>
+      {searchEnabled ? (
+        <label className="flex min-w-0 flex-1 items-center gap-2.5 rounded-sm border border-border bg-bg-page px-3 py-2.5 focus-within:border-primary sm:max-w-md xl:max-w-[360px]">
+          <Search className="h-[18px] w-[18px] shrink-0 text-text-secondary" aria-hidden />
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Buscar contratos, clientes…"
+            aria-label="Buscar contratos y clientes"
+            className="min-w-0 flex-1 bg-transparent text-sm text-text-primary outline-none placeholder:text-text-secondary"
+          />
+        </label>
+      ) : null}
 
       <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
         <button

@@ -7,7 +7,9 @@ import { useEffect } from "react";
 import { X } from "lucide-react";
 
 import rocchiaLogo from "@/assets/rocchia-logo.png";
+import { useAuth } from "@/context/auth-context";
 import { mainNav } from "@/config/navigation";
+import { canManageUsers } from "@/lib/auth/roles";
 
 function isActive(pathname: string, href: string) {
   if (href === "/") return pathname === "/";
@@ -16,6 +18,8 @@ function isActive(pathname: string, href: string) {
 
 function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
+  const { user } = useAuth();
+  const navItems = mainNav.filter((item) => !item.adminOnly || canManageUsers(user));
 
   return (
     <>
@@ -34,7 +38,7 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
       </div>
       <p className="mb-2 text-[11px] text-[var(--nav-subtitle)]">Jurídico · Inmobiliario</p>
       <nav className="flex flex-1 flex-col gap-1">
-        {mainNav.map(({ label, href, icon: Icon }) => {
+        {navItems.map(({ label, href, icon: Icon }) => {
           const active = isActive(pathname, href);
           return (
             <Link

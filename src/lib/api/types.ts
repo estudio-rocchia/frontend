@@ -22,6 +22,54 @@ export interface MeResponse {
   user: AuthUser;
 }
 
+export interface SistemaRolRecord {
+  id: number;
+  code: string;
+  name: string;
+  description: string | null;
+  esSistema: boolean;
+}
+
+export interface UsuarioRolSummary {
+  id: number;
+  code: string;
+  name: string;
+}
+
+export interface UsuarioRecord {
+  id: number;
+  username: string;
+  email: string;
+  activo: boolean;
+  personaId: number | null;
+  ultimoAccesoEn: string | null;
+  creadoEn: string;
+  actualizadoEn: string;
+  roles: UsuarioRolSummary[];
+}
+
+export interface CreateUsuarioInput {
+  username: string;
+  email: string;
+  password: string;
+  roleIds: number[];
+  personaId?: number | null;
+}
+
+export interface UpdateUsuarioInput {
+  email?: string;
+  activo?: boolean;
+  personaId?: number | null;
+}
+
+export interface SetUsuarioRolesInput {
+  roleIds: number[];
+}
+
+export interface ResetUsuarioPasswordInput {
+  password: string;
+}
+
 export interface CatalogoItem {
   id: number;
   code: string;

@@ -15,6 +15,7 @@ export type NavItem = {
   label: string;
   href: string;
   icon: LucideIcon;
+  adminOnly?: boolean;
 };
 
 export const mainNav: NavItem[] = [
@@ -25,6 +26,6 @@ export const mainNav: NavItem[] = [
   { label: "Jurídico", href: "/juridico", icon: Scale },
   { label: "Visas", href: "/visas", icon: Stamp },
   { label: "Clientes", href: "/clientes", icon: Users },
-  { label: "Usuarios", href: "/usuarios", icon: ShieldCheck },
+  { label: "Usuarios", href: "/usuarios", icon: ShieldCheck, adminOnly: true },
   { label: "Calendario", href: "/calendario", icon: CalendarDays },
 ];

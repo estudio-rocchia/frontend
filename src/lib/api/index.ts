@@ -28,6 +28,12 @@ import type {
   RegisterPagoResult,
   CreatePeriodoInput,
   CreateServicioInput,
+  CreateUsuarioInput,
+  ResetUsuarioPasswordInput,
+  SetUsuarioRolesInput,
+  SistemaRolRecord,
+  UpdateUsuarioInput,
+  UsuarioRecord,
   SecheepImportInput,
   SecheepImportResult,
   PeriodoServicioRecord,
@@ -47,6 +53,50 @@ export function login(usernameOrEmail: string, password: string) {
 
 export function fetchMe(token: string) {
   return apiRequest<MeResponse>("/auth/me", { token });
+}
+
+export function fetchUsuarios(token: string) {
+  return apiRequest<{ items: UsuarioRecord[] }>("/usuarios", { token });
+}
+
+export function fetchSistemaRoles(token: string) {
+  return apiRequest<{ items: SistemaRolRecord[] }>("/catalogos/roles", { token });
+}
+
+export function createUsuario(token: string, body: CreateUsuarioInput) {
+  return apiRequest<UsuarioRecord>("/usuarios", {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function fetchUsuario(token: string, id: number) {
+  return apiRequest<UsuarioRecord>(`/usuarios/${id}`, { token });
+}
+
+export function updateUsuario(token: string, id: number, body: UpdateUsuarioInput) {
+  return apiRequest<UsuarioRecord>(`/usuarios/${id}`, {
+    method: "PATCH",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function setUsuarioRoles(token: string, id: number, body: SetUsuarioRolesInput) {
+  return apiRequest<UsuarioRecord>(`/usuarios/${id}/roles`, {
+    method: "PUT",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function resetUsuarioPassword(token: string, id: number, body: ResetUsuarioPasswordInput) {
+  return apiRequest<UsuarioRecord>(`/usuarios/${id}/reset-password`, {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
 }
 
 export function fetchDashboardResumen(token: string, limit = 20) {
@@ -198,13 +248,24 @@ export function fetchLocalidades(token: string) {
 
 export function createPersona(
   token: string,
-  body: { tipoPersona: "natural" | "juridica"; nombre?: string; apellido?: string | null; razonSocial?: string | null },
+  body: {
+    tipoPersona: "natural" | "juridica";
+    nombre?: string;
+    apellido?: string | null;
+    razonSocial?: string | null;
+    email?: string | null;
+    phone?: string | null;
+  },
 ) {
   return apiRequest<PersonaRecord>("/personas", {
     method: "POST",
     token,
     body: JSON.stringify(body),
   });
+}
+
+export function fetchPersona(token: string, id: number) {
+  return apiRequest<PersonaRecord>(`/personas/${id}`, { token });
 }
 
 export function createLocalidad(token: string, body: { name: string; province: string; country?: string }) {
