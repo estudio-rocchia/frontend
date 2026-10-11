@@ -23,8 +23,11 @@ import { rentalSummaryStats, type RentalRow } from "@/data/alquileres-rentals";
 import type { PeriodoFormValues } from "@/components/alquileres/PeriodoServicioModal";
 import type { ServicioFormValues } from "@/components/alquileres/ServicioFormModal";
 import type { RegistrarPagoServicioFormValues } from "@/components/alquileres/RegistrarPagoServicioModal";
+import type { OwnerFieldValue, PersonaFieldValue } from "@/components/alquileres/PersonaSelectField";
 import {
   ApiError,
+  addInmueblePropietario,
+  fetchInmueblePropietarios,
   applyContratoAjuste,
   changeContratoEstado,
   createContrato,
@@ -44,16 +47,20 @@ import {
   fetchInmuebleFicha,
   fetchInmuebles,
   fetchLocalidades,
+  fetchPersona,
+  fetchPersonas,
   fetchServicios,
   fetchServiciosPeriodos,
   issueRecibo,
   registerPago,
+  updatePersonaAdministracion,
   updateServicio,
 } from "@/lib/api";
 import type {
   CatalogoItem,
   ContratoDetail,
   CreatePeriodoInput,
+  PersonaRecord,
   SecheepImportInput,
   PeriodoServicioRecord,
   ServicioContratoRecord,
@@ -74,11 +81,49 @@ import {
   mapContratoDetailToFicha,
   mapContratoTableItemToRentalRow,
 } from "@/lib/mappers/rentals";
+import {
+  loadInmueblesSinAlquiler,
+  type InmuebleSinAlquiler,
+} from "@/lib/mappers/propietario-inmuebles";
 
 function addYears(isoDate: string, years: number): string {
   const date = new Date(`${isoDate}T12:00:00`);
   date.setFullYear(date.getFullYear() + years);
   return date.toISOString().slice(0, 10);
+}
+
+async function resolveTenantPersona(
+  token: string,
+  field: PersonaFieldValue,
+): Promise<PersonaRecord> {
+  if (field.mode === "existing") {
+    return fetchPersona(token, field.personaId);
+  }
+  const parts = parsePersonName(field.fullName);
+  return createPersona(token, {
+    tipoPersona: "natural",
+    nombre: parts.nombre,
+    apellido: parts.apellido,
+  });
+}
+
+async function resolveOwnerPersona(
+  token: string,
+  field: OwnerFieldValue,
+): Promise<PersonaRecord> {
+  if (field.mode === "existing") {
+    return fetchPersona(token, field.personaId);
+  }
+  const parts = parsePersonName(field.fullName);
+  const persona = await createPersona(token, {
+    tipoPersona: "natural",
+    nombre: parts.nombre,
+    apellido: parts.apellido,
+  });
+  await updatePersonaAdministracion(token, persona.id, {
+    porcentajeAdministracion: field.porcentajeAdministracion,
+  });
+  return fetchPersona(token, persona.id);
 }
 
 export function AlquileresWorkspace() {
@@ -99,6 +144,8 @@ export function AlquileresWorkspace() {
     tiposInmueble: Array<{ id: number; code: string; name: string }>;
     inmuebleCodes: string[];
     contratoCodes: Array<string | null>;
+    personas: PersonaRecord[];
+    inmueblesSinAlquiler: InmuebleSinAlquiler[];
   } | null>(null);
   const [cobrarModalOpen, setCobrarModalOpen] = useState(false);
   const [liquidacionModalOpen, setLiquidacionModalOpen] = useState(false);
@@ -595,15 +642,19 @@ export function AlquileresWorkspace() {
   async function openNewContractModal() {
     if (!token) return;
     try {
-      const [tiposInmueble, inmueblesRes, contratosRes] = await Promise.all([
+      const [tiposInmueble, inmueblesRes, contratosRes, personasRes] = await Promise.all([
         fetchCatalog(token, "/catalogos/tipos-inmueble"),
         fetchInmuebles(token, { limit: 200 }),
         fetchContratos(token, { limit: 200 }),
+        fetchPersonas(token, { limit: 200 }),
       ]);
+      const inmueblesSinAlquiler = await loadInmueblesSinAlquiler(token, personasRes.items);
       setCodeContext({
         tiposInmueble: tiposInmueble.items,
         inmuebleCodes: inmueblesRes.items.map((item) => item.code),
         contratoCodes: contratosRes.items.map((item) => item.contratoCode),
+        personas: personasRes.items,
+        inmueblesSinAlquiler,
       });
       setNewModalOpen(true);
     } catch (err) {
@@ -624,22 +675,6 @@ export function AlquileresWorkspace() {
       ]);
 
       const indexItem = indices.items.find((item) => item.code === form.index) ?? indices.items[0];
-      const tiposInmueble = codeContext?.tiposInmueble.length
-        ? codeContext.tiposInmueble
-        : (await fetchCatalog(token, "/catalogos/tipos-inmueble")).items;
-      const tipoInmueble =
-        tiposInmueble.find((item) => item.code === form.tipoInmuebleCode) ??
-        tiposInmueble.find((item) => item.code === "house") ??
-        tiposInmueble[0];
-
-      if (!tipoInmueble) {
-        throw new ApiError(400, {
-          error: {
-            code: "VALIDATION_ERROR",
-            message: "No se pudo cargar el catálogo de tipos de inmueble",
-          },
-        });
-      }
 
       if (!indexItem?.id) {
         throw new ApiError(400, {
@@ -653,26 +688,10 @@ export function AlquileresWorkspace() {
       const usedInmuebleCodes = inmueblesRes.items.map((item) => item.code);
       const usedContratoCodes = contratosRes.items.map((item) => item.contratoCode);
 
-      let localidad = localidades.items.find((item) => item.name.toLowerCase().includes("bre"));
-      if (!localidad) {
-        localidad = await createLocalidad(token, {
-          name: "Las Breñas",
-          province: "Chaco",
-        });
-      }
-
-      const tenantParts = parsePersonName(form.tenant);
-      const ownerParts = parsePersonName(form.owner);
-      const inquilino = await createPersona(token, {
-        tipoPersona: "natural",
-        nombre: tenantParts.nombre,
-        apellido: tenantParts.apellido,
-      });
-      await createPersona(token, {
-        tipoPersona: "natural",
-        nombre: ownerParts.nombre,
-        apellido: ownerParts.apellido,
-      });
+      const [inquilino, propietario] = await Promise.all([
+        resolveTenantPersona(token, form.tenant),
+        resolveOwnerPersona(token, form.owner),
+      ]);
 
       const today = new Date().toISOString().slice(0, 10);
       const amount = Number(form.amount.replace(/\D/g, ""));
@@ -707,35 +726,119 @@ export function AlquileresWorkspace() {
         });
       }
 
-      const inmueblePrefix = prefixForTipoInmueble(form.tipoInmuebleCode);
-      let inmueble = null as Awaited<ReturnType<typeof createInmueble>> | null;
-      const reservedInmuebleCodes = [...usedInmuebleCodes];
-      for (let attempt = 0; attempt < 5; attempt += 1) {
-        const inmuebleCode = nextInmuebleCode(inmueblePrefix, reservedInmuebleCodes);
-        try {
-          inmueble = await createInmueble(token, {
-            code: inmuebleCode,
-            tipoInmuebleId: tipoInmueble.id,
-            localidadId: localidad.id,
-            title: form.propertyLabel.trim(),
-            direccion: form.propertyAddress.trim(),
+      let inmueble: Awaited<ReturnType<typeof createInmueble>> | null = null;
+
+      if (form.property.mode === "existente") {
+        const inmuebleId = form.property.inmuebleId;
+        if (!inmuebleId) {
+          throw new ApiError(400, {
+            error: {
+              code: "VALIDATION_ERROR",
+              message: "Seleccioná un inmueble sin alquiler activo",
+            },
           });
-          break;
-        } catch (err) {
-          if (err instanceof ApiError && err.status === 409) {
-            reservedInmuebleCodes.push(inmuebleCode);
-            continue;
-          }
-          throw err;
         }
+
+        const selected = inmueblesRes.items.find((item) => item.id === inmuebleId);
+        if (!selected) {
+          throw new ApiError(404, {
+            error: { code: "NOT_FOUND", message: "El inmueble seleccionado no existe" },
+          });
+        }
+
+        const hasActiveContract = contratosRes.items.some(
+          (contrato) => contrato.inmuebleId === inmuebleId && contrato.estado === "active",
+        );
+        if (hasActiveContract) {
+          throw new ApiError(409, {
+            error: {
+              code: "CONFLICT",
+              message: "Ese inmueble ya tiene un contrato de alquiler activo",
+            },
+          });
+        }
+
+        inmueble = selected;
+
+        let alreadyLinked = false;
+        try {
+          const propietariosRes = await fetchInmueblePropietarios(token, inmueble.id);
+          alreadyLinked = propietariosRes.items.some((row) => row.personaId === propietario.id);
+        } catch {
+          // si no puede leer propietarios, intenta vincular igual
+        }
+
+        if (!alreadyLinked) {
+          await addInmueblePropietario(token, inmueble.id, { personaId: propietario.id });
+        }
+      } else if (form.property.mode === "nuevo") {
+        const property = form.property;
+        const tiposInmueble = codeContext?.tiposInmueble.length
+          ? codeContext.tiposInmueble
+          : (await fetchCatalog(token, "/catalogos/tipos-inmueble")).items;
+        const tipoInmueble =
+          tiposInmueble.find((item) => item.code === property.tipoInmuebleCode) ??
+          tiposInmueble.find((item) => item.code === "house") ??
+          tiposInmueble[0];
+
+        if (!tipoInmueble) {
+          throw new ApiError(400, {
+            error: {
+              code: "VALIDATION_ERROR",
+              message: "No se pudo cargar el catálogo de tipos de inmueble",
+            },
+          });
+        }
+
+        let localidad = localidades.items.find((item) => item.name.toLowerCase().includes("bre"));
+        if (!localidad) {
+          localidad = await createLocalidad(token, {
+            name: "Las Breñas",
+            province: "Chaco",
+          });
+        }
+
+        const inmueblePrefix = prefixForTipoInmueble(property.tipoInmuebleCode);
+        const reservedInmuebleCodes = [...usedInmuebleCodes];
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+          const inmuebleCode = nextInmuebleCode(inmueblePrefix, reservedInmuebleCodes);
+          try {
+            inmueble = await createInmueble(token, {
+              code: inmuebleCode,
+              tipoInmuebleId: tipoInmueble.id,
+              localidadId: localidad.id,
+              title: property.propertyLabel.trim(),
+              direccion: property.propertyAddress.trim(),
+            });
+            break;
+          } catch (err) {
+            if (err instanceof ApiError && err.status === 409) {
+              reservedInmuebleCodes.push(inmuebleCode);
+              continue;
+            }
+            throw err;
+          }
+        }
+
+        if (!inmueble) {
+          throw new ApiError(409, {
+            error: {
+              code: "CONFLICT",
+              message: "No se pudo reservar un código de inmueble. Reintentá.",
+            },
+          });
+        }
+
+        await addInmueblePropietario(token, inmueble.id, { personaId: propietario.id });
+      } else {
+        throw new ApiError(400, {
+          error: { code: "VALIDATION_ERROR", message: "Seleccioná cómo cargar la propiedad" },
+        });
       }
 
       if (!inmueble) {
         throw new ApiError(409, {
-          error: {
-            code: "CONFLICT",
-            message: "No se pudo reservar un código de inmueble. Reintentá.",
-          },
+          error: { code: "CONFLICT", message: "No se pudo resolver el inmueble del contrato" },
         });
       }
 
@@ -931,6 +1034,8 @@ export function AlquileresWorkspace() {
         submitting={submitting}
         tiposInmueble={codeContext?.tiposInmueble ?? []}
         usedInmuebleCodes={codeContext?.inmuebleCodes ?? []}
+        personas={codeContext?.personas ?? []}
+        inmueblesSinAlquiler={codeContext?.inmueblesSinAlquiler ?? []}
       />
 
       {toast ? (

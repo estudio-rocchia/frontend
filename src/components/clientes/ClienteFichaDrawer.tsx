@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { VincularInmueblePropietarioForm } from "@/components/clientes/VincularInmueblePropietarioForm";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { DrawerPanel } from "@/components/ui/DrawerPanel";
 import { FieldBlock } from "@/components/ui/FormLayout";
@@ -11,13 +12,17 @@ import { ADMIN_PORCENTAJE_OPTIONS, type ClienteRow } from "@/data/clientes";
 import {
   ApiError,
   fetchContratos,
-  fetchInmuebleFicha,
   fetchPersona,
   updatePersonaAdministracion,
 } from "@/lib/api";
-import type { ContratoListItem, PersonaRecord } from "@/lib/api/types";
+import type { ContratoListItem, InmuebleRecord, PersonaRecord } from "@/lib/api/types";
 import { formatMoney, personaDisplayName } from "@/lib/format";
 import { vinculoBadgeClass } from "@/lib/mappers/clientes";
+import {
+  loadPropiedadesAdministradas,
+  propiedadAdministradaLabel,
+  type PropiedadAdministrada,
+} from "@/lib/mappers/propietario-inmuebles";
 
 type FichaTab = "resumen" | "inmobiliaria" | "juridico" | "visas" | "historial";
 
@@ -28,12 +33,6 @@ const tabs: { id: FichaTab; label: string }[] = [
   { id: "visas", label: "Visas" },
   { id: "historial", label: "Historial" },
 ];
-
-interface InmobiliariaVinculo {
-  titulo: string;
-  detalle: string;
-  etiqueta: string;
-}
 
 function SectionTitle({ children }: { children: string }) {
   return (
@@ -65,20 +64,43 @@ export function ClienteFichaDrawer({
   const [activeTab, setActiveTab] = useState<FichaTab>("resumen");
   const [detail, setDetail] = useState<PersonaRecord | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
-  const [contratos, setContratos] = useState<ContratoListItem[]>([]);
-  const [inmobiliariaVinculos, setInmobiliariaVinculos] = useState<InmobiliariaVinculo[]>([]);
+  const [contratosInquilino, setContratosInquilino] = useState<ContratoListItem[]>([]);
+  const [propiedades, setPropiedades] = useState<PropiedadAdministrada[]>([]);
+  const [linkedInmuebleIds, setLinkedInmuebleIds] = useState<Set<number>>(new Set());
+  const [inmuebles, setInmuebles] = useState<InmuebleRecord[]>([]);
   const [porcentajeAdmin, setPorcentajeAdmin] = useState("6");
   const [savingAdmin, setSavingAdmin] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const esPropietario = clienteRow?.esPropietario ?? false;
+  const tienePropiedades = propiedades.length > 0;
+
+  const reloadInmobiliaria = useCallback(async () => {
+    if (!token || !persona) return;
+
+    const [personaDetail, contratosRes, propiedadesData] = await Promise.all([
+      fetchPersona(token, persona.id),
+      fetchContratos(token, { estado: "active", limit: 200 }),
+      loadPropiedadesAdministradas(token, persona.id),
+    ]);
+
+    setDetail(personaDetail);
+    setContratosInquilino(
+      contratosRes.items.filter((contrato) => contrato.inquilinoId === persona.id),
+    );
+    setPropiedades(propiedadesData.propiedades);
+    setLinkedInmuebleIds(propiedadesData.linkedInmuebleIds);
+    setInmuebles(propiedadesData.inmuebles);
+    setPorcentajeAdmin(String(Number(personaDetail.porcentajeAdministracion ?? "6") || 6));
+  }, [token, persona]);
 
   useEffect(() => {
     if (!open || !persona) {
       setDetail(null);
-      setContratos([]);
-      setInmobiliariaVinculos([]);
+      setContratosInquilino([]);
+      setPropiedades([]);
+      setLinkedInmuebleIds(new Set());
+      setInmuebles([]);
       setActiveTab("resumen");
       setError(null);
       setSuccess(null);
@@ -90,60 +112,16 @@ export function ClienteFichaDrawer({
     setLoadingDetail(true);
     setError(null);
 
-    void (async () => {
-      try {
-        const [personaDetail, contratosRes] = await Promise.all([
-          fetchPersona(token, persona.id),
-          fetchContratos(token, { estado: "active", limit: 200 }),
-        ]);
-
-        const contratosCliente = contratosRes.items.filter(
-          (contrato) => contrato.inquilinoId === persona.id,
-        );
-        const vinculos: InmobiliariaVinculo[] = contratosCliente.map((contrato) => ({
-          titulo: `${contrato.inmuebleTitle} · Alquiler activo`,
-          detalle: `${formatMoney(contrato.montoAlquiler, contrato.codigoMoneda)} · ${contrato.contratoCode ?? "Sin código"}`,
-          etiqueta: "Contrato e inquilino",
-        }));
-
-        const inmuebleIds = [...new Set(contratosRes.items.map((contrato) => contrato.inmuebleId))];
-        await Promise.all(
-          inmuebleIds.map(async (inmuebleId) => {
-            try {
-              const ficha = await fetchInmuebleFicha(token, inmuebleId);
-              const esProp = ficha.propietarios.some((prop) => prop.personaId === persona.id);
-              if (!esProp) return;
-              const contrato = contratosRes.items.find((item) => item.inmuebleId === inmuebleId);
-              vinculos.push({
-                titulo: contrato?.inmuebleTitle ?? `Inmueble #${inmuebleId}`,
-                detalle: contrato
-                  ? `Administración activa · ${contrato.contratoCode ?? "Sin código"}`
-                  : "Propietario registrado",
-                etiqueta: "Propietario",
-              });
-            } catch {
-              // sin permiso
-            }
-          }),
-        );
-
-        setDetail(personaDetail);
-        setContratos(contratosCliente);
-        setInmobiliariaVinculos(vinculos);
-        setPorcentajeAdmin(
-          String(Number(personaDetail.porcentajeAdministracion ?? "6") || 6),
-        );
-      } catch (err) {
+    void reloadInmobiliaria()
+      .catch((err) => {
         if (err instanceof ApiError && err.status === 401) {
           logout();
           return;
         }
         setError(err instanceof ApiError ? err.message : "No se pudo cargar la ficha del cliente");
-      } finally {
-        setLoadingDetail(false);
-      }
-    })();
-  }, [open, persona, token, logout]);
+      })
+      .finally(() => setLoadingDetail(false));
+  }, [open, persona, token, logout, reloadInmobiliaria]);
 
   const displayPersona = detail ?? persona;
   const metaLine = useMemo(() => {
@@ -192,6 +170,20 @@ export function ClienteFichaDrawer({
     }
   }
 
+  async function handleInmuebleLinked() {
+    setSuccess("Inmueble vinculado al propietario.");
+    setError(null);
+    setLoadingDetail(true);
+    try {
+      await reloadInmobiliaria();
+      onUpdated();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo actualizar la ficha");
+    } finally {
+      setLoadingDetail(false);
+    }
+  }
+
   return (
     <DrawerPanel
       open={open}
@@ -213,7 +205,7 @@ export function ClienteFichaDrawer({
         ) : null
       }
       footer={
-        activeTab === "inmobiliaria" && esPropietario ? (
+        activeTab === "inmobiliaria" && tienePropiedades ? (
           <>
             <ButtonOutline onClick={onClose}>Cerrar</ButtonOutline>
             <ButtonPrimary disabled={savingAdmin} onClick={() => void handleSaveAdministracion()}>
@@ -264,7 +256,7 @@ export function ClienteFichaDrawer({
               <FieldBlock label="Correo" value={displayPersona.email ?? "—"} />
               <FieldBlock label="Teléfono" value={displayPersona.phone ?? "—"} />
               <FieldBlock label="Dirección" value={displayPersona.address ?? "—"} />
-              {esPropietario ? (
+              {tienePropiedades ? (
                 <FieldBlock
                   label="% administración"
                   value={formatPorcentaje(displayPersona.porcentajeAdministracion)}
@@ -283,28 +275,50 @@ export function ClienteFichaDrawer({
         {!loadingDetail && activeTab === "inmobiliaria" ? (
           <div className="flex flex-col gap-6">
             <div className="flex flex-col gap-3">
-              <SectionTitle>Vínculos inmobiliarios</SectionTitle>
-              {inmobiliariaVinculos.length === 0 ? (
-                <p className="text-sm text-text-secondary">Sin contratos ni inmuebles vinculados.</p>
+              <SectionTitle>Propiedades en administración</SectionTitle>
+              {propiedades.length === 0 ? (
+                <p className="text-sm text-text-secondary">
+                  Este cliente todavía no tiene inmuebles vinculados en administración.
+                </p>
               ) : (
                 <div className="flex flex-col gap-3">
-                  {inmobiliariaVinculos.map((vinculo, index) => (
-                    <div
-                      key={`${vinculo.titulo}-${index}`}
-                      className="rounded-md border border-border bg-bg-page px-4 py-3"
-                    >
-                      <p className="text-[13px] font-semibold text-text-primary">{vinculo.titulo}</p>
-                      <p className="mt-1 text-[12px] text-text-secondary">{vinculo.detalle}</p>
-                      <p className="mt-2 text-[11px] font-semibold uppercase tracking-wide text-primary">
-                        {vinculo.etiqueta}
-                      </p>
-                    </div>
-                  ))}
+                  {propiedades.map((propiedad) => {
+                    const label = propiedadAdministradaLabel(propiedad);
+                    return (
+                      <div
+                        key={propiedad.inmuebleId}
+                        className="rounded-md border border-border bg-bg-page px-4 py-3"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex flex-col gap-1">
+                            <p className="text-[13px] font-semibold text-text-primary">{label.titulo}</p>
+                            <p className="text-[12px] text-text-secondary">{label.detalle}</p>
+                            <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-primary">
+                              {label.etiqueta}
+                            </p>
+                          </div>
+                          {!propiedad.contratoActivo ? (
+                            <StatusBadge label="Sin alquiler" variant="warning" />
+                          ) : (
+                            <StatusBadge label="Alquilado" variant="success" />
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
 
-            {esPropietario ? (
+            <VincularInmueblePropietarioForm
+              personaId={persona.id}
+              inmuebles={inmuebles}
+              linkedInmuebleIds={linkedInmuebleIds}
+              onLinked={() => void handleInmuebleLinked()}
+              onError={setError}
+            />
+
+            {tienePropiedades ? (
               <div className="flex flex-col gap-4 rounded-md border border-border bg-bg-page p-4">
                 <div className="flex flex-col gap-1">
                   <h4 className="text-sm font-semibold text-text-primary">Honorarios de administración</h4>
@@ -352,12 +366,14 @@ export function ClienteFichaDrawer({
               </div>
             ) : null}
 
-            {contratos.length > 0 ? (
+            {contratosInquilino.length > 0 ? (
               <div className="flex flex-col gap-2">
                 <SectionTitle>Contratos como inquilino</SectionTitle>
-                {contratos.map((contrato) => (
+                {contratosInquilino.map((contrato) => (
                   <div key={contrato.id} className="flex items-center justify-between gap-3 text-[13px]">
-                    <span className="text-text-primary">{contrato.inmuebleTitle}</span>
+                    <span className="text-text-primary">
+                      {contrato.inmuebleTitle} · {formatMoney(contrato.montoAlquiler, contrato.codigoMoneda)}
+                    </span>
                     <StatusBadge label="Activo" variant="success" />
                   </div>
                 ))}

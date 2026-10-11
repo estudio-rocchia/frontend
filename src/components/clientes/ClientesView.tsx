@@ -14,10 +14,9 @@ import {
   ApiError,
   fetchContratos,
   fetchContratosTableSummary,
-  fetchInmuebleFicha,
   fetchPersonas,
 } from "@/lib/api";
-import type { ContratoListItem, PersonaRecord } from "@/lib/api/types";
+import type { PersonaRecord } from "@/lib/api/types";
 import { pagePaddingClass } from "@/lib/layout";
 import {
   buildClientesContext,
@@ -27,28 +26,9 @@ import {
   searchClientes,
   vinculoBadgeClass,
 } from "@/lib/mappers/clientes";
+import { loadAllPropietarioPersonaIds } from "@/lib/mappers/propietario-inmuebles";
 
 const tableHeaders = ["Cliente", "Documento", "Vínculos", "Contacto", "Estado", "Acciones"];
-
-async function loadPropietarioIds(token: string, contratos: ContratoListItem[]): Promise<number[]> {
-  const inmuebleIds = [...new Set(contratos.map((contrato) => contrato.inmuebleId))];
-  const ids = new Set<number>();
-
-  await Promise.all(
-    inmuebleIds.map(async (inmuebleId) => {
-      try {
-        const ficha = await fetchInmuebleFicha(token, inmuebleId);
-        for (const propietario of ficha.propietarios) {
-          ids.add(propietario.personaId);
-        }
-      } catch {
-        // sin permiso o inmueble sin ficha
-      }
-    }),
-  );
-
-  return [...ids];
-}
 
 export function ClientesView() {
   const router = useRouter();
@@ -76,7 +56,7 @@ export function ClientesView() {
         fetchContratosTableSummary(token, { estado: "active", limit: 200 }),
       ]);
 
-      const propietarioIds = await loadPropietarioIds(token, contratosRes.items);
+      const propietarioIds = await loadAllPropietarioPersonaIds(token);
       const context = buildClientesContext(contratosRes.items, summaryRes.items, propietarioIds);
       const rows = personasRes.items.map((persona) => mapPersonaToClienteRow(persona, context));
 

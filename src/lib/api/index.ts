@@ -379,6 +379,27 @@ export function createInmueble(
   });
 }
 
+export function fetchInmueblePropietarios(token: string, inmuebleId: number) {
+  return apiRequest<{
+    items: Array<{ id: number; personaId: number; inmuebleId: number }>;
+  }>(`/inmuebles/${inmuebleId}/propietarios`, { token });
+}
+
+export function addInmueblePropietario(
+  token: string,
+  inmuebleId: number,
+  body: { personaId: number },
+) {
+  return apiRequest<{ id: number; personaId: number; inmuebleId: number }>(
+    `/inmuebles/${inmuebleId}/propietarios`,
+    {
+      method: "POST",
+      token,
+      body: JSON.stringify(body),
+    },
+  );
+}
+
 export function createContrato(
   token: string,
   body: Record<string, unknown>,
