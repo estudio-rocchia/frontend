@@ -1,5 +1,5 @@
-import { PlaceholderPage } from "@/components/PlaceholderPage";
+import { ClientesView } from "@/components/clientes/ClientesView";
 
 export default function ClientesPage() {
-  return <PlaceholderPage title="Listado Clientes" />;
+  return <ClientesView />;
 }

@@ -277,6 +277,17 @@ export function downloadLiquidacionPdf(token: string, id: number) {
   return apiBlob(`/liquidaciones/${id}/pdf`, token);
 }
 
+export function updatePersonaAdministracion(
+  token: string,
+  id: number,
+  body: { porcentajeAdministracion: number },
+) {
+  return apiRequest<PersonaRecord>(`/personas/${id}`, {
+    method: "PATCH",
+    token,
+    body: JSON.stringify(body),
+  });
+}
 
 export function fetchInmuebleFicha(token: string, inmuebleId: number) {
   return apiRequest<InmuebleFicha>(`/inmuebles/${inmuebleId}/ficha`, { token });
@@ -299,16 +310,37 @@ export function fetchLocalidades(token: string) {
   );
 }
 
+export function fetchPersonas(
+  token: string,
+  params?: { activo?: boolean; q?: string; limit?: number; offset?: number },
+) {
+  const query = new URLSearchParams();
+  if (params?.activo !== undefined) query.set("activo", String(params.activo));
+  if (params?.q) query.set("q", params.q);
+  query.set("limit", String(params?.limit ?? 200));
+  if (params?.offset !== undefined) query.set("offset", String(params.offset));
+  const suffix = query.toString();
+  return apiRequest<{ items: PersonaRecord[] }>(`/personas?${suffix}`, { token });
+}
 
 export function createPersona(
   token: string,
   body: {
     tipoPersona: "natural" | "juridica";
-    nombre?: string;
+    nombre?: string | null;
     apellido?: string | null;
+    fechaNacimiento?: string | null;
+    estadoCivil?: "single" | "married" | "divorced" | "widowed" | "civil_union" | null;
+    tipoDocumento?: "DNI" | "CUIT" | "PASSPORT" | null;
+    numeroDocumento?: string | null;
     razonSocial?: string | null;
+    nombreRepresentante?: string | null;
+    cuit?: string | null;
     email?: string | null;
     phone?: string | null;
+    address?: string | null;
+    notas?: string | null;
+    activo?: boolean;
   },
 ) {
   return apiRequest<PersonaRecord>("/personas", {
