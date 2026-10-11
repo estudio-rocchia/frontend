@@ -36,6 +36,8 @@ import type {
   UsuarioRecord,
   SecheepImportInput,
   SecheepImportResult,
+  LiquidacionRecord,
+  PropietarioAdministracionSummary,
   PeriodoServicioRecord,
   ServicioContratoRecord,
   UpdateServicioInput,
@@ -225,6 +227,57 @@ export function downloadReciboPdf(token: string, reciboId: number) {
   return apiBlob(`/recibos/${reciboId}/pdf`, token);
 }
 
+export function fetchPropietariosAdministracion(
+  token: string,
+  params: { anioPeriodo: number; mesPeriodo: number; codigoMoneda?: string },
+) {
+  const query = new URLSearchParams({
+    anioPeriodo: String(params.anioPeriodo),
+    mesPeriodo: String(params.mesPeriodo),
+  });
+  if (params.codigoMoneda) query.set("codigoMoneda", params.codigoMoneda);
+  return apiRequest<{ items: PropietarioAdministracionSummary[] }>(
+    `/liquidaciones/propietarios?${query}`,
+    { token },
+  );
+}
+
+export function createLiquidacionBorrador(
+  token: string,
+  body: { personaId: number; anioPeriodo: number; mesPeriodo: number; codigoMoneda?: string },
+) {
+  return apiRequest<LiquidacionRecord>("/liquidaciones/borrador", {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function updateLiquidacion(
+  token: string,
+  id: number,
+  body: { aclaraciones?: string | null; porcentajeHonorario?: number; totalEntrega?: number },
+) {
+  return apiRequest<LiquidacionRecord>(`/liquidaciones/${id}`, {
+    method: "PATCH",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function issueLiquidacion(token: string, id: number) {
+  return apiRequest<LiquidacionRecord>(`/liquidaciones/${id}/emitir`, {
+    method: "POST",
+    token,
+    body: JSON.stringify({}),
+  });
+}
+
+export function downloadLiquidacionPdf(token: string, id: number) {
+  return apiBlob(`/liquidaciones/${id}/pdf`, token);
+}
+
+
 export function fetchInmuebleFicha(token: string, inmuebleId: number) {
   return apiRequest<InmuebleFicha>(`/inmuebles/${inmuebleId}/ficha`, { token });
 }
@@ -245,6 +298,7 @@ export function fetchLocalidades(token: string) {
     { token },
   );
 }
+
 
 export function createPersona(
   token: string,

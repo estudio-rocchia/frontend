@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { AdjustContractModal } from "@/components/alquileres/AdjustContractModal";
 import { CobrarAlquilerModal } from "@/components/alquileres/CobrarAlquilerModal";
+import { LiquidacionPropietarioModal } from "@/components/alquileres/LiquidacionPropietarioModal";
 import { ContractFichaDrawer } from "@/components/alquileres/ContractFichaDrawer";
 import {
   NewContractModal,
@@ -14,7 +15,7 @@ import {
   type RenewContractForm,
 } from "@/components/alquileres/RenewContractModal";
 import { RentalsTable } from "@/components/alquileres/RentalsTable";
-import { ButtonPrimary } from "@/components/ui/Button";
+import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { useAuth } from "@/context/auth-context";
 import type { ContractDetail } from "@/data/alquileres-contract-details";
@@ -100,6 +101,7 @@ export function AlquileresWorkspace() {
     contratoCodes: Array<string | null>;
   } | null>(null);
   const [cobrarModalOpen, setCobrarModalOpen] = useState(false);
+  const [liquidacionModalOpen, setLiquidacionModalOpen] = useState(false);
   const [cobrarRow, setCobrarRow] = useState<RentalRow | null>(null);
   const [drawerServicios, setDrawerServicios] = useState<ServicioContratoRecord[]>([]);
   const [drawerPeriodos, setDrawerPeriodos] = useState<PeriodoServicioRecord[]>([]);
@@ -807,9 +809,14 @@ export function AlquileresWorkspace() {
               Operá contratos activos, ajustes por índice y renovaciones.
             </p>
           </div>
-          <ButtonPrimary type="button" onClick={() => void openNewContractModal()} disabled={submitting}>
-            Nuevo contrato
-          </ButtonPrimary>
+          <div className="flex flex-wrap gap-2">
+            <ButtonOutline type="button" onClick={() => setLiquidacionModalOpen(true)}>
+              Liquidación propietarios
+            </ButtonOutline>
+            <ButtonPrimary type="button" onClick={() => void openNewContractModal()} disabled={submitting}>
+              Nuevo contrato
+            </ButtonPrimary>
+          </div>
         </header>
 
         {!loading && !error && rows.length > 0 ? (
@@ -857,6 +864,11 @@ export function AlquileresWorkspace() {
         )}
       </div>
 
+      <LiquidacionPropietarioModal
+        open={liquidacionModalOpen}
+        onClose={() => setLiquidacionModalOpen(false)}
+        token={token}
+      />
       <CobrarAlquilerModal
         open={cobrarModalOpen}
         onClose={() => {
