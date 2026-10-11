@@ -142,15 +142,68 @@ export interface ApplyAjusteResponse {
   contrato: ContratoRecord;
 }
 
+
+export interface PropietarioAdministracionSummary {
+  personaId: number;
+  displayName: string;
+  porcentajeAdministracion: string;
+  inmueblesEnAdministracion: number;
+  alquileresCobradosMes: string;
+  codigoMoneda: string;
+  liquidacionExistenteId: number | null;
+  liquidacionEstado: "draft" | "issued" | "delivered" | "cancelled" | null;
+}
+
+export interface LiquidacionLineaRecord {
+  id: number;
+  liquidacionId: number;
+  contratoId: number;
+  inmuebleId: number;
+  descripcionInmueble: string;
+  montoAlquiler: string;
+  montoHonorario: string;
+  orden: number;
+  pagoId: number | null;
+}
+
+export interface LiquidacionRecord {
+  id: number;
+  liquidacionNumber: string;
+  personaId: number;
+  anioPeriodo: number;
+  mesPeriodo: number;
+  porcentajeHonorario: string;
+  totalAlquileres: string;
+  totalHonorarios: string;
+  totalEntrega: string;
+  codigoMoneda: string;
+  aclaraciones: string | null;
+  estado: "draft" | "issued" | "delivered" | "cancelled";
+  fechaEmision: string | null;
+  lineas: LiquidacionLineaRecord[];
+  propietario?: { id: number; displayName: string; porcentajeAdministracion: string };
+}
+
 export interface PersonaRecord {
   id: number;
   tipoPersona: string;
   nombre: string | null;
   apellido: string | null;
+  fechaNacimiento?: string | null;
+  estadoCivil?: string | null;
+  tipoDocumento?: string | null;
+  numeroDocumento?: string | null;
   razonSocial: string | null;
+  nombreRepresentante?: string | null;
   cuit: string | null;
   email: string | null;
   phone: string | null;
+  address?: string | null;
+  notas?: string | null;
+  porcentajeAdministracion?: string;
+  activo?: boolean;
+  creadoEn?: string;
+  actualizadoEn?: string;
 }
 
 export interface InmuebleRecord {
