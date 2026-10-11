@@ -144,15 +144,13 @@ export function mapContratoListItemToRentalRow(
   const { status, filterStatus } = mapEstado(estadoCode, diasAtraso, ajustePendiente, needsCollection);
 
   const currency = (contrato.codigoMoneda === "USD" ? "USD" : "ARS") as "ARS" | "USD";
-  const amountSource = mora?.saldoTotal ?? cobrar?.saldoTotal ?? contrato.montoAlquiler;
-  const amountCurrency = mora?.codigoMoneda ?? cobrar?.codigoMoneda ?? contrato.codigoMoneda;
 
   return {
     id: String(contrato.id),
     contractProperty: `${contrato.inmuebleCode} · ${contrato.inmuebleTitle}`,
     tenant: contrato.inquilinoNombre,
     month: monthLabelFromIsoDate(meta?.fechaVencimiento),
-    amount: formatMoney(amountSource, amountCurrency),
+    amount: formatMoney(contrato.montoAlquiler, contrato.codigoMoneda),
     currency,
     daysOverdue: diasAtraso,
     status,
@@ -217,8 +215,6 @@ export function mapContratoToRentalRow(
   const { status, filterStatus } = mapEstado(estadoCode, diasAtraso, ajustePendiente, needsCollection);
 
   const currency = (contrato.codigoMoneda === "USD" ? "USD" : "ARS") as "ARS" | "USD";
-  const amountSource = mora?.saldoTotal ?? cobrar?.saldoTotal ?? cuota?.saldoTotal ?? contrato.montoAlquiler;
-  const amountCurrency = mora?.codigoMoneda ?? cobrar?.codigoMoneda ?? cuota?.codigoMoneda ?? contrato.codigoMoneda;
 
   const code = inmuebleCode ?? `REF-${contrato.id}`;
 
@@ -227,7 +223,7 @@ export function mapContratoToRentalRow(
     contractProperty: `${code} · ${inmuebleTitle}`,
     tenant: inquilinoNombre,
     month: cuota ? formatMonthYear(cuota.anioPeriodo, cuota.mesPeriodo) : "—",
-    amount: formatMoney(amountSource, amountCurrency),
+    amount: formatMoney(contrato.montoAlquiler, contrato.codigoMoneda),
     currency,
     daysOverdue: diasAtraso,
     status,

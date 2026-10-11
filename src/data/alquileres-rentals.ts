@@ -17,6 +17,7 @@ export type RentalRow = {
   contractProperty: string;
   tenant: string;
   month: string;
+  /** Monto mensual de alquiler vigente en el contrato (no depósito ni saldo de cuota). */
   amount: string;
   currency: "ARS" | "USD";
   daysOverdue: number;

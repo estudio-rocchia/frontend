@@ -1,25 +1,13 @@
 "use client";
 
-import { Bell, Menu, Search } from "lucide-react";
-import { usePathname } from "next/navigation";
-import { useEffect } from "react";
+import { Bell, Menu } from "lucide-react";
 
 import { useAuth } from "@/context/auth-context";
-import { useSearch } from "@/context/search-context";
 import { ButtonOutline } from "@/components/ui/Button";
 
 export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
   const { user, logout } = useAuth();
-  const { query, setQuery, clearQuery } = useSearch();
-  const pathname = usePathname();
   const displayName = user?.username ?? "Usuario";
-  const searchEnabled = pathname === "/alquileres" || pathname.startsWith("/alquileres/");
-
-  useEffect(() => {
-    if (!searchEnabled) {
-      clearQuery();
-    }
-  }, [searchEnabled, clearQuery]);
 
   return (
     <header className="flex min-h-16 shrink-0 items-center gap-2 border-b border-border bg-bg-card px-4 py-3 sm:gap-3 sm:px-5 xl:px-6">
@@ -31,20 +19,6 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
       >
         <Menu className="h-5 w-5" />
       </button>
-
-      {searchEnabled ? (
-        <label className="flex min-w-0 flex-1 items-center gap-2.5 rounded-sm border border-border bg-bg-page px-3 py-2.5 focus-within:border-primary sm:max-w-md xl:max-w-[360px]">
-          <Search className="h-[18px] w-[18px] shrink-0 text-text-secondary" aria-hidden />
-          <input
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Buscar contratos, clientes…"
-            aria-label="Buscar contratos y clientes"
-            className="min-w-0 flex-1 bg-transparent text-sm text-text-primary outline-none placeholder:text-text-secondary"
-          />
-        </label>
-      ) : null}
 
       <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
         <button
