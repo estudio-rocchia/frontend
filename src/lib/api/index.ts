@@ -242,6 +242,10 @@ export function fetchPropietariosAdministracion(
   );
 }
 
+export function fetchLiquidacion(token: string, id: number) {
+  return apiRequest<LiquidacionRecord>(`/liquidaciones/${id}`, { token });
+}
+
 export function createLiquidacionBorrador(
   token: string,
   body: { personaId: number; anioPeriodo: number; mesPeriodo: number; codigoMoneda?: string },

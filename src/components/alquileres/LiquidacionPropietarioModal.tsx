@@ -5,14 +5,16 @@ import { useCallback, useEffect, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import {
+  ApiError,
   createLiquidacionBorrador,
   downloadLiquidacionPdf,
+  fetchLiquidacion,
   fetchPropietariosAdministracion,
   issueLiquidacion,
   updateLiquidacion,
 } from "@/lib/api";
 import type { LiquidacionRecord, PropietarioAdministracionSummary } from "@/lib/api/types";
-import { downloadBlob, formatMoney, rentalApiErrorMessage } from "@/lib/format";
+import { downloadBlob, formatMoney, normalizeCurrency, rentalApiErrorMessage } from "@/lib/format";
 
 function currentPeriod() {
   const now = new Date();
@@ -68,34 +70,73 @@ export function LiquidacionPropietarioModal({
     void loadOwners();
   }, [open, loadOwners]);
 
-  async function handleCreateDraft() {
+  useEffect(() => {
+    if (!open) return;
+    setLiquidacion(null);
+    setAclaraciones("");
+    setError(null);
+  }, [open, anio, mes, selectedOwnerId]);
+
+  function applyLiquidacionRecord(record: LiquidacionRecord) {
+    if (!record.id || !Array.isArray(record.lineas)) {
+      throw new Error("La respuesta del servidor no incluyó la liquidación completa. Reintentá.");
+    }
+    setLiquidacion(record);
+    setAclaraciones(record.aclaraciones ?? "");
+  }
+
+  async function loadExistingLiquidacion(liquidacionId: number) {
+    if (!token) return;
+    const record = await fetchLiquidacion(token, liquidacionId);
+    applyLiquidacionRecord(record);
+  }
+
+  async function handleOpenOrCreateDraft() {
     if (!token || selectedOwnerId === null) return;
     setSubmitting(true);
     setError(null);
     try {
+      const existingId = selectedOwner?.liquidacionExistenteId;
+      if (existingId) {
+        await loadExistingLiquidacion(existingId);
+        return;
+      }
+
       const record = await createLiquidacionBorrador(token, {
         personaId: selectedOwnerId,
         anioPeriodo: anio,
         mesPeriodo: mes,
         codigoMoneda: "ARS",
       });
-      if (!record.id || !Array.isArray(record.lineas)) {
-        throw new Error("La respuesta del servidor no incluyó el borrador completo. Reintentá.");
-      }
-      setLiquidacion(record);
-      setAclaraciones(record.aclaraciones ?? "");
+      applyLiquidacionRecord(record);
+      void loadOwners();
     } catch (err) {
-      setError(rentalApiErrorMessage(err));
+      if (err instanceof ApiError && err.status === 409 && selectedOwner?.liquidacionExistenteId) {
+        try {
+          await loadExistingLiquidacion(selectedOwner.liquidacionExistenteId);
+          return;
+        } catch (loadErr) {
+          setError(rentalApiErrorMessage(loadErr, "No se pudo abrir la liquidación existente"));
+          return;
+        }
+      }
+      setError(rentalApiErrorMessage(err, "No se pudo generar el borrador"));
     } finally {
       setSubmitting(false);
     }
   }
 
-  async function handleEmit() {
+  async function handleEmitOrDownload() {
     if (!token || !liquidacion) return;
     setSubmitting(true);
     setError(null);
     try {
+      if (liquidacion.estado !== "draft") {
+        const pdf = await downloadLiquidacionPdf(token, liquidacion.id);
+        downloadBlob(pdf, `liquidacion-${liquidacion.liquidacionNumber}.pdf`);
+        return;
+      }
+
       await updateLiquidacion(token, liquidacion.id, { aclaraciones });
       const issued = await issueLiquidacion(token, liquidacion.id);
       const pdf = await downloadLiquidacionPdf(token, issued.id);
@@ -103,13 +144,27 @@ export function LiquidacionPropietarioModal({
       setLiquidacion(issued);
       void loadOwners();
     } catch (err) {
-      setError(rentalApiErrorMessage(err));
+      setError(rentalApiErrorMessage(err, "No se pudo emitir la liquidación"));
     } finally {
       setSubmitting(false);
     }
   }
 
   const selectedOwner = owners.find((o) => o.personaId === selectedOwnerId) ?? null;
+  const liquidacionMoneda = normalizeCurrency(liquidacion?.codigoMoneda ?? "ARS");
+  const existingLiquidacionEstado = selectedOwner?.liquidacionEstado ?? null;
+  const hasExistingLiquidacion = Boolean(selectedOwner?.liquidacionExistenteId);
+  const isDraftLiquidacion = liquidacion?.estado === "draft";
+
+  const primaryActionLabel = (() => {
+    if (liquidacion) {
+      return isDraftLiquidacion ? "Emitir PDF" : "Descargar PDF";
+    }
+    if (hasExistingLiquidacion) {
+      return existingLiquidacionEstado === "draft" ? "Abrir borrador" : "Abrir liquidación";
+    }
+    return "Generar borrador";
+  })();
 
   return (
     <Modal
@@ -123,19 +178,13 @@ export function LiquidacionPropietarioModal({
           <ButtonOutline type="button" onClick={onClose} disabled={submitting}>
             Cerrar
           </ButtonOutline>
-          {!liquidacion ? (
-            <ButtonPrimary
-              type="button"
-              onClick={() => void handleCreateDraft()}
-              disabled={submitting || selectedOwnerId === null || loading}
-            >
-              Generar borrador
-            </ButtonPrimary>
-          ) : (
-            <ButtonPrimary type="button" onClick={() => void handleEmit()} disabled={submitting}>
-              Emitir PDF
-            </ButtonPrimary>
-          )}
+          <ButtonPrimary
+            type="button"
+            onClick={() => void (liquidacion ? handleEmitOrDownload() : handleOpenOrCreateDraft())}
+            disabled={submitting || selectedOwnerId === null || loading}
+          >
+            {primaryActionLabel}
+          </ButtonPrimary>
         </div>
       }
     >
@@ -179,7 +228,7 @@ export function LiquidacionPropietarioModal({
                 {owners.map((owner) => (
                   <option key={owner.personaId} value={owner.personaId}>
                     {owner.displayName} — {owner.porcentajeAdministracion}% —{" "}
-                    {formatMoney(owner.alquileresCobradosMes, owner.codigoMoneda)} cobrados
+                    {formatMoney(owner.alquileresCobradosMes, normalizeCurrency(owner.codigoMoneda))} cobrados
                   </option>
                 ))}
               </select>
@@ -188,9 +237,17 @@ export function LiquidacionPropietarioModal({
               <p className="text-sm text-text-secondary">
                 {selectedOwner.inmueblesEnAdministracion} inmueble(s) en administración · honorarios{" "}
                 {selectedOwner.porcentajeAdministracion}%
-                {selectedOwner.liquidacionExistenteId
-                  ? ` · liquidación existente (${selectedOwner.liquidacionEstado})`
-                  : ""}
+                {hasExistingLiquidacion ? (
+                  <>
+                    {" "}
+                    ·{" "}
+                    <span className="font-medium text-primary">
+                      {existingLiquidacionEstado === "draft"
+                        ? "Ya hay un borrador para este período"
+                        : `Liquidación ${existingLiquidacionEstado ?? "existente"} para este período`}
+                    </span>
+                  </>
+                ) : null}
               </p>
             ) : null}
           </>
@@ -199,14 +256,15 @@ export function LiquidacionPropietarioModal({
             <div className="rounded border border-border bg-bg-subtle p-3 text-sm">
               <p className="font-medium">{liquidacion.propietario?.displayName ?? "Propietario"}</p>
               <p className="text-text-secondary">
+                {liquidacion.liquidacionNumber} · {liquidacion.estado === "draft" ? "Borrador" : "Emitida"} ·
                 Honorarios {liquidacion.porcentajeHonorario}% · Entrega{" "}
-                {formatMoney(liquidacion.totalEntrega, liquidacion.codigoMoneda)}
+                {formatMoney(liquidacion.totalEntrega, liquidacionMoneda)}
               </p>
               <ul className="mt-2 list-disc pl-5">
                 {(liquidacion.lineas ?? []).map((linea) => (
                   <li key={linea.id}>
-                    {linea.descripcionInmueble}: {formatMoney(linea.montoAlquiler, liquidacion.codigoMoneda)} (
-                    admin {formatMoney(linea.montoHonorario, liquidacion.codigoMoneda)})
+                    {linea.descripcionInmueble}: {formatMoney(linea.montoAlquiler, liquidacionMoneda)} (
+                    admin {formatMoney(linea.montoHonorario, liquidacionMoneda)})
                   </li>
                 ))}
               </ul>
@@ -214,9 +272,11 @@ export function LiquidacionPropietarioModal({
             <label className="flex flex-col gap-1 text-sm">
               <span className="font-medium text-text-primary">Aclaraciones</span>
               <textarea
-                className="min-h-[180px] rounded border border-border px-2 py-1.5 font-mono text-xs leading-relaxed"
+                className="min-h-[180px] rounded border border-border px-2 py-1.5 font-mono text-xs leading-relaxed disabled:opacity-70"
                 value={aclaraciones}
                 onChange={(e) => setAclaraciones(e.target.value)}
+                readOnly={!isDraftLiquidacion}
+                disabled={!isDraftLiquidacion}
               />
             </label>
           </>
