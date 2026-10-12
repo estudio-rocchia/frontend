@@ -4,12 +4,12 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 
-import { VincularInmueblePropietarioForm } from "@/components/clientes/VincularInmueblePropietarioForm";
+import { ClienteInmobiliariaTab } from "@/components/clientes/ClienteInmobiliariaTab";
 import { ButtonOutline } from "@/components/ui/Button";
 import { FieldBlock } from "@/components/ui/FormLayout";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useAuth } from "@/context/auth-context";
-import { ADMIN_PORCENTAJE_OPTIONS, type ClienteRow } from "@/data/clientes";
+import { type ClienteRow } from "@/data/clientes";
 import {
   ApiError,
   fetchContratos,
@@ -19,14 +19,10 @@ import {
   updatePropietarioAdministracion,
 } from "@/lib/api";
 import type { ContratoListItem, InmuebleRecord, PersonaRecord } from "@/lib/api/types";
-import { formatMoney, personaDisplayName } from "@/lib/format";
+import { personaDisplayName } from "@/lib/format";
 import { pagePaddingClass } from "@/lib/layout";
 import { buildClientesContext, mapPersonaToClienteRow, vinculoBadgeClass } from "@/lib/mappers/clientes";
-import {
-  loadPropiedadesAdministradas,
-  propiedadAdministradaLabel,
-  type PropiedadAdministrada,
-} from "@/lib/mappers/propietario-inmuebles";
+import { loadPropiedadesAdministradas, type PropiedadAdministrada } from "@/lib/mappers/propietario-inmuebles";
 
 type FichaTab = "resumen" | "inmobiliaria" | "juridico" | "visas" | "historial";
 
@@ -324,130 +320,21 @@ export function ClienteFichaView() {
         ) : null}
 
         {!loadingDetail && activeTab === "inmobiliaria" ? (
-          <div className="flex flex-col gap-6">
-            <div className="flex flex-col gap-3">
-              <SectionTitle>Propiedades en administración</SectionTitle>
-              {propiedades.length === 0 ? (
-                <p className="text-sm text-text-secondary">
-                  Este cliente todavía no tiene inmuebles vinculados en administración.
-                </p>
-              ) : (
-                <div className="flex flex-col gap-3">
-                  {propiedades.map((propiedad) => {
-                    const label = propiedadAdministradaLabel(propiedad);
-                    const pctValue = pctEdits[propiedad.propietarioId] ?? String(
-                      Number(propiedad.porcentajeAdministracion) || 6,
-                    );
-                    const saving = savingPropietarioId === propiedad.propietarioId;
-                    return (
-                      <div
-                        key={propiedad.inmuebleId}
-                        className="rounded-md border border-border bg-bg-page px-4 py-3"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex flex-col gap-1">
-                            <p className="text-[13px] font-semibold text-text-primary">{label.titulo}</p>
-                            <p className="text-[12px] text-text-secondary">{label.detalle}</p>
-                            <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-primary">
-                              {label.etiqueta}
-                            </p>
-                          </div>
-                          {!propiedad.contratoActivo ? (
-                            <StatusBadge label="Sin alquiler" variant="warning" />
-                          ) : (
-                            <StatusBadge label="Alquilado" variant="success" />
-                          )}
-                        </div>
-                        <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4">
-                          <p className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
-                            Honorarios de administración
-                          </p>
-                          <div className="flex flex-wrap gap-2">
-                            {ADMIN_PORCENTAJE_OPTIONS.map((option) => {
-                              const selected = Number(pctValue) === option;
-                              return (
-                                <button
-                                  key={option}
-                                  type="button"
-                                  disabled={saving}
-                                  onClick={() =>
-                                    setPctEdits((current) => ({
-                                      ...current,
-                                      [propiedad.propietarioId]: String(option),
-                                    }))
-                                  }
-                                  className={`rounded-full border border-border px-3 py-1.5 text-[12px] transition-colors disabled:opacity-60 ${
-                                    selected
-                                      ? "bg-primary-soft font-semibold text-primary"
-                                      : "bg-bg-card text-text-secondary hover:text-text-primary"
-                                  }`}
-                                >
-                                  {option}%
-                                </button>
-                              );
-                            })}
-                          </div>
-                          <div className="flex flex-wrap items-end gap-3">
-                            <label className="flex max-w-[140px] flex-col gap-1.5">
-                              <span className="text-[11px] font-semibold text-text-secondary">Otro %</span>
-                              <input
-                                type="number"
-                                min={0.01}
-                                max={100}
-                                step={0.01}
-                                disabled={saving}
-                                value={pctValue}
-                                onChange={(event) =>
-                                  setPctEdits((current) => ({
-                                    ...current,
-                                    [propiedad.propietarioId]: event.target.value,
-                                  }))
-                                }
-                                className="rounded-sm border border-border bg-bg-card px-3 py-2 text-[13px] text-text-primary outline-none focus:border-primary disabled:opacity-60"
-                              />
-                            </label>
-                            <button
-                              type="button"
-                              disabled={saving}
-                              onClick={() => void handleSavePropiedadAdministracion(propiedad)}
-                              className="rounded-sm bg-primary px-3 py-2 text-[12px] font-semibold text-white disabled:opacity-60"
-                            >
-                              {saving ? "Guardando…" : "Guardar %"}
-                            </button>
-                          </div>
-                          <p className="text-[12px] text-text-secondary">
-                            Actual: {formatPorcentaje(propiedad.porcentajeAdministracion)}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            <VincularInmueblePropietarioForm
-              personaId={persona.id}
-              inmuebles={inmuebles}
-              linkedInmuebleIds={linkedInmuebleIds}
-              onLinked={() => void handleInmuebleLinked()}
-              onError={setError}
-            />
-
-            {contratosInquilino.length > 0 ? (
-              <div className="flex flex-col gap-2">
-                <SectionTitle>Contratos como inquilino</SectionTitle>
-                {contratosInquilino.map((contrato) => (
-                  <div key={contrato.id} className="flex items-center justify-between gap-3 text-[13px]">
-                    <span className="text-text-primary">
-                      {contrato.inmuebleTitle} · {formatMoney(contrato.montoAlquiler, contrato.codigoMoneda)}
-                    </span>
-                    <StatusBadge label="Activo" variant="success" />
-                  </div>
-                ))}
-              </div>
-            ) : null}
-          </div>
+          <ClienteInmobiliariaTab
+            personaId={persona.id}
+            propiedades={propiedades}
+            contratosInquilino={contratosInquilino}
+            inmuebles={inmuebles}
+            linkedInmuebleIds={linkedInmuebleIds}
+            pctEdits={pctEdits}
+            savingPropietarioId={savingPropietarioId}
+            onPctChange={(propietarioId, value) =>
+              setPctEdits((current) => ({ ...current, [propietarioId]: value }))
+            }
+            onSavePropiedad={(propiedad) => void handleSavePropiedadAdministracion(propiedad)}
+            onInmuebleLinked={() => void handleInmuebleLinked()}
+            onError={setError}
+          />
         ) : null}
 
         {!loadingDetail && activeTab === "juridico" ? (
