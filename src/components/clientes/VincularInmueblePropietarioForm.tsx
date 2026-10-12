@@ -25,12 +25,14 @@ export function VincularInmueblePropietarioForm({
   linkedInmuebleIds,
   onLinked,
   onError,
+  showHeader = true,
 }: {
   personaId: number;
   inmuebles: InmuebleRecord[];
   linkedInmuebleIds: Set<number>;
   onLinked: () => void;
   onError: (message: string) => void;
+  showHeader?: boolean;
 }) {
   const { token, logout } = useAuth();
   const [mode, setMode] = useState<LinkMode>("nuevo");
@@ -169,12 +171,14 @@ export function VincularInmueblePropietarioForm({
 
   return (
     <div className="flex flex-col gap-4 rounded-md border border-dashed border-primary/40 bg-primary-soft/30 p-4">
-      <div className="flex flex-col gap-1">
-        <h4 className="text-sm font-semibold text-text-primary">Agregar inmueble en administración</h4>
-        <p className="text-xs text-text-secondary">
-          Vinculá una propiedad al propietario aunque todavía no tenga inquilino ni contrato de alquiler.
-        </p>
-      </div>
+      {showHeader ? (
+        <div className="flex flex-col gap-1">
+          <h4 className="text-sm font-semibold text-text-primary">Agregar inmueble en administración</h4>
+          <p className="text-xs text-text-secondary">
+            Vinculá una propiedad al propietario aunque todavía no tenga inquilino ni contrato de alquiler.
+          </p>
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap gap-2">
         {(
