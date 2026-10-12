@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Search } from "lucide-react";
 import { RentalFilterChips } from "@/components/alquileres/RentalFilterChips";
-import { useSearch } from "@/context/search-context";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import {
@@ -54,20 +54,20 @@ export function RentalsTable({
   onAdjust: (row: RentalRow) => void;
   onRenew: (row: RentalRow) => void;
 }) {
-  const { query } = useSearch();
+  const [searchQuery, setSearchQuery] = useState("");
   const operationalCounts = useMemo(() => rentalOperationalCounts(rows), [rows]);
   const [activeChip, setActiveChip] = useState<RentalChipId>(() => defaultActiveChip(operationalCounts));
   const inCollectionWindow = isRentCollectionWindow();
   const [page, setPage] = useState(1);
 
   const filtered = useMemo(() => {
-    const scopedRows = query.trim() ? rows : filterRentals(rows, activeChip);
-    return searchRentals(scopedRows, query);
-  }, [rows, activeChip, query]);
+    const scopedRows = searchQuery.trim() ? rows : filterRentals(rows, activeChip);
+    return searchRentals(scopedRows, searchQuery);
+  }, [rows, activeChip, searchQuery]);
 
   useEffect(() => {
     setPage(1);
-  }, [query, activeChip]);
+  }, [searchQuery, activeChip]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -95,25 +95,38 @@ export function RentalsTable({
         {inCollectionWindow ? (
           <p className="text-xs text-text-secondary">{rentCollectionWindowHint()}</p>
         ) : null}
-        <RentalFilterChips
-          active={activeChip}
-          counts={{
-            a_cobrar: operationalCounts.aCobrar,
-            ajuste_pendiente: operationalCounts.ajustePendiente,
-            renovacion_proxima: operationalCounts.renovacionProxima,
-          }}
-          onChange={(chip) => {
-            setActiveChip(chip);
-            setPage(1);
-          }}
-        />
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
+          <label className="flex min-w-0 items-center gap-2.5 rounded-sm border border-border bg-bg-page px-3 py-2.5 focus-within:border-primary lg:max-w-sm lg:shrink-0">
+            <Search className="h-4 w-4 shrink-0 text-text-secondary" aria-hidden />
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Contrato, propiedad o inquilino…"
+              aria-label="Buscar contratos"
+              className="min-w-0 flex-1 bg-transparent text-sm text-text-primary outline-none placeholder:text-text-secondary"
+            />
+          </label>
+          <RentalFilterChips
+            active={activeChip}
+            counts={{
+              a_cobrar: operationalCounts.aCobrar,
+              ajuste_pendiente: operationalCounts.ajustePendiente,
+              renovacion_proxima: operationalCounts.renovacionProxima,
+            }}
+            onChange={(chip) => {
+              setActiveChip(chip);
+              setPage(1);
+            }}
+          />
+        </div>
       </section>
 
       <section className="flex min-h-[400px] flex-1 flex-col overflow-hidden rounded-md border border-border bg-bg-card shadow-[var(--shadow-card)]">
         <div className="border-b border-border px-4 py-4 sm:px-5">
           <h2 className="text-[15px] font-semibold text-text-primary">Listado de contratos</h2>
           <p className="text-xs text-text-secondary">
-            {query.trim()
+            {searchQuery.trim()
               ? `Resultados de búsqueda · ${filtered.length} contrato${filtered.length === 1 ? "" : "s"}`
               : `${filtered.length} contrato${filtered.length === 1 ? "" : "s"} en el filtro actual`}
           </p>
@@ -126,7 +139,7 @@ export function RentalsTable({
                 <th className="px-3 sm:px-5">Contrato / Propiedad</th>
                 <th className="px-3 sm:px-5">Inquilino</th>
                 <th className="hidden px-3 sm:px-5 2xl:table-cell">Mes</th>
-                <th className="px-3 text-right sm:px-5">Monto</th>
+                <th className="px-3 text-right sm:px-5">Alquiler actual</th>
                 <th className="hidden px-3 text-right sm:px-5 lg:table-cell">Días mora</th>
                 <th className="px-3 text-center sm:px-5">Estado</th>
                 <th className="hidden whitespace-nowrap px-3 sm:px-5 xl:table-cell">Inicio</th>

@@ -1,6 +1,8 @@
 "use client";
 
+import { ContractDepositoPlanSection } from "@/components/alquileres/ContractDepositoPlanSection";
 import { ContractServiciosSection } from "@/components/alquileres/ContractServiciosSection";
+import type { PlanActualizacionDepositoFormValues } from "@/components/alquileres/PlanActualizacionDepositoModal";
 import type { PeriodoFormValues } from "@/components/alquileres/PeriodoServicioModal";
 import type { ServicioFormValues } from "@/components/alquileres/ServicioFormModal";
 import type { RegistrarPagoServicioFormValues } from "@/components/alquileres/RegistrarPagoServicioModal";
@@ -12,7 +14,9 @@ import type { ContractDetail } from "@/data/alquileres-contract-details";
 import { moneyClassName } from "@/lib/format";
 import type {
   CatalogoItem,
+  ContratoDetail,
   PeriodoServicioRecord,
+  PlanActualizacionDepositoDetail,
   SecheepImportInput,
   ServicioContratoRecord,
 } from "@/lib/api/types";
@@ -20,12 +24,16 @@ import type {
 export function ContractFichaDrawer({
   open,
   detail,
+  contrato,
   servicios,
   periodos,
+  planesDeposito,
   tiposServicio,
   serviciosLoading,
   serviciosSubmitting,
   canEditServicios,
+  canManageDepositoPlan,
+  onCreatePlanDeposito,
   onCreateServicio,
   onUpdateServicio,
   onDeactivateServicio,
@@ -38,12 +46,16 @@ export function ContractFichaDrawer({
 }: {
   open: boolean;
   detail: ContractDetail | null;
+  contrato: ContratoDetail | null;
   servicios: ServicioContratoRecord[];
   periodos: PeriodoServicioRecord[];
+  planesDeposito: PlanActualizacionDepositoDetail[];
   tiposServicio: CatalogoItem[];
   serviciosLoading?: boolean;
   serviciosSubmitting?: boolean;
   canEditServicios?: boolean;
+  canManageDepositoPlan?: boolean;
+  onCreatePlanDeposito: (values: PlanActualizacionDepositoFormValues) => Promise<void>;
   onCreateServicio: (values: ServicioFormValues) => Promise<void>;
   onUpdateServicio: (servicioId: number, values: ServicioFormValues) => Promise<void>;
   onDeactivateServicio: (servicioId: number) => Promise<void>;
@@ -130,6 +142,19 @@ export function ContractFichaDrawer({
             <FieldBlock label="Observaciones" value={detail.punitiveHint} />
           </div>
         </FormSection>
+
+        {contrato ? (
+          <div className="border-t border-border pt-2">
+            <ContractDepositoPlanSection
+              contrato={contrato}
+              planes={planesDeposito}
+              loading={serviciosLoading}
+              submitting={serviciosSubmitting}
+              canManage={Boolean(canManageDepositoPlan)}
+              onCreatePlan={onCreatePlanDeposito}
+            />
+          </div>
+        ) : null}
 
         <div className="border-t border-border pt-2">
           <ContractServiciosSection

@@ -11,8 +11,8 @@ import { ApiError } from "@/lib/api";
 export default function LoginPage() {
   const { login, token, loading } = useAuth();
   const router = useRouter();
-  const [usernameOrEmail, setUsernameOrEmail] = useState("demo.staff");
-  const [password, setPassword] = useState("DemoStaff2026!");
+  const [usernameOrEmail, setUsernameOrEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -103,11 +103,6 @@ export default function LoginPage() {
             {submitting ? "Ingresando…" : "Ingresar"}
           </ButtonPrimary>
         </div>
-
-        <p className="mt-4 text-xs text-text-secondary">
-          Demo local: <code className="text-text-primary">demo.staff</code> /{" "}
-          <code className="text-text-primary">DemoStaff2026!</code>
-        </p>
       </form>
     </div>
   );

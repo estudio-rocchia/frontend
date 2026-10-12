@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { AdjustContractModal } from "@/components/alquileres/AdjustContractModal";
 import { CobrarAlquilerModal } from "@/components/alquileres/CobrarAlquilerModal";
+import { LiquidacionPropietarioModal } from "@/components/alquileres/LiquidacionPropietarioModal";
 import { ContractFichaDrawer } from "@/components/alquileres/ContractFichaDrawer";
 import {
   NewContractModal,
@@ -14,21 +15,26 @@ import {
   type RenewContractForm,
 } from "@/components/alquileres/RenewContractModal";
 import { RentalsTable } from "@/components/alquileres/RentalsTable";
-import { ButtonPrimary } from "@/components/ui/Button";
+import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { useAuth } from "@/context/auth-context";
 import type { ContractDetail } from "@/data/alquileres-contract-details";
 import { rentalSummaryStats, type RentalRow } from "@/data/alquileres-rentals";
+import type { PlanActualizacionDepositoFormValues } from "@/components/alquileres/PlanActualizacionDepositoModal";
 import type { PeriodoFormValues } from "@/components/alquileres/PeriodoServicioModal";
 import type { ServicioFormValues } from "@/components/alquileres/ServicioFormModal";
 import type { RegistrarPagoServicioFormValues } from "@/components/alquileres/RegistrarPagoServicioModal";
+import type { OwnerFieldValue, PersonaFieldValue } from "@/components/alquileres/PersonaSelectField";
 import {
   ApiError,
+  addInmueblePropietario,
+  fetchInmueblePropietarios,
   applyContratoAjuste,
   changeContratoEstado,
   createContrato,
   createInmueble,
   createLocalidad,
+  createPlanActualizacionDeposito,
   createPeriodoServicio,
   createPersona,
   createServicio,
@@ -43,6 +49,10 @@ import {
   fetchInmuebleFicha,
   fetchInmuebles,
   fetchLocalidades,
+  fetchPersona,
+  fetchPersonas,
+  fetchPlanesActualizacionDeposito,
+  previewActualizacionDeposito,
   fetchServicios,
   fetchServiciosPeriodos,
   issueRecibo,
@@ -50,11 +60,14 @@ import {
   updateServicio,
 } from "@/lib/api";
 import type {
+  ActualizacionDepositoResult,
   CatalogoItem,
   ContratoDetail,
   CreatePeriodoInput,
+  PersonaRecord,
   SecheepImportInput,
   PeriodoServicioRecord,
+  PlanActualizacionDepositoDetail,
   ServicioContratoRecord,
 } from "@/lib/api/types";
 import { nextContratoCode, nextInmuebleCode, prefixForTipoInmueble } from "@/lib/codes";
@@ -73,11 +86,72 @@ import {
   mapContratoDetailToFicha,
   mapContratoTableItemToRentalRow,
 } from "@/lib/mappers/rentals";
+import {
+  loadInmueblesSinAlquiler,
+  type InmuebleSinAlquiler,
+} from "@/lib/mappers/propietario-inmuebles";
 
 function addYears(isoDate: string, years: number): string {
   const date = new Date(`${isoDate}T12:00:00`);
   date.setFullYear(date.getFullYear() + years);
   return date.toISOString().slice(0, 10);
+}
+
+async function createAutoPlanActualizacionDeposito(
+  token: string,
+  contratoId: number,
+  actualizacion: ActualizacionDepositoResult,
+  diaVencimientoPago: number,
+  notas: string,
+) {
+  const montoTotal = Number.parseFloat(actualizacion.diferencia);
+  if (!actualizacion.requiereCobro || !Number.isFinite(montoTotal) || montoTotal <= 0) {
+    return;
+  }
+
+  await createPlanActualizacionDeposito(token, contratoId, {
+    montoTotal,
+    codigoMoneda: actualizacion.codigoMoneda.trim(),
+    cantidadCuotas: 1,
+    diaVencimiento: diaVencimientoPago,
+    fechaPrimeraCuota: new Date().toISOString().slice(0, 10),
+    notas,
+  });
+}
+
+async function resolveTenantPersona(
+  token: string,
+  field: PersonaFieldValue,
+): Promise<PersonaRecord> {
+  if (field.mode === "existing") {
+    return fetchPersona(token, field.personaId);
+  }
+  const parts = parsePersonName(field.fullName);
+  return createPersona(token, {
+    tipoPersona: "natural",
+    nombre: parts.nombre,
+    apellido: parts.apellido,
+  });
+}
+
+async function resolveOwnerPersona(
+  token: string,
+  field: OwnerFieldValue,
+): Promise<PersonaRecord> {
+  if (field.mode === "existing") {
+    return fetchPersona(token, field.personaId);
+  }
+  const parts = parsePersonName(field.fullName);
+  return createPersona(token, {
+    tipoPersona: "natural",
+    nombre: parts.nombre,
+    apellido: parts.apellido,
+  });
+}
+
+function ownerPorcentajeAdministracion(field: OwnerFieldValue): number {
+  if (field.mode === "new") return field.porcentajeAdministracion;
+  return field.porcentajeAdministracion ?? 6;
 }
 
 export function AlquileresWorkspace() {
@@ -98,11 +172,15 @@ export function AlquileresWorkspace() {
     tiposInmueble: Array<{ id: number; code: string; name: string }>;
     inmuebleCodes: string[];
     contratoCodes: Array<string | null>;
+    personas: PersonaRecord[];
+    inmueblesSinAlquiler: InmuebleSinAlquiler[];
   } | null>(null);
   const [cobrarModalOpen, setCobrarModalOpen] = useState(false);
+  const [liquidacionModalOpen, setLiquidacionModalOpen] = useState(false);
   const [cobrarRow, setCobrarRow] = useState<RentalRow | null>(null);
   const [drawerServicios, setDrawerServicios] = useState<ServicioContratoRecord[]>([]);
   const [drawerPeriodos, setDrawerPeriodos] = useState<PeriodoServicioRecord[]>([]);
+  const [drawerPlanesDeposito, setDrawerPlanesDeposito] = useState<PlanActualizacionDepositoDetail[]>([]);
   const [tiposServicio, setTiposServicio] = useState<CatalogoItem[]>([]);
   const [serviciosLoading, setServiciosLoading] = useState(false);
   const [serviciosSubmitting, setServiciosSubmitting] = useState(false);
@@ -149,9 +227,10 @@ export function AlquileresWorkspace() {
       if (!token) return;
       setServiciosLoading(true);
       try {
-        const [serviciosRes, periodosRes, tiposRes, mediosRes] = await Promise.all([
+        const [serviciosRes, periodosRes, planesRes, tiposRes, mediosRes] = await Promise.all([
           fetchServicios(token, contratoId),
           fetchServiciosPeriodos(token, contratoId),
+          fetchPlanesActualizacionDeposito(token, contratoId),
           tiposServicio.length
             ? Promise.resolve({ items: tiposServicio })
             : fetchCatalog(token, "/catalogos/tipos-servicio"),
@@ -161,6 +240,7 @@ export function AlquileresWorkspace() {
         ]);
         setDrawerServicios(serviciosRes.items);
         setDrawerPeriodos(periodosRes.items);
+        setDrawerPlanesDeposito(planesRes.items);
         if (!tiposServicio.length) {
           setTiposServicio(tiposRes.items);
         }
@@ -184,6 +264,7 @@ export function AlquileresWorkspace() {
       setSelectedContrato(null);
       setDrawerServicios([]);
       setDrawerPeriodos([]);
+      setDrawerPlanesDeposito([]);
       try {
         const contratoId = Number(id);
         const detailRes = await fetchContrato(token, contratoId);
@@ -354,6 +435,45 @@ export function AlquileresWorkspace() {
   }
 
 
+  async function handleCreatePlanDeposito(values: PlanActualizacionDepositoFormValues) {
+    if (!token || !selectedContrato) return;
+
+    const montoTotal = Number(values.montoTotal.replace(/\D/g, ""));
+    const cantidadCuotas = Number(values.cantidadCuotas);
+    const diaVencimiento = Number(values.diaVencimiento);
+    if (!Number.isFinite(montoTotal) || montoTotal <= 0) {
+      showToast("Ingresá un monto total válido.");
+      return;
+    }
+    if (!Number.isInteger(cantidadCuotas) || cantidadCuotas < 1) {
+      showToast("Ingresá una cantidad de cuotas válida.");
+      return;
+    }
+    if (!Number.isInteger(diaVencimiento) || diaVencimiento < 1 || diaVencimiento > 31) {
+      showToast("Ingresá un día de vencimiento entre 1 y 31.");
+      return;
+    }
+
+    setServiciosSubmitting(true);
+    try {
+      await createPlanActualizacionDeposito(token, selectedContrato.id, {
+        montoTotal,
+        codigoMoneda: selectedContrato.codigoMoneda.trim(),
+        cantidadCuotas,
+        diaVencimiento,
+        fechaPrimeraCuota: values.fechaPrimeraCuota,
+        notas: values.notas.trim() || null,
+      });
+      showToast("Plan de actualización de depósito creado.");
+      await loadDrawerServicios(selectedContrato.id);
+    } catch (err) {
+      showToast(rentalApiErrorMessage(err, "No se pudo crear el plan de depósito"));
+      throw err;
+    } finally {
+      setServiciosSubmitting(false);
+    }
+  }
+
   async function handleRegisterPago(
     periodo: PeriodoServicioRecord,
     _servicio: ServicioContratoRecord,
@@ -467,6 +587,17 @@ export function AlquileresWorkspace() {
         });
       }
 
+      let depositPreview: ActualizacionDepositoResult | null = null;
+      try {
+        depositPreview = await previewActualizacionDeposito(
+          token,
+          selectedContrato.id,
+          String(depositAmount),
+        );
+      } catch {
+        depositPreview = null;
+      }
+
       await changeContratoEstado(token, selectedContrato.id, "finished");
 
       let nuevoContrato = null as Awaited<ReturnType<typeof createContrato>> | null;
@@ -512,9 +643,23 @@ export function AlquileresWorkspace() {
         });
       }
 
+      if (depositPreview?.requiereCobro) {
+        await createAutoPlanActualizacionDeposito(
+          token,
+          nuevoContrato.id,
+          depositPreview,
+          moraPayload.diaVencimientoPago,
+          `Plan automático por renovación del contrato #${selectedContrato.id}.`,
+        );
+      }
+
       setRenewModalOpen(false);
       const inmuebleCode = selectedContrato.inmueble?.code ?? "inmueble";
-      showToast(`Renovación registrada para ${inmuebleCode}.`);
+      showToast(
+        depositPreview?.requiereCobro
+          ? `Renovación registrada para ${inmuebleCode}. Plan de depósito creado.`
+          : `Renovación registrada para ${inmuebleCode}.`,
+      );
       await loadRows();
     } catch (err) {
       showToast(rentalApiErrorMessage(err, "No se pudo renovar el contrato"));
@@ -575,13 +720,27 @@ export function AlquileresWorkspace() {
 
     setSubmitting(true);
     try {
-      await applyContratoAjuste(token, selectedContrato.id, {
+      const result = await applyContratoAjuste(token, selectedContrato.id, {
         fechaAjuste: input.fechaAjuste,
       });
 
+      if (result.actualizacionDeposito?.requiereCobro) {
+        await createAutoPlanActualizacionDeposito(
+          token,
+          selectedContrato.id,
+          result.actualizacionDeposito,
+          selectedContrato.diaVencimientoPago,
+          "Plan automático por actualización de depósito (ajuste de alquiler).",
+        );
+      }
+
       setAdjustModalOpen(false);
       const inmuebleCode = selectedContrato.inmueble?.code ?? "inmueble";
-      showToast(`Ajuste aplicado para ${inmuebleCode}.`);
+      showToast(
+        result.actualizacionDeposito?.requiereCobro
+          ? `Ajuste aplicado para ${inmuebleCode}. Plan de depósito creado.`
+          : `Ajuste aplicado para ${inmuebleCode}.`,
+      );
       await loadRows();
     } catch (err) {
       showToast(rentalApiErrorMessage(err, "No se pudo aplicar el ajuste"));
@@ -593,15 +752,19 @@ export function AlquileresWorkspace() {
   async function openNewContractModal() {
     if (!token) return;
     try {
-      const [tiposInmueble, inmueblesRes, contratosRes] = await Promise.all([
+      const [tiposInmueble, inmueblesRes, contratosRes, personasRes] = await Promise.all([
         fetchCatalog(token, "/catalogos/tipos-inmueble"),
         fetchInmuebles(token, { limit: 200 }),
         fetchContratos(token, { limit: 200 }),
+        fetchPersonas(token, { limit: 200 }),
       ]);
+      const inmueblesSinAlquiler = await loadInmueblesSinAlquiler(token, personasRes.items);
       setCodeContext({
         tiposInmueble: tiposInmueble.items,
         inmuebleCodes: inmueblesRes.items.map((item) => item.code),
         contratoCodes: contratosRes.items.map((item) => item.contratoCode),
+        personas: personasRes.items,
+        inmueblesSinAlquiler,
       });
       setNewModalOpen(true);
     } catch (err) {
@@ -622,22 +785,6 @@ export function AlquileresWorkspace() {
       ]);
 
       const indexItem = indices.items.find((item) => item.code === form.index) ?? indices.items[0];
-      const tiposInmueble = codeContext?.tiposInmueble.length
-        ? codeContext.tiposInmueble
-        : (await fetchCatalog(token, "/catalogos/tipos-inmueble")).items;
-      const tipoInmueble =
-        tiposInmueble.find((item) => item.code === form.tipoInmuebleCode) ??
-        tiposInmueble.find((item) => item.code === "house") ??
-        tiposInmueble[0];
-
-      if (!tipoInmueble) {
-        throw new ApiError(400, {
-          error: {
-            code: "VALIDATION_ERROR",
-            message: "No se pudo cargar el catálogo de tipos de inmueble",
-          },
-        });
-      }
 
       if (!indexItem?.id) {
         throw new ApiError(400, {
@@ -651,26 +798,10 @@ export function AlquileresWorkspace() {
       const usedInmuebleCodes = inmueblesRes.items.map((item) => item.code);
       const usedContratoCodes = contratosRes.items.map((item) => item.contratoCode);
 
-      let localidad = localidades.items.find((item) => item.name.toLowerCase().includes("bre"));
-      if (!localidad) {
-        localidad = await createLocalidad(token, {
-          name: "Las Breñas",
-          province: "Chaco",
-        });
-      }
-
-      const tenantParts = parsePersonName(form.tenant);
-      const ownerParts = parsePersonName(form.owner);
-      const inquilino = await createPersona(token, {
-        tipoPersona: "natural",
-        nombre: tenantParts.nombre,
-        apellido: tenantParts.apellido,
-      });
-      await createPersona(token, {
-        tipoPersona: "natural",
-        nombre: ownerParts.nombre,
-        apellido: ownerParts.apellido,
-      });
+      const [inquilino, propietario] = await Promise.all([
+        resolveTenantPersona(token, form.tenant),
+        resolveOwnerPersona(token, form.owner),
+      ]);
 
       const today = new Date().toISOString().slice(0, 10);
       const amount = Number(form.amount.replace(/\D/g, ""));
@@ -705,35 +836,125 @@ export function AlquileresWorkspace() {
         });
       }
 
-      const inmueblePrefix = prefixForTipoInmueble(form.tipoInmuebleCode);
-      let inmueble = null as Awaited<ReturnType<typeof createInmueble>> | null;
-      const reservedInmuebleCodes = [...usedInmuebleCodes];
-      for (let attempt = 0; attempt < 5; attempt += 1) {
-        const inmuebleCode = nextInmuebleCode(inmueblePrefix, reservedInmuebleCodes);
-        try {
-          inmueble = await createInmueble(token, {
-            code: inmuebleCode,
-            tipoInmuebleId: tipoInmueble.id,
-            localidadId: localidad.id,
-            title: form.propertyLabel.trim(),
-            direccion: form.propertyAddress.trim(),
+      let inmueble: Awaited<ReturnType<typeof createInmueble>> | null = null;
+
+      if (form.property.mode === "existente") {
+        const inmuebleId = form.property.inmuebleId;
+        if (!inmuebleId) {
+          throw new ApiError(400, {
+            error: {
+              code: "VALIDATION_ERROR",
+              message: "Seleccioná un inmueble sin alquiler activo",
+            },
           });
-          break;
-        } catch (err) {
-          if (err instanceof ApiError && err.status === 409) {
-            reservedInmuebleCodes.push(inmuebleCode);
-            continue;
-          }
-          throw err;
         }
+
+        const selected = inmueblesRes.items.find((item) => item.id === inmuebleId);
+        if (!selected) {
+          throw new ApiError(404, {
+            error: { code: "NOT_FOUND", message: "El inmueble seleccionado no existe" },
+          });
+        }
+
+        const hasActiveContract = contratosRes.items.some(
+          (contrato) => contrato.inmuebleId === inmuebleId && contrato.estado === "active",
+        );
+        if (hasActiveContract) {
+          throw new ApiError(409, {
+            error: {
+              code: "CONFLICT",
+              message: "Ese inmueble ya tiene un contrato de alquiler activo",
+            },
+          });
+        }
+
+        inmueble = selected;
+
+        let alreadyLinked = false;
+        try {
+          const propietariosRes = await fetchInmueblePropietarios(token, inmueble.id);
+          alreadyLinked = propietariosRes.items.some((row) => row.personaId === propietario.id);
+        } catch {
+          // si no puede leer propietarios, intenta vincular igual
+        }
+
+        if (!alreadyLinked) {
+          await addInmueblePropietario(token, inmueble.id, {
+            personaId: propietario.id,
+            porcentajeAdministracion: ownerPorcentajeAdministracion(form.owner),
+          });
+        }
+      } else if (form.property.mode === "nuevo") {
+        const property = form.property;
+        const tiposInmueble = codeContext?.tiposInmueble.length
+          ? codeContext.tiposInmueble
+          : (await fetchCatalog(token, "/catalogos/tipos-inmueble")).items;
+        const tipoInmueble =
+          tiposInmueble.find((item) => item.code === property.tipoInmuebleCode) ??
+          tiposInmueble.find((item) => item.code === "house") ??
+          tiposInmueble[0];
+
+        if (!tipoInmueble) {
+          throw new ApiError(400, {
+            error: {
+              code: "VALIDATION_ERROR",
+              message: "No se pudo cargar el catálogo de tipos de inmueble",
+            },
+          });
+        }
+
+        let localidad = localidades.items.find((item) => item.name.toLowerCase().includes("bre"));
+        if (!localidad) {
+          localidad = await createLocalidad(token, {
+            name: "Las Breñas",
+            province: "Chaco",
+          });
+        }
+
+        const inmueblePrefix = prefixForTipoInmueble(property.tipoInmuebleCode);
+        const reservedInmuebleCodes = [...usedInmuebleCodes];
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+          const inmuebleCode = nextInmuebleCode(inmueblePrefix, reservedInmuebleCodes);
+          try {
+            inmueble = await createInmueble(token, {
+              code: inmuebleCode,
+              tipoInmuebleId: tipoInmueble.id,
+              localidadId: localidad.id,
+              title: property.propertyLabel.trim(),
+              direccion: property.propertyAddress.trim(),
+            });
+            break;
+          } catch (err) {
+            if (err instanceof ApiError && err.status === 409) {
+              reservedInmuebleCodes.push(inmuebleCode);
+              continue;
+            }
+            throw err;
+          }
+        }
+
+        if (!inmueble) {
+          throw new ApiError(409, {
+            error: {
+              code: "CONFLICT",
+              message: "No se pudo reservar un código de inmueble. Reintentá.",
+            },
+          });
+        }
+
+        await addInmueblePropietario(token, inmueble.id, {
+          personaId: propietario.id,
+          porcentajeAdministracion: ownerPorcentajeAdministracion(form.owner),
+        });
+      } else {
+        throw new ApiError(400, {
+          error: { code: "VALIDATION_ERROR", message: "Seleccioná cómo cargar la propiedad" },
+        });
       }
 
       if (!inmueble) {
         throw new ApiError(409, {
-          error: {
-            code: "CONFLICT",
-            message: "No se pudo reservar un código de inmueble. Reintentá.",
-          },
+          error: { code: "CONFLICT", message: "No se pudo resolver el inmueble del contrato" },
         });
       }
 
@@ -807,9 +1028,14 @@ export function AlquileresWorkspace() {
               Operá contratos activos, ajustes por índice y renovaciones.
             </p>
           </div>
-          <ButtonPrimary type="button" onClick={() => void openNewContractModal()} disabled={submitting}>
-            Nuevo contrato
-          </ButtonPrimary>
+          <div className="flex flex-wrap gap-2">
+            <ButtonOutline type="button" onClick={() => setLiquidacionModalOpen(true)}>
+              Liquidación propietarios
+            </ButtonOutline>
+            <ButtonPrimary type="button" onClick={() => void openNewContractModal()} disabled={submitting}>
+              Nuevo contrato
+            </ButtonPrimary>
+          </div>
         </header>
 
         {!loading && !error && rows.length > 0 ? (
@@ -857,6 +1083,11 @@ export function AlquileresWorkspace() {
         )}
       </div>
 
+      <LiquidacionPropietarioModal
+        open={liquidacionModalOpen}
+        onClose={() => setLiquidacionModalOpen(false)}
+        token={token}
+      />
       <CobrarAlquilerModal
         open={cobrarModalOpen}
         onClose={() => {
@@ -876,12 +1107,16 @@ export function AlquileresWorkspace() {
       <ContractFichaDrawer
         open={drawerOpen}
         detail={detail}
+        contrato={selectedContrato}
         servicios={drawerServicios}
         periodos={drawerPeriodos}
+        planesDeposito={drawerPlanesDeposito}
         tiposServicio={tiposServicio}
         serviciosLoading={serviciosLoading}
         serviciosSubmitting={serviciosSubmitting}
         canEditServicios={selectedContrato?.estado === "active"}
+        canManageDepositoPlan={selectedContrato?.estado === "active"}
+        onCreatePlanDeposito={handleCreatePlanDeposito}
         onCreateServicio={handleCreateServicio}
         onUpdateServicio={handleUpdateServicio}
         onDeactivateServicio={handleDeactivateServicio}
@@ -919,6 +1154,8 @@ export function AlquileresWorkspace() {
         submitting={submitting}
         tiposInmueble={codeContext?.tiposInmueble ?? []}
         usedInmuebleCodes={codeContext?.inmuebleCodes ?? []}
+        personas={codeContext?.personas ?? []}
+        inmueblesSinAlquiler={codeContext?.inmueblesSinAlquiler ?? []}
       />
 
       {toast ? (

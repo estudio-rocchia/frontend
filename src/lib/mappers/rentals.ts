@@ -144,15 +144,13 @@ export function mapContratoListItemToRentalRow(
   const { status, filterStatus } = mapEstado(estadoCode, diasAtraso, ajustePendiente, needsCollection);
 
   const currency = (contrato.codigoMoneda === "USD" ? "USD" : "ARS") as "ARS" | "USD";
-  const amountSource = mora?.saldoTotal ?? cobrar?.saldoTotal ?? contrato.montoAlquiler;
-  const amountCurrency = mora?.codigoMoneda ?? cobrar?.codigoMoneda ?? contrato.codigoMoneda;
 
   return {
     id: String(contrato.id),
     contractProperty: `${contrato.inmuebleCode} · ${contrato.inmuebleTitle}`,
     tenant: contrato.inquilinoNombre,
     month: monthLabelFromIsoDate(meta?.fechaVencimiento),
-    amount: formatMoney(amountSource, amountCurrency),
+    amount: formatMoney(contrato.montoAlquiler, contrato.codigoMoneda),
     currency,
     daysOverdue: diasAtraso,
     status,
@@ -170,18 +168,19 @@ export function mapContratoListItemToRentalRow(
 }
 
 export function buildBillingIndex(resumen: DashboardResumen) {
+  const ajusteByContrato = new Map(
+    resumen.ajustePendiente.map((item) => [item.contratoId, item]),
+  );
+
   const moraByContrato = new Map<number, { diasAtraso: number; saldoTotal: string; codigoMoneda: string }>();
   for (const item of resumen.enMora) {
+    if (ajusteByContrato.has(item.contratoId)) continue;
     moraByContrato.set(item.contratoId, {
       diasAtraso: item.diasAtraso,
       saldoTotal: item.saldoTotal,
       codigoMoneda: item.codigoMoneda,
     });
   }
-
-  const ajusteByContrato = new Map(
-    resumen.ajustePendiente.map((item) => [item.contratoId, item]),
-  );
   const cobrarByContrato = new Map<number, { saldoTotal: string; codigoMoneda: string }>();
   for (const item of resumen.cobrarEsteMes) {
     cobrarByContrato.set(item.contratoId, {
@@ -212,13 +211,11 @@ export function mapContratoToRentalRow(
   const ajustePendiente = Boolean(ajusteItem) && !needsRenewal;
   const needsCollection = Boolean(cobrar) && !mora;
 
-  const diasAtraso = mora?.diasAtraso ?? cuota?.mora?.diasAtraso ?? 0;
-  const estadoCode = mora ? "late" : (cuota?.estadoCode ?? "pending");
+  const diasAtraso = ajustePendiente ? 0 : (mora?.diasAtraso ?? cuota?.mora?.diasAtraso ?? 0);
+  const estadoCode = ajustePendiente ? "pending" : mora ? "late" : (cuota?.estadoCode ?? "pending");
   const { status, filterStatus } = mapEstado(estadoCode, diasAtraso, ajustePendiente, needsCollection);
 
   const currency = (contrato.codigoMoneda === "USD" ? "USD" : "ARS") as "ARS" | "USD";
-  const amountSource = mora?.saldoTotal ?? cobrar?.saldoTotal ?? cuota?.saldoTotal ?? contrato.montoAlquiler;
-  const amountCurrency = mora?.codigoMoneda ?? cobrar?.codigoMoneda ?? cuota?.codigoMoneda ?? contrato.codigoMoneda;
 
   const code = inmuebleCode ?? `REF-${contrato.id}`;
 
@@ -227,7 +224,7 @@ export function mapContratoToRentalRow(
     contractProperty: `${code} · ${inmuebleTitle}`,
     tenant: inquilinoNombre,
     month: cuota ? formatMonthYear(cuota.anioPeriodo, cuota.mesPeriodo) : "—",
-    amount: formatMoney(amountSource, amountCurrency),
+    amount: formatMoney(contrato.montoAlquiler, contrato.codigoMoneda),
     currency,
     daysOverdue: diasAtraso,
     status,

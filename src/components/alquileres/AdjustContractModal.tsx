@@ -195,6 +195,24 @@ export function AdjustContractModal({
           ) : null}
         </div>
 
+        {preview?.actualizacionDeposito.requiereCobro ? (
+          <div className="rounded-sm border border-primary/20 bg-primary-soft/50 px-4 py-3 text-[13px] text-text-primary">
+            El depósito pasa de{" "}
+            <span className={moneyClassName}>
+              {formatMoney(preview.actualizacionDeposito.montoAnterior, currency)}
+            </span>{" "}
+            a{" "}
+            <span className={moneyClassName}>
+              {formatMoney(preview.actualizacionDeposito.montoNuevo, currency)}
+            </span>
+            . Diferencia a cobrar:{" "}
+            <strong className={moneyClassName}>
+              {formatMoney(preview.actualizacionDeposito.diferencia, currency)}
+            </strong>
+            . Se creará un plan de cuotas automáticamente.
+          </div>
+        ) : null}
+
         <div className="border-t border-border pt-4">
           <button
             type="button"

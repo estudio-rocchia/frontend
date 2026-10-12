@@ -9,11 +9,17 @@ import {
   applyMora,
   downloadReciboPdf,
   fetchCuotas,
+  fetchPlanesActualizacionDeposito,
   generateCuota,
   issueRecibo,
   registerPago,
 } from "@/lib/api";
-import type { CatalogoItem, CuotaDetail } from "@/lib/api/types";
+import type {
+  CatalogoItem,
+  CuotaActualizacionDepositoDetail,
+  CuotaDetail,
+  PlanActualizacionDepositoDetail,
+} from "@/lib/api/types";
 import { downloadBlob, formatMoney, moneyClassName, rentalApiErrorMessage } from "@/lib/format";
 import {
   buildRentImputaciones,
@@ -23,6 +29,13 @@ import {
   isCuotaOverdue,
   pickCuotaParaCobrar,
 } from "@/lib/mappers/cuotas";
+import {
+  activePlanActualizacionDeposito,
+  appendDepositoImputacion,
+  cuotaDepositoLabel,
+  cuotaDepositoSaldoPendiente,
+  pickCuotaDepositoParaCobrar,
+} from "@/lib/mappers/deposito-plan";
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -49,6 +62,9 @@ export function CobrarAlquilerModal({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cuota, setCuota] = useState<CuotaDetail | null>(null);
+  const [planDeposito, setPlanDeposito] = useState<PlanActualizacionDepositoDetail | null>(null);
+  const [cuotaDeposito, setCuotaDeposito] = useState<CuotaActualizacionDepositoDetail | null>(null);
+  const [includeDeposito, setIncludeDeposito] = useState(false);
   const [fechaPago, setFechaPago] = useState(todayIso());
   const [medioPagoId, setMedioPagoId] = useState(0);
   const [emitRecibo, setEmitRecibo] = useState(true);
@@ -56,6 +72,9 @@ export function CobrarAlquilerModal({
   useEffect(() => {
     if (!open || !token || contratoId === null) {
       setCuota(null);
+      setPlanDeposito(null);
+      setCuotaDeposito(null);
+      setIncludeDeposito(false);
       setError(null);
       return;
     }
@@ -75,13 +94,30 @@ export function CobrarAlquilerModal({
       setEmitRecibo(true);
 
       try {
-        const { items } = await fetchCuotas(authToken, id);
-        let target = pickCuotaParaCobrar(items);
+        const cuotasRes = await fetchCuotas(authToken, id);
+        let planes: PlanActualizacionDepositoDetail[] = [];
+        try {
+          const planesRes = await fetchPlanesActualizacionDeposito(authToken, id);
+          planes = planesRes.items;
+        } catch {
+          // El cobro de alquiler no depende del plan de depósito; si falla (p. ej. migración
+          // pendiente o backend desactualizado), seguimos sin cuota de depósito.
+          planes = [];
+        }
+
+        let target = pickCuotaParaCobrar(cuotasRes.items);
         if (!target) {
           const period = currentBillingPeriod();
           target = await generateCuota(authToken, id, period);
         }
-        if (!cancelled) setCuota(target);
+        const activePlan = activePlanActualizacionDeposito(planes);
+        const pendingDeposito = pickCuotaDepositoParaCobrar(activePlan);
+        if (!cancelled) {
+          setCuota(target);
+          setPlanDeposito(activePlan);
+          setCuotaDeposito(pendingDeposito);
+          setIncludeDeposito(Boolean(pendingDeposito));
+        }
       } catch (err) {
         if (!cancelled) {
           setError(rentalApiErrorMessage(err, "No se pudo preparar el cobro"));
@@ -99,7 +135,10 @@ export function CobrarAlquilerModal({
 
   async function handleSubmit() {
     if (!token || !contratoId || !cuota) return;
-    const monto = cuotaSaldoPendiente(cuota);
+    const saldoAlquilerInicial = cuotaSaldoPendiente(cuota);
+    const saldoDepositoInicial =
+      includeDeposito && cuotaDeposito ? cuotaDepositoSaldoPendiente(cuotaDeposito) : 0;
+    const monto = saldoAlquilerInicial + saldoDepositoInicial;
     if (monto <= 0) {
       setError("No hay saldo pendiente para cobrar.");
       return;
@@ -113,13 +152,19 @@ export function CobrarAlquilerModal({
     setError(null);
     try {
       let cuotaActualizada = cuota;
-      if (isCuotaOverdue(cuota) && Number(cuota.saldoMora) === 0) {
-        const moraResult = await applyMora(token, contratoId, cuota.id);
+      if (isCuotaOverdue(cuota, fechaPago)) {
+        const moraResult = await applyMora(token, contratoId, cuota.id, { asOfDate: fechaPago });
         cuotaActualizada = moraResult.cuota;
       }
 
-      const montoFinal = cuotaSaldoPendiente(cuotaActualizada);
-      const imputaciones = buildRentImputaciones(cuotaActualizada, montoFinal);
+      const montoAlquiler = cuotaSaldoPendiente(cuotaActualizada);
+      const montoDeposito =
+        includeDeposito && cuotaDeposito ? cuotaDepositoSaldoPendiente(cuotaDeposito) : 0;
+      const montoFinal = montoAlquiler + montoDeposito;
+      let imputaciones = buildRentImputaciones(cuotaActualizada, montoAlquiler);
+      if (includeDeposito && cuotaDeposito && montoDeposito > 0) {
+        imputaciones = appendDepositoImputacion(imputaciones, cuotaDeposito);
+      }
       if (!imputaciones.length) {
         setError("No hay saldo pendiente para imputar.");
         return;
@@ -152,7 +197,10 @@ export function CobrarAlquilerModal({
     }
   }
 
-  const saldo = cuota ? cuotaSaldoPendiente(cuota) : 0;
+  const saldoAlquiler = cuota ? cuotaSaldoPendiente(cuota) : 0;
+  const saldoDeposito =
+    includeDeposito && cuotaDeposito ? cuotaDepositoSaldoPendiente(cuotaDeposito) : 0;
+  const saldo = saldoAlquiler + saldoDeposito;
   const saldoMora = cuota ? Number(cuota.saldoMora) || 0 : 0;
   const moneda = cuota?.codigoMoneda.trim() ?? "ARS";
 
@@ -189,10 +237,40 @@ export function CobrarAlquilerModal({
               {isCuotaOverdue(cuota) ? " · Vencido" : ""}
             </p>
             <p className={`mt-2 text-[32px] font-bold leading-none text-primary ${moneyClassName}`}>
-              {formatMoney(cuota.saldoTotal, moneda)}
+              {formatMoney(String(saldo), moneda)}
             </p>
             {saldoMora > 0 ? (
               <p className="mt-2 text-[12px] text-text-secondary">Incluye mora punitoria</p>
+            ) : null}
+          </div>
+
+          <div className="rounded-md border border-border bg-bg-page px-4 py-3 text-[13px]">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-text-secondary">Alquiler</span>
+              <span className="font-semibold text-text-primary">
+                {formatMoney(String(saldoAlquiler), moneda)}
+              </span>
+            </div>
+            {cuotaDeposito && planDeposito ? (
+              <label className="mt-3 flex items-start justify-between gap-3 border-t border-border pt-3">
+                <span className="flex items-start gap-2">
+                  <input
+                    type="checkbox"
+                    checked={includeDeposito}
+                    onChange={(e) => setIncludeDeposito(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-border"
+                  />
+                  <span>
+                    <span className="block font-medium text-text-primary">Actualización de depósito</span>
+                    <span className="mt-0.5 block text-[12px] text-text-secondary">
+                      {cuotaDepositoLabel(cuotaDeposito, planDeposito)}
+                    </span>
+                  </span>
+                </span>
+                <span className="font-semibold text-text-primary">
+                  {formatMoney(String(cuotaDepositoSaldoPendiente(cuotaDeposito)), moneda)}
+                </span>
+              </label>
             ) : null}
           </div>
 

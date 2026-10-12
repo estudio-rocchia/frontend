@@ -106,6 +106,14 @@ export interface PreviewAjusteResponse {
   fuenteHasta: string;
 }
 
+export interface ActualizacionDepositoResult {
+  montoAnterior: string;
+  montoNuevo: string;
+  diferencia: string;
+  codigoMoneda: string;
+  requiereCobro: boolean;
+}
+
 /** Read-only preview from GET /contratos/:id/ajustes/preview (same math as apply). */
 export interface ContratoAjustePreviewResponse {
   contratoId: number;
@@ -123,6 +131,7 @@ export interface ContratoAjustePreviewResponse {
   variacionPct: string;
   frecuenciaAjusteMeses: number | null;
   mesesDesdeBase: number;
+  actualizacionDeposito: ActualizacionDepositoResult;
 }
 
 export interface ApplyAjusteInput {
@@ -140,6 +149,76 @@ export interface ApplyAjusteResponse {
     factor: string;
   };
   contrato: ContratoRecord;
+  actualizacionDeposito: ActualizacionDepositoResult | null;
+}
+
+
+export interface PropietarioAdministracionSummary {
+  personaId: number;
+  displayName: string;
+  porcentajeAdministracion: string;
+  inmueblesEnAdministracion: number;
+  alquileresCobradosMes: string;
+  codigoMoneda: string;
+  liquidacionExistenteId: number | null;
+  liquidacionEstado: "draft" | "issued" | "delivered" | "cancelled" | null;
+}
+
+export interface LiquidacionLineaRecord {
+  id: number;
+  liquidacionId: number;
+  contratoId: number;
+  inmuebleId: number;
+  descripcionInmueble: string;
+  montoAlquiler: string;
+  montoHonorario: string;
+  porcentajeHonorario?: string | null;
+  orden: number;
+  pagoId: number | null;
+}
+
+export interface PropiedadAdministradaRecord {
+  inmuebleId: number;
+  propietarioId: number;
+  porcentajeAdministracion: string;
+  code: string;
+  title: string;
+  direccion: string | null;
+  contratoActivo: {
+    id: number;
+    contratoCode: string | null;
+    montoAlquiler: string;
+    codigoMoneda: string;
+  } | null;
+}
+
+export interface PropietarioRecord {
+  id: number;
+  inmuebleId: number;
+  personaId: number;
+  tipoTitularidad?: string;
+  porcentajeParticipacion?: string | null;
+  porcentajeAdministracion: string;
+  notas?: string | null;
+  persona?: { id: number; displayName: string | null };
+}
+
+export interface LiquidacionRecord {
+  id: number;
+  liquidacionNumber: string;
+  personaId: number;
+  anioPeriodo: number;
+  mesPeriodo: number;
+  porcentajeHonorario: string;
+  totalAlquileres: string;
+  totalHonorarios: string;
+  totalEntrega: string;
+  codigoMoneda: string;
+  aclaraciones: string | null;
+  estado: "draft" | "issued" | "delivered" | "cancelled";
+  fechaEmision: string | null;
+  lineas: LiquidacionLineaRecord[];
+  propietario?: { id: number; displayName: string; porcentajeAdministracion: string };
 }
 
 export interface PersonaRecord {
@@ -147,10 +226,21 @@ export interface PersonaRecord {
   tipoPersona: string;
   nombre: string | null;
   apellido: string | null;
+  fechaNacimiento?: string | null;
+  estadoCivil?: string | null;
+  tipoDocumento?: string | null;
+  numeroDocumento?: string | null;
   razonSocial: string | null;
+  nombreRepresentante?: string | null;
   cuit: string | null;
   email: string | null;
   phone: string | null;
+  address?: string | null;
+  notas?: string | null;
+  porcentajeAdministracion?: string;
+  activo?: boolean;
+  creadoEn?: string;
+  actualizadoEn?: string;
 }
 
 export interface InmuebleRecord {
@@ -358,7 +448,48 @@ export interface CreatePeriodoInput {
   notas?: string | null;
 }
 
-export type ImputacionTargetType = "cuota_alquiler" | "mora" | "periodo_servicio";
+export type ImputacionTargetType =
+  | "cuota_alquiler"
+  | "mora"
+  | "periodo_servicio"
+  | "cuota_actualizacion_deposito";
+
+export type PlanActualizacionDepositoEstado = "active" | "completed" | "cancelled";
+
+export interface CuotaActualizacionDepositoDetail {
+  id: number;
+  planId: number;
+  numero: number;
+  fechaVencimiento: string;
+  monto: string;
+  montoPagado: string;
+  estadoCode: string;
+  saldo: string;
+}
+
+export interface PlanActualizacionDepositoDetail {
+  id: number;
+  contratoId: number;
+  movimientoDepositoId: number | null;
+  montoTotal: string;
+  codigoMoneda: string;
+  cantidadCuotas: number;
+  diaVencimiento: number;
+  notas: string | null;
+  estado: PlanActualizacionDepositoEstado;
+  creadoEn: string;
+  cuotas: CuotaActualizacionDepositoDetail[];
+}
+
+export interface CreatePlanActualizacionDepositoInput {
+  montoTotal: number;
+  codigoMoneda: string;
+  cantidadCuotas: number;
+  diaVencimiento: number;
+  fechaPrimeraCuota: string;
+  movimientoDepositoId?: number | null;
+  notas?: string | null;
+}
 
 export interface ImputacionInput {
   targetType: ImputacionTargetType;

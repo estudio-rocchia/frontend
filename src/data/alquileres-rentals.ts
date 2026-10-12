@@ -17,6 +17,7 @@ export type RentalRow = {
   contractProperty: string;
   tenant: string;
   month: string;
+  /** Monto mensual de alquiler vigente en el contrato (no depósito ni saldo de cuota). */
   amount: string;
   currency: "ARS" | "USD";
   daysOverdue: number;
@@ -73,7 +74,8 @@ export function rentalSummaryStats(rows: RentalRow[]) {
 /** Mostrar acción Cobrar: ventana del 1 al 10, o si ya está en mora. */
 export function canCollectRent(row: RentalRow): boolean {
   if (row.needsRenewal) return false;
-  if (row.filterStatus === "en_mora" || row.daysOverdue > 0) return true;
+  if (row.filterStatus === "en_mora") return true;
+  if (row.daysOverdue > 0 && row.filterStatus !== "ajuste_pendiente") return true;
   return row.needsCollection && isRentCollectionWindow();
 }
 
@@ -84,129 +86,6 @@ export function visibleFilterChips() {
 }
 
 export type RentalChipId = (typeof rentalFilterChips)[number]["id"];
-
-export const alquileresRentals: RentalRow[] = [
-  {
-    id: "ALQ-1042",
-    contractProperty: "ALQ-1042 · Palermo",
-    tenant: "Lucía Fernández",
-    month: "Sep 2026",
-    amount: "$ 485.000",
-    currency: "ARS",
-    daysOverdue: 0,
-    status: { label: "Al día", variant: "success" },
-    filterStatus: "al_dia",
-    contractStart: "12/05/2022",
-    contractEnd: "11/05/2027",
-    daysUntilContractEnd: 999,
-    canAdjust: true,
-    needsAdjustment: false,
-    needsRenewal: false,
-    needsCollection: false,
-    ultimoAjusteEn: null,
-    servicios: { summary: "Luz", detail: "Al día", status: { label: "Al día", variant: "success" } },
-  },
-  {
-    id: "ALQ-0988",
-    contractProperty: "ALQ-0988 · San Isidro",
-    tenant: "Grupo Norte SRL",
-    month: "Sep 2026",
-    amount: "USD 1.200",
-    currency: "USD",
-    daysOverdue: 14,
-    status: { label: "En mora", variant: "danger" },
-    filterStatus: "en_mora",
-    contractStart: "03/11/2020",
-    contractEnd: "02/11/2025",
-    daysUntilContractEnd: -300,
-    canAdjust: true,
-    needsAdjustment: false,
-    needsRenewal: true,
-    needsCollection: false,
-    ultimoAjusteEn: null,
-    servicios: { summary: "Luz", detail: "Al día", status: { label: "Al día", variant: "success" } },
-  },
-  {
-    id: "ALQ-1103",
-    contractProperty: "ALQ-1103 · Belgrano",
-    tenant: "Martín Acosta",
-    month: "Ago 2026",
-    amount: "$ 620.000",
-    currency: "ARS",
-    daysOverdue: 35,
-    status: { label: "En mora", variant: "danger" },
-    filterStatus: "en_mora",
-    contractStart: "22/07/2023",
-    contractEnd: "21/07/2028",
-    daysUntilContractEnd: 999,
-    canAdjust: true,
-    needsAdjustment: false,
-    needsRenewal: false,
-    needsCollection: false,
-    ultimoAjusteEn: null,
-    servicios: { summary: "Luz", detail: "Al día", status: { label: "Al día", variant: "success" } },
-  },
-  {
-    id: "ALQ-0871",
-    contractProperty: "ALQ-0871 · Microcentro",
-    tenant: "Byte Legal",
-    month: "Sep 2026",
-    amount: "$ 890.000",
-    currency: "ARS",
-    daysOverdue: 0,
-    status: { label: "Al día", variant: "success" },
-    filterStatus: "al_dia",
-    contractStart: "01/01/2019",
-    contractEnd: "31/12/2026",
-    daysUntilContractEnd: 88,
-    canAdjust: true,
-    needsAdjustment: false,
-    needsRenewal: false,
-    needsCollection: false,
-    ultimoAjusteEn: null,
-    servicios: { summary: "Luz", detail: "Al día", status: { label: "Al día", variant: "success" } },
-  },
-  {
-    id: "ALQ-1156",
-    contractProperty: "ALQ-1156 · Nordelta",
-    tenant: "Fam. Pérez",
-    month: "Sep 2026",
-    amount: "USD 2.800",
-    currency: "USD",
-    daysOverdue: 5,
-    status: { label: "Próx. mora", variant: "warning" },
-    filterStatus: "prox_mora",
-    contractStart: "01/10/2024",
-    contractEnd: "30/09/2026",
-    daysUntilContractEnd: -4,
-    canAdjust: true,
-    needsAdjustment: false,
-    needsRenewal: true,
-    needsCollection: false,
-    ultimoAjusteEn: null,
-    servicios: { summary: "Luz", detail: "Al día", status: { label: "Al día", variant: "success" } },
-  },
-  {
-    id: "ALQ-1020",
-    contractProperty: "ALQ-1020 · Recoleta",
-    tenant: "Studio Alfa",
-    month: "Sep 2026",
-    amount: "$ 410.000",
-    currency: "ARS",
-    daysOverdue: 0,
-    status: { label: "Al día", variant: "success" },
-    filterStatus: "al_dia",
-    contractStart: "18/06/2025",
-    contractEnd: "17/06/2030",
-    daysUntilContractEnd: 999,
-    canAdjust: true,
-    needsAdjustment: false,
-    needsRenewal: false,
-    needsCollection: false,
-    ultimoAjusteEn: null,
-    servicios: { summary: "Luz", detail: "Al día", status: { label: "Al día", variant: "success" } },
-  },
-];
 
 function normalizeSearchText(value: string): string {
   return value

@@ -16,6 +16,7 @@ import type {
   PagoDetail,
   PagoRecord,
   PersonaRecord,
+  ActualizacionDepositoResult,
   ApplyAjusteInput,
   ApplyAjusteResponse,
   ContratoAjustePreviewResponse,
@@ -27,6 +28,8 @@ import type {
   RegisterPagoInput,
   RegisterPagoResult,
   CreatePeriodoInput,
+  CreatePlanActualizacionDepositoInput,
+  PlanActualizacionDepositoDetail,
   CreateServicioInput,
   CreateUsuarioInput,
   ResetUsuarioPasswordInput,
@@ -36,6 +39,10 @@ import type {
   UsuarioRecord,
   SecheepImportInput,
   SecheepImportResult,
+  LiquidacionRecord,
+  PropiedadAdministradaRecord,
+  PropietarioAdministracionSummary,
+  PropietarioRecord,
   PeriodoServicioRecord,
   ServicioContratoRecord,
   UpdateServicioInput,
@@ -197,6 +204,28 @@ export function importSecheep(token: string, servicioId: number, body: SecheepIm
   });
 }
 
+export function fetchPlanesActualizacionDeposito(token: string, contratoId: number) {
+  return apiRequest<{ items: PlanActualizacionDepositoDetail[] }>(
+    `/contratos/${contratoId}/planes-actualizacion-deposito`,
+    { token },
+  );
+}
+
+export function createPlanActualizacionDeposito(
+  token: string,
+  contratoId: number,
+  body: CreatePlanActualizacionDepositoInput,
+) {
+  return apiRequest<PlanActualizacionDepositoDetail>(
+    `/contratos/${contratoId}/planes-actualizacion-deposito`,
+    {
+      method: "POST",
+      token,
+      body: JSON.stringify(body),
+    },
+  );
+}
+
 export function fetchPagos(token: string, contratoId: number) {
   return apiRequest<{ items: PagoRecord[] }>(`/contratos/${contratoId}/pagos`, { token });
 }
@@ -225,6 +254,72 @@ export function downloadReciboPdf(token: string, reciboId: number) {
   return apiBlob(`/recibos/${reciboId}/pdf`, token);
 }
 
+export function fetchPropietariosAdministracion(
+  token: string,
+  params: { anioPeriodo: number; mesPeriodo: number; codigoMoneda?: string },
+) {
+  const query = new URLSearchParams({
+    anioPeriodo: String(params.anioPeriodo),
+    mesPeriodo: String(params.mesPeriodo),
+  });
+  if (params.codigoMoneda) query.set("codigoMoneda", params.codigoMoneda);
+  return apiRequest<{ items: PropietarioAdministracionSummary[] }>(
+    `/liquidaciones/propietarios?${query}`,
+    { token },
+  );
+}
+
+export function fetchLiquidacion(token: string, id: number) {
+  return apiRequest<LiquidacionRecord>(`/liquidaciones/${id}`, { token });
+}
+
+export function createLiquidacionBorrador(
+  token: string,
+  body: { personaId: number; anioPeriodo: number; mesPeriodo: number; codigoMoneda?: string },
+) {
+  return apiRequest<LiquidacionRecord>("/liquidaciones/borrador", {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function updateLiquidacion(
+  token: string,
+  id: number,
+  body: { aclaraciones?: string | null; porcentajeHonorario?: number; totalEntrega?: number },
+) {
+  return apiRequest<LiquidacionRecord>(`/liquidaciones/${id}`, {
+    method: "PATCH",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function issueLiquidacion(token: string, id: number) {
+  return apiRequest<LiquidacionRecord>(`/liquidaciones/${id}/emitir`, {
+    method: "POST",
+    token,
+    body: JSON.stringify({}),
+  });
+}
+
+export function downloadLiquidacionPdf(token: string, id: number) {
+  return apiBlob(`/liquidaciones/${id}/pdf`, token);
+}
+
+export function updatePersonaAdministracion(
+  token: string,
+  id: number,
+  body: { porcentajeAdministracion: number },
+) {
+  return apiRequest<PersonaRecord>(`/personas/${id}`, {
+    method: "PATCH",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
 export function fetchInmuebleFicha(token: string, inmuebleId: number) {
   return apiRequest<InmuebleFicha>(`/inmuebles/${inmuebleId}/ficha`, { token });
 }
@@ -246,15 +341,37 @@ export function fetchLocalidades(token: string) {
   );
 }
 
+export function fetchPersonas(
+  token: string,
+  params?: { activo?: boolean; q?: string; limit?: number; offset?: number },
+) {
+  const query = new URLSearchParams();
+  if (params?.activo !== undefined) query.set("activo", String(params.activo));
+  if (params?.q) query.set("q", params.q);
+  query.set("limit", String(params?.limit ?? 200));
+  if (params?.offset !== undefined) query.set("offset", String(params.offset));
+  const suffix = query.toString();
+  return apiRequest<{ items: PersonaRecord[] }>(`/personas?${suffix}`, { token });
+}
+
 export function createPersona(
   token: string,
   body: {
     tipoPersona: "natural" | "juridica";
-    nombre?: string;
+    nombre?: string | null;
     apellido?: string | null;
+    fechaNacimiento?: string | null;
+    estadoCivil?: "single" | "married" | "divorced" | "widowed" | "civil_union" | null;
+    tipoDocumento?: "DNI" | "CUIT" | "PASSPORT" | null;
+    numeroDocumento?: string | null;
     razonSocial?: string | null;
+    nombreRepresentante?: string | null;
+    cuit?: string | null;
     email?: string | null;
     phone?: string | null;
+    address?: string | null;
+    notas?: string | null;
+    activo?: boolean;
   },
 ) {
   return apiRequest<PersonaRecord>("/personas", {
@@ -288,6 +405,48 @@ export function createInmueble(
 ) {
   return apiRequest<InmuebleRecord>("/inmuebles", {
     method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function fetchPropietarioPersonaIds(token: string) {
+  return apiRequest<{ personaIds: number[] }>("/propietarios/persona-ids", { token });
+}
+
+export function fetchPropiedadesAdministradasPorPersona(token: string, personaId: number) {
+  return apiRequest<{ items: PropiedadAdministradaRecord[] }>(
+    `/propietarios/por-persona/${personaId}/propiedades`,
+    { token },
+  );
+}
+
+export function fetchInmueblePropietarios(token: string, inmuebleId: number) {
+  return apiRequest<{ items: PropietarioRecord[] }>(`/inmuebles/${inmuebleId}/propietarios`, {
+    token,
+  });
+}
+
+export function addInmueblePropietario(
+  token: string,
+  inmuebleId: number,
+  body: { personaId: number; porcentajeAdministracion?: number },
+) {
+  return apiRequest<PropietarioRecord>(`/inmuebles/${inmuebleId}/propietarios`, {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function updatePropietarioAdministracion(
+  token: string,
+  inmuebleId: number,
+  propietarioId: number,
+  body: { porcentajeAdministracion: number },
+) {
+  return apiRequest<PropietarioRecord>(`/inmuebles/${inmuebleId}/propietarios/${propietarioId}`, {
+    method: "PATCH",
     token,
     body: JSON.stringify(body),
   });
@@ -340,6 +499,18 @@ export function previewContratoAjuste(token: string, contratoId: number, fechaAj
   const query = new URLSearchParams({ fechaAjuste });
   return apiRequest<ContratoAjustePreviewResponse>(
     `/contratos/${contratoId}/ajustes/preview?${query}`,
+    { token },
+  );
+}
+
+export function previewActualizacionDeposito(
+  token: string,
+  contratoId: number,
+  montoObjetivo: string,
+) {
+  const query = new URLSearchParams({ montoObjetivo });
+  return apiRequest<ActualizacionDepositoResult>(
+    `/contratos/${contratoId}/actualizacion-deposito/preview?${query}`,
     { token },
   );
 }

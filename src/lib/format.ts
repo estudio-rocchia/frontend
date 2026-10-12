@@ -7,14 +7,50 @@ const MONTHS_ES = [
 
 const MONEY_NBSP = "\u00A0";
 
-export function formatMoney(amount: string, currency: string): string {
-  const value = Number(amount);
-  if (Number.isNaN(value)) return amount;
+export type MoneyCurrency = "ARS" | "USD";
+
+/** Normaliza códigos ISO; nunca lanza aunque el backend envíe datos corruptos. */
+export function normalizeCurrency(
+  value: string | null | undefined,
+  fallback: MoneyCurrency = "ARS",
+): MoneyCurrency {
+  const code = value?.trim().toUpperCase() ?? "";
+  if (code === "USD") return "USD";
+  if (code === "ARS") return "ARS";
+  return fallback;
+}
+
+function parseMoneyAmount(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const value = Number(trimmed);
+  return Number.isFinite(value) ? value : null;
+}
+
+function isCurrencyCode(raw: string): boolean {
+  const code = raw.trim().toUpperCase();
+  return code === "ARS" || code === "USD";
+}
+
+export function formatMoney(amount: string, currency: string | null | undefined = "ARS"): string {
+  let moneyRaw = amount;
+  let currencyRaw = currency ?? "ARS";
+
+  // Corrige argumentos invertidos (monto en el parámetro de moneda).
+  if (isCurrencyCode(moneyRaw) && parseMoneyAmount(currencyRaw) !== null) {
+    moneyRaw = currencyRaw;
+    currencyRaw = amount;
+  }
+
+  const value = parseMoneyAmount(moneyRaw);
+  if (value === null) return moneyRaw;
+
+  const code = normalizeCurrency(currencyRaw);
   const formatted = value.toLocaleString("es-AR", {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   });
-  return currency === "USD" ? `USD${MONEY_NBSP}${formatted}` : `$${MONEY_NBSP}${formatted}`;
+  return code === "USD" ? `USD${MONEY_NBSP}${formatted}` : `$${MONEY_NBSP}${formatted}`;
 }
 
 /** Evita que el símbolo y el monto se partan en dos líneas en tablas y tarjetas. */
@@ -126,7 +162,17 @@ const RENTAL_ERROR_MESSAGES: Record<string, string> = {
   "Request validation failed": "Datos inválidos. Revisá los campos del formulario.",
   "Rent imputacion must cover the full outstanding balance for the installment":
     "El alquiler se cobra siempre por el total de la cuota.",
+  "A liquidación already exists for this owner and period":
+    "Ya hay una liquidación para ese propietario y período. Abrila desde el botón o cambiá mes/año.",
 };
+
+const MORA_TARGET_MISSING_RE = /^Mora (\d+) does not exist$/;
+
+function translateMoraTargetMissing(message: string): string | null {
+  const match = MORA_TARGET_MISSING_RE.exec(message);
+  if (!match) return null;
+  return `No se encontró el registro de mora #${match[1]}. Volvé a abrir el cobro para recalcular la mora.`;
+}
 
 const INDEX_VALUE_MISSING_RE = /^No index value for (ICL|IPC|CAC) at /;
 
@@ -139,6 +185,8 @@ export function rentalApiErrorMessage(err: unknown, fallback = "No se pudo crear
     if (indexMatch) {
       return `No hay valor ${indexMatch[1]} para ese período. Ejecutá sync de índices o cargá el monto manualmente.`;
     }
+    const moraMissing = translateMoraTargetMissing(err.message);
+    if (moraMissing) return moraMissing;
     return RENTAL_ERROR_MESSAGES[err.message] ?? err.message;
   }
   return fallback;
