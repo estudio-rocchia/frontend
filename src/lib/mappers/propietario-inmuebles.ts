@@ -1,10 +1,18 @@
 import {
-  fetchContratos,
   fetchInmueblePropietarios,
   fetchInmuebles,
+  fetchPropiedadesAdministradasPorPersona,
+  fetchPropietarioPersonaIds,
+  fetchContratos,
 } from "@/lib/api";
-import type { ContratoListItem, InmuebleRecord, PersonaRecord } from "@/lib/api/types";
+import type { InmuebleRecord, PersonaRecord, PropiedadAdministradaRecord } from "@/lib/api/types";
 import { formatMoney, personaDisplayName } from "@/lib/format";
+
+export interface InmueblePropietarioResumen {
+  propietarioId: number;
+  personaId: number;
+  porcentajeAdministracion: string;
+}
 
 export interface InmuebleSinAlquiler {
   inmuebleId: number;
@@ -12,16 +20,11 @@ export interface InmuebleSinAlquiler {
   title: string;
   direccion: string | null;
   propietarioIds: number[];
+  propietarios: InmueblePropietarioResumen[];
   propietarioLabel: string;
 }
 
-export interface PropiedadAdministrada {
-  inmuebleId: number;
-  code: string;
-  title: string;
-  direccion: string | null;
-  contratoActivo: ContratoListItem | null;
-}
+export type PropiedadAdministrada = PropiedadAdministradaRecord;
 
 export interface PropiedadesPersonaResult {
   propiedades: PropiedadAdministrada[];
@@ -33,40 +36,16 @@ export async function loadPropiedadesAdministradas(
   token: string,
   personaId: number,
 ): Promise<PropiedadesPersonaResult> {
-  const [inmueblesRes, contratosRes] = await Promise.all([
+  const [propiedadesRes, inmueblesRes] = await Promise.all([
+    fetchPropiedadesAdministradasPorPersona(token, personaId),
     fetchInmuebles(token, { limit: 200 }),
-    fetchContratos(token, { estado: "active", limit: 200 }),
   ]);
 
-  const propiedades: PropiedadAdministrada[] = [];
-  const linkedInmuebleIds = new Set<number>();
-
-  await Promise.all(
-    inmueblesRes.items.map(async (inmueble) => {
-      try {
-        const propietariosRes = await fetchInmueblePropietarios(token, inmueble.id);
-        const esPropietario = propietariosRes.items.some((row) => row.personaId === personaId);
-        if (!esPropietario) return;
-
-        linkedInmuebleIds.add(inmueble.id);
-        propiedades.push({
-          inmuebleId: inmueble.id,
-          code: inmueble.code,
-          title: inmueble.title,
-          direccion: inmueble.direccion,
-          contratoActivo: contratosRes.items.find((contrato) => contrato.inmuebleId === inmueble.id) ?? null,
-        });
-      } catch {
-        // sin permiso o inmueble sin propietarios
-      }
-    }),
-  );
-
-  propiedades.sort((a, b) => a.code.localeCompare(b.code, "es"));
+  const propiedades = propiedadesRes.items;
 
   return {
     propiedades,
-    linkedInmuebleIds,
+    linkedInmuebleIds: new Set(propiedades.map((propiedad) => propiedad.inmuebleId)),
     inmuebles: inmueblesRes.items,
   };
 }
@@ -82,58 +61,56 @@ export async function loadInmueblesSinAlquiler(
 
   const alquiladosIds = new Set(contratosRes.items.map((contrato) => contrato.inmuebleId));
   const personaById = new Map(personas.map((persona) => [persona.id, persona]));
-  const results: InmuebleSinAlquiler[] = [];
+  const vacantes = inmueblesRes.items.filter((inmueble) => !alquiladosIds.has(inmueble.id));
 
-  await Promise.all(
-    inmueblesRes.items
-      .filter((inmueble) => !alquiladosIds.has(inmueble.id))
-      .map(async (inmueble) => {
-        let propietarioIds: number[] = [];
-        try {
-          const propietariosRes = await fetchInmueblePropietarios(token, inmueble.id);
-          propietarioIds = propietariosRes.items.map((row) => row.personaId);
-        } catch {
-          // sin permiso
-        }
-
-        const propietarioLabel = propietarioIds
-          .map((personaId) => personaDisplayName(personaById.get(personaId) ?? {}))
-          .filter((name) => name !== "—")
-          .join(" · ");
-
-        results.push({
-          inmuebleId: inmueble.id,
-          code: inmueble.code,
-          title: inmueble.title,
-          direccion: inmueble.direccion,
-          propietarioIds,
-          propietarioLabel: propietarioLabel || "Sin propietario asignado",
-        });
-      }),
+  const propietariosByInmueble = await Promise.all(
+    vacantes.map(async (inmueble) => {
+      try {
+        const propietariosRes = await fetchInmueblePropietarios(token, inmueble.id);
+        return { inmueble, propietarios: propietariosRes.items };
+      } catch {
+        return { inmueble, propietarios: [] };
+      }
+    }),
   );
+
+  const results: InmuebleSinAlquiler[] = propietariosByInmueble.map(({ inmueble, propietarios }) => {
+    const links = propietarios.map((row) => ({
+      propietarioId: row.id,
+      personaId: row.personaId,
+      porcentajeAdministracion: row.porcentajeAdministracion,
+    }));
+    const propietarioIds = links.map((row) => row.personaId);
+    const propietarioLabel = propietarioIds
+      .map((personaId) => {
+        const persona = personaById.get(personaId);
+        const name = persona ? personaDisplayName(persona) : null;
+        const link = links.find((row) => row.personaId === personaId);
+        const pct = link?.porcentajeAdministracion ?? "6";
+        const pctLabel = `${Number(pct).toLocaleString("es-AR", { maximumFractionDigits: 2 })}%`;
+        return name ? `${name} (${pctLabel})` : pctLabel;
+      })
+      .filter((label) => label !== "—")
+      .join(" · ");
+
+    return {
+      inmuebleId: inmueble.id,
+      code: inmueble.code,
+      title: inmueble.title,
+      direccion: inmueble.direccion,
+      propietarioIds,
+      propietarios: links,
+      propietarioLabel: propietarioLabel || "Sin propietario asignado",
+    };
+  });
 
   results.sort((a, b) => a.code.localeCompare(b.code, "es"));
   return results;
 }
 
 export async function loadAllPropietarioPersonaIds(token: string): Promise<number[]> {
-  const inmueblesRes = await fetchInmuebles(token, { limit: 200 });
-  const ids = new Set<number>();
-
-  await Promise.all(
-    inmueblesRes.items.map(async (inmueble) => {
-      try {
-        const propietariosRes = await fetchInmueblePropietarios(token, inmueble.id);
-        for (const row of propietariosRes.items) {
-          ids.add(row.personaId);
-        }
-      } catch {
-        // sin permiso
-      }
-    }),
-  );
-
-  return [...ids];
+  const response = await fetchPropietarioPersonaIds(token);
+  return response.personaIds;
 }
 
 export function propiedadAdministradaLabel(propiedad: PropiedadAdministrada): {

@@ -257,16 +257,18 @@ export function LiquidacionPropietarioModal({
               <p className="font-medium">{liquidacion.propietario?.displayName ?? "Propietario"}</p>
               <p className="text-text-secondary">
                 {liquidacion.liquidacionNumber} · {liquidacion.estado === "draft" ? "Borrador" : "Emitida"} ·
-                Honorarios {liquidacion.porcentajeHonorario}% · Entrega{" "}
-                {formatMoney(liquidacion.totalEntrega, liquidacionMoneda)}
+                Entrega {formatMoney(liquidacion.totalEntrega, liquidacionMoneda)}
               </p>
               <ul className="mt-2 list-disc pl-5">
-                {(liquidacion.lineas ?? []).map((linea) => (
-                  <li key={linea.id}>
-                    {linea.descripcionInmueble}: {formatMoney(linea.montoAlquiler, liquidacionMoneda)} (
-                    admin {formatMoney(linea.montoHonorario, liquidacionMoneda)})
-                  </li>
-                ))}
+                {(liquidacion.lineas ?? []).map((linea) => {
+                  const pct = linea.porcentajeHonorario ?? liquidacion.porcentajeHonorario;
+                  return (
+                    <li key={linea.id}>
+                      {linea.descripcionInmueble}: {formatMoney(linea.montoAlquiler, liquidacionMoneda)} (
+                      {pct}% admin {formatMoney(linea.montoHonorario, liquidacionMoneda)})
+                    </li>
+                  );
+                })}
               </ul>
             </div>
             <label className="flex flex-col gap-1 text-sm">

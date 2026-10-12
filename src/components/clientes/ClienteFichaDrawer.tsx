@@ -3,18 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { VincularInmueblePropietarioForm } from "@/components/clientes/VincularInmueblePropietarioForm";
-import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
+import { ButtonOutline } from "@/components/ui/Button";
 import { DrawerPanel } from "@/components/ui/DrawerPanel";
 import { FieldBlock } from "@/components/ui/FormLayout";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useAuth } from "@/context/auth-context";
 import { ADMIN_PORCENTAJE_OPTIONS, type ClienteRow } from "@/data/clientes";
-import {
-  ApiError,
-  fetchContratos,
-  fetchPersona,
-  updatePersonaAdministracion,
-} from "@/lib/api";
+import { ApiError, fetchContratos, fetchPersona, updatePropietarioAdministracion } from "@/lib/api";
 import type { ContratoListItem, InmuebleRecord, PersonaRecord } from "@/lib/api/types";
 import { formatMoney, personaDisplayName } from "@/lib/format";
 import { vinculoBadgeClass } from "@/lib/mappers/clientes";
@@ -68,8 +63,8 @@ export function ClienteFichaDrawer({
   const [propiedades, setPropiedades] = useState<PropiedadAdministrada[]>([]);
   const [linkedInmuebleIds, setLinkedInmuebleIds] = useState<Set<number>>(new Set());
   const [inmuebles, setInmuebles] = useState<InmuebleRecord[]>([]);
-  const [porcentajeAdmin, setPorcentajeAdmin] = useState("6");
-  const [savingAdmin, setSavingAdmin] = useState(false);
+  const [pctEdits, setPctEdits] = useState<Record<number, string>>({});
+  const [savingPropietarioId, setSavingPropietarioId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -91,7 +86,14 @@ export function ClienteFichaDrawer({
     setPropiedades(propiedadesData.propiedades);
     setLinkedInmuebleIds(propiedadesData.linkedInmuebleIds);
     setInmuebles(propiedadesData.inmuebles);
-    setPorcentajeAdmin(String(Number(personaDetail.porcentajeAdministracion ?? "6") || 6));
+    setPctEdits(
+      Object.fromEntries(
+        propiedadesData.propiedades.map((propiedad) => [
+          propiedad.propietarioId,
+          String(Number(propiedad.porcentajeAdministracion) || 6),
+        ]),
+      ),
+    );
   }, [token, persona]);
 
   useEffect(() => {
@@ -140,24 +142,30 @@ export function ClienteFichaDrawer({
 
   if (!persona || !displayPersona) return null;
 
-  async function handleSaveAdministracion() {
-    if (!token || !persona) return;
-    const numeric = Number(porcentajeAdmin);
+  async function handleSavePropiedadAdministracion(propiedad: PropiedadAdministrada) {
+    if (!token) return;
+    const numeric = Number(pctEdits[propiedad.propietarioId]);
     if (!Number.isFinite(numeric) || numeric <= 0 || numeric > 100) {
       setError("El porcentaje debe estar entre 0 y 100.");
       return;
     }
 
-    setSavingAdmin(true);
+    setSavingPropietarioId(propiedad.propietarioId);
     setError(null);
     setSuccess(null);
 
     try {
-      const updated = await updatePersonaAdministracion(token, persona.id, {
+      await updatePropietarioAdministracion(token, propiedad.inmuebleId, propiedad.propietarioId, {
         porcentajeAdministracion: numeric,
       });
-      setDetail(updated);
-      setSuccess("Porcentaje de administración actualizado.");
+      setPropiedades((current) =>
+        current.map((item) =>
+          item.propietarioId === propiedad.propietarioId
+            ? { ...item, porcentajeAdministracion: String(numeric) }
+            : item,
+        ),
+      );
+      setSuccess(`Porcentaje actualizado para ${propiedad.title}.`);
       onUpdated();
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
@@ -166,7 +174,7 @@ export function ClienteFichaDrawer({
       }
       setError(err instanceof ApiError ? err.message : "No se pudo guardar el porcentaje");
     } finally {
-      setSavingAdmin(false);
+      setSavingPropietarioId(null);
     }
   }
 
@@ -204,18 +212,7 @@ export function ClienteFichaDrawer({
           </div>
         ) : null
       }
-      footer={
-        activeTab === "inmobiliaria" && tienePropiedades ? (
-          <>
-            <ButtonOutline onClick={onClose}>Cerrar</ButtonOutline>
-            <ButtonPrimary disabled={savingAdmin} onClick={() => void handleSaveAdministracion()}>
-              {savingAdmin ? "Guardando…" : "Guardar administración"}
-            </ButtonPrimary>
-          </>
-        ) : (
-          <ButtonOutline onClick={onClose}>Cerrar</ButtonOutline>
-        )
-      }
+      footer={<ButtonOutline onClick={onClose}>Cerrar</ButtonOutline>}
     >
       <div className="flex flex-col gap-6">
         <div className="flex flex-wrap gap-2 border-b border-border pb-1">
@@ -259,7 +256,11 @@ export function ClienteFichaDrawer({
               {tienePropiedades ? (
                 <FieldBlock
                   label="% administración"
-                  value={formatPorcentaje(displayPersona.porcentajeAdministracion)}
+                  value={
+                    propiedades.length === 1
+                      ? formatPorcentaje(propiedades[0]?.porcentajeAdministracion)
+                      : "Varía por propiedad"
+                  }
                 />
               ) : null}
             </div>
@@ -284,6 +285,10 @@ export function ClienteFichaDrawer({
                 <div className="flex flex-col gap-3">
                   {propiedades.map((propiedad) => {
                     const label = propiedadAdministradaLabel(propiedad);
+                    const pctValue = pctEdits[propiedad.propietarioId] ?? String(
+                      Number(propiedad.porcentajeAdministracion) || 6,
+                    );
+                    const saving = savingPropietarioId === propiedad.propietarioId;
                     return (
                       <div
                         key={propiedad.inmuebleId}
@@ -303,6 +308,67 @@ export function ClienteFichaDrawer({
                             <StatusBadge label="Alquilado" variant="success" />
                           )}
                         </div>
+                        <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4">
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
+                            Honorarios de administración
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {ADMIN_PORCENTAJE_OPTIONS.map((option) => {
+                              const selected = Number(pctValue) === option;
+                              return (
+                                <button
+                                  key={option}
+                                  type="button"
+                                  disabled={saving}
+                                  onClick={() =>
+                                    setPctEdits((current) => ({
+                                      ...current,
+                                      [propiedad.propietarioId]: String(option),
+                                    }))
+                                  }
+                                  className={`rounded-full border border-border px-3 py-1.5 text-[12px] transition-colors disabled:opacity-60 ${
+                                    selected
+                                      ? "bg-primary-soft font-semibold text-primary"
+                                      : "bg-bg-card text-text-secondary hover:text-text-primary"
+                                  }`}
+                                >
+                                  {option}%
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <div className="flex flex-wrap items-end gap-3">
+                            <label className="flex max-w-[140px] flex-col gap-1.5">
+                              <span className="text-[11px] font-semibold text-text-secondary">Otro %</span>
+                              <input
+                                type="number"
+                                min={0.01}
+                                max={100}
+                                step={0.01}
+                                disabled={saving}
+                                value={pctValue}
+                                onChange={(event) =>
+                                  setPctEdits((current) => ({
+                                    ...current,
+                                    [propiedad.propietarioId]: event.target.value,
+                                  }))
+                                }
+                                className="rounded-sm border border-border bg-bg-card px-3 py-2 text-[13px] text-text-primary outline-none focus:border-primary disabled:opacity-60"
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              disabled={saving}
+                              onClick={() => void handleSavePropiedadAdministracion(propiedad)}
+                              className="rounded-sm bg-primary px-3 py-2 text-[12px] font-semibold text-white disabled:opacity-60"
+                            >
+                              {saving ? "Guardando…" : "Guardar %"}
+                            </button>
+                          </div>
+                          <p className="text-[12px] text-text-secondary">
+                            Actual: {formatPorcentaje(propiedad.porcentajeAdministracion)}
+                          </p>
+                        </div>
                       </div>
                     );
                   })}
@@ -317,54 +383,6 @@ export function ClienteFichaDrawer({
               onLinked={() => void handleInmuebleLinked()}
               onError={setError}
             />
-
-            {tienePropiedades ? (
-              <div className="flex flex-col gap-4 rounded-md border border-border bg-bg-page p-4">
-                <div className="flex flex-col gap-1">
-                  <h4 className="text-sm font-semibold text-text-primary">Honorarios de administración</h4>
-                  <p className="text-xs text-text-secondary">
-                    Porcentaje aplicado en las liquidaciones mensuales al propietario.
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  {ADMIN_PORCENTAJE_OPTIONS.map((option) => {
-                    const selected = Number(porcentajeAdmin) === option;
-                    return (
-                      <button
-                        key={option}
-                        type="button"
-                        onClick={() => setPorcentajeAdmin(String(option))}
-                        className={`rounded-full border border-border px-3.5 py-2 text-[13px] transition-colors ${
-                          selected
-                            ? "bg-primary-soft font-semibold text-primary"
-                            : "bg-bg-card text-text-secondary hover:text-text-primary"
-                        }`}
-                      >
-                        {option}%
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <label className="flex max-w-[160px] flex-col gap-1.5">
-                  <span className="text-[11px] font-semibold text-text-secondary">Otro porcentaje</span>
-                  <input
-                    type="number"
-                    min={0.01}
-                    max={100}
-                    step={0.01}
-                    value={porcentajeAdmin}
-                    onChange={(event) => setPorcentajeAdmin(event.target.value)}
-                    className="rounded-sm border border-border bg-bg-card px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
-                  />
-                </label>
-
-                <p className="text-[12px] text-text-secondary">
-                  Actual: {formatPorcentaje(displayPersona.porcentajeAdministracion)}
-                </p>
-              </div>
-            ) : null}
 
             {contratosInquilino.length > 0 ? (
               <div className="flex flex-col gap-2">

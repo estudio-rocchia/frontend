@@ -37,7 +37,9 @@ import type {
   SecheepImportInput,
   SecheepImportResult,
   LiquidacionRecord,
+  PropiedadAdministradaRecord,
   PropietarioAdministracionSummary,
+  PropietarioRecord,
   PeriodoServicioRecord,
   ServicioContratoRecord,
   UpdateServicioInput,
@@ -383,25 +385,46 @@ export function createInmueble(
   });
 }
 
+export function fetchPropietarioPersonaIds(token: string) {
+  return apiRequest<{ personaIds: number[] }>("/propietarios/persona-ids", { token });
+}
+
+export function fetchPropiedadesAdministradasPorPersona(token: string, personaId: number) {
+  return apiRequest<{ items: PropiedadAdministradaRecord[] }>(
+    `/propietarios/por-persona/${personaId}/propiedades`,
+    { token },
+  );
+}
+
 export function fetchInmueblePropietarios(token: string, inmuebleId: number) {
-  return apiRequest<{
-    items: Array<{ id: number; personaId: number; inmuebleId: number }>;
-  }>(`/inmuebles/${inmuebleId}/propietarios`, { token });
+  return apiRequest<{ items: PropietarioRecord[] }>(`/inmuebles/${inmuebleId}/propietarios`, {
+    token,
+  });
 }
 
 export function addInmueblePropietario(
   token: string,
   inmuebleId: number,
-  body: { personaId: number },
+  body: { personaId: number; porcentajeAdministracion?: number },
 ) {
-  return apiRequest<{ id: number; personaId: number; inmuebleId: number }>(
-    `/inmuebles/${inmuebleId}/propietarios`,
-    {
-      method: "POST",
-      token,
-      body: JSON.stringify(body),
-    },
-  );
+  return apiRequest<PropietarioRecord>(`/inmuebles/${inmuebleId}/propietarios`, {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function updatePropietarioAdministracion(
+  token: string,
+  inmuebleId: number,
+  propietarioId: number,
+  body: { porcentajeAdministracion: number },
+) {
+  return apiRequest<PropietarioRecord>(`/inmuebles/${inmuebleId}/propietarios/${propietarioId}`, {
+    method: "PATCH",
+    token,
+    body: JSON.stringify(body),
+  });
 }
 
 export function createContrato(

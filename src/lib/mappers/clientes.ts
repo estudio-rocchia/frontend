@@ -1,5 +1,5 @@
 import type { ClienteFilterId, ClienteRow, ClienteVinculoBadge } from "@/data/clientes";
-import type { ContratoListItem, ContratoTableItem, PersonaRecord } from "@/lib/api/types";
+import type { ContratoTableItem, PersonaRecord } from "@/lib/api/types";
 import { personaDisplayName } from "@/lib/format";
 
 export interface ClientesContext {
@@ -40,11 +40,10 @@ function buildEstado(persona: PersonaRecord, context: ClientesContext) {
 }
 
 export function buildClientesContext(
-  contratos: ContratoListItem[],
   contratosSummary: ContratoTableItem[],
   propietarioIds: Iterable<number>,
 ): ClientesContext {
-  const inquilinoIds = new Set(contratos.map((contrato) => contrato.inquilinoId));
+  const inquilinoIds = new Set(contratosSummary.map((contrato) => contrato.inquilinoId));
   const morosoIds = new Set<number>();
 
   for (const row of contratosSummary) {

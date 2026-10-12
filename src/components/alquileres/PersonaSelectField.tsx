@@ -12,7 +12,7 @@ export type PersonaFieldValue =
   | { mode: "new"; fullName: string };
 
 export type OwnerFieldValue =
-  | { mode: "existing"; personaId: number; label: string }
+  | { mode: "existing"; personaId: number; label: string; porcentajeAdministracion?: number }
   | { mode: "new"; fullName: string; porcentajeAdministracion: number };
 
 function filterPersonas(personas: PersonaRecord[], query: string): PersonaRecord[] {
@@ -164,32 +164,52 @@ export function OwnerSelectField({
   onChange: (value: OwnerFieldValue) => void;
   personas: PersonaRecord[];
 }) {
-  const selectedPersona =
-    value.mode === "existing" ? personas.find((persona) => persona.id === value.personaId) : null;
-
   if (value.mode === "existing") {
-    const pct = Number(selectedPersona?.porcentajeAdministracion ?? "6");
-    const pctLabel = Number.isFinite(pct) ? `${pct}%` : "6%";
+    const pct = value.porcentajeAdministracion ?? 6;
     return (
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-3">
         <PersonaSelectField
           label="Propietario"
           value={value}
           onChange={(next) => {
             if (next.mode === "existing") {
-              onChange(next);
+              onChange({ ...next, porcentajeAdministracion: pct });
               return;
             }
             onChange({
               mode: "new",
               fullName: next.fullName,
-              porcentajeAdministracion: 6,
+              porcentajeAdministracion: pct,
             });
           }}
           personas={personas}
           placeholder="Buscar propietario…"
         />
-        <p className="text-[12px] text-text-secondary">Honorarios de administración: {pctLabel}</p>
+        <div className="flex flex-col gap-2">
+          <span className="text-[11px] font-semibold text-text-secondary">% administración</span>
+          <div className="flex flex-wrap gap-2">
+            {ADMIN_PORCENTAJE_OPTIONS.map((option) => {
+              const selected = pct === option;
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => onChange({ ...value, porcentajeAdministracion: option })}
+                  className={`rounded-full border border-border px-3.5 py-2 text-[13px] transition-colors ${
+                    selected
+                      ? "bg-primary-soft font-semibold text-primary"
+                      : "bg-bg-card text-text-secondary hover:text-text-primary"
+                  }`}
+                >
+                  {option}%
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[12px] text-text-secondary">
+            Se aplicará al vincular esta propiedad al propietario.
+          </p>
+        </div>
       </div>
     );
   }

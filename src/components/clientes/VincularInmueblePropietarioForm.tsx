@@ -14,6 +14,7 @@ import {
   fetchLocalidades,
 } from "@/lib/api";
 import type { CatalogoItem, InmuebleRecord } from "@/lib/api/types";
+import { ADMIN_PORCENTAJE_OPTIONS } from "@/data/clientes";
 import { nextInmuebleCode, prefixForTipoInmueble } from "@/lib/codes";
 
 type LinkMode = "existente" | "nuevo";
@@ -40,6 +41,7 @@ export function VincularInmueblePropietarioForm({
   const [tiposInmueble, setTiposInmueble] = useState<CatalogoItem[]>([]);
   const [loadingCatalog, setLoadingCatalog] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [porcentajeAdministracion, setPorcentajeAdministracion] = useState("6");
 
   const disponibles = useMemo(
     () =>
@@ -138,11 +140,21 @@ export function VincularInmueblePropietarioForm({
         inmuebleId = inmueble.id;
       }
 
-      await addInmueblePropietario(token, inmuebleId, { personaId });
+      const pct = Number(porcentajeAdministracion);
+      if (!Number.isFinite(pct) || pct <= 0 || pct > 100) {
+        onError("El porcentaje de administración debe estar entre 0 y 100.");
+        return;
+      }
+
+      await addInmueblePropietario(token, inmuebleId, {
+        personaId,
+        porcentajeAdministracion: pct,
+      });
 
       setSelectedInmuebleId("");
       setPropertyLabel("");
       setPropertyAddress("");
+      setPorcentajeAdministracion("6");
       onLinked();
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
@@ -251,6 +263,41 @@ export function VincularInmueblePropietarioForm({
           />
         </div>
       )}
+
+      <div className="flex flex-col gap-2">
+        <span className="text-[11px] font-semibold text-text-secondary">% administración</span>
+        <div className="flex flex-wrap gap-2">
+          {ADMIN_PORCENTAJE_OPTIONS.map((option) => {
+            const selected = Number(porcentajeAdministracion) === option;
+            return (
+              <button
+                key={option}
+                type="button"
+                onClick={() => setPorcentajeAdministracion(String(option))}
+                className={`rounded-full border border-border px-3.5 py-2 text-[13px] transition-colors ${
+                  selected
+                    ? "bg-primary-soft font-semibold text-primary"
+                    : "bg-bg-card text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                {option}%
+              </button>
+            );
+          })}
+        </div>
+        <label className="flex max-w-[160px] flex-col gap-1.5">
+          <span className="text-[11px] font-semibold text-text-secondary">Otro porcentaje</span>
+          <input
+            type="number"
+            min={0.01}
+            max={100}
+            step={0.01}
+            value={porcentajeAdministracion}
+            onChange={(event) => setPorcentajeAdministracion(event.target.value)}
+            className="rounded-sm border border-border bg-bg-card px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
+          />
+        </label>
+      </div>
 
       <ButtonPrimary
         type="button"

@@ -12,9 +12,9 @@ import { useAuth } from "@/context/auth-context";
 import { clienteFilters, type ClienteFilterId, type ClienteRow } from "@/data/clientes";
 import {
   ApiError,
-  fetchContratos,
   fetchContratosTableSummary,
   fetchPersonas,
+  fetchPropietarioPersonaIds,
 } from "@/lib/api";
 import type { PersonaRecord } from "@/lib/api/types";
 import { pagePaddingClass } from "@/lib/layout";
@@ -26,8 +26,6 @@ import {
   searchClientes,
   vinculoBadgeClass,
 } from "@/lib/mappers/clientes";
-import { loadAllPropietarioPersonaIds } from "@/lib/mappers/propietario-inmuebles";
-
 const tableHeaders = ["Cliente", "Documento", "Vínculos", "Contacto", "Estado", "Acciones"];
 
 export function ClientesView() {
@@ -50,14 +48,13 @@ export function ClientesView() {
     setError(null);
 
     try {
-      const [personasRes, contratosRes, summaryRes] = await Promise.all([
+      const [personasRes, summaryRes, propietarioIdsRes] = await Promise.all([
         fetchPersonas(token, { limit: 200 }),
-        fetchContratos(token, { estado: "active", limit: 200 }),
         fetchContratosTableSummary(token, { estado: "active", limit: 200 }),
+        fetchPropietarioPersonaIds(token),
       ]);
 
-      const propietarioIds = await loadAllPropietarioPersonaIds(token);
-      const context = buildClientesContext(contratosRes.items, summaryRes.items, propietarioIds);
+      const context = buildClientesContext(summaryRes.items, propietarioIdsRes.personaIds);
       const rows = personasRes.items.map((persona) => mapPersonaToClienteRow(persona, context));
 
       setPersonas(personasRes.items);

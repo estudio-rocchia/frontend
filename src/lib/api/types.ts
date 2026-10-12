@@ -162,8 +162,35 @@ export interface LiquidacionLineaRecord {
   descripcionInmueble: string;
   montoAlquiler: string;
   montoHonorario: string;
+  porcentajeHonorario?: string | null;
   orden: number;
   pagoId: number | null;
+}
+
+export interface PropiedadAdministradaRecord {
+  inmuebleId: number;
+  propietarioId: number;
+  porcentajeAdministracion: string;
+  code: string;
+  title: string;
+  direccion: string | null;
+  contratoActivo: {
+    id: number;
+    contratoCode: string | null;
+    montoAlquiler: string;
+    codigoMoneda: string;
+  } | null;
+}
+
+export interface PropietarioRecord {
+  id: number;
+  inmuebleId: number;
+  personaId: number;
+  tipoTitularidad?: string;
+  porcentajeParticipacion?: string | null;
+  porcentajeAdministracion: string;
+  notas?: string | null;
+  persona?: { id: number; displayName: string | null };
 }
 
 export interface LiquidacionRecord {

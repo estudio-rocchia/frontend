@@ -53,7 +53,6 @@ import {
   fetchServiciosPeriodos,
   issueRecibo,
   registerPago,
-  updatePersonaAdministracion,
   updateServicio,
 } from "@/lib/api";
 import type {
@@ -115,15 +114,16 @@ async function resolveOwnerPersona(
     return fetchPersona(token, field.personaId);
   }
   const parts = parsePersonName(field.fullName);
-  const persona = await createPersona(token, {
+  return createPersona(token, {
     tipoPersona: "natural",
     nombre: parts.nombre,
     apellido: parts.apellido,
   });
-  await updatePersonaAdministracion(token, persona.id, {
-    porcentajeAdministracion: field.porcentajeAdministracion,
-  });
-  return fetchPersona(token, persona.id);
+}
+
+function ownerPorcentajeAdministracion(field: OwnerFieldValue): number {
+  if (field.mode === "new") return field.porcentajeAdministracion;
+  return field.porcentajeAdministracion ?? 6;
 }
 
 export function AlquileresWorkspace() {
@@ -769,7 +769,10 @@ export function AlquileresWorkspace() {
         }
 
         if (!alreadyLinked) {
-          await addInmueblePropietario(token, inmueble.id, { personaId: propietario.id });
+          await addInmueblePropietario(token, inmueble.id, {
+            personaId: propietario.id,
+            porcentajeAdministracion: ownerPorcentajeAdministracion(form.owner),
+          });
         }
       } else if (form.property.mode === "nuevo") {
         const property = form.property;
@@ -829,7 +832,10 @@ export function AlquileresWorkspace() {
           });
         }
 
-        await addInmueblePropietario(token, inmueble.id, { personaId: propietario.id });
+        await addInmueblePropietario(token, inmueble.id, {
+          personaId: propietario.id,
+          porcentajeAdministracion: ownerPorcentajeAdministracion(form.owner),
+        });
       } else {
         throw new ApiError(400, {
           error: { code: "VALIDATION_ERROR", message: "Seleccioná cómo cargar la propiedad" },

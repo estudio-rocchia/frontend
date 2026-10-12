@@ -120,15 +120,14 @@ function ownerFromInmueble(
   };
 }
 
-function assignedOwnerAdminLabel(
-  propietarioIds: number[],
-  personas: PersonaRecord[],
-): string | null {
-  if (propietarioIds.length === 0) return null;
-  const parts = propietarioIds.map((personaId) => {
-    const persona = personas.find((item) => item.id === personaId);
-    const pct = Number(persona?.porcentajeAdministracion ?? "6");
-    const pctLabel = Number.isFinite(pct) ? `${pct}%` : "6%";
+function assignedOwnerAdminLabel(inmueble: InmuebleSinAlquiler, personas: PersonaRecord[]): string | null {
+  if (inmueble.propietarios.length === 0) return null;
+  const parts = inmueble.propietarios.map((link) => {
+    const persona = personas.find((item) => item.id === link.personaId);
+    const pct = Number(link.porcentajeAdministracion ?? "6");
+    const pctLabel = Number.isFinite(pct)
+      ? `${pct.toLocaleString("es-AR", { maximumFractionDigits: 2 })}%`
+      : "6%";
     const name = persona ? personaDisplayName(persona) : null;
     return name ? `${name}: ${pctLabel}` : pctLabel;
   });
@@ -191,7 +190,7 @@ export function NewContractModal({
 
   const assignedOwnerAdminLabelText = useMemo(() => {
     if (!selectedVacante) return null;
-    return assignedOwnerAdminLabel(selectedVacante.propietarioIds, personas);
+    return assignedOwnerAdminLabel(selectedVacante, personas);
   }, [selectedVacante, personas]);
 
   function handleClose() {
