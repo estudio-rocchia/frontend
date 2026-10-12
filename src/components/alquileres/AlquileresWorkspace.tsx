@@ -52,6 +52,7 @@ import {
   fetchPersona,
   fetchPersonas,
   fetchPlanesActualizacionDeposito,
+  previewActualizacionDeposito,
   fetchServicios,
   fetchServiciosPeriodos,
   issueRecibo,
@@ -59,6 +60,7 @@ import {
   updateServicio,
 } from "@/lib/api";
 import type {
+  ActualizacionDepositoResult,
   CatalogoItem,
   ContratoDetail,
   CreatePeriodoInput,
@@ -93,6 +95,28 @@ function addYears(isoDate: string, years: number): string {
   const date = new Date(`${isoDate}T12:00:00`);
   date.setFullYear(date.getFullYear() + years);
   return date.toISOString().slice(0, 10);
+}
+
+async function createAutoPlanActualizacionDeposito(
+  token: string,
+  contratoId: number,
+  actualizacion: ActualizacionDepositoResult,
+  diaVencimientoPago: number,
+  notas: string,
+) {
+  const montoTotal = Number.parseFloat(actualizacion.diferencia);
+  if (!actualizacion.requiereCobro || !Number.isFinite(montoTotal) || montoTotal <= 0) {
+    return;
+  }
+
+  await createPlanActualizacionDeposito(token, contratoId, {
+    montoTotal,
+    codigoMoneda: actualizacion.codigoMoneda.trim(),
+    cantidadCuotas: 1,
+    diaVencimiento: diaVencimientoPago,
+    fechaPrimeraCuota: new Date().toISOString().slice(0, 10),
+    notas,
+  });
 }
 
 async function resolveTenantPersona(
@@ -563,6 +587,17 @@ export function AlquileresWorkspace() {
         });
       }
 
+      let depositPreview: ActualizacionDepositoResult | null = null;
+      try {
+        depositPreview = await previewActualizacionDeposito(
+          token,
+          selectedContrato.id,
+          String(depositAmount),
+        );
+      } catch {
+        depositPreview = null;
+      }
+
       await changeContratoEstado(token, selectedContrato.id, "finished");
 
       let nuevoContrato = null as Awaited<ReturnType<typeof createContrato>> | null;
@@ -608,9 +643,23 @@ export function AlquileresWorkspace() {
         });
       }
 
+      if (depositPreview?.requiereCobro) {
+        await createAutoPlanActualizacionDeposito(
+          token,
+          nuevoContrato.id,
+          depositPreview,
+          moraPayload.diaVencimientoPago,
+          `Plan automático por renovación del contrato #${selectedContrato.id}.`,
+        );
+      }
+
       setRenewModalOpen(false);
       const inmuebleCode = selectedContrato.inmueble?.code ?? "inmueble";
-      showToast(`Renovación registrada para ${inmuebleCode}.`);
+      showToast(
+        depositPreview?.requiereCobro
+          ? `Renovación registrada para ${inmuebleCode}. Plan de depósito creado.`
+          : `Renovación registrada para ${inmuebleCode}.`,
+      );
       await loadRows();
     } catch (err) {
       showToast(rentalApiErrorMessage(err, "No se pudo renovar el contrato"));
@@ -671,13 +720,27 @@ export function AlquileresWorkspace() {
 
     setSubmitting(true);
     try {
-      await applyContratoAjuste(token, selectedContrato.id, {
+      const result = await applyContratoAjuste(token, selectedContrato.id, {
         fechaAjuste: input.fechaAjuste,
       });
 
+      if (result.actualizacionDeposito?.requiereCobro) {
+        await createAutoPlanActualizacionDeposito(
+          token,
+          selectedContrato.id,
+          result.actualizacionDeposito,
+          selectedContrato.diaVencimientoPago,
+          "Plan automático por actualización de depósito (ajuste de alquiler).",
+        );
+      }
+
       setAdjustModalOpen(false);
       const inmuebleCode = selectedContrato.inmueble?.code ?? "inmueble";
-      showToast(`Ajuste aplicado para ${inmuebleCode}.`);
+      showToast(
+        result.actualizacionDeposito?.requiereCobro
+          ? `Ajuste aplicado para ${inmuebleCode}. Plan de depósito creado.`
+          : `Ajuste aplicado para ${inmuebleCode}.`,
+      );
       await loadRows();
     } catch (err) {
       showToast(rentalApiErrorMessage(err, "No se pudo aplicar el ajuste"));

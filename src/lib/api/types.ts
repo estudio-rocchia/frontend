@@ -106,6 +106,14 @@ export interface PreviewAjusteResponse {
   fuenteHasta: string;
 }
 
+export interface ActualizacionDepositoResult {
+  montoAnterior: string;
+  montoNuevo: string;
+  diferencia: string;
+  codigoMoneda: string;
+  requiereCobro: boolean;
+}
+
 /** Read-only preview from GET /contratos/:id/ajustes/preview (same math as apply). */
 export interface ContratoAjustePreviewResponse {
   contratoId: number;
@@ -123,6 +131,7 @@ export interface ContratoAjustePreviewResponse {
   variacionPct: string;
   frecuenciaAjusteMeses: number | null;
   mesesDesdeBase: number;
+  actualizacionDeposito: ActualizacionDepositoResult;
 }
 
 export interface ApplyAjusteInput {
@@ -140,6 +149,7 @@ export interface ApplyAjusteResponse {
     factor: string;
   };
   contrato: ContratoRecord;
+  actualizacionDeposito: ActualizacionDepositoResult | null;
 }
 
 

@@ -16,6 +16,7 @@ import type {
   PagoDetail,
   PagoRecord,
   PersonaRecord,
+  ActualizacionDepositoResult,
   ApplyAjusteInput,
   ApplyAjusteResponse,
   ContratoAjustePreviewResponse,
@@ -498,6 +499,18 @@ export function previewContratoAjuste(token: string, contratoId: number, fechaAj
   const query = new URLSearchParams({ fechaAjuste });
   return apiRequest<ContratoAjustePreviewResponse>(
     `/contratos/${contratoId}/ajustes/preview?${query}`,
+    { token },
+  );
+}
+
+export function previewActualizacionDeposito(
+  token: string,
+  contratoId: number,
+  montoObjetivo: string,
+) {
+  const query = new URLSearchParams({ montoObjetivo });
+  return apiRequest<ActualizacionDepositoResult>(
+    `/contratos/${contratoId}/actualizacion-deposito/preview?${query}`,
     { token },
   );
 }

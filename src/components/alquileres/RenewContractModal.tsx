@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { ChipToggle, FieldBlock, FormField, FormSection } from "@/components/ui/FormLayout";
 import type { AdjustmentIndex } from "@/data/alquileres-contract-details";
 import type { ContratoDetail } from "@/lib/api/types";
-import { formatDateDisplay, personaDisplayName } from "@/lib/format";
+import { previewActualizacionDeposito } from "@/lib/api";
+import { formatDateDisplay, formatMoney, moneyClassName, personaDisplayName } from "@/lib/format";
 import { MoraPunitoriaFields } from "@/components/alquileres/MoraPunitoriaFields";
 import {
   DEFAULT_MORA_PUNITORIA,
@@ -67,13 +68,13 @@ function montoInputFromApi(value: string | null | undefined): string {
 function buildFormFromContrato(contrato: ContratoDetail): RenewContractForm {
   const dates = defaultRenewalDates(contrato);
   const currency = contrato.codigoMoneda.trim() === "USD" ? "USD" : "ARS";
-  const deposit = contrato.montoDeposito ?? contrato.montoAlquiler;
+  const suggestedRent = montoInputFromApi(contrato.montoAlquiler);
 
   return {
     fechaInicio: dates.fechaInicio,
     fechaFin: dates.fechaFin,
-    amount: montoInputFromApi(contrato.montoAlquiler),
-    depositAmount: montoInputFromApi(deposit),
+    amount: suggestedRent,
+    depositAmount: suggestedRent,
     currency,
     index: indiceCodeFromContrato(contrato) ?? "ICL",
     frecuenciaAjusteMeses: defaultFrecuenciaAjuste(contrato),
@@ -95,6 +96,7 @@ const emptyForm: RenewContractForm = {
 export function RenewContractModal({
   open,
   contrato,
+  token,
   onClose,
   onSubmit,
   submitting = false,
@@ -107,11 +109,40 @@ export function RenewContractModal({
   submitting?: boolean;
 }) {
   const [form, setForm] = useState<RenewContractForm>(emptyForm);
+  const [depositPreview, setDepositPreview] = useState<{
+    montoAnterior: string;
+    montoNuevo: string;
+    diferencia: string;
+    codigoMoneda: string;
+    requiereCobro: boolean;
+  } | null>(null);
 
   useEffect(() => {
     if (!open || !contrato) return;
     setForm(buildFormFromContrato(contrato));
+    setDepositPreview(null);
   }, [open, contrato?.id]);
+
+  const depositTarget = useMemo(() => {
+    const parsed = Number(form.depositAmount.replace(/\D/g, ""));
+    if (!Number.isFinite(parsed) || parsed <= 0) return null;
+    return String(parsed);
+  }, [form.depositAmount]);
+
+  useEffect(() => {
+    if (!open || !contrato || !token || !depositTarget) {
+      setDepositPreview(null);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void previewActualizacionDeposito(token, contrato.id, depositTarget)
+        .then(setDepositPreview)
+        .catch(() => setDepositPreview(null));
+    }, 300);
+
+    return () => window.clearTimeout(timer);
+  }, [open, contrato, token, depositTarget]);
 
   function handleClose() {
     setForm(emptyForm);
@@ -119,7 +150,13 @@ export function RenewContractModal({
   }
 
   function patch(partial: Partial<RenewContractForm>) {
-    setForm((prev) => ({ ...prev, ...partial }));
+    setForm((prev) => {
+      const next = { ...prev, ...partial };
+      if (partial.amount !== undefined && partial.depositAmount === undefined) {
+        next.depositAmount = partial.amount;
+      }
+      return next;
+    });
   }
 
   const inmuebleLabel = contrato?.inmueble
@@ -206,10 +243,10 @@ export function RenewContractModal({
                   placeholder="485000 o 1200"
                 />
                 <FormField
-                  label="Depósito de garantía"
+                  label="Depósito de garantía (1 mes)"
                   value={form.depositAmount}
                   onChange={(v) => patch({ depositAmount: v })}
-                  placeholder="Ej. 970000"
+                  placeholder="Igual al alquiler mensual"
                 />
                 <div className="flex flex-col gap-1.5">
                   <span className="text-[11px] font-semibold text-text-secondary">Moneda</span>
@@ -220,6 +257,19 @@ export function RenewContractModal({
                   />
                 </div>
               </div>
+              {depositPreview?.requiereCobro ? (
+                <div className="rounded-sm border border-primary/20 bg-primary-soft/50 px-4 py-3 text-[13px] text-text-primary">
+                  Depósito actual:{" "}
+                  <span className={moneyClassName}>
+                    {formatMoney(depositPreview.montoAnterior, depositPreview.codigoMoneda)}
+                  </span>
+                  . Diferencia a cobrar al inquilino:{" "}
+                  <strong className={moneyClassName}>
+                    {formatMoney(depositPreview.diferencia, depositPreview.codigoMoneda)}
+                  </strong>
+                  . Se creará un plan de cuotas automáticamente.
+                </div>
+              ) : null}
               <div className="flex flex-col gap-1.5">
                 <span className="text-[11px] font-semibold text-text-secondary">Índice de ajuste</span>
                 <ChipToggle

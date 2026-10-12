@@ -94,16 +94,23 @@ export function CobrarAlquilerModal({
       setEmitRecibo(true);
 
       try {
-        const [cuotasRes, planesRes] = await Promise.all([
-          fetchCuotas(authToken, id),
-          fetchPlanesActualizacionDeposito(authToken, id),
-        ]);
+        const cuotasRes = await fetchCuotas(authToken, id);
+        let planes: PlanActualizacionDepositoDetail[] = [];
+        try {
+          const planesRes = await fetchPlanesActualizacionDeposito(authToken, id);
+          planes = planesRes.items;
+        } catch {
+          // El cobro de alquiler no depende del plan de depósito; si falla (p. ej. migración
+          // pendiente o backend desactualizado), seguimos sin cuota de depósito.
+          planes = [];
+        }
+
         let target = pickCuotaParaCobrar(cuotasRes.items);
         if (!target) {
           const period = currentBillingPeriod();
           target = await generateCuota(authToken, id, period);
         }
-        const activePlan = activePlanActualizacionDeposito(planesRes.items);
+        const activePlan = activePlanActualizacionDeposito(planes);
         const pendingDeposito = pickCuotaDepositoParaCobrar(activePlan);
         if (!cancelled) {
           setCuota(target);
@@ -145,8 +152,8 @@ export function CobrarAlquilerModal({
     setError(null);
     try {
       let cuotaActualizada = cuota;
-      if (isCuotaOverdue(cuota) && Number(cuota.saldoMora) === 0) {
-        const moraResult = await applyMora(token, contratoId, cuota.id);
+      if (isCuotaOverdue(cuota, fechaPago)) {
+        const moraResult = await applyMora(token, contratoId, cuota.id, { asOfDate: fechaPago });
         cuotaActualizada = moraResult.cuota;
       }
 

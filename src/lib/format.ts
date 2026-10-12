@@ -166,6 +166,14 @@ const RENTAL_ERROR_MESSAGES: Record<string, string> = {
     "Ya hay una liquidación para ese propietario y período. Abrila desde el botón o cambiá mes/año.",
 };
 
+const MORA_TARGET_MISSING_RE = /^Mora (\d+) does not exist$/;
+
+function translateMoraTargetMissing(message: string): string | null {
+  const match = MORA_TARGET_MISSING_RE.exec(message);
+  if (!match) return null;
+  return `No se encontró el registro de mora #${match[1]}. Volvé a abrir el cobro para recalcular la mora.`;
+}
+
 const INDEX_VALUE_MISSING_RE = /^No index value for (ICL|IPC|CAC) at /;
 
 export function rentalApiErrorMessage(err: unknown, fallback = "No se pudo crear el contrato"): string {
@@ -177,6 +185,8 @@ export function rentalApiErrorMessage(err: unknown, fallback = "No se pudo crear
     if (indexMatch) {
       return `No hay valor ${indexMatch[1]} para ese período. Ejecutá sync de índices o cargá el monto manualmente.`;
     }
+    const moraMissing = translateMoraTargetMissing(err.message);
+    if (moraMissing) return moraMissing;
     return RENTAL_ERROR_MESSAGES[err.message] ?? err.message;
   }
   return fallback;
