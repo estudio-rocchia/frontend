@@ -74,7 +74,8 @@ export function rentalSummaryStats(rows: RentalRow[]) {
 /** Mostrar acción Cobrar: ventana del 1 al 10, o si ya está en mora. */
 export function canCollectRent(row: RentalRow): boolean {
   if (row.needsRenewal) return false;
-  if (row.filterStatus === "en_mora" || row.daysOverdue > 0) return true;
+  if (row.filterStatus === "en_mora") return true;
+  if (row.daysOverdue > 0 && row.filterStatus !== "ajuste_pendiente") return true;
   return row.needsCollection && isRentCollectionWindow();
 }
 
