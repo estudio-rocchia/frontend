@@ -1,18 +1,27 @@
 "use client";
 
+import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { ArrowLeft } from "lucide-react";
 
 import { VincularInmueblePropietarioForm } from "@/components/clientes/VincularInmueblePropietarioForm";
 import { ButtonOutline } from "@/components/ui/Button";
-import { DrawerPanel } from "@/components/ui/DrawerPanel";
 import { FieldBlock } from "@/components/ui/FormLayout";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useAuth } from "@/context/auth-context";
 import { ADMIN_PORCENTAJE_OPTIONS, type ClienteRow } from "@/data/clientes";
-import { ApiError, fetchContratos, fetchPersona, updatePropietarioAdministracion } from "@/lib/api";
+import {
+  ApiError,
+  fetchContratos,
+  fetchContratosTableSummary,
+  fetchPersona,
+  fetchPropietarioPersonaIds,
+  updatePropietarioAdministracion,
+} from "@/lib/api";
 import type { ContratoListItem, InmuebleRecord, PersonaRecord } from "@/lib/api/types";
 import { formatMoney, personaDisplayName } from "@/lib/format";
-import { vinculoBadgeClass } from "@/lib/mappers/clientes";
+import { pagePaddingClass } from "@/lib/layout";
+import { buildClientesContext, mapPersonaToClienteRow, vinculoBadgeClass } from "@/lib/mappers/clientes";
 import {
   loadPropiedadesAdministradas,
   propiedadAdministradaLabel,
@@ -42,22 +51,23 @@ function formatPorcentaje(value: string | null | undefined): string {
   return `${numeric.toLocaleString("es-AR", { maximumFractionDigits: 2 })}%`;
 }
 
-export function ClienteFichaDrawer({
-  open,
-  persona,
-  clienteRow,
-  onClose,
-  onUpdated,
-}: {
-  open: boolean;
-  persona: PersonaRecord | null;
-  clienteRow: ClienteRow | null;
-  onClose: () => void;
-  onUpdated: () => void;
-}) {
+function personaInitials(persona: PersonaRecord): string {
+  const first = persona.nombre?.trim().charAt(0) ?? "";
+  const last = persona.apellido?.trim().charAt(0) ?? "";
+  return `${first}${last}`.toUpperCase() || "?";
+}
+
+export function ClienteFichaView() {
+  const router = useRouter();
+  const params = useParams();
+  const personaId = Number(params.id);
+  const validId = Number.isInteger(personaId) && personaId > 0;
+
   const { token, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<FichaTab>("resumen");
-  const [detail, setDetail] = useState<PersonaRecord | null>(null);
+  const [persona, setPersona] = useState<PersonaRecord | null>(null);
+  const [clienteRow, setClienteRow] = useState<ClienteRow | null>(null);
+  const [loading, setLoading] = useState(true);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [contratosInquilino, setContratosInquilino] = useState<ContratoListItem[]>([]);
   const [propiedades, setPropiedades] = useState<PropiedadAdministrada[]>([]);
@@ -71,17 +81,23 @@ export function ClienteFichaDrawer({
   const tienePropiedades = propiedades.length > 0;
 
   const reloadInmobiliaria = useCallback(async () => {
-    if (!token || !persona) return;
+    if (!token || !validId) return;
 
-    const [personaDetail, contratosRes, propiedadesData] = await Promise.all([
-      fetchPersona(token, persona.id),
-      fetchContratos(token, { estado: "active", limit: 200 }),
-      loadPropiedadesAdministradas(token, persona.id),
-    ]);
+    const [personaDetail, contratosRes, propiedadesData, summaryRes, propietarioIdsRes] =
+      await Promise.all([
+        fetchPersona(token, personaId),
+        fetchContratos(token, { estado: "active", limit: 200 }),
+        loadPropiedadesAdministradas(token, personaId),
+        fetchContratosTableSummary(token, { estado: "active", limit: 200 }),
+        fetchPropietarioPersonaIds(token),
+      ]);
 
-    setDetail(personaDetail);
+    const context = buildClientesContext(summaryRes.items, propietarioIdsRes.personaIds);
+
+    setPersona(personaDetail);
+    setClienteRow(mapPersonaToClienteRow(personaDetail, context));
     setContratosInquilino(
-      contratosRes.items.filter((contrato) => contrato.inquilinoId === persona.id),
+      contratosRes.items.filter((contrato) => contrato.inquilinoId === personaId),
     );
     setPropiedades(propiedadesData.propiedades);
     setLinkedInmuebleIds(propiedadesData.linkedInmuebleIds);
@@ -94,25 +110,19 @@ export function ClienteFichaDrawer({
         ]),
       ),
     );
-  }, [token, persona]);
+  }, [token, validId, personaId]);
 
   useEffect(() => {
-    if (!open || !persona) {
-      setDetail(null);
-      setContratosInquilino([]);
-      setPropiedades([]);
-      setLinkedInmuebleIds(new Set());
-      setInmuebles([]);
-      setActiveTab("resumen");
-      setError(null);
-      setSuccess(null);
+    if (!validId) {
+      setLoading(false);
+      setError("Cliente no encontrado.");
       return;
     }
-
     if (!token) return;
 
-    setLoadingDetail(true);
+    setLoading(true);
     setError(null);
+    setActiveTab("resumen");
 
     void reloadInmobiliaria()
       .catch((err) => {
@@ -120,27 +130,39 @@ export function ClienteFichaDrawer({
           logout();
           return;
         }
+        if (err instanceof ApiError && err.status === 404) {
+          setError("Cliente no encontrado.");
+          return;
+        }
         setError(err instanceof ApiError ? err.message : "No se pudo cargar la ficha del cliente");
       })
-      .finally(() => setLoadingDetail(false));
-  }, [open, persona, token, logout, reloadInmobiliaria]);
+      .finally(() => setLoading(false));
+  }, [validId, token, logout, reloadInmobiliaria]);
 
-  const displayPersona = detail ?? persona;
   const metaLine = useMemo(() => {
-    if (!displayPersona) return "";
+    if (!persona) return "";
     const parts = [
-      displayPersona.numeroDocumento
-        ? `DNI ${displayPersona.numeroDocumento}`
-        : displayPersona.cuit
-          ? `CUIT ${displayPersona.cuit}`
-          : null,
-      displayPersona.email,
-      displayPersona.phone,
+      persona.numeroDocumento ? `DNI ${persona.numeroDocumento}` : persona.cuit ? `CUIT ${persona.cuit}` : null,
+      persona.email,
+      persona.phone,
     ].filter(Boolean);
     return parts.join(" · ");
-  }, [displayPersona]);
+  }, [persona]);
 
-  if (!persona || !displayPersona) return null;
+  if (!validId || (error && !persona && !loading)) {
+    return (
+      <div className={`flex flex-col gap-4 ${pagePaddingClass}`}>
+        <p className="rounded-sm border border-danger bg-danger-bg px-3 py-2 text-sm text-danger">
+          {error ?? "Cliente no encontrado."}
+        </p>
+        <ButtonOutline onClick={() => router.push("/clientes")}>Volver al listado</ButtonOutline>
+      </div>
+    );
+  }
+
+  if (loading || !persona) {
+    return <p className={`${pagePaddingClass} text-sm text-text-secondary`}>Cargando ficha del cliente…</p>;
+  }
 
   async function handleSavePropiedadAdministracion(propiedad: PropiedadAdministrada) {
     if (!token) return;
@@ -166,7 +188,6 @@ export function ClienteFichaDrawer({
         ),
       );
       setSuccess(`Porcentaje actualizado para ${propiedad.title}.`);
-      onUpdated();
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         logout();
@@ -184,7 +205,6 @@ export function ClienteFichaDrawer({
     setLoadingDetail(true);
     try {
       await reloadInmobiliaria();
-      onUpdated();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo actualizar la ficha");
     } finally {
@@ -193,29 +213,58 @@ export function ClienteFichaDrawer({
   }
 
   return (
-    <DrawerPanel
-      open={open}
-      onClose={onClose}
-      title={personaDisplayName(displayPersona)}
-      subtitle={metaLine}
-      banner={
-        clienteRow ? (
-          <div className="flex flex-wrap gap-2">
-            {clienteRow.vinculos.map((vinculo) => (
-              <span
-                key={vinculo.id}
-                className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${vinculoBadgeClass(vinculo.id)}`}
-              >
-                {vinculo.label}
-              </span>
-            ))}
+    <div className={`flex flex-col gap-6 ${pagePaddingClass}`}>
+      <button
+        type="button"
+        onClick={() => router.push("/clientes")}
+        className="flex w-fit items-center gap-2 text-sm font-medium text-text-secondary transition-colors hover:text-primary"
+      >
+        <ArrowLeft className="h-4 w-4" aria-hidden />
+        Volver al listado
+      </button>
+
+      <div className="flex flex-wrap gap-2 border-b border-border pb-1">
+        <button
+          type="button"
+          onClick={() => router.push("/clientes")}
+          className="rounded-t-sm px-4 py-2.5 text-sm font-medium text-text-secondary hover:text-text-primary"
+        >
+          Listado
+        </button>
+        <span className="rounded-t-sm border-b-2 border-primary px-4 py-2.5 text-sm font-medium text-primary">
+          Perfil 360°
+        </span>
+      </div>
+
+      <header className="flex flex-col gap-4 rounded-md border border-border bg-bg-card p-5 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex gap-4">
+          <div
+            className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary-soft text-lg font-bold text-primary"
+            aria-hidden
+          >
+            {personaInitials(persona)}
           </div>
-        ) : null
-      }
-      footer={<ButtonOutline onClick={onClose}>Cerrar</ButtonOutline>}
-    >
-      <div className="flex flex-col gap-6">
-        <div className="flex flex-wrap gap-2 border-b border-border pb-1">
+          <div className="flex flex-col gap-2">
+            <h1 className="text-[26px] font-bold text-primary">{personaDisplayName(persona)}</h1>
+            {metaLine ? <p className="text-sm text-text-secondary">{metaLine}</p> : null}
+            {clienteRow && clienteRow.vinculos.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {clienteRow.vinculos.map((vinculo) => (
+                  <span
+                    key={vinculo.id}
+                    className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${vinculoBadgeClass(vinculo.id)}`}
+                  >
+                    {vinculo.label}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </header>
+
+      <section className="rounded-md border border-border bg-bg-card">
+        <div className="flex flex-wrap gap-2 border-b border-border px-5 pt-4">
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -232,6 +281,7 @@ export function ClienteFichaDrawer({
           ))}
         </div>
 
+        <div className="flex flex-col gap-6 p-5">
         {error ? (
           <p className="rounded-sm border border-danger bg-danger-bg px-3 py-2 text-sm text-danger">{error}</p>
         ) : null}
@@ -240,19 +290,19 @@ export function ClienteFichaDrawer({
         ) : null}
 
         {loadingDetail ? (
-          <p className="text-sm text-text-secondary">Cargando ficha…</p>
+          <p className="text-sm text-text-secondary">Actualizando…</p>
         ) : null}
 
         {!loadingDetail && activeTab === "resumen" ? (
           <div className="flex flex-col gap-5">
             <div className="grid gap-4 sm:grid-cols-2">
-              <FieldBlock label="Tipo" value={displayPersona.tipoPersona === "juridica" ? "Jurídica" : "Natural"} />
-              <FieldBlock label="Estado" value={displayPersona.activo === false ? "Inactivo" : "Activo"} />
-              <FieldBlock label="Documento" value={displayPersona.numeroDocumento ?? "—"} />
-              <FieldBlock label="CUIT/CUIL" value={displayPersona.cuit ?? "—"} />
-              <FieldBlock label="Correo" value={displayPersona.email ?? "—"} />
-              <FieldBlock label="Teléfono" value={displayPersona.phone ?? "—"} />
-              <FieldBlock label="Dirección" value={displayPersona.address ?? "—"} />
+              <FieldBlock label="Tipo" value={persona.tipoPersona === "juridica" ? "Jurídica" : "Natural"} />
+              <FieldBlock label="Estado" value={persona.activo === false ? "Inactivo" : "Activo"} />
+              <FieldBlock label="Documento" value={persona.numeroDocumento ?? "—"} />
+              <FieldBlock label="CUIT/CUIL" value={persona.cuit ?? "—"} />
+              <FieldBlock label="Correo" value={persona.email ?? "—"} />
+              <FieldBlock label="Teléfono" value={persona.phone ?? "—"} />
+              <FieldBlock label="Dirección" value={persona.address ?? "—"} />
               {tienePropiedades ? (
                 <FieldBlock
                   label="% administración"
@@ -264,10 +314,10 @@ export function ClienteFichaDrawer({
                 />
               ) : null}
             </div>
-            {displayPersona.notas ? (
+            {persona.notas ? (
               <div className="flex flex-col gap-1">
                 <SectionTitle>Notas</SectionTitle>
-                <p className="text-[13px] text-text-primary">{displayPersona.notas}</p>
+                <p className="text-[13px] text-text-primary">{persona.notas}</p>
               </div>
             ) : null}
           </div>
@@ -426,7 +476,8 @@ export function ClienteFichaDrawer({
             </p>
           </div>
         ) : null}
-      </div>
-    </DrawerPanel>
+        </div>
+      </section>
+    </div>
   );
 }

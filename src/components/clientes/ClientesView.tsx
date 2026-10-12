@@ -4,7 +4,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
 
-import { ClienteFichaDrawer } from "@/components/clientes/ClienteFichaDrawer";
 import { ButtonPrimary } from "@/components/ui/Button";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -39,7 +38,6 @@ export function ClientesView() {
   const [clienteRows, setClienteRows] = useState<ClienteRow[]>([]);
   const [activeFilter, setActiveFilter] = useState<ClienteFilterId>("todos");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedClienteId, setSelectedClienteId] = useState<number | null>(null);
   const [listTab, setListTab] = useState<"listado" | "nuevo">("listado");
 
   const load = useCallback(async () => {
@@ -100,8 +98,6 @@ export function ClientesView() {
     [clienteRows],
   );
 
-  const selectedPersona = personas.find((persona) => persona.id === selectedClienteId) ?? null;
-  const selectedRow = clienteRows.find((row) => row.id === selectedClienteId) ?? null;
   const hasSearch = searchQuery.trim().length > 0;
 
   const resultSummary = useMemo(() => {
@@ -298,7 +294,7 @@ export function ClientesView() {
                       <td className="h-[52px] px-5">
                         <button
                           type="button"
-                          onClick={() => setSelectedClienteId(row.id)}
+                          onClick={() => router.push(`/clientes/${row.id}`)}
                           className="text-[13px] font-semibold text-primary hover:underline"
                         >
                           Ver ficha
@@ -312,14 +308,6 @@ export function ClientesView() {
           </div>
         </section>
       </div>
-
-      <ClienteFichaDrawer
-        open={selectedClienteId !== null}
-        persona={selectedPersona}
-        clienteRow={selectedRow}
-        onClose={() => setSelectedClienteId(null)}
-        onUpdated={() => void load()}
-      />
     </>
   );
 }
