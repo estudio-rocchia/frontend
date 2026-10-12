@@ -20,6 +20,7 @@ import { KpiCard } from "@/components/ui/KpiCard";
 import { useAuth } from "@/context/auth-context";
 import type { ContractDetail } from "@/data/alquileres-contract-details";
 import { rentalSummaryStats, type RentalRow } from "@/data/alquileres-rentals";
+import type { PlanActualizacionDepositoFormValues } from "@/components/alquileres/PlanActualizacionDepositoModal";
 import type { PeriodoFormValues } from "@/components/alquileres/PeriodoServicioModal";
 import type { ServicioFormValues } from "@/components/alquileres/ServicioFormModal";
 import type { RegistrarPagoServicioFormValues } from "@/components/alquileres/RegistrarPagoServicioModal";
@@ -33,6 +34,7 @@ import {
   createContrato,
   createInmueble,
   createLocalidad,
+  createPlanActualizacionDeposito,
   createPeriodoServicio,
   createPersona,
   createServicio,
@@ -49,6 +51,7 @@ import {
   fetchLocalidades,
   fetchPersona,
   fetchPersonas,
+  fetchPlanesActualizacionDeposito,
   fetchServicios,
   fetchServiciosPeriodos,
   issueRecibo,
@@ -62,6 +65,7 @@ import type {
   PersonaRecord,
   SecheepImportInput,
   PeriodoServicioRecord,
+  PlanActualizacionDepositoDetail,
   ServicioContratoRecord,
 } from "@/lib/api/types";
 import { nextContratoCode, nextInmuebleCode, prefixForTipoInmueble } from "@/lib/codes";
@@ -152,6 +156,7 @@ export function AlquileresWorkspace() {
   const [cobrarRow, setCobrarRow] = useState<RentalRow | null>(null);
   const [drawerServicios, setDrawerServicios] = useState<ServicioContratoRecord[]>([]);
   const [drawerPeriodos, setDrawerPeriodos] = useState<PeriodoServicioRecord[]>([]);
+  const [drawerPlanesDeposito, setDrawerPlanesDeposito] = useState<PlanActualizacionDepositoDetail[]>([]);
   const [tiposServicio, setTiposServicio] = useState<CatalogoItem[]>([]);
   const [serviciosLoading, setServiciosLoading] = useState(false);
   const [serviciosSubmitting, setServiciosSubmitting] = useState(false);
@@ -198,9 +203,10 @@ export function AlquileresWorkspace() {
       if (!token) return;
       setServiciosLoading(true);
       try {
-        const [serviciosRes, periodosRes, tiposRes, mediosRes] = await Promise.all([
+        const [serviciosRes, periodosRes, planesRes, tiposRes, mediosRes] = await Promise.all([
           fetchServicios(token, contratoId),
           fetchServiciosPeriodos(token, contratoId),
+          fetchPlanesActualizacionDeposito(token, contratoId),
           tiposServicio.length
             ? Promise.resolve({ items: tiposServicio })
             : fetchCatalog(token, "/catalogos/tipos-servicio"),
@@ -210,6 +216,7 @@ export function AlquileresWorkspace() {
         ]);
         setDrawerServicios(serviciosRes.items);
         setDrawerPeriodos(periodosRes.items);
+        setDrawerPlanesDeposito(planesRes.items);
         if (!tiposServicio.length) {
           setTiposServicio(tiposRes.items);
         }
@@ -233,6 +240,7 @@ export function AlquileresWorkspace() {
       setSelectedContrato(null);
       setDrawerServicios([]);
       setDrawerPeriodos([]);
+      setDrawerPlanesDeposito([]);
       try {
         const contratoId = Number(id);
         const detailRes = await fetchContrato(token, contratoId);
@@ -402,6 +410,45 @@ export function AlquileresWorkspace() {
     }
   }
 
+
+  async function handleCreatePlanDeposito(values: PlanActualizacionDepositoFormValues) {
+    if (!token || !selectedContrato) return;
+
+    const montoTotal = Number(values.montoTotal.replace(/\D/g, ""));
+    const cantidadCuotas = Number(values.cantidadCuotas);
+    const diaVencimiento = Number(values.diaVencimiento);
+    if (!Number.isFinite(montoTotal) || montoTotal <= 0) {
+      showToast("Ingresá un monto total válido.");
+      return;
+    }
+    if (!Number.isInteger(cantidadCuotas) || cantidadCuotas < 1) {
+      showToast("Ingresá una cantidad de cuotas válida.");
+      return;
+    }
+    if (!Number.isInteger(diaVencimiento) || diaVencimiento < 1 || diaVencimiento > 31) {
+      showToast("Ingresá un día de vencimiento entre 1 y 31.");
+      return;
+    }
+
+    setServiciosSubmitting(true);
+    try {
+      await createPlanActualizacionDeposito(token, selectedContrato.id, {
+        montoTotal,
+        codigoMoneda: selectedContrato.codigoMoneda.trim(),
+        cantidadCuotas,
+        diaVencimiento,
+        fechaPrimeraCuota: values.fechaPrimeraCuota,
+        notas: values.notas.trim() || null,
+      });
+      showToast("Plan de actualización de depósito creado.");
+      await loadDrawerServicios(selectedContrato.id);
+    } catch (err) {
+      showToast(rentalApiErrorMessage(err, "No se pudo crear el plan de depósito"));
+      throw err;
+    } finally {
+      setServiciosSubmitting(false);
+    }
+  }
 
   async function handleRegisterPago(
     periodo: PeriodoServicioRecord,
@@ -997,12 +1044,16 @@ export function AlquileresWorkspace() {
       <ContractFichaDrawer
         open={drawerOpen}
         detail={detail}
+        contrato={selectedContrato}
         servicios={drawerServicios}
         periodos={drawerPeriodos}
+        planesDeposito={drawerPlanesDeposito}
         tiposServicio={tiposServicio}
         serviciosLoading={serviciosLoading}
         serviciosSubmitting={serviciosSubmitting}
         canEditServicios={selectedContrato?.estado === "active"}
+        canManageDepositoPlan={selectedContrato?.estado === "active"}
+        onCreatePlanDeposito={handleCreatePlanDeposito}
         onCreateServicio={handleCreateServicio}
         onUpdateServicio={handleUpdateServicio}
         onDeactivateServicio={handleDeactivateServicio}

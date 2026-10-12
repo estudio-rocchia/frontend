@@ -438,7 +438,48 @@ export interface CreatePeriodoInput {
   notas?: string | null;
 }
 
-export type ImputacionTargetType = "cuota_alquiler" | "mora" | "periodo_servicio";
+export type ImputacionTargetType =
+  | "cuota_alquiler"
+  | "mora"
+  | "periodo_servicio"
+  | "cuota_actualizacion_deposito";
+
+export type PlanActualizacionDepositoEstado = "active" | "completed" | "cancelled";
+
+export interface CuotaActualizacionDepositoDetail {
+  id: number;
+  planId: number;
+  numero: number;
+  fechaVencimiento: string;
+  monto: string;
+  montoPagado: string;
+  estadoCode: string;
+  saldo: string;
+}
+
+export interface PlanActualizacionDepositoDetail {
+  id: number;
+  contratoId: number;
+  movimientoDepositoId: number | null;
+  montoTotal: string;
+  codigoMoneda: string;
+  cantidadCuotas: number;
+  diaVencimiento: number;
+  notas: string | null;
+  estado: PlanActualizacionDepositoEstado;
+  creadoEn: string;
+  cuotas: CuotaActualizacionDepositoDetail[];
+}
+
+export interface CreatePlanActualizacionDepositoInput {
+  montoTotal: number;
+  codigoMoneda: string;
+  cantidadCuotas: number;
+  diaVencimiento: number;
+  fechaPrimeraCuota: string;
+  movimientoDepositoId?: number | null;
+  notas?: string | null;
+}
 
 export interface ImputacionInput {
   targetType: ImputacionTargetType;

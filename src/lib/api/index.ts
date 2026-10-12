@@ -27,6 +27,8 @@ import type {
   RegisterPagoInput,
   RegisterPagoResult,
   CreatePeriodoInput,
+  CreatePlanActualizacionDepositoInput,
+  PlanActualizacionDepositoDetail,
   CreateServicioInput,
   CreateUsuarioInput,
   ResetUsuarioPasswordInput,
@@ -199,6 +201,28 @@ export function importSecheep(token: string, servicioId: number, body: SecheepIm
     token,
     body: JSON.stringify(body),
   });
+}
+
+export function fetchPlanesActualizacionDeposito(token: string, contratoId: number) {
+  return apiRequest<{ items: PlanActualizacionDepositoDetail[] }>(
+    `/contratos/${contratoId}/planes-actualizacion-deposito`,
+    { token },
+  );
+}
+
+export function createPlanActualizacionDeposito(
+  token: string,
+  contratoId: number,
+  body: CreatePlanActualizacionDepositoInput,
+) {
+  return apiRequest<PlanActualizacionDepositoDetail>(
+    `/contratos/${contratoId}/planes-actualizacion-deposito`,
+    {
+      method: "POST",
+      token,
+      body: JSON.stringify(body),
+    },
+  );
 }
 
 export function fetchPagos(token: string, contratoId: number) {
