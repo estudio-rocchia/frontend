@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { DM_Sans } from "next/font/google";
 
+import { WebVitalsReporter } from "@/components/observability/WebVitalsReporter";
 import { AuthProvider } from "@/context/auth-context";
 import "./globals.css";
 
@@ -23,7 +24,10 @@ export default function RootLayout({
   return (
     <html lang="es" className={`${dmSans.variable} h-full antialiased`}>
       <body className="min-h-full">
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <WebVitalsReporter />
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

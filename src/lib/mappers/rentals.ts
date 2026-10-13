@@ -4,6 +4,7 @@ import type {
   ContratoDetail,
   ContratoListItem,
   ContratoRecord,
+  ContratoOperativa,
   ContratoTableItem,
   CuotaDetail,
   DashboardResumen,
@@ -114,12 +115,66 @@ function mapServiciosResumen(resumen: ServiciosTableSummary): RentalRow["servici
   };
 }
 
+function mapOperativaToRentalFields(
+  contrato: ContratoListItem,
+  operativa: ContratoOperativa,
+): Pick<
+  RentalRow,
+  | "month"
+  | "daysOverdue"
+  | "status"
+  | "filterStatus"
+  | "needsAdjustment"
+  | "needsCollection"
+  | "ultimoAjusteEn"
+> {
+  const daysUntilContractEnd = daysUntilDate(contrato.fechaFin);
+  const needsRenewal = daysUntilContractEnd <= 30;
+  const ajustePendiente = operativa.ajustePendiente && !needsRenewal;
+  const needsCollection = operativa.aCobrarEsteMes;
+  const diasAtraso = operativa.diasAtraso;
+  const estadoCode = diasAtraso > 0 ? "late" : "pending";
+  const { status, filterStatus } = mapEstado(estadoCode, diasAtraso, ajustePendiente, needsCollection);
+
+  return {
+    month: monthLabelFromIsoDate(operativa.fechaVencimientoCuota ?? undefined),
+    daysOverdue: diasAtraso,
+    status,
+    filterStatus,
+    needsAdjustment: ajustePendiente,
+    needsCollection,
+    ultimoAjusteEn: operativa.ultimoAjusteEn,
+  };
+}
+
 export function mapContratoTableItemToRentalRow(
   contrato: ContratoTableItem,
-  billing: ReturnType<typeof buildBillingIndex>,
-  dashboardMeta: Map<number, DashboardContractMeta>,
+  billing?: ReturnType<typeof buildBillingIndex>,
+  dashboardMeta?: Map<number, DashboardContractMeta>,
 ): RentalRow {
-  const row = mapContratoListItemToRentalRow(contrato, billing, dashboardMeta);
+  if (contrato.operativa) {
+    const daysUntilContractEnd = daysUntilDate(contrato.fechaFin);
+    const needsRenewal = daysUntilContractEnd <= 30;
+    const currency = (contrato.codigoMoneda === "USD" ? "USD" : "ARS") as "ARS" | "USD";
+    const operativaFields = mapOperativaToRentalFields(contrato, contrato.operativa);
+
+    return {
+      id: String(contrato.id),
+      contractProperty: `${contrato.inmuebleCode} · ${contrato.inmuebleTitle}`,
+      tenant: contrato.inquilinoNombre,
+      amount: formatMoney(contrato.montoAlquiler, contrato.codigoMoneda),
+      currency,
+      contractStart: formatDateDisplay(contrato.fechaInicio),
+      contractEnd: formatDateDisplay(contrato.fechaFin),
+      daysUntilContractEnd,
+      canAdjust: contratoSupportsIndexAdjustment(contrato),
+      needsRenewal,
+      servicios: mapServiciosResumen(contrato.serviciosResumen),
+      ...operativaFields,
+    };
+  }
+
+  const row = mapContratoListItemToRentalRow(contrato, billing!, dashboardMeta!);
   return { ...row, servicios: mapServiciosResumen(contrato.serviciosResumen) };
 }
 

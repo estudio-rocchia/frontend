@@ -203,6 +203,20 @@ export interface PropietarioRecord {
   persona?: { id: number; displayName: string | null };
 }
 
+export interface InmuebleVacantePropietarioResumen {
+  propietarioId: number;
+  personaId: number;
+  porcentajeAdministracion: string;
+}
+
+export interface InmuebleVacanteConPropietarios {
+  inmuebleId: number;
+  code: string;
+  title: string;
+  direccion: string | null;
+  propietarios: InmuebleVacantePropietarioResumen[];
+}
+
 export interface LiquidacionRecord {
   id: number;
   liquidacionNumber: string;
@@ -292,8 +306,53 @@ export interface ServiciosTableSummary {
   status: { label: string; variant: "success" | "warning" | "danger" };
 }
 
+export interface ContratoOperativa {
+  diasAtraso: number;
+  aCobrarEsteMes: boolean;
+  ajustePendiente: boolean;
+  ultimoAjusteEn: string | null;
+  fechaVencimientoCuota: string | null;
+}
+
 export interface ContratoTableItem extends ContratoListItem {
   serviciosResumen: ServiciosTableSummary;
+  operativa?: ContratoOperativa;
+}
+
+export type ContratoOperativaFilter =
+  | "todos"
+  | "a_cobrar"
+  | "en_mora"
+  | "al_dia"
+  | "ajuste_pendiente"
+  | "renovacion_proxima"
+  | "USD"
+  | "ARS";
+
+export interface ContratoTableStats {
+  total: number;
+  aCobrar: number;
+  enMora: number;
+  ajustePendiente: number;
+  renovacionProxima: number;
+}
+
+export interface ContratoTablePage {
+  items: ContratoTableItem[];
+  total: number;
+  stats: ContratoTableStats;
+  nextCursor?: number | null;
+}
+
+export interface InquilinosContext {
+  inquilinoIds: number[];
+  morosoInquilinoIds: number[];
+}
+
+export interface PersonasPage {
+  items: PersonaRecord[];
+  total: number;
+  nextCursor?: number | null;
 }
 
 export interface ContratoDetail extends ContratoRecord {

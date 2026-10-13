@@ -4,40 +4,54 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
 
-import { ButtonPrimary } from "@/components/ui/Button";
+import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { KpiCard } from "@/components/ui/KpiCard";
+import { KpiSkeletonRow, PageHeaderSkeleton, TableSkeleton } from "@/components/ui/Skeleton";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useAuth } from "@/context/auth-context";
 import { clienteFilters, type ClienteFilterId, type ClienteRow } from "@/data/clientes";
-import {
-  ApiError,
-  fetchContratosTableSummary,
-  fetchPersonas,
-  fetchPropietarioPersonaIds,
-} from "@/lib/api";
+import { ApiError, fetchPersonas } from "@/lib/api";
+import { fetchClientesContext } from "@/lib/api/clientes-context";
 import type { PersonaRecord } from "@/lib/api/types";
+import { useCursorPagination } from "@/lib/hooks/use-cursor-pagination";
 import { pagePaddingClass } from "@/lib/layout";
+import { useClientePrefetch } from "@/lib/use-cliente-prefetch";
 import {
-  buildClientesContext,
+  type ClientesContext,
+  clienteFilterToVinculo,
   filterClientes,
-  mapClientesKpis,
+  mapClientesKpisFromContext,
   mapPersonaToClienteRow,
-  searchClientes,
   vinculoBadgeClass,
 } from "@/lib/mappers/clientes";
+
+const PAGE_SIZE = 20;
 const tableHeaders = ["Cliente", "Documento", "Vínculos", "Contacto", "Estado", "Acciones"];
 
 export function ClientesView() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { token, logout } = useAuth();
+  const { prefetch: prefetchCliente } = useClientePrefetch(token);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [personas, setPersonas] = useState<PersonaRecord[]>([]);
   const [clienteRows, setClienteRows] = useState<ClienteRow[]>([]);
   const [activeFilter, setActiveFilter] = useState<ClienteFilterId>("todos");
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const {
+    currentCursor,
+    pageIndex,
+    canGoPrev,
+    canGoNext,
+    reset: resetPagination,
+    applyResponse,
+    goNext,
+    goPrev,
+  } = useCursorPagination();
+  const [totalPersonas, setTotalPersonas] = useState(0);
+  const [context, setContext] = useState<ClientesContext | null>(null);
   const [listTab, setListTab] = useState<"listado" | "nuevo">("listado");
 
   const load = useCallback(async () => {
@@ -46,17 +60,30 @@ export function ClientesView() {
     setError(null);
 
     try {
-      const [personasRes, summaryRes, propietarioIdsRes] = await Promise.all([
-        fetchPersonas(token, { limit: 200 }),
-        fetchContratosTableSummary(token, { estado: "active", limit: 200 }),
-        fetchPropietarioPersonaIds(token),
-      ]);
+      if (activeFilter === "juridico" || activeFilter === "visas") {
+        const clientesContext = await fetchClientesContext(token);
+        setContext(clientesContext);
+        setClienteRows([]);
+        setTotalPersonas(0);
+        return;
+      }
 
-      const context = buildClientesContext(summaryRes.items, propietarioIdsRes.personaIds);
-      const rows = personasRes.items.map((persona) => mapPersonaToClienteRow(persona, context));
+      const clientesContext = await fetchClientesContext(token);
+      const vinculo = clienteFilterToVinculo(activeFilter);
 
-      setPersonas(personasRes.items);
+      const personasRes = await fetchPersonas(token, {
+        limit: PAGE_SIZE,
+        cursor: currentCursor,
+        q: debouncedSearch.trim() || undefined,
+        vinculo,
+      });
+
+      const rows = personasRes.items.map((persona) => mapPersonaToClienteRow(persona, clientesContext));
+
+      setContext(clientesContext);
       setClienteRows(rows);
+      setTotalPersonas(personasRes.total ?? personasRes.items.length);
+      applyResponse(personasRes.nextCursor);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         logout();
@@ -66,7 +93,16 @@ export function ClientesView() {
     } finally {
       setLoading(false);
     }
-  }, [token, logout]);
+  }, [token, logout, currentCursor, debouncedSearch, activeFilter, applyResponse]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(searchQuery), 300);
+    return () => window.clearTimeout(timer);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    resetPagination();
+  }, [debouncedSearch, activeFilter, resetPagination]);
 
   useEffect(() => {
     void load();
@@ -79,37 +115,60 @@ export function ClientesView() {
     router.replace("/clientes");
   }, [searchParams, router]);
 
-  const kpis = useMemo(() => mapClientesKpis(clienteRows), [clienteRows]);
+  const kpis = useMemo(
+    () =>
+      context
+        ? mapClientesKpisFromContext(totalPersonas, context)
+        : mapClientesKpisFromContext(0, {
+            inquilinoIds: new Set(),
+            propietarioIds: new Set(),
+            morosoIds: new Set(),
+          }),
+    [context, totalPersonas],
+  );
 
-  const filteredRows = useMemo(() => {
-    const byFilter = filterClientes(clienteRows, activeFilter);
-    return searchClientes(byFilter, searchQuery);
-  }, [clienteRows, activeFilter, searchQuery]);
+  const filteredRows = useMemo(
+    () =>
+      activeFilter === "juridico" || activeFilter === "visas"
+        ? []
+        : filterClientes(clienteRows, activeFilter),
+    [clienteRows, activeFilter],
+  );
 
   const filterCounts = useMemo(
     () => ({
-      todos: clienteRows.length,
-      inquilinos: clienteRows.filter((row) => row.esInquilino).length,
-      propietarios: clienteRows.filter((row) => row.esPropietario).length,
+      todos: totalPersonas,
+      inquilinos: context?.inquilinoIds.size ?? 0,
+      propietarios: context?.propietarioIds.size ?? 0,
       juridico: 0,
       visas: 0,
-      morosos: clienteRows.filter((row) => row.enMora).length,
+      morosos: context?.morosoIds.size ?? 0,
     }),
-    [clienteRows],
+    [context, totalPersonas],
   );
 
   const hasSearch = searchQuery.trim().length > 0;
+  const totalPages = Math.max(1, Math.ceil(totalPersonas / PAGE_SIZE));
+  const currentPage = pageIndex + 1;
+  const rangeStart = totalPersonas === 0 ? 0 : pageIndex * PAGE_SIZE + 1;
+  const rangeEnd = Math.min((pageIndex + 1) * PAGE_SIZE, totalPersonas);
 
   const resultSummary = useMemo(() => {
     const count = filteredRows.length;
-    const countLabel = `${count} cliente${count === 1 ? "" : "s"}`;
+    const countLabel = `${totalPersonas} cliente${totalPersonas === 1 ? "" : "s"}`;
     const filterLabel = clienteFilters.find((filter) => filter.id === activeFilter)?.label ?? "";
-    if (hasSearch) return `${countLabel} encontrado${count === 1 ? "" : "s"} · ${filterLabel}`;
+    if (hasSearch) return `${countLabel} encontrado${totalPersonas === 1 ? "" : "s"} · ${filterLabel}`;
     return `${countLabel} · ${filterLabel}`;
-  }, [filteredRows.length, hasSearch, activeFilter]);
+  }, [filteredRows.length, hasSearch, activeFilter, totalPersonas]);
 
-  if (loading) {
-    return <p className={`${pagePaddingClass} text-sm text-text-secondary`}>Cargando clientes…</p>;
+  if (loading && !context) {
+    return (
+      <div className={`flex flex-col gap-6 ${pagePaddingClass}`}>
+        <PageHeaderSkeleton />
+        <KpiSkeletonRow />
+        <TableSkeleton rows={8} columns={6} />
+      </div>
+    );
   }
 
   if (error) {
@@ -246,7 +305,17 @@ export function ClientesView() {
                 </tr>
               </thead>
               <tbody>
-                {filteredRows.length === 0 ? (
+                {loading ? (
+                  Array.from({ length: 6 }).map((_, index) => (
+                    <tr key={index} className="border-t border-border">
+                      {tableHeaders.map((header) => (
+                        <td key={header} className="h-[52px] px-5">
+                          <div className="h-4 animate-pulse rounded-sm bg-border/70" />
+                        </td>
+                      ))}
+                    </tr>
+                  ))
+                ) : filteredRows.length === 0 ? (
                   <tr>
                     <td colSpan={tableHeaders.length} className="px-5 py-8 text-sm text-text-secondary">
                       {activeFilter === "juridico" || activeFilter === "visas"
@@ -263,6 +332,7 @@ export function ClientesView() {
                       className={`border-t border-border transition-colors hover:bg-bg-page ${
                         !row.activo ? "opacity-70" : ""
                       }`}
+                      onMouseEnter={() => prefetchCliente(row.id)}
                     >
                       <td className="h-[52px] px-5">
                         <div className="flex flex-col gap-0.5">
@@ -306,6 +376,33 @@ export function ClientesView() {
               </tbody>
             </table>
           </div>
+
+          <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3">
+            <p className="text-[12px] text-text-secondary">
+              {totalPersonas === 0
+                ? "0 clientes"
+                : `Mostrando ${rangeStart}–${rangeEnd} de ${totalPersonas} clientes`}
+            </p>
+            <div className="flex items-center gap-2">
+              <ButtonOutline
+                type="button"
+                disabled={!canGoPrev || loading}
+                onClick={goPrev}
+              >
+                Anterior
+              </ButtonOutline>
+              <span className="min-w-[88px] text-center text-[12px] font-semibold text-text-secondary">
+                Página {currentPage} de {totalPages}
+              </span>
+              <ButtonOutline
+                type="button"
+                disabled={!canGoNext || loading}
+                onClick={goNext}
+              >
+                Siguiente
+              </ButtonOutline>
+            </div>
+          </footer>
         </section>
       </div>
     </>
