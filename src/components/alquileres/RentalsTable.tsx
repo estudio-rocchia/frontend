@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import { RentalFilterChips } from "@/components/alquileres/RentalFilterChips";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import {
   canCollectRent,
@@ -13,6 +13,7 @@ import {
   type RentalChipId,
   type RentalRow,
 } from "@/data/alquileres-rentals";
+import type { ContratoTableStats } from "@/lib/api/types";
 import { contractEndHint, moneyClassName } from "@/lib/format";
 import { isRentCollectionWindow, rentCollectionWindowHint } from "@/lib/rental-collection";
 
@@ -41,50 +42,80 @@ function defaultActiveChip(counts: ReturnType<typeof rentalOperationalCounts>): 
   return "todos";
 }
 
+type RentalsTableProps = {
+  rows: RentalRow[];
+  onViewFicha: (row: RentalRow) => void;
+  onCollect: (row: RentalRow) => void;
+  onAdjust: (row: RentalRow) => void;
+  onRenew: (row: RentalRow) => void;
+  onPrefetch?: (row: RentalRow) => void;
+  serverMode?: boolean;
+  loading?: boolean;
+  total?: number;
+  page?: number;
+  pageSize?: number;
+  canGoPrev?: boolean;
+  canGoNext?: boolean;
+  onGoPrev?: () => void;
+  onGoNext?: () => void;
+  stats?: ContratoTableStats;
+  searchQuery?: string;
+  activeChip?: RentalChipId;
+  onSearchChange?: (query: string) => void;
+  onChipChange?: (chip: RentalChipId) => void;
+  onPageChange?: (page: number) => void;
+};
+
 export function RentalsTable({
   rows,
   onViewFicha,
   onCollect,
   onAdjust,
   onRenew,
-}: {
-  rows: RentalRow[];
-  onViewFicha: (row: RentalRow) => void;
-  onCollect: (row: RentalRow) => void;
-  onAdjust: (row: RentalRow) => void;
-  onRenew: (row: RentalRow) => void;
-}) {
-  const [searchQuery, setSearchQuery] = useState("");
-  const operationalCounts = useMemo(() => rentalOperationalCounts(rows), [rows]);
-  const [activeChip, setActiveChip] = useState<RentalChipId>(() => defaultActiveChip(operationalCounts));
+  onPrefetch,
+  serverMode = false,
+  loading = false,
+  total = 0,
+  page = 1,
+  pageSize = PAGE_SIZE,
+  canGoPrev,
+  canGoNext,
+  onGoPrev,
+  onGoNext,
+  stats,
+  searchQuery: controlledSearch = "",
+  activeChip: controlledChip,
+  onSearchChange,
+  onChipChange,
+  onPageChange,
+}: RentalsTableProps) {
   const inCollectionWindow = isRentCollectionWindow();
-  const [page, setPage] = useState(1);
+  const operationalCounts = serverMode && stats
+    ? {
+        aCobrar: stats.aCobrar,
+        ajustePendiente: stats.ajustePendiente,
+        renovacionProxima: stats.renovacionProxima,
+      }
+    : rentalOperationalCounts(rows);
 
-  const filtered = useMemo(() => {
-    const scopedRows = searchQuery.trim() ? rows : filterRentals(rows, activeChip);
-    return searchRentals(scopedRows, searchQuery);
-  }, [rows, activeChip, searchQuery]);
+  const activeChip = controlledChip ?? defaultActiveChip(operationalCounts);
+  const searchQuery = controlledSearch;
 
-  useEffect(() => {
-    setPage(1);
-  }, [searchQuery, activeChip]);
+  const filtered = serverMode
+    ? rows
+    : (() => {
+        const scopedRows = searchQuery.trim() ? rows : filterRentals(rows, activeChip);
+        return searchRentals(scopedRows, searchQuery);
+      })();
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const filteredTotal = serverMode ? total : filtered.length;
+  const totalPages = Math.max(1, Math.ceil(filteredTotal / pageSize));
   const currentPage = Math.min(page, totalPages);
+  const paginated = serverMode ? rows : filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
-  const paginated = useMemo(() => {
-    const start = (currentPage - 1) * PAGE_SIZE;
-    return filtered.slice(start, start + PAGE_SIZE);
-  }, [filtered, currentPage]);
-
-  useEffect(() => {
-    if (page > totalPages) {
-      setPage(totalPages);
-    }
-  }, [page, totalPages]);
-
-  const rangeStart = filtered.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
-  const rangeEnd = Math.min(currentPage * PAGE_SIZE, filtered.length);
+  const rangeStart = filteredTotal === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const rangeEnd = Math.min(currentPage * pageSize, filteredTotal);
+  const useCursorPagination = serverMode && onGoNext !== undefined && onGoPrev !== undefined;
 
   return (
     <div className="flex flex-col gap-5">
@@ -101,7 +132,7 @@ export function RentalsTable({
             <input
               type="search"
               value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
+              onChange={(event) => onSearchChange?.(event.target.value)}
               placeholder="Contrato, propiedad o inquilino…"
               aria-label="Buscar contratos"
               className="min-w-0 flex-1 bg-transparent text-sm text-text-primary outline-none placeholder:text-text-secondary"
@@ -115,8 +146,8 @@ export function RentalsTable({
               renovacion_proxima: operationalCounts.renovacionProxima,
             }}
             onChange={(chip) => {
-              setActiveChip(chip);
-              setPage(1);
+              onChipChange?.(chip);
+              onPageChange?.(1);
             }}
           />
         </div>
@@ -127,8 +158,8 @@ export function RentalsTable({
           <h2 className="text-[15px] font-semibold text-text-primary">Listado de contratos</h2>
           <p className="text-xs text-text-secondary">
             {searchQuery.trim()
-              ? `Resultados de búsqueda · ${filtered.length} contrato${filtered.length === 1 ? "" : "s"}`
-              : `${filtered.length} contrato${filtered.length === 1 ? "" : "s"} en el filtro actual`}
+              ? `Resultados de búsqueda · ${filteredTotal} contrato${filteredTotal === 1 ? "" : "s"}`
+              : `${filteredTotal} contrato${filteredTotal === 1 ? "" : "s"} en el filtro actual`}
           </p>
         </div>
 
@@ -149,7 +180,17 @@ export function RentalsTable({
               </tr>
             </thead>
             <tbody>
-              {paginated.length === 0 ? (
+              {loading ? (
+                Array.from({ length: 6 }).map((_, index) => (
+                  <tr key={index} className="border-b border-border [&>td]:py-4">
+                    {Array.from({ length: 10 }).map((__, cellIndex) => (
+                      <td key={cellIndex} className="px-3 sm:px-5">
+                        <Skeleton className="h-4 w-full max-w-[120px]" />
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              ) : paginated.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="px-5 py-14 text-center text-sm text-text-secondary">
                     No hay contratos para mostrar con este filtro.
@@ -165,6 +206,7 @@ export function RentalsTable({
                     <tr
                       key={row.id}
                       className="border-b border-border align-middle transition-colors hover:bg-bg-page/70 [&>td]:py-4"
+                      onMouseEnter={() => onPrefetch?.(row)}
                     >
                       <td className="px-3 font-medium text-text-primary sm:px-5">{row.contractProperty}</td>
                       <td className="px-3 text-text-primary sm:px-5">{row.tenant}</td>
@@ -204,7 +246,11 @@ export function RentalsTable({
                               Cobrar
                             </ButtonPrimary>
                           ) : null}
-                          <ButtonOutline type="button" onClick={() => onViewFicha(row)} className="px-2.5 py-1.5 text-xs sm:px-[18px] sm:py-2 sm:text-sm">
+                          <ButtonOutline
+                            type="button"
+                            onClick={() => onViewFicha(row)}
+                            className="px-2.5 py-1.5 text-xs sm:px-[18px] sm:py-2 sm:text-sm"
+                          >
                             Ver ficha
                           </ButtonOutline>
                           {showAdjust ? (
@@ -229,15 +275,15 @@ export function RentalsTable({
 
         <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3 sm:px-5">
           <p className="text-[12px] text-text-secondary">
-            {filtered.length === 0
+            {filteredTotal === 0
               ? "0 contratos"
-              : `Mostrando ${rangeStart}–${rangeEnd} de ${filtered.length} contratos`}
+              : `Mostrando ${rangeStart}–${rangeEnd} de ${filteredTotal} contratos`}
           </p>
           <div className="flex items-center gap-2">
             <ButtonOutline
               type="button"
-              disabled={currentPage <= 1}
-              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+              disabled={(useCursorPagination ? !canGoPrev : currentPage <= 1) || loading}
+              onClick={() => (useCursorPagination ? onGoPrev?.() : onPageChange?.(currentPage - 1))}
             >
               Anterior
             </ButtonOutline>
@@ -246,8 +292,8 @@ export function RentalsTable({
             </span>
             <ButtonOutline
               type="button"
-              disabled={currentPage >= totalPages}
-              onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+              disabled={(useCursorPagination ? !canGoNext : currentPage >= totalPages) || loading}
+              onClick={() => (useCursorPagination ? onGoNext?.() : onPageChange?.(currentPage + 1))}
             >
               Siguiente
             </ButtonOutline>

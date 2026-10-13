@@ -1,5 +1,6 @@
 import type { ClienteFilterId, ClienteRow, ClienteVinculoBadge } from "@/data/clientes";
-import type { ContratoTableItem, PersonaRecord } from "@/lib/api/types";
+import type { PersonaVinculoFilter } from "@/lib/api";
+import type { InquilinosContext, PersonaRecord } from "@/lib/api/types";
 import { personaDisplayName } from "@/lib/format";
 
 export interface ClientesContext {
@@ -39,25 +40,57 @@ function buildEstado(persona: PersonaRecord, context: ClientesContext) {
   return { label: "Activo", variant: "success" as const };
 }
 
+export function clienteFilterToVinculo(filter: ClienteFilterId): PersonaVinculoFilter | undefined {
+  switch (filter) {
+    case "inquilinos":
+      return "inquilino";
+    case "propietarios":
+      return "propietario";
+    case "morosos":
+      return "moroso";
+    default:
+      return undefined;
+  }
+}
+
 export function buildClientesContext(
-  contratosSummary: ContratoTableItem[],
+  inquilinosContext: InquilinosContext,
   propietarioIds: Iterable<number>,
 ): ClientesContext {
-  const inquilinoIds = new Set(contratosSummary.map((contrato) => contrato.inquilinoId));
-  const morosoIds = new Set<number>();
-
-  for (const row of contratosSummary) {
-    const statusLabel = row.serviciosResumen.status.label.toLowerCase();
-    if (statusLabel.includes("mora") || row.serviciosResumen.status.variant === "danger") {
-      morosoIds.add(row.inquilinoId);
-    }
-  }
-
   return {
-    inquilinoIds,
+    inquilinoIds: new Set(inquilinosContext.inquilinoIds),
     propietarioIds: new Set(propietarioIds),
-    morosoIds,
+    morosoIds: new Set(inquilinosContext.morosoInquilinoIds),
   };
+}
+
+export function mapClientesKpisFromContext(
+  totalPersonas: number,
+  context: ClientesContext,
+) {
+  const total = Number.isFinite(totalPersonas) ? totalPersonas : 0;
+  return [
+    {
+      label: "Total clientes",
+      value: total.toLocaleString("es-AR"),
+      hint: "Registro unificado",
+    },
+    {
+      label: "Con contrato activo",
+      value: context.inquilinoIds.size.toLocaleString("es-AR"),
+      hint: "Inmobiliaria",
+    },
+    {
+      label: "Propietarios",
+      value: context.propietarioIds.size.toLocaleString("es-AR"),
+      hint: "En administración",
+    },
+    {
+      label: "En mora",
+      value: context.morosoIds.size.toLocaleString("es-AR"),
+      hint: "Requieren gestión",
+    },
+  ];
 }
 
 export function mapPersonaToClienteRow(persona: PersonaRecord, context: ClientesContext): ClienteRow {

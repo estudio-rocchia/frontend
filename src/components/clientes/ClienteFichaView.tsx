@@ -7,18 +7,20 @@ import { ArrowLeft } from "lucide-react";
 import { ClienteInmobiliariaTab } from "@/components/clientes/ClienteInmobiliariaTab";
 import { ButtonOutline } from "@/components/ui/Button";
 import { FieldBlock } from "@/components/ui/FormLayout";
+import { PageHeaderSkeleton, Skeleton } from "@/components/ui/Skeleton";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useAuth } from "@/context/auth-context";
 import { type ClienteRow } from "@/data/clientes";
 import {
   ApiError,
   fetchContratos,
-  fetchContratosTableSummary,
+  fetchInquilinosContext,
   fetchPersona,
   fetchPropietarioPersonaIds,
   updatePropietarioAdministracion,
 } from "@/lib/api";
-import type { ContratoListItem, InmuebleRecord, PersonaRecord } from "@/lib/api/types";
+import { useClientePrefetch } from "@/lib/use-cliente-prefetch";
+import type { ContratoListItem, PersonaRecord } from "@/lib/api/types";
 import { personaDisplayName } from "@/lib/format";
 import { pagePaddingClass } from "@/lib/layout";
 import { buildClientesContext, mapPersonaToClienteRow, vinculoBadgeClass } from "@/lib/mappers/clientes";
@@ -60,15 +62,16 @@ export function ClienteFichaView() {
   const validId = Number.isInteger(personaId) && personaId > 0;
 
   const { token, logout } = useAuth();
+  const { consume: consumePrefetchedCliente } = useClientePrefetch(token);
   const [activeTab, setActiveTab] = useState<FichaTab>("resumen");
   const [persona, setPersona] = useState<PersonaRecord | null>(null);
   const [clienteRow, setClienteRow] = useState<ClienteRow | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingInmobiliaria, setLoadingInmobiliaria] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [contratosInquilino, setContratosInquilino] = useState<ContratoListItem[]>([]);
   const [propiedades, setPropiedades] = useState<PropiedadAdministrada[]>([]);
   const [linkedInmuebleIds, setLinkedInmuebleIds] = useState<Set<number>>(new Set());
-  const [inmuebles, setInmuebles] = useState<InmuebleRecord[]>([]);
   const [pctEdits, setPctEdits] = useState<Record<number, string>>({});
   const [savingPropietarioId, setSavingPropietarioId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -76,28 +79,9 @@ export function ClienteFichaView() {
 
   const tienePropiedades = propiedades.length > 0;
 
-  const reloadInmobiliaria = useCallback(async () => {
-    if (!token || !validId) return;
-
-    const [personaDetail, contratosRes, propiedadesData, summaryRes, propietarioIdsRes] =
-      await Promise.all([
-        fetchPersona(token, personaId),
-        fetchContratos(token, { estado: "active", limit: 200 }),
-        loadPropiedadesAdministradas(token, personaId),
-        fetchContratosTableSummary(token, { estado: "active", limit: 200 }),
-        fetchPropietarioPersonaIds(token),
-      ]);
-
-    const context = buildClientesContext(summaryRes.items, propietarioIdsRes.personaIds);
-
-    setPersona(personaDetail);
-    setClienteRow(mapPersonaToClienteRow(personaDetail, context));
-    setContratosInquilino(
-      contratosRes.items.filter((contrato) => contrato.inquilinoId === personaId),
-    );
+  const applyPropiedades = useCallback((propiedadesData: Awaited<ReturnType<typeof loadPropiedadesAdministradas>>) => {
     setPropiedades(propiedadesData.propiedades);
     setLinkedInmuebleIds(propiedadesData.linkedInmuebleIds);
-    setInmuebles(propiedadesData.inmuebles);
     setPctEdits(
       Object.fromEntries(
         propiedadesData.propiedades.map((propiedad) => [
@@ -106,7 +90,42 @@ export function ClienteFichaView() {
         ]),
       ),
     );
-  }, [token, validId, personaId]);
+  }, []);
+
+  const loadInmobiliariaDetails = useCallback(async () => {
+    if (!token || !validId) return;
+    setLoadingInmobiliaria(true);
+    try {
+      const [contratosRes, propiedadesData] = await Promise.all([
+        fetchContratos(token, { inquilinoId: personaId, estado: "active", limit: 20 }),
+        loadPropiedadesAdministradas(token, personaId),
+      ]);
+      setContratosInquilino(contratosRes.items);
+      applyPropiedades(propiedadesData);
+    } finally {
+      setLoadingInmobiliaria(false);
+    }
+  }, [token, validId, personaId, applyPropiedades]);
+
+  const loadCore = useCallback(async () => {
+    if (!token || !validId) return;
+
+    const cached = await consumePrefetchedCliente(personaId);
+    if (cached) {
+      setPersona(cached.persona);
+      setClienteRow(mapPersonaToClienteRow(cached.persona, cached.context));
+      return;
+    }
+
+    const [personaDetail, inquilinosRes, propietarioIdsRes] = await Promise.all([
+      fetchPersona(token, personaId),
+      fetchInquilinosContext(token),
+      fetchPropietarioPersonaIds(token),
+    ]);
+    const context = buildClientesContext(inquilinosRes, propietarioIdsRes.personaIds);
+    setPersona(personaDetail);
+    setClienteRow(mapPersonaToClienteRow(personaDetail, context));
+  }, [token, validId, personaId, consumePrefetchedCliente]);
 
   useEffect(() => {
     if (!validId) {
@@ -120,7 +139,11 @@ export function ClienteFichaView() {
     setError(null);
     setActiveTab("resumen");
 
-    void reloadInmobiliaria()
+    void loadCore()
+      .then(() => {
+        setLoading(false);
+        return loadInmobiliariaDetails();
+      })
       .catch((err) => {
         if (err instanceof ApiError && err.status === 401) {
           logout();
@@ -133,7 +156,7 @@ export function ClienteFichaView() {
         setError(err instanceof ApiError ? err.message : "No se pudo cargar la ficha del cliente");
       })
       .finally(() => setLoading(false));
-  }, [validId, token, logout, reloadInmobiliaria]);
+  }, [validId, token, logout, loadCore, loadInmobiliariaDetails]);
 
   const metaLine = useMemo(() => {
     if (!persona) return "";
@@ -157,7 +180,22 @@ export function ClienteFichaView() {
   }
 
   if (loading || !persona) {
-    return <p className={`${pagePaddingClass} text-sm text-text-secondary`}>Cargando ficha del cliente…</p>;
+    return (
+      <div className={`flex flex-col gap-6 ${pagePaddingClass}`}>
+        <Skeleton className="h-4 w-32" />
+        <PageHeaderSkeleton />
+        <div className="rounded-md border border-border bg-bg-card p-5">
+          <div className="grid gap-4 sm:grid-cols-2">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <div key={index} className="flex flex-col gap-2">
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-4 w-40" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   async function handleSavePropiedadAdministracion(propiedad: PropiedadAdministrada) {
@@ -200,7 +238,7 @@ export function ClienteFichaView() {
     setError(null);
     setLoadingDetail(true);
     try {
-      await reloadInmobiliaria();
+      await loadInmobiliariaDetails();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo actualizar la ficha");
     } finally {
@@ -320,11 +358,13 @@ export function ClienteFichaView() {
         ) : null}
 
         {!loadingDetail && activeTab === "inmobiliaria" ? (
+          loadingInmobiliaria ? (
+            <p className="text-sm text-text-secondary">Cargando datos inmobiliarios…</p>
+          ) : (
           <ClienteInmobiliariaTab
             personaId={persona.id}
             propiedades={propiedades}
             contratosInquilino={contratosInquilino}
-            inmuebles={inmuebles}
             linkedInmuebleIds={linkedInmuebleIds}
             pctEdits={pctEdits}
             savingPropietarioId={savingPropietarioId}
@@ -335,6 +375,7 @@ export function ClienteFichaView() {
             onInmuebleLinked={() => void handleInmuebleLinked()}
             onError={setError}
           />
+          )
         ) : null}
 
         {!loadingDetail && activeTab === "juridico" ? (

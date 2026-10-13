@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { ClienteInmobiliariaAgregarSection } from "@/components/clientes/ClienteInmobiliariaAgregarSection";
 import { ClienteInmobiliariaPropiedadesSection } from "@/components/clientes/ClienteInmobiliariaPropiedadesSection";
+import { useAuth } from "@/context/auth-context";
 import type { ContratoListItem, InmuebleRecord } from "@/lib/api/types";
-import type { PropiedadAdministrada } from "@/lib/mappers/propietario-inmuebles";
+import { loadInmueblesCatalog, type PropiedadAdministrada } from "@/lib/mappers/propietario-inmuebles";
 
 type InmobiliariaView = "propiedades" | "agregar";
 
@@ -18,7 +19,6 @@ export function ClienteInmobiliariaTab({
   personaId,
   propiedades,
   contratosInquilino,
-  inmuebles,
   linkedInmuebleIds,
   pctEdits,
   savingPropietarioId,
@@ -30,7 +30,6 @@ export function ClienteInmobiliariaTab({
   personaId: number;
   propiedades: PropiedadAdministrada[];
   contratosInquilino: ContratoListItem[];
-  inmuebles: InmuebleRecord[];
   linkedInmuebleIds: Set<number>;
   pctEdits: Record<number, string>;
   savingPropietarioId: number | null;
@@ -39,7 +38,19 @@ export function ClienteInmobiliariaTab({
   onInmuebleLinked: () => void;
   onError: (message: string) => void;
 }) {
+  const { token } = useAuth();
   const [activeView, setActiveView] = useState<InmobiliariaView>("propiedades");
+  const [inmuebles, setInmuebles] = useState<InmuebleRecord[]>([]);
+  const [loadingInmuebles, setLoadingInmuebles] = useState(false);
+
+  useEffect(() => {
+    if (activeView !== "agregar" || inmuebles.length > 0 || !token) return;
+    setLoadingInmuebles(true);
+    void loadInmueblesCatalog(token)
+      .then(setInmuebles)
+      .catch(() => onError("No se pudo cargar el catálogo de inmuebles"))
+      .finally(() => setLoadingInmuebles(false));
+  }, [activeView, inmuebles.length, token, onError]);
 
   function handleInmuebleLinked() {
     onInmuebleLinked();
@@ -75,6 +86,8 @@ export function ClienteInmobiliariaTab({
           onSavePropiedad={onSavePropiedad}
           onAgregarInmueble={() => setActiveView("agregar")}
         />
+      ) : loadingInmuebles ? (
+        <p className="text-sm text-text-secondary">Cargando catálogo de inmuebles…</p>
       ) : (
         <ClienteInmobiliariaAgregarSection
           personaId={personaId}

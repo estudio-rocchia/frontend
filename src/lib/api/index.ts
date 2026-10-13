@@ -1,16 +1,22 @@
+import { withCache } from "./cache";
 import { apiBlob, apiRequest } from "./client";
 import type {
   CatalogoItem,
   ContratoDetail,
   ContratoListItem,
   ContratoRecord,
+  ContratoOperativaFilter,
   ContratoTableItem,
+  ContratoTablePage,
+  InquilinosContext,
+  PersonasPage,
   ApplyMoraResult,
   CuotaDetail,
   GenerateCuotaInput,
   DashboardResumen,
   InmuebleFicha,
   InmuebleRecord,
+  InmuebleVacanteConPropietarios,
   LoginResponse,
   MeResponse,
   PagoDetail,
@@ -110,18 +116,43 @@ export function fetchDashboardResumen(token: string, limit = 20) {
   return apiRequest<DashboardResumen>(`/dashboard/resumen?limit=${limit}`, { token });
 }
 
-export function fetchContratos(token: string, params?: { estado?: string; limit?: number }) {
+export function fetchContratos(
+  token: string,
+  params?: { estado?: string; inquilinoId?: number; inmuebleId?: number; limit?: number },
+) {
   const query = new URLSearchParams();
   if (params?.estado) query.set("estado", params.estado);
+  if (params?.inquilinoId) query.set("inquilinoId", String(params.inquilinoId));
+  if (params?.inmuebleId) query.set("inmuebleId", String(params.inmuebleId));
   query.set("limit", String(params?.limit ?? 100));
   return apiRequest<{ items: ContratoListItem[] }>(`/contratos?${query}`, { token });
 }
 
-export function fetchContratosTableSummary(token: string, params?: { estado?: string; limit?: number }) {
+export function fetchContratosTableSummary(
+  token: string,
+  params?: {
+    estado?: string;
+    limit?: number;
+    offset?: number;
+    cursor?: number;
+    q?: string;
+    operativa?: ContratoOperativaFilter;
+  },
+) {
   const query = new URLSearchParams();
   if (params?.estado) query.set("estado", params.estado);
-  query.set("limit", String(params?.limit ?? 100));
-  return apiRequest<{ items: ContratoTableItem[] }>(`/contratos/table-summary?${query}`, { token });
+  if (params?.q?.trim()) query.set("q", params.q.trim());
+  if (params?.operativa && params.operativa !== "todos") query.set("operativa", params.operativa);
+  if (params?.cursor !== undefined) query.set("cursor", String(params.cursor));
+  query.set("limit", String(params?.limit ?? 50));
+  if (params?.cursor === undefined) {
+    query.set("offset", String(params?.offset ?? 0));
+  }
+  return apiRequest<ContratoTablePage>(`/contratos/table-summary?${query}`, { token });
+}
+
+export function fetchInquilinosContext(token: string) {
+  return apiRequest<InquilinosContext>("/contratos/inquilinos-context", { token });
 }
 
 export function fetchContrato(token: string, id: number) {
@@ -331,7 +362,7 @@ export function fetchInmuebles(token: string, params?: { limit?: number }) {
 }
 
 export function fetchCatalog<T extends CatalogoItem>(token: string, path: string) {
-  return apiRequest<{ items: T[] }>(path, { token });
+  return withCache(`catalog:${path}`, () => apiRequest<{ items: T[] }>(path, { token }));
 }
 
 export function fetchLocalidades(token: string) {
@@ -341,17 +372,32 @@ export function fetchLocalidades(token: string) {
   );
 }
 
+export type PersonaVinculoFilter = "inquilino" | "propietario" | "moroso";
+
 export function fetchPersonas(
-  token: string,
-  params?: { activo?: boolean; q?: string; limit?: number; offset?: number },
+ token: string,
+ params?: {
+   activo?: boolean;
+   q?: string;
+   ids?: number[];
+   vinculo?: PersonaVinculoFilter;
+   cursor?: number;
+   limit?: number;
+   offset?: number;
+ },
 ) {
-  const query = new URLSearchParams();
-  if (params?.activo !== undefined) query.set("activo", String(params.activo));
-  if (params?.q) query.set("q", params.q);
-  query.set("limit", String(params?.limit ?? 200));
-  if (params?.offset !== undefined) query.set("offset", String(params.offset));
+ const query = new URLSearchParams();
+ if (params?.activo !== undefined) query.set("activo", String(params.activo));
+ if (params?.q) query.set("q", params.q);
+ if (params?.vinculo) query.set("vinculo", params.vinculo);
+ else if (params?.ids?.length) query.set("ids", params.ids.join(","));
+ if (params?.cursor !== undefined) query.set("cursor", String(params.cursor));
+ query.set("limit", String(params?.limit ?? 200));
+ if (params?.cursor === undefined && params?.offset !== undefined) {
+   query.set("offset", String(params.offset));
+ }
   const suffix = query.toString();
-  return apiRequest<{ items: PersonaRecord[] }>(`/personas?${suffix}`, { token });
+  return apiRequest<PersonasPage>(`/personas?${suffix}`, { token });
 }
 
 export function createPersona(
@@ -412,6 +458,13 @@ export function createInmueble(
 
 export function fetchPropietarioPersonaIds(token: string) {
   return apiRequest<{ personaIds: number[] }>("/propietarios/persona-ids", { token });
+}
+
+export function fetchInmueblesVacantesConPropietarios(token: string) {
+  return apiRequest<{ items: InmuebleVacanteConPropietarios[] }>(
+    "/propietarios/inmuebles-vacantes",
+    { token },
+  );
 }
 
 export function fetchPropiedadesAdministradasPorPersona(token: string, personaId: number) {

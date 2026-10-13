@@ -1,9 +1,8 @@
 import {
-  fetchInmueblePropietarios,
   fetchInmuebles,
+  fetchInmueblesVacantesConPropietarios,
   fetchPropiedadesAdministradasPorPersona,
   fetchPropietarioPersonaIds,
-  fetchContratos,
 } from "@/lib/api";
 import type { InmuebleRecord, PersonaRecord, PropiedadAdministradaRecord } from "@/lib/api/types";
 import { formatMoney, personaDisplayName } from "@/lib/format";
@@ -35,13 +34,14 @@ export interface PropiedadesPersonaResult {
 export async function loadPropiedadesAdministradas(
   token: string,
   personaId: number,
+  options?: { includeInmueblesCatalog?: boolean },
 ): Promise<PropiedadesPersonaResult> {
-  const [propiedadesRes, inmueblesRes] = await Promise.all([
-    fetchPropiedadesAdministradasPorPersona(token, personaId),
-    fetchInmuebles(token, { limit: 200 }),
-  ]);
-
+  const propiedadesRes = await fetchPropiedadesAdministradasPorPersona(token, personaId);
   const propiedades = propiedadesRes.items;
+
+  const inmueblesRes = options?.includeInmueblesCatalog
+    ? await fetchInmuebles(token, { limit: 200 })
+    : { items: [] as InmuebleRecord[] };
 
   return {
     propiedades,
@@ -50,33 +50,21 @@ export async function loadPropiedadesAdministradas(
   };
 }
 
+export async function loadInmueblesCatalog(token: string): Promise<InmuebleRecord[]> {
+  const inmueblesRes = await fetchInmuebles(token, { limit: 200 });
+  return inmueblesRes.items;
+}
+
 export async function loadInmueblesSinAlquiler(
   token: string,
   personas: PersonaRecord[],
 ): Promise<InmuebleSinAlquiler[]> {
-  const [inmueblesRes, contratosRes] = await Promise.all([
-    fetchInmuebles(token, { limit: 200 }),
-    fetchContratos(token, { estado: "active", limit: 200 }),
-  ]);
-
-  const alquiladosIds = new Set(contratosRes.items.map((contrato) => contrato.inmuebleId));
+  const vacantesRes = await fetchInmueblesVacantesConPropietarios(token);
   const personaById = new Map(personas.map((persona) => [persona.id, persona]));
-  const vacantes = inmueblesRes.items.filter((inmueble) => !alquiladosIds.has(inmueble.id));
 
-  const propietariosByInmueble = await Promise.all(
-    vacantes.map(async (inmueble) => {
-      try {
-        const propietariosRes = await fetchInmueblePropietarios(token, inmueble.id);
-        return { inmueble, propietarios: propietariosRes.items };
-      } catch {
-        return { inmueble, propietarios: [] };
-      }
-    }),
-  );
-
-  const results: InmuebleSinAlquiler[] = propietariosByInmueble.map(({ inmueble, propietarios }) => {
-    const links = propietarios.map((row) => ({
-      propietarioId: row.id,
+  const results: InmuebleSinAlquiler[] = vacantesRes.items.map((inmueble) => {
+    const links = inmueble.propietarios.map((row) => ({
+      propietarioId: row.propietarioId,
       personaId: row.personaId,
       porcentajeAdministracion: row.porcentajeAdministracion,
     }));
@@ -94,7 +82,7 @@ export async function loadInmueblesSinAlquiler(
       .join(" · ");
 
     return {
-      inmuebleId: inmueble.id,
+      inmuebleId: inmueble.inmuebleId,
       code: inmueble.code,
       title: inmueble.title,
       direccion: inmueble.direccion,

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { KpiCard } from "@/components/ui/KpiCard";
+import { KpiSkeletonRow, PageHeaderSkeleton, TableSkeleton } from "@/components/ui/Skeleton";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useAuth } from "@/context/auth-context";
 import { ApiError, fetchDashboardResumen } from "@/lib/api";
@@ -41,7 +42,13 @@ export function DashboardView() {
   }, [load]);
 
   if (loading) {
-    return <p className={`${pagePaddingClass} text-sm text-text-secondary`}>Cargando dashboard…</p>;
+    return (
+      <div className={`flex flex-col gap-5 ${pagePaddingClass}`}>
+        <PageHeaderSkeleton />
+        <KpiSkeletonRow />
+        <TableSkeleton rows={6} columns={5} />
+      </div>
+    );
   }
 
   if (error) {

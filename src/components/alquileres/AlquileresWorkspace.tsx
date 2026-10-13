@@ -1,30 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
+import { useCallback, useState } from "react";
 
-import { AdjustContractModal } from "@/components/alquileres/AdjustContractModal";
-import { CobrarAlquilerModal } from "@/components/alquileres/CobrarAlquilerModal";
-import { LiquidacionPropietarioModal } from "@/components/alquileres/LiquidacionPropietarioModal";
-import { ContractFichaDrawer } from "@/components/alquileres/ContractFichaDrawer";
-import {
-  NewContractModal,
-  type NewContractForm,
-} from "@/components/alquileres/NewContractModal";
-import {
-  RenewContractModal,
-  type RenewContractForm,
-} from "@/components/alquileres/RenewContractModal";
+import { AlquileresKpiSection } from "@/components/alquileres/AlquileresKpiSection";
 import { RentalsTable } from "@/components/alquileres/RentalsTable";
+import type { NewContractForm } from "@/components/alquileres/NewContractModal";
+import type { RenewContractForm } from "@/components/alquileres/RenewContractModal";
+import { ALQUILERES_PAGE_SIZE, useAlquileresTable } from "@/components/alquileres/use-alquileres-table";
+import { useAlquileresDrawer } from "@/components/alquileres/use-alquileres-drawer";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
-import { KpiCard } from "@/components/ui/KpiCard";
 import { useAuth } from "@/context/auth-context";
-import type { ContractDetail } from "@/data/alquileres-contract-details";
-import { rentalSummaryStats, type RentalRow } from "@/data/alquileres-rentals";
-import type { PlanActualizacionDepositoFormValues } from "@/components/alquileres/PlanActualizacionDepositoModal";
-import type { PeriodoFormValues } from "@/components/alquileres/PeriodoServicioModal";
-import type { ServicioFormValues } from "@/components/alquileres/ServicioFormModal";
-import type { RegistrarPagoServicioFormValues } from "@/components/alquileres/RegistrarPagoServicioModal";
-import type { OwnerFieldValue, PersonaFieldValue } from "@/components/alquileres/PersonaSelectField";
+import { type RentalRow } from "@/data/alquileres-rentals";
 import {
   ApiError,
   addInmueblePropietario,
@@ -34,134 +21,99 @@ import {
   createContrato,
   createInmueble,
   createLocalidad,
-  createPlanActualizacionDeposito,
-  createPeriodoServicio,
-  createPersona,
-  createServicio,
-  deactivateServicio,
-  importSecheep,
-  downloadReciboPdf,
   fetchCatalog,
   fetchContrato,
   fetchContratos,
-  fetchContratosTableSummary,
-  fetchDashboardResumen,
-  fetchInmuebleFicha,
   fetchInmuebles,
   fetchLocalidades,
-  fetchPersona,
   fetchPersonas,
-  fetchPlanesActualizacionDeposito,
   previewActualizacionDeposito,
-  fetchServicios,
-  fetchServiciosPeriodos,
-  issueRecibo,
-  registerPago,
-  updateServicio,
 } from "@/lib/api";
+import { addYears, createAutoPlanActualizacionDeposito } from "@/lib/alquileres/deposito-plan";
+import {
+  ownerPorcentajeAdministracion,
+  resolveOwnerPersona,
+  resolveTenantPersona,
+} from "@/lib/alquileres/persona-resolve";
+import { useContratoPrefetch } from "@/lib/use-contrato-prefetch";
 import type {
   ActualizacionDepositoResult,
-  CatalogoItem,
-  ContratoDetail,
-  CreatePeriodoInput,
   PersonaRecord,
-  SecheepImportInput,
-  PeriodoServicioRecord,
-  PlanActualizacionDepositoDetail,
-  ServicioContratoRecord,
 } from "@/lib/api/types";
 import { nextContratoCode, nextInmuebleCode, prefixForTipoInmueble } from "@/lib/codes";
-import {
-  parsePersonName,
-  personaDisplayName,
-  downloadBlob,
-  rentalApiErrorMessage,
-} from "@/lib/format";
+import { rentalApiErrorMessage } from "@/lib/format";
 import { pagePaddingClass } from "@/lib/layout";
-import { isRentCollectionWindow } from "@/lib/rental-collection";
 import { resolveMoraPunitoriaPayload } from "@/lib/mora-punitoria";
-import {
-  buildBillingIndex,
-  buildDashboardContractMeta,
-  mapContratoDetailToFicha,
-  mapContratoTableItemToRentalRow,
-} from "@/lib/mappers/rentals";
 import {
   loadInmueblesSinAlquiler,
   type InmuebleSinAlquiler,
 } from "@/lib/mappers/propietario-inmuebles";
 
-function addYears(isoDate: string, years: number): string {
-  const date = new Date(`${isoDate}T12:00:00`);
-  date.setFullYear(date.getFullYear() + years);
-  return date.toISOString().slice(0, 10);
-}
-
-async function createAutoPlanActualizacionDeposito(
-  token: string,
-  contratoId: number,
-  actualizacion: ActualizacionDepositoResult,
-  diaVencimientoPago: number,
-  notas: string,
-) {
-  const montoTotal = Number.parseFloat(actualizacion.diferencia);
-  if (!actualizacion.requiereCobro || !Number.isFinite(montoTotal) || montoTotal <= 0) {
-    return;
-  }
-
-  await createPlanActualizacionDeposito(token, contratoId, {
-    montoTotal,
-    codigoMoneda: actualizacion.codigoMoneda.trim(),
-    cantidadCuotas: 1,
-    diaVencimiento: diaVencimientoPago,
-    fechaPrimeraCuota: new Date().toISOString().slice(0, 10),
-    notas,
-  });
-}
-
-async function resolveTenantPersona(
-  token: string,
-  field: PersonaFieldValue,
-): Promise<PersonaRecord> {
-  if (field.mode === "existing") {
-    return fetchPersona(token, field.personaId);
-  }
-  const parts = parsePersonName(field.fullName);
-  return createPersona(token, {
-    tipoPersona: "natural",
-    nombre: parts.nombre,
-    apellido: parts.apellido,
-  });
-}
-
-async function resolveOwnerPersona(
-  token: string,
-  field: OwnerFieldValue,
-): Promise<PersonaRecord> {
-  if (field.mode === "existing") {
-    return fetchPersona(token, field.personaId);
-  }
-  const parts = parsePersonName(field.fullName);
-  return createPersona(token, {
-    tipoPersona: "natural",
-    nombre: parts.nombre,
-    apellido: parts.apellido,
-  });
-}
-
-function ownerPorcentajeAdministracion(field: OwnerFieldValue): number {
-  if (field.mode === "new") return field.porcentajeAdministracion;
-  return field.porcentajeAdministracion ?? 6;
-}
+const AdjustContractModal = dynamic(
+  () =>
+    import("@/components/alquileres/AdjustContractModal").then((mod) => ({
+      default: mod.AdjustContractModal,
+    })),
+  { ssr: false },
+);
+const CobrarAlquilerModal = dynamic(
+  () =>
+    import("@/components/alquileres/CobrarAlquilerModal").then((mod) => ({
+      default: mod.CobrarAlquilerModal,
+    })),
+  { ssr: false },
+);
+const LiquidacionPropietarioModal = dynamic(
+  () =>
+    import("@/components/alquileres/LiquidacionPropietarioModal").then((mod) => ({
+      default: mod.LiquidacionPropietarioModal,
+    })),
+  { ssr: false },
+);
+const ContractFichaDrawer = dynamic(
+  () =>
+    import("@/components/alquileres/ContractFichaDrawer").then((mod) => ({
+      default: mod.ContractFichaDrawer,
+    })),
+  { ssr: false },
+);
+const NewContractModal = dynamic(
+  () =>
+    import("@/components/alquileres/NewContractModal").then((mod) => ({
+      default: mod.NewContractModal,
+    })),
+  { ssr: false },
+);
+const RenewContractModal = dynamic(
+  () =>
+    import("@/components/alquileres/RenewContractModal").then((mod) => ({
+      default: mod.RenewContractModal,
+    })),
+  { ssr: false },
+);
 
 export function AlquileresWorkspace() {
   const { token, logout } = useAuth();
-  const [rows, setRows] = useState<RentalRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [detail, setDetail] = useState<ContractDetail | null>(null);
-  const [selectedContrato, setSelectedContrato] = useState<ContratoDetail | null>(null);
+  const { prefetch: prefetchContrato } = useContratoPrefetch(token);
+  const {
+    rows,
+    loading,
+    error,
+    pageIndex,
+    canGoPrev,
+    canGoNext,
+    goNext,
+    goPrev,
+    searchQuery,
+    setSearchQuery,
+    activeChip,
+    setActiveChip,
+    tableTotal,
+    tableStats,
+    stats,
+    loadRows,
+  } = useAlquileresTable(token, logout);
+
   const [newModalOpen, setNewModalOpen] = useState(false);
   const [renewModalOpen, setRenewModalOpen] = useState(false);
   const [adjustModalOpen, setAdjustModalOpen] = useState(false);
@@ -175,361 +127,44 @@ export function AlquileresWorkspace() {
     personas: PersonaRecord[];
     inmueblesSinAlquiler: InmuebleSinAlquiler[];
   } | null>(null);
-  const [cobrarModalOpen, setCobrarModalOpen] = useState(false);
   const [liquidacionModalOpen, setLiquidacionModalOpen] = useState(false);
-  const [cobrarRow, setCobrarRow] = useState<RentalRow | null>(null);
-  const [drawerServicios, setDrawerServicios] = useState<ServicioContratoRecord[]>([]);
-  const [drawerPeriodos, setDrawerPeriodos] = useState<PeriodoServicioRecord[]>([]);
-  const [drawerPlanesDeposito, setDrawerPlanesDeposito] = useState<PlanActualizacionDepositoDetail[]>([]);
-  const [tiposServicio, setTiposServicio] = useState<CatalogoItem[]>([]);
-  const [serviciosLoading, setServiciosLoading] = useState(false);
-  const [serviciosSubmitting, setServiciosSubmitting] = useState(false);
-  const [mediosPago, setMediosPago] = useState<CatalogoItem[]>([]);
 
   const showToast = useCallback((message: string) => {
     setToast(message);
     window.setTimeout(() => setToast(null), 3200);
   }, []);
 
-  const loadRows = useCallback(async () => {
-    if (!token) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const [contratosRes, resumen] = await Promise.all([
-        fetchContratosTableSummary(token, { estado: "active", limit: 100 }),
-        fetchDashboardResumen(token, 100),
-      ]);
-      const billing = buildBillingIndex(resumen);
-      const dashboardMeta = buildDashboardContractMeta(resumen);
-      const mapped = contratosRes.items.map((contrato) =>
-        mapContratoTableItemToRentalRow(contrato, billing, dashboardMeta),
-      );
-
-      setRows(mapped);
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 401) {
-        logout();
-        return;
-      }
-      setError(err instanceof ApiError ? err.message : "Error al cargar alquileres");
-    } finally {
-      setLoading(false);
-    }
-  }, [token, logout]);
-
-  useEffect(() => {
-    void loadRows();
-  }, [loadRows]);
-
-  const loadDrawerServicios = useCallback(
-    async (contratoId: number) => {
-      if (!token) return;
-      setServiciosLoading(true);
-      try {
-        const [serviciosRes, periodosRes, planesRes, tiposRes, mediosRes] = await Promise.all([
-          fetchServicios(token, contratoId),
-          fetchServiciosPeriodos(token, contratoId),
-          fetchPlanesActualizacionDeposito(token, contratoId),
-          tiposServicio.length
-            ? Promise.resolve({ items: tiposServicio })
-            : fetchCatalog(token, "/catalogos/tipos-servicio"),
-          mediosPago.length
-            ? Promise.resolve({ items: mediosPago })
-            : fetchCatalog(token, "/catalogos/medios-pago"),
-        ]);
-        setDrawerServicios(serviciosRes.items);
-        setDrawerPeriodos(periodosRes.items);
-        setDrawerPlanesDeposito(planesRes.items);
-        if (!tiposServicio.length) {
-          setTiposServicio(tiposRes.items);
-        }
-        if (!mediosPago.length) {
-          setMediosPago(mediosRes.items);
-        }
-      } catch (err) {
-        showToast(err instanceof ApiError ? err.message : "No se pudieron cargar los servicios");
-      } finally {
-        setServiciosLoading(false);
-      }
-    },
-    [token, showToast, tiposServicio, mediosPago],
-  );
-
-  const openDrawer = useCallback(
-    async (id: string) => {
-      if (!token) return;
-      setDrawerOpen(true);
-      setDetail(null);
-      setSelectedContrato(null);
-      setDrawerServicios([]);
-      setDrawerPeriodos([]);
-      setDrawerPlanesDeposito([]);
-      try {
-        const contratoId = Number(id);
-        const detailRes = await fetchContrato(token, contratoId);
-        setSelectedContrato(detailRes);
-        let ficha = { propietarios: [] as Array<{ personaId: number; nombre?: string | null; apellido?: string | null; razonSocial?: string | null }> };
-        if (detailRes.inmueble?.id) {
-          try {
-            ficha = await fetchInmuebleFicha(token, detailRes.inmueble.id);
-          } catch {
-            // staff may lack owner detail permission
-          }
-        }
-        setDetail(mapContratoDetailToFicha(detailRes, ficha.propietarios));
-        void loadDrawerServicios(contratoId);
-      } catch (err) {
-        showToast(err instanceof ApiError ? err.message : "No se pudo cargar la ficha");
-        setDrawerOpen(false);
-      }
-    },
-    [token, showToast, loadDrawerServicios],
-  );
-
-  const openCollectFromRow = useCallback(
-    async (row: RentalRow) => {
-      if (!token) return;
-      if (mediosPago.length === 0) {
-        try {
-          const res = await fetchCatalog(token, "/catalogos/medios-pago");
-          setMediosPago(res.items);
-        } catch (err) {
-          showToast(err instanceof ApiError ? err.message : "No se pudieron cargar los medios de pago");
-          return;
-        }
-      }
-      setCobrarRow(row);
-      setCobrarModalOpen(true);
-    },
-    [token, mediosPago.length, showToast],
-  );
-
-  async function handleCreateServicio(values: ServicioFormValues) {
-    if (!token || !selectedContrato) return;
-    setServiciosSubmitting(true);
-    try {
-      const body =
-        values.modoFacturacion === "fixed"
-          ? {
-              tipoServicioId: values.tipoServicioId,
-              provider: values.provider.trim() || null,
-              numeroMedidor: values.numeroMedidor.trim() || null,
-              numeroClienteSecheep: values.numeroClienteSecheep.trim() || null,
-              numeroSuministroSecheep: values.numeroSuministroSecheep.trim() || null,
-              modoFacturacion: values.modoFacturacion,
-              montoFijo: Number(values.montoFijo),
-              codigoMoneda: values.codigoMoneda,
-            }
-          : {
-              tipoServicioId: values.tipoServicioId,
-              provider: values.provider.trim() || null,
-              numeroMedidor: values.numeroMedidor.trim() || null,
-              numeroClienteSecheep: values.numeroClienteSecheep.trim() || null,
-              numeroSuministroSecheep: values.numeroSuministroSecheep.trim() || null,
-              modoFacturacion: values.modoFacturacion,
-            };
-      await createServicio(token, selectedContrato.id, body);
-      showToast("Servicio agregado.");
-      await loadDrawerServicios(selectedContrato.id);
-      await loadRows();
-    } catch (err) {
-      showToast(rentalApiErrorMessage(err, "No se pudo agregar el servicio"));
-    } finally {
-      setServiciosSubmitting(false);
-    }
-  }
-
-  async function handleUpdateServicio(servicioId: number, values: ServicioFormValues) {
-    if (!token || !selectedContrato) return;
-    setServiciosSubmitting(true);
-    try {
-      const patch =
-        values.modoFacturacion === "fixed"
-          ? {
-              provider: values.provider.trim() || null,
-              numeroMedidor: values.numeroMedidor.trim() || null,
-              numeroClienteSecheep: values.numeroClienteSecheep.trim() || null,
-              numeroSuministroSecheep: values.numeroSuministroSecheep.trim() || null,
-              modoFacturacion: values.modoFacturacion,
-              montoFijo: Number(values.montoFijo),
-              codigoMoneda: values.codigoMoneda,
-            }
-          : {
-              provider: values.provider.trim() || null,
-              numeroMedidor: values.numeroMedidor.trim() || null,
-              numeroClienteSecheep: values.numeroClienteSecheep.trim() || null,
-              numeroSuministroSecheep: values.numeroSuministroSecheep.trim() || null,
-              modoFacturacion: values.modoFacturacion,
-              montoFijo: null,
-              codigoMoneda: null,
-            };
-      await updateServicio(token, servicioId, patch);
-      showToast("Servicio actualizado.");
-      await loadDrawerServicios(selectedContrato.id);
-      await loadRows();
-    } catch (err) {
-      showToast(rentalApiErrorMessage(err, "No se pudo actualizar el servicio"));
-    } finally {
-      setServiciosSubmitting(false);
-    }
-  }
-
-  async function handleDeactivateServicio(servicioId: number) {
-    if (!token || !selectedContrato) return;
-    setServiciosSubmitting(true);
-    try {
-      await deactivateServicio(token, servicioId);
-      showToast("Servicio desactivado.");
-      await loadDrawerServicios(selectedContrato.id);
-      await loadRows();
-    } catch (err) {
-      showToast(rentalApiErrorMessage(err, "No se pudo desactivar el servicio"));
-    } finally {
-      setServiciosSubmitting(false);
-    }
-  }
-
-  async function handleImportSecheep(servicioId: number, payload: SecheepImportInput) {
-    if (!token || !selectedContrato) return;
-    setServiciosSubmitting(true);
-    try {
-      const result = await importSecheep(token, servicioId, payload);
-      showToast(
-        `SECHEEP importado: ${result.creados} nuevo(s), ${result.actualizados} actualizado(s). ${result.sync.vencidas} vencida(s), ${result.sync.pendientes} pendiente(s).`,
-      );
-      await loadDrawerServicios(selectedContrato.id);
-      await loadRows();
-    } catch (err) {
-      showToast(rentalApiErrorMessage(err, "No se pudo importar desde SECHEEP"));
-      throw err;
-    } finally {
-      setServiciosSubmitting(false);
-    }
-  }
-
-  async function handleCreatePeriodo(servicioId: number, values: PeriodoFormValues) {
-    if (!token || !selectedContrato) return;
-    setServiciosSubmitting(true);
-    try {
-      const servicio = drawerServicios.find((s) => s.id === servicioId);
-      const body: CreatePeriodoInput = {
-        inicioPeriodo: values.inicioPeriodo,
-        finPeriodo: values.finPeriodo,
-        fechaVencimiento: values.fechaVencimiento || null,
-        notas: values.notas.trim() || null,
-        ...(servicio?.modoFacturacion === "variable"
-          ? { monto: Number(values.monto), codigoMoneda: values.codigoMoneda }
-          : {}),
-      };
-      await createPeriodoServicio(token, servicioId, body);
-      showToast("Período registrado.");
-      await loadDrawerServicios(selectedContrato.id);
-      await loadRows();
-    } catch (err) {
-      showToast(rentalApiErrorMessage(err, "No se pudo registrar el período"));
-      throw err;
-    } finally {
-      setServiciosSubmitting(false);
-    }
-  }
-
-
-  async function handleCreatePlanDeposito(values: PlanActualizacionDepositoFormValues) {
-    if (!token || !selectedContrato) return;
-
-    const montoTotal = Number(values.montoTotal.replace(/\D/g, ""));
-    const cantidadCuotas = Number(values.cantidadCuotas);
-    const diaVencimiento = Number(values.diaVencimiento);
-    if (!Number.isFinite(montoTotal) || montoTotal <= 0) {
-      showToast("Ingresá un monto total válido.");
-      return;
-    }
-    if (!Number.isInteger(cantidadCuotas) || cantidadCuotas < 1) {
-      showToast("Ingresá una cantidad de cuotas válida.");
-      return;
-    }
-    if (!Number.isInteger(diaVencimiento) || diaVencimiento < 1 || diaVencimiento > 31) {
-      showToast("Ingresá un día de vencimiento entre 1 y 31.");
-      return;
-    }
-
-    setServiciosSubmitting(true);
-    try {
-      await createPlanActualizacionDeposito(token, selectedContrato.id, {
-        montoTotal,
-        codigoMoneda: selectedContrato.codigoMoneda.trim(),
-        cantidadCuotas,
-        diaVencimiento,
-        fechaPrimeraCuota: values.fechaPrimeraCuota,
-        notas: values.notas.trim() || null,
-      });
-      showToast("Plan de actualización de depósito creado.");
-      await loadDrawerServicios(selectedContrato.id);
-    } catch (err) {
-      showToast(rentalApiErrorMessage(err, "No se pudo crear el plan de depósito"));
-      throw err;
-    } finally {
-      setServiciosSubmitting(false);
-    }
-  }
-
-  async function handleRegisterPago(
-    periodo: PeriodoServicioRecord,
-    _servicio: ServicioContratoRecord,
-    values: RegistrarPagoServicioFormValues,
-  ) {
-    if (!token || !selectedContrato) return;
-    const monto = Number(values.monto);
-    if (!Number.isFinite(monto) || monto <= 0) {
-      showToast("Ingresá un monto válido.");
-      return;
-    }
-
-    setServiciosSubmitting(true);
-    try {
-      const result = await registerPago(token, selectedContrato.id, {
-        fechaPago: values.fechaPago,
-        montoTotal: monto,
-        codigoMoneda: periodo.codigoMoneda.trim(),
-        medioPagoId: values.medioPagoId,
-        reference: values.reference.trim() || null,
-        notas: values.notas.trim() || null,
-        imputaciones: [
-          {
-            targetType: "periodo_servicio",
-            targetId: periodo.id,
-            monto,
-          },
-        ],
-      });
-
-      if (values.emitRecibo) {
-        try {
-          const recibo = await issueRecibo(token, result.pago.id);
-          const pdf = await downloadReciboPdf(token, recibo.id);
-          downloadBlob(pdf, `recibo-${recibo.reciboNumber}.pdf`);
-          showToast(`Pago registrado. Recibo ${recibo.reciboNumber} descargado.`);
-        } catch (reciboErr) {
-          showToast(
-            rentalApiErrorMessage(
-              reciboErr,
-              "Pago registrado, pero no se pudo emitir el recibo.",
-            ),
-          );
-        }
-      } else {
-        showToast("Pago de servicio registrado.");
-      }
-
-      await loadDrawerServicios(selectedContrato.id);
-      await loadRows();
-    } catch (err) {
-      showToast(rentalApiErrorMessage(err, "No se pudo registrar el pago"));
-    } finally {
-      setServiciosSubmitting(false);
-    }
-  }
+  const {
+    drawerOpen,
+    setDrawerOpen,
+    detail,
+    selectedContrato,
+    setSelectedContrato,
+    drawerServicios,
+    drawerPeriodos,
+    drawerPlanesDeposito,
+    tiposServicio,
+    mediosPago,
+    serviciosLoading,
+    serviciosSubmitting,
+    cobrarModalOpen,
+    setCobrarModalOpen,
+    cobrarRow,
+    setCobrarRow,
+    openDrawer,
+    openCollectFromRow,
+    handleCreateServicio,
+    handleUpdateServicio,
+    handleDeactivateServicio,
+    handleImportSecheep,
+    handleCreatePeriodo,
+    handleCreatePlanDeposito,
+    handleRegisterPago,
+  } = useAlquileresDrawer({
+    token,
+    showToast,
+    onRowsChanged: loadRows,
+  });
 
   async function handleRenewContract(form: RenewContractForm) {
     if (!token || !selectedContrato) return;
@@ -1014,10 +649,6 @@ export function AlquileresWorkspace() {
     }
   }
 
-  const tableRows = useMemo(() => rows, [rows]);
-  const stats = useMemo(() => rentalSummaryStats(rows), [rows]);
-  const inCollectionWindow = isRentCollectionWindow();
-
   return (
     <>
       <div className={`flex flex-col gap-6 sm:gap-8 ${pagePaddingClass}`}>
@@ -1038,34 +669,14 @@ export function AlquileresWorkspace() {
           </div>
         </header>
 
-        {!loading && !error && rows.length > 0 ? (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <KpiCard label="Contratos activos" value={String(stats.total)} hint="En esta vista" />
-            {inCollectionWindow ? (
-              <KpiCard
-                label="A cobrar"
-                value={String(stats.aCobrar)}
-                hint="Cuota del mes (días 1 al 10)"
-              />
-            ) : (
-              <KpiCard label="En mora" value={String(stats.enMora)} hint="Con días de atraso" />
-            )}
-            <KpiCard
-              label="Ajuste pendiente"
-              value={String(stats.ajustePendiente)}
-              hint="Requieren actualización de monto"
-            />
-            <KpiCard
-              label="Por vencer"
-              value={String(stats.renovacionProxima)}
-              hint="Renovación próxima"
-            />
-          </div>
-        ) : null}
+        <AlquileresKpiSection
+          loading={loading}
+          hasStats={tableStats !== null}
+          error={error}
+          stats={stats}
+        />
 
-        {loading ? (
-          <p className="text-sm text-text-secondary">Cargando contratos…</p>
-        ) : error ? (
+        {error ? (
           <div>
             <p className="rounded-sm border border-danger bg-danger-bg px-3 py-2 text-sm text-danger">{error}</p>
             <button type="button" onClick={() => void loadRows()} className="mt-3 text-sm font-semibold text-primary">
@@ -1074,7 +685,22 @@ export function AlquileresWorkspace() {
           </div>
         ) : (
           <RentalsTable
-            rows={tableRows}
+            rows={rows}
+            loading={loading}
+            serverMode
+            total={tableTotal}
+            page={pageIndex + 1}
+            pageSize={ALQUILERES_PAGE_SIZE}
+            canGoPrev={canGoPrev}
+            canGoNext={canGoNext}
+            onGoPrev={goPrev}
+            onGoNext={goNext}
+            stats={stats}
+            searchQuery={searchQuery}
+            activeChip={activeChip}
+            onSearchChange={setSearchQuery}
+            onChipChange={setActiveChip}
+            onPrefetch={(row) => prefetchContrato(Number(row.id))}
             onViewFicha={(row) => void openDrawer(row.id)}
             onCollect={(row) => void openCollectFromRow(row)}
             onAdjust={(row) => void openAdjustFromRow(row)}
@@ -1083,28 +709,33 @@ export function AlquileresWorkspace() {
         )}
       </div>
 
-      <LiquidacionPropietarioModal
-        open={liquidacionModalOpen}
-        onClose={() => setLiquidacionModalOpen(false)}
-        token={token}
-      />
-      <CobrarAlquilerModal
-        open={cobrarModalOpen}
-        onClose={() => {
-          setCobrarModalOpen(false);
-          setCobrarRow(null);
-        }}
-        row={cobrarRow}
-        contratoId={cobrarRow ? Number(cobrarRow.id) : null}
-        token={token}
-        mediosPago={mediosPago}
-        onSuccess={() => {
-          showToast("Cobro registrado.");
-          void loadRows();
-        }}
-      />
+      {liquidacionModalOpen ? (
+        <LiquidacionPropietarioModal
+          open={liquidacionModalOpen}
+          onClose={() => setLiquidacionModalOpen(false)}
+          token={token}
+        />
+      ) : null}
+      {cobrarModalOpen ? (
+        <CobrarAlquilerModal
+          open={cobrarModalOpen}
+          onClose={() => {
+            setCobrarModalOpen(false);
+            setCobrarRow(null);
+          }}
+          row={cobrarRow}
+          contratoId={cobrarRow ? Number(cobrarRow.id) : null}
+          token={token}
+          mediosPago={mediosPago}
+          onSuccess={() => {
+            showToast("Cobro registrado.");
+            void loadRows();
+          }}
+        />
+      ) : null}
 
-      <ContractFichaDrawer
+      {drawerOpen ? (
+        <ContractFichaDrawer
         open={drawerOpen}
         detail={detail}
         contrato={selectedContrato}
@@ -1126,9 +757,11 @@ export function AlquileresWorkspace() {
         mediosPago={mediosPago}
         canRegisterPago={selectedContrato?.estado === "active"}
         onClose={() => setDrawerOpen(false)}
-      />
+        />
+      ) : null}
 
-      <AdjustContractModal
+      {adjustModalOpen ? (
+        <AdjustContractModal
         open={adjustModalOpen}
         contrato={selectedContrato}
         token={token}
@@ -1136,18 +769,22 @@ export function AlquileresWorkspace() {
         onClose={() => setAdjustModalOpen(false)}
         onSubmit={(input) => void handleAdjustContract(input)}
         submitting={submitting}
-      />
+        />
+      ) : null}
 
-      <RenewContractModal
+      {renewModalOpen ? (
+        <RenewContractModal
         open={renewModalOpen}
         contrato={selectedContrato}
         token={token}
         onClose={() => setRenewModalOpen(false)}
         onSubmit={(form) => void handleRenewContract(form)}
         submitting={submitting}
-      />
+        />
+      ) : null}
 
-      <NewContractModal
+      {newModalOpen ? (
+        <NewContractModal
         open={newModalOpen}
         onClose={() => setNewModalOpen(false)}
         onSubmit={(form) => void handleNewContract(form)}
@@ -1156,7 +793,8 @@ export function AlquileresWorkspace() {
         usedInmuebleCodes={codeContext?.inmuebleCodes ?? []}
         personas={codeContext?.personas ?? []}
         inmueblesSinAlquiler={codeContext?.inmueblesSinAlquiler ?? []}
-      />
+        />
+      ) : null}
 
       {toast ? (
         <div
