@@ -17,6 +17,8 @@ export function cuotaEstadoLabel(estadoCode: string): string {
       return "En mora";
     case "pending":
       return "Pendiente";
+    case "partial":
+      return "Parcial";
     default:
       return estadoCode;
   }
@@ -96,4 +98,13 @@ export function buildRentImputaciones(cuota: CuotaDetail, montoTotal: number): I
   }
 
   return imputaciones;
+}
+
+
+/** Si el contrato activo puede abrir el flujo de cobro (cuota pendiente o mes sin generar). */
+export function canCollectRentFromCuotas(cuotas: CuotaDetail[]): boolean {
+  if (pickCuotaParaCobrar(cuotas)) return true;
+  const period = currentBillingPeriod();
+  const current = findCuotaForPeriod(cuotas, period.anioPeriodo, period.mesPeriodo);
+  return !current;
 }

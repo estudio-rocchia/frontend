@@ -24,7 +24,6 @@ import { downloadBlob, formatMoney, moneyClassName, rentalApiErrorMessage } from
 import {
   buildRentImputaciones,
   cuotaPeriodLabel,
-  cuotaSaldoPendiente,
   currentBillingPeriod,
   isCuotaOverdue,
   pickCuotaParaCobrar,
@@ -41,10 +40,23 @@ function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+function saldoAlquilerPendiente(cuota: CuotaDetail): number {
+  return Number(cuota.saldoAlquiler) || 0;
+}
+
+function saldoMoraPendiente(cuota: CuotaDetail): number {
+  return Number(cuota.saldoMora) || 0;
+}
+
+function saldoCuotaTotal(cuota: CuotaDetail): number {
+  return saldoAlquilerPendiente(cuota) + saldoMoraPendiente(cuota);
+}
+
 export function CobrarAlquilerModal({
   open,
   onClose,
-  row,
+  row = null,
+  subtitle,
   contratoId,
   token,
   mediosPago,
@@ -52,7 +64,8 @@ export function CobrarAlquilerModal({
 }: {
   open: boolean;
   onClose: () => void;
-  row: RentalRow | null;
+  row?: RentalRow | null;
+  subtitle?: string;
   contratoId: number | null;
   token: string | null;
   mediosPago: CatalogoItem[];
@@ -110,6 +123,11 @@ export function CobrarAlquilerModal({
           const period = currentBillingPeriod();
           target = await generateCuota(authToken, id, period);
         }
+        const fechaCobro = todayIso();
+        if (isCuotaOverdue(target, fechaCobro)) {
+          const moraResult = await applyMora(authToken, id, target.id, { asOfDate: fechaCobro });
+          target = moraResult.cuota;
+        }
         const activePlan = activePlanActualizacionDeposito(planes);
         const pendingDeposito = pickCuotaDepositoParaCobrar(activePlan);
         if (!cancelled) {
@@ -133,12 +151,37 @@ export function CobrarAlquilerModal({
     };
   }, [open, token, contratoId, mediosPago]);
 
+  useEffect(() => {
+    if (!open || !token || contratoId === null || !cuota || loading) return;
+    if (!isCuotaOverdue(cuota, fechaPago)) return;
+
+    const authToken = token;
+    const id = contratoId;
+    const cuotaId = cuota.id;
+    let cancelled = false;
+
+    async function refreshMora() {
+      try {
+        const moraResult = await applyMora(authToken, id, cuotaId, { asOfDate: fechaPago });
+        if (!cancelled) setCuota(moraResult.cuota);
+      } catch (err) {
+        if (!cancelled) {
+          setError(rentalApiErrorMessage(err, "No se pudo calcular la mora"));
+        }
+      }
+    }
+
+    void refreshMora();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, token, contratoId, cuota?.id, fechaPago, loading]);
+
   async function handleSubmit() {
     if (!token || !contratoId || !cuota) return;
-    const saldoAlquilerInicial = cuotaSaldoPendiente(cuota);
     const saldoDepositoInicial =
       includeDeposito && cuotaDeposito ? cuotaDepositoSaldoPendiente(cuotaDeposito) : 0;
-    const monto = saldoAlquilerInicial + saldoDepositoInicial;
+    const monto = saldoCuotaTotal(cuota) + saldoDepositoInicial;
     if (monto <= 0) {
       setError("No hay saldo pendiente para cobrar.");
       return;
@@ -157,11 +200,12 @@ export function CobrarAlquilerModal({
         cuotaActualizada = moraResult.cuota;
       }
 
-      const montoAlquiler = cuotaSaldoPendiente(cuotaActualizada);
+      const montoAlquiler = saldoAlquilerPendiente(cuotaActualizada);
+      const montoMora = saldoMoraPendiente(cuotaActualizada);
       const montoDeposito =
         includeDeposito && cuotaDeposito ? cuotaDepositoSaldoPendiente(cuotaDeposito) : 0;
-      const montoFinal = montoAlquiler + montoDeposito;
-      let imputaciones = buildRentImputaciones(cuotaActualizada, montoAlquiler);
+      const montoFinal = montoAlquiler + montoMora + montoDeposito;
+      let imputaciones = buildRentImputaciones(cuotaActualizada, montoAlquiler + montoMora);
       if (includeDeposito && cuotaDeposito && montoDeposito > 0) {
         imputaciones = appendDepositoImputacion(imputaciones, cuotaDeposito);
       }
@@ -197,19 +241,20 @@ export function CobrarAlquilerModal({
     }
   }
 
-  const saldoAlquiler = cuota ? cuotaSaldoPendiente(cuota) : 0;
+  const saldoAlquiler = cuota ? saldoAlquilerPendiente(cuota) : 0;
+  const saldoMora = cuota ? saldoMoraPendiente(cuota) : 0;
   const saldoDeposito =
     includeDeposito && cuotaDeposito ? cuotaDepositoSaldoPendiente(cuotaDeposito) : 0;
-  const saldo = saldoAlquiler + saldoDeposito;
-  const saldoMora = cuota ? Number(cuota.saldoMora) || 0 : 0;
+  const saldo = saldoAlquiler + saldoMora + saldoDeposito;
   const moneda = cuota?.codigoMoneda.trim() ?? "ARS";
+  const diasMora = cuota?.mora?.diasAtraso ?? 0;
 
   return (
     <Modal
       open={open}
       onClose={onClose}
       title="Cobrar alquiler"
-      subtitle={row ? `${row.tenant} · ${row.contractProperty}` : undefined}
+      subtitle={subtitle ?? (row ? `${row.tenant} · ${row.contractProperty}` : undefined)}
       footer={
         <>
           <ButtonOutline type="button" onClick={onClose} disabled={submitting}>
@@ -239,9 +284,6 @@ export function CobrarAlquilerModal({
             <p className={`mt-2 text-[32px] font-bold leading-none text-primary ${moneyClassName}`}>
               {formatMoney(String(saldo), moneda)}
             </p>
-            {saldoMora > 0 ? (
-              <p className="mt-2 text-[12px] text-text-secondary">Incluye mora punitoria</p>
-            ) : null}
           </div>
 
           <div className="rounded-md border border-border bg-bg-page px-4 py-3 text-[13px]">
@@ -251,6 +293,17 @@ export function CobrarAlquilerModal({
                 {formatMoney(String(saldoAlquiler), moneda)}
               </span>
             </div>
+            {saldoMora > 0 ? (
+              <div className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3">
+                <span className="text-text-secondary">
+                  Mora punitoria
+                  {diasMora > 0 ? ` (${diasMora} día${diasMora === 1 ? "" : "s"})` : ""}
+                </span>
+                <span className="font-semibold text-danger">
+                  {formatMoney(String(saldoMora), moneda)}
+                </span>
+              </div>
+            ) : null}
             {cuotaDeposito && planDeposito ? (
               <label className="mt-3 flex items-start justify-between gap-3 border-t border-border pt-3">
                 <span className="flex items-start gap-2">

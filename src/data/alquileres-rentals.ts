@@ -1,5 +1,3 @@
-import { isRentCollectionWindow } from "@/lib/rental-collection";
-
 export type RentalFilterStatus =
   | "al_dia"
   | "en_mora"
@@ -71,18 +69,16 @@ export function rentalSummaryStats(rows: RentalRow[]) {
   };
 }
 
-/** Mostrar acción Cobrar: ventana del 1 al 10, o si ya está en mora. */
+/** Mostrar acción Cobrar mientras haya cuota del mes pendiente o esté en mora. */
 export function canCollectRent(row: RentalRow): boolean {
   if (row.needsRenewal) return false;
   if (row.filterStatus === "en_mora") return true;
   if (row.daysOverdue > 0 && row.filterStatus !== "ajuste_pendiente") return true;
-  return row.needsCollection && isRentCollectionWindow();
+  return row.needsCollection;
 }
 
 export function visibleFilterChips() {
-  return rentalFilterChips.filter(
-    (chip) => chip.id !== "a_cobrar" || isRentCollectionWindow(),
-  );
+  return rentalFilterChips;
 }
 
 export type RentalChipId = (typeof rentalFilterChips)[number]["id"];

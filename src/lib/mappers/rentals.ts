@@ -20,7 +20,6 @@ import {
   formatMonthYear,
   personaDisplayName,
 } from "@/lib/format";
-import { isRentCollectionWindow } from "@/lib/rental-collection";
 import { contratoSupportsIndexAdjustment } from "@/lib/rental-adjustment";
 import { serviciosSummaryFromData } from "@/lib/mappers/servicios";
 
@@ -44,7 +43,7 @@ function mapEstado(
   if (estadoCode === "late" || diasAtraso > 0) {
     return { status: { label: "En mora", variant: "danger" }, filterStatus: "en_mora" };
   }
-  if (cobrarPendiente && isRentCollectionWindow()) {
+  if (cobrarPendiente) {
     return { status: { label: "A cobrar", variant: "warning" }, filterStatus: "al_dia" };
   }
   if (estadoCode === "partial") {

@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 
 import { AlquileresKpiSection } from "@/components/alquileres/AlquileresKpiSection";
@@ -38,6 +39,7 @@ import {
 import { useContratoPrefetch } from "@/lib/use-contrato-prefetch";
 import type {
   ActualizacionDepositoResult,
+  ContratoDetail,
   PersonaRecord,
 } from "@/lib/api/types";
 import { nextContratoCode, nextInmuebleCode, prefixForTipoInmueble } from "@/lib/codes";
@@ -70,13 +72,6 @@ const LiquidacionPropietarioModal = dynamic(
     })),
   { ssr: false },
 );
-const ContractFichaDrawer = dynamic(
-  () =>
-    import("@/components/alquileres/ContractFichaDrawer").then((mod) => ({
-      default: mod.ContractFichaDrawer,
-    })),
-  { ssr: false },
-);
 const NewContractModal = dynamic(
   () =>
     import("@/components/alquileres/NewContractModal").then((mod) => ({
@@ -93,6 +88,7 @@ const RenewContractModal = dynamic(
 );
 
 export function AlquileresWorkspace() {
+  const router = useRouter();
   const { token, logout } = useAuth();
   const { prefetch: prefetchContrato } = useContratoPrefetch(token);
   const {
@@ -128,6 +124,7 @@ export function AlquileresWorkspace() {
     inmueblesSinAlquiler: InmuebleSinAlquiler[];
   } | null>(null);
   const [liquidacionModalOpen, setLiquidacionModalOpen] = useState(false);
+  const [selectedContrato, setSelectedContrato] = useState<ContratoDetail | null>(null);
 
   const showToast = useCallback((message: string) => {
     setToast(message);
@@ -135,36 +132,23 @@ export function AlquileresWorkspace() {
   }, []);
 
   const {
-    drawerOpen,
-    setDrawerOpen,
-    detail,
-    selectedContrato,
-    setSelectedContrato,
-    drawerServicios,
-    drawerPeriodos,
-    drawerPlanesDeposito,
-    tiposServicio,
     mediosPago,
-    serviciosLoading,
-    serviciosSubmitting,
     cobrarModalOpen,
     setCobrarModalOpen,
     cobrarRow,
     setCobrarRow,
-    openDrawer,
     openCollectFromRow,
-    handleCreateServicio,
-    handleUpdateServicio,
-    handleDeactivateServicio,
-    handleImportSecheep,
-    handleCreatePeriodo,
-    handleCreatePlanDeposito,
-    handleRegisterPago,
   } = useAlquileresDrawer({
     token,
     showToast,
-    onRowsChanged: loadRows,
   });
+
+  const openFicha = useCallback(
+    (contratoId: string | number) => {
+      router.push(`/alquileres/${contratoId}`);
+    },
+    [router],
+  );
 
   async function handleRenewContract(form: RenewContractForm) {
     if (!token || !selectedContrato) return;
@@ -346,7 +330,10 @@ export function AlquileresWorkspace() {
     }
   }
 
-  async function handleAdjustContract(input: { fechaAjuste: string }) {
+  async function handleAdjustContract(input: {
+    fechaAjuste: string;
+    depositoPlan?: { crearPlan: boolean; cantidadCuotas: number };
+  }) {
     if (!token || !selectedContrato) return;
     if (selectedContrato.estado !== "active") {
       showToast("Solo se pueden ajustar contratos activos.");
@@ -359,22 +346,29 @@ export function AlquileresWorkspace() {
         fechaAjuste: input.fechaAjuste,
       });
 
-      if (result.actualizacionDeposito?.requiereCobro) {
+      const planChoice = input.depositoPlan;
+      const creoPlan =
+        result.actualizacionDeposito?.requiereCobro && planChoice?.crearPlan !== false;
+
+      if (creoPlan && result.actualizacionDeposito) {
         await createAutoPlanActualizacionDeposito(
           token,
           selectedContrato.id,
           result.actualizacionDeposito,
           selectedContrato.diaVencimientoPago,
-          "Plan automático por actualización de depósito (ajuste de alquiler).",
+          "Plan por actualización de depósito (ajuste de alquiler).",
+          planChoice,
         );
       }
 
       setAdjustModalOpen(false);
       const inmuebleCode = selectedContrato.inmueble?.code ?? "inmueble";
       showToast(
-        result.actualizacionDeposito?.requiereCobro
+        creoPlan
           ? `Ajuste aplicado para ${inmuebleCode}. Plan de depósito creado.`
-          : `Ajuste aplicado para ${inmuebleCode}.`,
+          : result.actualizacionDeposito?.requiereCobro
+            ? `Ajuste aplicado para ${inmuebleCode}. Podés crear el plan de depósito desde la ficha.`
+            : `Ajuste aplicado para ${inmuebleCode}.`,
       );
       await loadRows();
     } catch (err) {
@@ -638,7 +632,7 @@ export function AlquileresWorkspace() {
       showToast(`Alquiler ${inmueble.code} creado.`);
       try {
         await loadRows();
-        void openDrawer(String(contrato.id));
+        openFicha(contrato.id);
       } catch {
         showToast("Contrato creado, pero no se pudo refrescar la lista.");
       }
@@ -701,7 +695,7 @@ export function AlquileresWorkspace() {
             onSearchChange={setSearchQuery}
             onChipChange={setActiveChip}
             onPrefetch={(row) => prefetchContrato(Number(row.id))}
-            onViewFicha={(row) => void openDrawer(row.id)}
+            onViewFicha={(row) => openFicha(row.id)}
             onCollect={(row) => void openCollectFromRow(row)}
             onAdjust={(row) => void openAdjustFromRow(row)}
             onRenew={(row) => void openRenewFromRow(row)}
@@ -731,32 +725,6 @@ export function AlquileresWorkspace() {
             showToast("Cobro registrado.");
             void loadRows();
           }}
-        />
-      ) : null}
-
-      {drawerOpen ? (
-        <ContractFichaDrawer
-        open={drawerOpen}
-        detail={detail}
-        contrato={selectedContrato}
-        servicios={drawerServicios}
-        periodos={drawerPeriodos}
-        planesDeposito={drawerPlanesDeposito}
-        tiposServicio={tiposServicio}
-        serviciosLoading={serviciosLoading}
-        serviciosSubmitting={serviciosSubmitting}
-        canEditServicios={selectedContrato?.estado === "active"}
-        canManageDepositoPlan={selectedContrato?.estado === "active"}
-        onCreatePlanDeposito={handleCreatePlanDeposito}
-        onCreateServicio={handleCreateServicio}
-        onUpdateServicio={handleUpdateServicio}
-        onDeactivateServicio={handleDeactivateServicio}
-        onCreatePeriodo={handleCreatePeriodo}
-        onImportSecheep={handleImportSecheep}
-        onRegisterPago={handleRegisterPago}
-        mediosPago={mediosPago}
-        canRegisterPago={selectedContrato?.estado === "active"}
-        onClose={() => setDrawerOpen(false)}
         />
       ) : null}
 
