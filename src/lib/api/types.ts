@@ -92,6 +92,22 @@ export interface PreviewAjusteInput {
   fechaHasta: string;
 }
 
+export interface IndiceSyncStats {
+  fetched: number;
+  upserted: number;
+  skipped?: boolean;
+  warning?: string;
+}
+
+export interface SyncIndicesResponse {
+  syncedAt: string;
+  desde: string;
+  hasta: string;
+  ICL: IndiceSyncStats;
+  IPC: IndiceSyncStats;
+  CAC: IndiceSyncStats;
+}
+
 export interface PreviewAjusteResponse {
   tipoIndiceCode: IndiceCode;
   periodoDesde: string;
@@ -584,15 +600,43 @@ export interface RegisterPagoResult {
   periodosActualizados: PeriodoServicioPaymentRecord[];
 }
 
+export interface ImputacionRecord {
+  id: number;
+  pagoId: number;
+  cuotaAlquilerId: number | null;
+  moraId: number | null;
+  periodoServicioId: number | null;
+  monto: string;
+  creadoEn: string;
+}
+
+export interface PagoConceptoLine {
+  concept: string;
+  label: string;
+  monto: string;
+}
+
 export interface PagoRecord {
   id: number;
+  contratoId: number | null;
+  ventaId: number | null;
   fechaPago: string;
   montoTotal: string;
   codigoMoneda: string;
+  medioPagoId: number;
+  reference: string | null;
+  notas: string | null;
+  creadoPor: number | null;
+  creadoEn: string;
+}
+
+export interface PagoListItem extends PagoRecord {
+  conceptos: PagoConceptoLine[];
 }
 
 export interface PagoDetail extends PagoRecord {
-  recibo: { id: number; reciboNumber: string } | null;
+  imputaciones: ImputacionRecord[];
+  recibo: ReciboRecord | null;
 }
 
 export interface ReciboRecord {

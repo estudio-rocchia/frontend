@@ -20,6 +20,7 @@ import type {
   LoginResponse,
   MeResponse,
   PagoDetail,
+  PagoListItem,
   PagoRecord,
   PersonaRecord,
   ActualizacionDepositoResult,
@@ -29,6 +30,7 @@ import type {
   IndiceCode,
   PreviewAjusteInput,
   PreviewAjusteResponse,
+  SyncIndicesResponse,
   ValorIndiceRecord,
   ReciboRecord,
   RegisterPagoInput,
@@ -54,7 +56,7 @@ import type {
   UpdateServicioInput,
 } from "./types";
 
-export { ApiError, getApiBaseUrl } from "./client";
+export { ApiError, NetworkError, getApiBaseUrl } from "./client";
 export type * from "./types";
 
 export function login(usernameOrEmail: string, password: string) {
@@ -258,7 +260,7 @@ export function createPlanActualizacionDeposito(
 }
 
 export function fetchPagos(token: string, contratoId: number) {
-  return apiRequest<{ items: PagoRecord[] }>(`/contratos/${contratoId}/pagos`, { token });
+  return apiRequest<{ items: PagoListItem[] }>(`/contratos/${contratoId}/pagos`, { token });
 }
 
 export function registerPago(token: string, contratoId: number, body: RegisterPagoInput) {
@@ -536,6 +538,13 @@ export function fetchIndiceValores(
 ) {
   const query = new URLSearchParams({ desde, hasta });
   return apiRequest<{ items: ValorIndiceRecord[] }>(`/indices/${code}/valores?${query}`, {
+    token,
+  });
+}
+
+export function syncIndices(token: string) {
+  return apiRequest<SyncIndicesResponse>("/indices/sync", {
+    method: "POST",
     token,
   });
 }
