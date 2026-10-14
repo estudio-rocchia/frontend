@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { RefreshCw } from "lucide-react";
 
 import { KpiCard } from "@/components/ui/KpiCard";
-import { ButtonPrimary } from "@/components/ui/Button";
+import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { useAuth } from "@/context/auth-context";
-import { ApiError, fetchIndiceValores } from "@/lib/api";
-import type { IndiceCode, ValorIndiceRecord } from "@/lib/api/types";
+import { ApiError, fetchIndiceValores, NetworkError, syncIndices } from "@/lib/api";
+import type { IndiceCode, SyncIndicesResponse, ValorIndiceRecord } from "@/lib/api/types";
 import { formatIndexValue, formatPeriodoIndice } from "@/lib/format";
 import { pagePaddingClass } from "@/lib/layout";
 import { ADJUSTMENT_INDICES } from "@/lib/rental-adjustment";
@@ -77,7 +78,9 @@ export function IndicesView() {
   const [hasta, setHasta] = useState(defaults.hasta);
   const [rows, setRows] = useState<ValorIndiceRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -102,6 +105,41 @@ export function IndicesView() {
     void load();
   }, [load]);
 
+  const handleSync = useCallback(async () => {
+    if (!token || syncing) return;
+    setSyncing(true);
+    setSyncMessage(null);
+    setError(null);
+    try {
+      const result: SyncIndicesResponse = await syncIndices(token);
+      const cacNote = result.CAC.skipped
+        ? " CAC no se actualiza desde este botón (solo ICL e IPC)."
+        : ` CAC: ${result.CAC.upserted} actualizado(s).`;
+      setSyncMessage(
+        `ICL e IPC actualizados (ICL: ${result.ICL.upserted}, IPC: ${result.IPC.upserted}).${cacNote}`,
+      );
+      await load();
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        logout();
+        return;
+      }
+      if (err instanceof ApiError && err.status === 403) {
+        setError("No tenés permiso para actualizar los índices.");
+        return;
+      }
+      if (err instanceof NetworkError) {
+        setError(
+          "La actualización tardó demasiado o se perdió la conexión. Probá de nuevo; si persiste, usá npm run db:sync-indices en el servidor.",
+        );
+        return;
+      }
+      setError(err instanceof ApiError ? err.message : "Error al actualizar los índices");
+    } finally {
+      setSyncing(false);
+    }
+  }, [token, syncing, load, logout]);
+
   const latest = rows[0] ?? null;
   const variation = useMemo(() => monthOverMonthVariation(rows), [rows]);
   const rangeLabel = useMemo(() => {
@@ -112,13 +150,31 @@ export function IndicesView() {
 
   return (
     <div className={`flex flex-col gap-6 sm:gap-8 ${pagePaddingClass}`}>
-      <header className="flex flex-col gap-1">
-        <h1 className="text-[22px] font-bold text-text-primary">Índices de ajuste</h1>
-        <p className="max-w-2xl text-sm text-text-secondary">
-          Consultá los valores mensuales de ICL, IPC y CAC que usa el sistema para calcular
-          ajustes de alquiler.
-        </p>
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-[22px] font-bold text-text-primary">Índices de ajuste</h1>
+          <p className="max-w-2xl text-sm text-text-secondary">
+            Consultá los valores mensuales de ICL, IPC y CAC que usa el sistema para calcular
+            ajustes de alquiler. ICL e IPC se actualizan con el botón; el CAC (CAMARCO) se sincroniza
+            solo en el servidor entre los días 19 y 25 de cada mes (valor del mes anterior).
+          </p>
+        </div>
+        <ButtonOutline
+          type="button"
+          onClick={() => void handleSync()}
+          disabled={syncing || loading}
+          className="shrink-0 gap-2 self-start"
+        >
+          <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
+          {syncing ? "Actualizando ICL e IPC…" : "Actualizar ICL e IPC"}
+        </ButtonOutline>
       </header>
+
+      {syncMessage ? (
+        <p className="rounded-sm border border-primary/30 bg-primary-soft px-3 py-2 text-sm text-primary">
+          {syncMessage}
+        </p>
+      ) : null}
 
       <section className="flex flex-col gap-3">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
