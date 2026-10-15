@@ -96,6 +96,7 @@ export interface IndiceSyncStats {
   fetched: number;
   upserted: number;
   skipped?: boolean;
+  upToDate?: boolean;
   warning?: string;
 }
 

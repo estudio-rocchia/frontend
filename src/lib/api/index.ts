@@ -546,6 +546,7 @@ export function syncIndices(token: string) {
   return apiRequest<SyncIndicesResponse>("/indices/sync", {
     method: "POST",
     token,
+    signal: AbortSignal.timeout(120_000),
   });
 }
 

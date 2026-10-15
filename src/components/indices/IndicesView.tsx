@@ -115,10 +115,23 @@ export function IndicesView() {
       const cacNote = result.CAC.skipped
         ? " CAC no se actualiza desde este botón (solo ICL e IPC)."
         : ` CAC: ${result.CAC.upserted} actualizado(s).`;
-      setSyncMessage(
-        `ICL e IPC actualizados (ICL: ${result.ICL.upserted}, IPC: ${result.IPC.upserted}).${cacNote}`,
-      );
-      await load();
+
+      const hadUpdates = result.ICL.upserted > 0 || result.IPC.upserted > 0;
+
+      if (result.ICL.upToDate && result.IPC.upToDate) {
+        setSyncMessage(`ICL e IPC ya están actualizados según las fuentes oficiales.${cacNote}`);
+      } else if (!hadUpdates) {
+        setSyncMessage(`No había cambios nuevos en ICL ni IPC.${cacNote}`);
+      } else {
+        setSyncMessage(
+          `ICL e IPC actualizados (ICL: ${result.ICL.upserted}, IPC: ${result.IPC.upserted}).${cacNote}`,
+        );
+      }
+
+      // Solo recargar la grilla si hubo filas nuevas; evita el titileo cuando ya estaba al día.
+      if (hadUpdates) {
+        await load();
+      }
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         logout();
@@ -153,11 +166,6 @@ export function IndicesView() {
       <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex flex-col gap-1">
           <h1 className="text-[22px] font-bold text-text-primary">Índices de ajuste</h1>
-          <p className="max-w-2xl text-sm text-text-secondary">
-            Consultá los valores mensuales de ICL, IPC y CAC que usa el sistema para calcular
-            ajustes de alquiler. ICL e IPC se actualizan con el botón; el CAC (CAMARCO) se sincroniza
-            solo en el servidor entre los días 19 y 25 de cada mes (valor del mes anterior).
-          </p>
         </div>
         <ButtonOutline
           type="button"
