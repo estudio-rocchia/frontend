@@ -84,7 +84,29 @@ export async function apiRequest<T>(
   return (await response.json()) as T;
 }
 
+function parseContentDispositionFilename(header: string | null): string | null {
+  if (!header) return null;
+  const utf8Match = /filename\*=UTF-8''([^;]+)/i.exec(header);
+  if (utf8Match?.[1]) {
+    try {
+      return decodeURIComponent(utf8Match[1]);
+    } catch {
+      return utf8Match[1];
+    }
+  }
+  const plainMatch = /filename="([^"]+)"/i.exec(header) ?? /filename=([^;]+)/i.exec(header);
+  return plainMatch?.[1]?.trim() ?? null;
+}
+
 export async function apiBlob(path: string, token: string): Promise<Blob> {
+  const { blob } = await apiBlobWithFilename(path, token);
+  return blob;
+}
+
+export async function apiBlobWithFilename(
+  path: string,
+  token: string,
+): Promise<{ blob: Blob; filename: string | null }> {
   const url = `${getApiBaseUrl()}${path.startsWith("/") ? path : `/${path}`}`;
   let response: Response;
   try {
@@ -104,5 +126,8 @@ export async function apiBlob(path: string, token: string): Promise<Blob> {
     throw new Error(`API error ${response.status}`);
   }
 
-  return response.blob();
+  return {
+    blob: await response.blob(),
+    filename: parseContentDispositionFilename(response.headers.get("content-disposition")),
+  };
 }

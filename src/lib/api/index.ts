@@ -1,5 +1,5 @@
 import { withCache } from "./cache";
-import { apiBlob, apiRequest } from "./client";
+import { apiBlob, apiBlobWithFilename, apiRequest } from "./client";
 import type {
   CatalogoItem,
   ContratoDetail,
@@ -338,7 +338,7 @@ export function issueLiquidacion(token: string, id: number) {
 }
 
 export function downloadLiquidacionPdf(token: string, id: number) {
-  return apiBlob(`/liquidaciones/${id}/pdf`, token);
+  return apiBlobWithFilename(`/liquidaciones/${id}/pdf`, token);
 }
 
 export function updatePersonaAdministracion(

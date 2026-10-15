@@ -156,15 +156,15 @@ export function LiquidacionPropietarioModal({
     setError(null);
     try {
       if (liquidacion.estado !== "draft") {
-        const pdf = await downloadLiquidacionPdf(token, liquidacion.id);
-        downloadBlob(pdf, `liquidacion-${liquidacion.liquidacionNumber}.pdf`);
+        const { blob, filename } = await downloadLiquidacionPdf(token, liquidacion.id);
+        downloadBlob(blob, filename ?? `liquidacion-${liquidacion.liquidacionNumber}.pdf`);
         return;
       }
 
       await updateLiquidacion(token, liquidacion.id, { aclaraciones });
       const issued = await issueLiquidacion(token, liquidacion.id);
-      const pdf = await downloadLiquidacionPdf(token, issued.id);
-      downloadBlob(pdf, `liquidacion-${issued.liquidacionNumber}.pdf`);
+      const { blob, filename } = await downloadLiquidacionPdf(token, issued.id);
+      downloadBlob(blob, filename ?? `liquidacion-${issued.liquidacionNumber}.pdf`);
       setLiquidacion(issued);
       void loadOwners();
     } catch (err) {
