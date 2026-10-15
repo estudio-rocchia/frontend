@@ -175,6 +175,7 @@ export interface PropietarioAdministracionSummary {
   displayName: string;
   porcentajeAdministracion: string;
   inmueblesEnAdministracion: number;
+  inmueblesConCobroMes: number;
   alquileresCobradosMes: string;
   codigoMoneda: string;
   liquidacionExistenteId: number | null;

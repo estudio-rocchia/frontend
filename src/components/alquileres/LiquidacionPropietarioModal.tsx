@@ -21,6 +21,30 @@ function currentPeriod() {
   return { anio: now.getFullYear(), mes: now.getMonth() + 1 };
 }
 
+function formatInmueblesConCobro(conCobro: number, total: number): string {
+  if (total <= 1) {
+    return `${conCobro} inmueble${conCobro === 1 ? "" : "s"}`;
+  }
+  return `${conCobro} de ${total} inmuebles`;
+}
+
+function liquidacionEstadoLabel(
+  estado: PropietarioAdministracionSummary["liquidacionEstado"],
+): string {
+  switch (estado) {
+    case "draft":
+      return "Ya hay un borrador para este período";
+    case "issued":
+      return "Ya hay una liquidación emitida para este período";
+    case "delivered":
+      return "Ya hay una liquidación entregada para este período";
+    case "cancelled":
+      return "Hay una liquidación cancelada para este período";
+    default:
+      return "Ya hay una liquidación para este período";
+  }
+}
+
 export function LiquidacionPropietarioModal({
   open,
   onClose,
@@ -224,27 +248,33 @@ export function LiquidacionPropietarioModal({
                 value={selectedOwnerId ?? ""}
                 onChange={(e) => setSelectedOwnerId(Number(e.target.value))}
               >
-                {owners.length === 0 ? <option value="">Sin propietarios en administración</option> : null}
+                {owners.length === 0 ? (
+                  <option value="">Sin alquileres cobrados en este período</option>
+                ) : null}
                 {owners.map((owner) => (
                   <option key={owner.personaId} value={owner.personaId}>
                     {owner.displayName} — {owner.porcentajeAdministracion}% —{" "}
-                    {formatMoney(owner.alquileresCobradosMes, normalizeCurrency(owner.codigoMoneda))} cobrados
+                    {formatMoney(owner.alquileresCobradosMes, normalizeCurrency(owner.codigoMoneda))} en
+                    alquileres cobrados (
+                    {formatInmueblesConCobro(owner.inmueblesConCobroMes, owner.inmueblesEnAdministracion)})
                   </option>
                 ))}
               </select>
             </label>
             {selectedOwner ? (
               <p className="text-sm text-text-secondary">
-                {selectedOwner.inmueblesEnAdministracion} inmueble(s) en administración · honorarios{" "}
+                {formatInmueblesConCobro(
+                  selectedOwner.inmueblesConCobroMes,
+                  selectedOwner.inmueblesEnAdministracion,
+                )}{" "}
+                con alquiler cobrado en el período · honorarios{" "}
                 {selectedOwner.porcentajeAdministracion}%
                 {hasExistingLiquidacion ? (
                   <>
                     {" "}
                     ·{" "}
                     <span className="font-medium text-primary">
-                      {existingLiquidacionEstado === "draft"
-                        ? "Ya hay un borrador para este período"
-                        : `Liquidación ${existingLiquidacionEstado ?? "existente"} para este período`}
+                      {liquidacionEstadoLabel(existingLiquidacionEstado)}
                     </span>
                   </>
                 ) : null}
