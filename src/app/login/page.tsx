@@ -60,6 +60,7 @@ export default function LoginPage() {
           <label className="flex flex-col gap-1.5">
             <span className="text-[11px] font-semibold text-text-secondary">Usuario o email</span>
             <input
+              data-testid="login-username"
               value={usernameOrEmail}
               onChange={(e) => setUsernameOrEmail(e.target.value)}
               autoComplete="username"
@@ -70,6 +71,7 @@ export default function LoginPage() {
             <span className="text-[11px] font-semibold text-text-secondary">Contraseña</span>
             <div className="relative">
               <input
+                data-testid="login-password"
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -99,7 +101,7 @@ export default function LoginPage() {
         ) : null}
 
         <div className="mt-6">
-          <ButtonPrimary type="submit" disabled={submitting}>
+          <ButtonPrimary type="submit" disabled={submitting} data-testid="login-submit">
             {submitting ? "Ingresando…" : "Ingresar"}
           </ButtonPrimary>
         </div>

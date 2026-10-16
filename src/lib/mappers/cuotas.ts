@@ -1,5 +1,122 @@
-import type { CuotaDetail, ImputacionInput } from "@/lib/api/types";
+import type { ContratoDetail, CuotaDetail, ImputacionInput } from "@/lib/api/types";
 import { formatMonthYear } from "@/lib/format";
+
+export type CuotaCobranzasRow = CuotaDetail & { projected?: boolean };
+
+function lastDayOfMonth(year: number, month: number): number {
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
+/** Misma regla que el backend: día de vencimiento acotado al fin de mes. */
+export function computeCuotaDueDate(year: number, month: number, day: number): string {
+  const actualDay = Math.min(day, lastDayOfMonth(year, month));
+  return `${year}-${String(month).padStart(2, "0")}-${String(actualDay).padStart(2, "0")}`;
+}
+
+function periodKey(anioPeriodo: number, mesPeriodo: number): string {
+  return `${anioPeriodo}-${mesPeriodo}`;
+}
+
+function comparePeriod(
+  a: { anioPeriodo: number; mesPeriodo: number },
+  b: { anioPeriodo: number; mesPeriodo: number },
+): number {
+  if (a.anioPeriodo !== b.anioPeriodo) return a.anioPeriodo - b.anioPeriodo;
+  return a.mesPeriodo - b.mesPeriodo;
+}
+
+function addMonth(anioPeriodo: number, mesPeriodo: number): { anioPeriodo: number; mesPeriodo: number } {
+  if (mesPeriodo === 12) return { anioPeriodo: anioPeriodo + 1, mesPeriodo: 1 };
+  return { anioPeriodo, mesPeriodo: mesPeriodo + 1 };
+}
+
+function periodFromIsoDate(iso: string): { anioPeriodo: number; mesPeriodo: number } {
+  const [year, month] = iso.split("-");
+  return { anioPeriodo: Number(year), mesPeriodo: Number(month) };
+}
+
+function minPeriod(
+  a: { anioPeriodo: number; mesPeriodo: number },
+  b: { anioPeriodo: number; mesPeriodo: number },
+): { anioPeriodo: number; mesPeriodo: number } {
+  return comparePeriod(a, b) <= 0 ? a : b;
+}
+
+function createProjectedCuota(
+  contrato: ContratoDetail,
+  anioPeriodo: number,
+  mesPeriodo: number,
+  fechaVencimiento: string,
+  asOfIso: string,
+): CuotaCobranzasRow {
+  const monto = String(contrato.montoAlquiler);
+  const estadoCode = fechaVencimiento < asOfIso ? "late" : "pending";
+  return {
+    id: -(anioPeriodo * 100 + mesPeriodo),
+    contratoId: contrato.id,
+    anioPeriodo,
+    mesPeriodo,
+    montoDebido: monto,
+    codigoMoneda: contrato.codigoMoneda,
+    fechaVencimiento,
+    estadoCode,
+    montoPagado: "0",
+    mora: null,
+    saldoAlquiler: monto,
+    saldoMora: "0",
+    saldoTotal: monto,
+    projected: true,
+  };
+}
+
+/**
+ * Cuotas registradas + períodos del contrato sin cuota generada (hasta el mes actual si está activo).
+ */
+export function buildCuotasCobranzasView(
+  cuotas: CuotaDetail[],
+  contrato: ContratoDetail,
+  asOf = new Date(),
+): CuotaCobranzasRow[] {
+  const asOfIso = asOf.toISOString().slice(0, 10);
+  const cuotaByPeriod = new Map(cuotas.map((c) => [periodKey(c.anioPeriodo, c.mesPeriodo), c]));
+
+  const contractEndPeriod = periodFromIsoDate(contrato.fechaFin);
+  const capPeriod =
+    contrato.estado === "active"
+      ? minPeriod(currentBillingPeriod(asOf), contractEndPeriod)
+      : contractEndPeriod;
+
+  const rows: CuotaCobranzasRow[] = [];
+  let cursor = periodFromIsoDate(contrato.fechaInicio);
+
+  for (let guard = 0; guard < 600 && comparePeriod(cursor, capPeriod) <= 0; guard += 1) {
+    const fechaVencimiento = computeCuotaDueDate(
+      cursor.anioPeriodo,
+      cursor.mesPeriodo,
+      contrato.diaVencimientoPago,
+    );
+
+    if (fechaVencimiento >= contrato.fechaInicio && fechaVencimiento <= contrato.fechaFin) {
+      const existing = cuotaByPeriod.get(periodKey(cursor.anioPeriodo, cursor.mesPeriodo));
+      rows.push(
+        existing
+          ? { ...existing, projected: false }
+          : createProjectedCuota(contrato, cursor.anioPeriodo, cursor.mesPeriodo, fechaVencimiento, asOfIso),
+      );
+    }
+
+    cursor = addMonth(cursor.anioPeriodo, cursor.mesPeriodo);
+  }
+
+  for (const cuota of cuotas) {
+    const key = periodKey(cuota.anioPeriodo, cuota.mesPeriodo);
+    if (!rows.some((row) => periodKey(row.anioPeriodo, row.mesPeriodo) === key)) {
+      rows.push({ ...cuota, projected: false });
+    }
+  }
+
+  return sortCuotasDesc(rows);
+}
 
 export function currentBillingPeriod(asOf = new Date()): { anioPeriodo: number; mesPeriodo: number } {
   return { anioPeriodo: asOf.getFullYear(), mesPeriodo: asOf.getMonth() + 1 };
@@ -9,14 +126,16 @@ export function cuotaPeriodLabel(cuota: CuotaDetail): string {
   return formatMonthYear(cuota.anioPeriodo, cuota.mesPeriodo);
 }
 
-export function cuotaEstadoLabel(estadoCode: string): string {
+export function cuotaEstadoLabel(estadoCode: string, projected = false): string {
   switch (estadoCode) {
     case "paid":
       return "Pagado";
     case "late":
-      return "En mora";
+      return projected ? "Vencida (sin generar)" : "En mora";
     case "pending":
-      return "Pendiente";
+      return projected ? "Pendiente (sin generar)" : "Pendiente";
+    case "partial":
+      return "Parcial";
     default:
       return estadoCode;
   }
@@ -48,9 +167,11 @@ export function cuotaSaldoPendiente(cuota: CuotaDetail): number {
   return Number(cuota.saldoTotal) || 0;
 }
 
-export function totalSaldoCuotas(cuotas: CuotaDetail[]): { total: number; codigoMoneda: string } {
-  const pendientes = cuotas.filter((c) => cuotaSaldoPendiente(c) > 0);
-  const total = pendientes.reduce((sum, c) => sum + cuotaSaldoPendiente(c), 0);
+export function totalSaldoCuotas(
+  cuotas: readonly Pick<CuotaDetail, "saldoTotal" | "codigoMoneda">[],
+): { total: number; codigoMoneda: string } {
+  const pendientes = cuotas.filter((c) => Number(c.saldoTotal) > 0);
+  const total = pendientes.reduce((sum, c) => sum + Number(c.saldoTotal), 0);
   const codigoMoneda = pendientes[0]?.codigoMoneda.trim() ?? "ARS";
   return { total, codigoMoneda };
 }
@@ -96,4 +217,13 @@ export function buildRentImputaciones(cuota: CuotaDetail, montoTotal: number): I
   }
 
   return imputaciones;
+}
+
+
+/** Si el contrato activo puede abrir el flujo de cobro (cuota pendiente o mes sin generar). */
+export function canCollectRentFromCuotas(cuotas: CuotaDetail[]): boolean {
+  if (pickCuotaParaCobrar(cuotas)) return true;
+  const period = currentBillingPeriod();
+  const current = findCuotaForPeriod(cuotas, period.anioPeriodo, period.mesPeriodo);
+  return !current;
 }

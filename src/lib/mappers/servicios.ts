@@ -1,5 +1,10 @@
-import type { PeriodoServicioRecord, ServicioContratoRecord } from "@/lib/api/types";
-import { formatDateDisplay, formatMoney } from "@/lib/format";
+import type {
+  CuotaDetail,
+  ImputacionInput,
+  PeriodoServicioRecord,
+  ServicioContratoRecord,
+} from "@/lib/api/types";
+import { formatDateDisplay, formatMoney, formatMonthYear } from "@/lib/format";
 import { isSecheepElectricity, secheepStatusFromSync } from "@/lib/mappers/secheep";
 
 export type PeriodoEstadoVariant = "success" | "warning" | "danger";
@@ -28,12 +33,140 @@ export function periodoEstadoVariant(code: string): PeriodoEstadoVariant {
   }
 }
 
+export function servicioDisplayName(servicio: {
+  tipoServicioCode: string;
+  tipoServicioName: string;
+  nombrePersonalizado?: string | null;
+}): string {
+  if (servicio.tipoServicioCode === "other") {
+    const custom = servicio.nombrePersonalizado?.trim();
+    if (custom) return custom;
+  }
+  return servicio.tipoServicioName;
+}
+
 export function modoFacturacionLabel(mode: ServicioContratoRecord["modoFacturacion"]): string {
   return mode === "fixed" ? "Monto fijo" : "Por boleta";
 }
 
 export function periodoRangeLabel(periodo: PeriodoServicioRecord): string {
   return `${formatDateDisplay(periodo.inicioPeriodo)} – ${formatDateDisplay(periodo.finPeriodo)}`;
+}
+
+export function periodoSaldoPendiente(periodo: PeriodoServicioRecord): number {
+  const saldo = Number(periodo.saldo);
+  return Number.isFinite(saldo) && saldo > 0 ? saldo : 0;
+}
+
+/** La inmobiliaria no cobra luz; solo controla si el inquilino está al día (SECHEEP). */
+export function servicioEsCobrable(
+  servicio: Pick<ServicioContratoRecord, "tipoServicioCode">,
+): boolean {
+  return servicio.tipoServicioCode !== "electricity";
+}
+
+function periodoEsCobrable(
+  periodo: PeriodoServicioRecord,
+  servicioById: Map<number, ServicioContratoRecord>,
+): boolean {
+  const servicio = servicioById.get(periodo.servicioContratoId);
+  return servicio ? servicioEsCobrable(servicio) : true;
+}
+
+/** Períodos de servicios con saldo en la misma moneda del cobro de alquiler. */
+export function periodosPendientesParaCobro(
+  periodos: PeriodoServicioRecord[],
+  codigoMoneda: string,
+): PeriodoServicioRecord[] {
+  const moneda = codigoMoneda.trim();
+  return periodos
+    .filter((periodo) => periodoSaldoPendiente(periodo) > 0 && periodo.codigoMoneda.trim() === moneda)
+    .sort((a, b) => a.inicioPeriodo.localeCompare(b.inicioPeriodo));
+}
+
+function cuotaPeriodIndex(cuota: Pick<CuotaDetail, "anioPeriodo" | "mesPeriodo">): number {
+  return Number(cuota.anioPeriodo) * 100 + Number(cuota.mesPeriodo);
+}
+
+function periodoPeriodIndex(periodo: PeriodoServicioRecord): number {
+  const [year, month] = periodo.inicioPeriodo.slice(0, 10).split("-").map(Number);
+  return year * 100 + month;
+}
+
+export function periodoMatchesCuotaMonth(
+  periodo: PeriodoServicioRecord,
+  cuota: Pick<CuotaDetail, "anioPeriodo" | "mesPeriodo">,
+): boolean {
+  return periodoPeriodIndex(periodo) === cuotaPeriodIndex(cuota);
+}
+
+export function periodoOnOrBeforeCuotaMonth(
+  periodo: PeriodoServicioRecord,
+  cuota: Pick<CuotaDetail, "anioPeriodo" | "mesPeriodo">,
+): boolean {
+  return periodoPeriodIndex(periodo) <= cuotaPeriodIndex(cuota);
+}
+
+/** Períodos de servicios con saldo hasta el mes de la cuota (cualquier moneda). Excluye luz. */
+export function periodosServiciosParaCobroCuota(
+  periodos: PeriodoServicioRecord[],
+  cuota: Pick<CuotaDetail, "anioPeriodo" | "mesPeriodo">,
+  servicios: ServicioContratoRecord[] = [],
+): PeriodoServicioRecord[] {
+  const servicioById = new Map(servicios.map((servicio) => [servicio.id, servicio]));
+  return periodos
+    .filter(
+      (periodo) =>
+        periodoSaldoPendiente(periodo) > 0 &&
+        periodoOnOrBeforeCuotaMonth(periodo, cuota) &&
+        periodoEsCobrable(periodo, servicioById),
+    )
+    .sort((a, b) => a.inicioPeriodo.localeCompare(b.inicioPeriodo));
+}
+
+export function periodosServiciosMesCuota(
+  periodos: PeriodoServicioRecord[],
+  cuota: Pick<CuotaDetail, "anioPeriodo" | "mesPeriodo">,
+): PeriodoServicioRecord[] {
+  return periodos.filter((periodo) => periodoMatchesCuotaMonth(periodo, cuota));
+}
+
+export function periodosServiciosPorMoneda(
+  periodos: PeriodoServicioRecord[],
+): Map<string, PeriodoServicioRecord[]> {
+  const byCurrency = new Map<string, PeriodoServicioRecord[]>();
+  for (const periodo of periodos) {
+    const moneda = periodo.codigoMoneda.trim();
+    const bucket = byCurrency.get(moneda) ?? [];
+    bucket.push(periodo);
+    byCurrency.set(moneda, bucket);
+  }
+  return byCurrency;
+}
+
+export function appendServicioPeriodoImputacion(
+  imputaciones: ImputacionInput[],
+  periodo: PeriodoServicioRecord,
+): ImputacionInput[] {
+  const monto = periodoSaldoPendiente(periodo);
+  if (monto <= 0) return imputaciones;
+  return [
+    ...imputaciones,
+    { targetType: "periodo_servicio", targetId: periodo.id, monto },
+  ];
+}
+
+export function servicioPeriodoCobroLabel(
+  periodo: PeriodoServicioRecord,
+  servicio: ServicioContratoRecord | undefined,
+  cuota?: Pick<CuotaDetail, "anioPeriodo" | "mesPeriodo">,
+): string {
+  const nombre = servicio ? servicioDisplayName(servicio) : "Servicio";
+  const moneda = periodo.codigoMoneda.trim();
+  if (cuota && periodoMatchesCuotaMonth(periodo, cuota)) {
+    return `${nombre} · ${formatMonthYear(cuota.anioPeriodo, cuota.mesPeriodo)} (${moneda})`;
+  }
+  return `${nombre} · ${periodoRangeLabel(periodo)} (${moneda})`;
 }
 
 export function servicioBillingSummary(servicio: ServicioContratoRecord): string {
@@ -43,13 +176,18 @@ export function servicioBillingSummary(servicio: ServicioContratoRecord): string
   return "Monto según boleta";
 }
 
-export function totalSaldoPendiente(periodos: PeriodoServicioRecord[]): {
+export function totalSaldoPendiente(
+  periodos: PeriodoServicioRecord[],
+  servicios: ServicioContratoRecord[] = [],
+): {
   total: number;
   currency: string | null;
 } {
+  const servicioById = new Map(servicios.map((servicio) => [servicio.id, servicio]));
   let total = 0;
   let currency: string | null = null;
   for (const periodo of periodos) {
+    if (!periodoEsCobrable(periodo, servicioById)) continue;
     const saldo = Number(periodo.saldo);
     if (!Number.isFinite(saldo) || saldo <= 0) continue;
     total += saldo;
@@ -137,6 +275,68 @@ export function defaultModoForTipo(code: string): "fixed" | "variable" {
   return code === "water" ? "fixed" : "variable";
 }
 
+const SERVICIO_DISPLAY_ORDER: Record<string, number> = {
+  water: 0,
+  electricity: 1,
+  other: 2,
+};
+
+export function compareServiciosForDisplay(
+  a: Pick<ServicioContratoRecord, "tipoServicioCode" | "tipoServicioName" | "nombrePersonalizado" | "id">,
+  b: Pick<ServicioContratoRecord, "tipoServicioCode" | "tipoServicioName" | "nombrePersonalizado" | "id">,
+): number {
+  const orderA = SERVICIO_DISPLAY_ORDER[a.tipoServicioCode] ?? 99;
+  const orderB = SERVICIO_DISPLAY_ORDER[b.tipoServicioCode] ?? 99;
+  if (orderA !== orderB) return orderA - orderB;
+  const byName = servicioDisplayName(a).localeCompare(servicioDisplayName(b), "es");
+  if (byName !== 0) return byName;
+  return a.id - b.id;
+}
+
+export type PeriodosPorServicioGroup = {
+  servicio: ServicioContratoRecord;
+  periodos: PeriodoServicioRecord[];
+  saldo: number;
+  monedaSaldo: string | null;
+};
+
+export function buildPeriodosGroupedByServicio(
+  servicios: ServicioContratoRecord[],
+  periodos: PeriodoServicioRecord[],
+): PeriodosPorServicioGroup[] {
+  const activos = servicios.filter((servicio) => servicio.activo);
+
+  return activos
+    .map((servicio) => {
+      const servicioPeriodos = periodosForServicio(periodos, servicio.id);
+      const monedaSaldo = servicioPeriodos.find((periodo) => Number(periodo.saldo) > 0)?.codigoMoneda ?? null;
+      const saldo = servicioEsCobrable(servicio)
+        ? servicioSaldoPendiente(periodos, servicio.id)
+        : 0;
+      return {
+        servicio,
+        periodos: servicioPeriodos,
+        saldo,
+        monedaSaldo: saldo > 0 ? monedaSaldo : null,
+      };
+    })
+    .filter((group) => group.periodos.length > 0)
+    .sort((a, b) => compareServiciosForDisplay(a.servicio, b.servicio));
+}
+
+export function servicioIdentificadorLabel(servicio: ServicioContratoRecord): string | null {
+  if (servicio.tipoServicioCode === "electricity") {
+    const parts = [
+      servicio.numeroClienteSecheep ? `Cliente ${servicio.numeroClienteSecheep}` : null,
+      servicio.numeroSuministroSecheep ? `Suministro ${servicio.numeroSuministroSecheep}` : null,
+    ].filter(Boolean);
+    return parts.length > 0 ? parts.join(" · ") : null;
+  }
+  if (servicio.numeroMedidor) {
+    return `Medidor ${servicio.numeroMedidor}`;
+  }
+  return null;
+}
 
 export type ServiciosTableSummary = {
   summary: string;
@@ -157,7 +357,7 @@ export function serviciosSummaryFromData(
     };
   }
 
-  const summary = activos.map((s) => s.tipoServicioName).join(" · ");
+  const summary = activos.map((s) => servicioDisplayName(s)).join(" · ");
   const electricity = activos.find((s) => isSecheepElectricity(s));
   const secheepStatus = electricity ? secheepStatusFromSync(electricity.secheepSync) : null;
   const { total, currency } = totalSaldoPendiente(periodos);

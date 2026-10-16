@@ -13,6 +13,10 @@ import {
   personaDisplayName,
 } from "@/lib/format";
 import {
+  DEFAULT_DEPOSITO_PLAN_CUOTAS,
+  type DepositoPlanChoice,
+} from "@/lib/alquileres/deposito-plan";
+import {
   contractualAdjustmentEnd,
   defaultAdjustmentHasta,
   fromIsoMonthDate,
@@ -24,6 +28,11 @@ import {
   vigenteDesdeLabel,
   type MonthYear,
 } from "@/lib/rental-adjustment";
+
+export type AdjustContractSubmitInput = {
+  fechaAjuste: string;
+  depositoPlan?: DepositoPlanChoice;
+};
 
 const MONTHS = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -87,16 +96,22 @@ export function AdjustContractModal({
   token: string | null;
   ultimoAjusteEn?: string | null;
   onClose: () => void;
-  onSubmit: (input: { fechaAjuste: string }) => void;
+  onSubmit: (input: AdjustContractSubmitInput) => void;
   submitting?: boolean;
 }) {
   const [fechaAjusteMonth, setFechaAjusteMonth] = useState<MonthYear | null>(null);
   const [showDetails, setShowDetails] = useState(false);
+  const [crearPlanDeposito, setCrearPlanDeposito] = useState(true);
+  const [cantidadCuotasDeposito, setCantidadCuotasDeposito] = useState(
+    String(DEFAULT_DEPOSITO_PLAN_CUOTAS),
+  );
 
   useEffect(() => {
     if (!open || !contrato) return;
     setFechaAjusteMonth(defaultFechaAjusteMonth(contrato, ultimoAjusteEn));
     setShowDetails(false);
+    setCrearPlanDeposito(true);
+    setCantidadCuotasDeposito(String(DEFAULT_DEPOSITO_PLAN_CUOTAS));
   }, [contrato, open, ultimoAjusteEn]);
 
   const fechaAjuste = fechaAjusteMonth ? toIsoMonthDate(fechaAjusteMonth) : null;
@@ -127,6 +142,20 @@ export function AdjustContractModal({
   const contractualEnd = contractualAdjustmentEnd(contrato, ultimoAjusteEn);
   const maxPublished = latestPublishedIndexMonth();
   const overdue = isAdjustmentOverdue(contrato, ultimoAjusteEn);
+  const cuotasDeposito = Number.parseInt(cantidadCuotasDeposito, 10);
+  const cuotasDepositoValidas =
+    Number.isInteger(cuotasDeposito) && cuotasDeposito >= 1 && cuotasDeposito <= 120;
+  const cuotaDepositoEstimada =
+    preview?.actualizacionDeposito.requiereCobro && cuotasDepositoValidas
+      ? formatMoney(
+          String(Number.parseFloat(preview.actualizacionDeposito.diferencia) / cuotasDeposito),
+          currency,
+        )
+      : null;
+  const depositoPlanInvalido =
+    Boolean(preview?.actualizacionDeposito.requiereCobro) &&
+    crearPlanDeposito &&
+    !cuotasDepositoValidas;
 
   const detailsNote = overdue
     ? `El ajuste debía aplicarse en ${formatMonthYear(contractualEnd.anio, contractualEnd.mes)}. Podés usar el último ${indiceCode} publicado (${formatMonthYear(maxPublished.anio, maxPublished.mes)}).`
@@ -150,10 +179,24 @@ export function AdjustContractModal({
           </ButtonOutline>
           <ButtonPrimary
             type="button"
-            disabled={!preview || Boolean(error) || loading || submitting || !fechaAjuste}
+            disabled={
+              !preview ||
+              Boolean(error) ||
+              loading ||
+              submitting ||
+              !fechaAjuste ||
+              depositoPlanInvalido
+            }
             onClick={() => {
-              if (!preview || !fechaAjuste) return;
-              onSubmit({ fechaAjuste: preview.fechaAjuste });
+              if (!preview || !fechaAjuste || depositoPlanInvalido) return;
+              const input: AdjustContractSubmitInput = { fechaAjuste: preview.fechaAjuste };
+              if (preview.actualizacionDeposito.requiereCobro) {
+                input.depositoPlan = {
+                  crearPlan: crearPlanDeposito,
+                  cantidadCuotas: cuotasDeposito,
+                };
+              }
+              onSubmit(input);
             }}
           >
             {submitting ? "Aplicando…" : "Confirmar ajuste"}
@@ -196,20 +239,63 @@ export function AdjustContractModal({
         </div>
 
         {preview?.actualizacionDeposito.requiereCobro ? (
-          <div className="rounded-sm border border-primary/20 bg-primary-soft/50 px-4 py-3 text-[13px] text-text-primary">
-            El depósito pasa de{" "}
-            <span className={moneyClassName}>
-              {formatMoney(preview.actualizacionDeposito.montoAnterior, currency)}
-            </span>{" "}
-            a{" "}
-            <span className={moneyClassName}>
-              {formatMoney(preview.actualizacionDeposito.montoNuevo, currency)}
-            </span>
-            . Diferencia a cobrar:{" "}
-            <strong className={moneyClassName}>
-              {formatMoney(preview.actualizacionDeposito.diferencia, currency)}
-            </strong>
-            . Se creará un plan de cuotas automáticamente.
+          <div className="flex flex-col gap-3 rounded-sm border border-primary/20 bg-primary-soft/50 px-4 py-3 text-[13px] text-text-primary">
+            <p>
+              El depósito pasa de{" "}
+              <span className={moneyClassName}>
+                {formatMoney(preview.actualizacionDeposito.montoAnterior, currency)}
+              </span>{" "}
+              a{" "}
+              <span className={moneyClassName}>
+                {formatMoney(preview.actualizacionDeposito.montoNuevo, currency)}
+              </span>
+              . Diferencia a cobrar:{" "}
+              <strong className={moneyClassName}>
+                {formatMoney(preview.actualizacionDeposito.diferencia, currency)}
+              </strong>
+              .
+            </p>
+
+            <label className="flex cursor-pointer items-start gap-2">
+              <input
+                type="checkbox"
+                checked={crearPlanDeposito}
+                onChange={(e) => setCrearPlanDeposito(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span>Crear plan de cuotas para cobrar la diferencia del depósito</span>
+            </label>
+
+            {crearPlanDeposito ? (
+              <div className="flex flex-col gap-2 pl-6">
+                <label className="flex flex-col gap-1">
+                  <span className="text-[11px] font-semibold text-text-secondary">
+                    Cantidad de cuotas
+                  </span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={120}
+                    value={cantidadCuotasDeposito}
+                    onChange={(e) => setCantidadCuotasDeposito(e.target.value)}
+                    className="w-28 rounded-sm border border-border bg-bg-page px-3 py-2 text-[13px] text-text-primary outline-none focus:border-primary"
+                  />
+                </label>
+                {cuotaDepositoEstimada ? (
+                  <p className="text-[12px] text-text-secondary">
+                    Cuotas estimadas de {cuotaDepositoEstimada} (el sistema ajusta centavos en la
+                    última).
+                  </p>
+                ) : null}
+                {depositoPlanInvalido ? (
+                  <p className="text-[12px] text-danger">Ingresá una cantidad de cuotas entre 1 y 120.</p>
+                ) : null}
+              </div>
+            ) : (
+              <p className="pl-6 text-[12px] text-text-secondary">
+                Podés crear el plan después desde la ficha del contrato.
+              </p>
+            )}
           </div>
         ) : null}
 

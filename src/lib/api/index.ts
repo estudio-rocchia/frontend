@@ -1,5 +1,5 @@
 import { withCache } from "./cache";
-import { apiBlob, apiRequest } from "./client";
+import { apiBlob, apiBlobWithFilename, apiRequest } from "./client";
 import type {
   CatalogoItem,
   ContratoDetail,
@@ -20,6 +20,7 @@ import type {
   LoginResponse,
   MeResponse,
   PagoDetail,
+  PagoListItem,
   PagoRecord,
   PersonaRecord,
   ActualizacionDepositoResult,
@@ -29,6 +30,7 @@ import type {
   IndiceCode,
   PreviewAjusteInput,
   PreviewAjusteResponse,
+  SyncIndicesResponse,
   ValorIndiceRecord,
   ReciboRecord,
   RegisterPagoInput,
@@ -54,7 +56,7 @@ import type {
   UpdateServicioInput,
 } from "./types";
 
-export { ApiError, getApiBaseUrl } from "./client";
+export { ApiError, NetworkError, getApiBaseUrl } from "./client";
 export type * from "./types";
 
 export function login(usernameOrEmail: string, password: string) {
@@ -258,7 +260,7 @@ export function createPlanActualizacionDeposito(
 }
 
 export function fetchPagos(token: string, contratoId: number) {
-  return apiRequest<{ items: PagoRecord[] }>(`/contratos/${contratoId}/pagos`, { token });
+  return apiRequest<{ items: PagoListItem[] }>(`/contratos/${contratoId}/pagos`, { token });
 }
 
 export function registerPago(token: string, contratoId: number, body: RegisterPagoInput) {
@@ -273,11 +275,15 @@ export function fetchPago(token: string, pagoId: number) {
   return apiRequest<PagoDetail>(`/pagos/${pagoId}`, { token });
 }
 
-export function issueRecibo(token: string, pagoId: number) {
+export function issueRecibo(
+  token: string,
+  pagoId: number,
+  options?: { copies?: number; additionalPagoIds?: number[] },
+) {
   return apiRequest<ReciboRecord>(`/pagos/${pagoId}/recibo`, {
     method: "POST",
     token,
-    body: JSON.stringify({}),
+    body: JSON.stringify(options ?? {}),
   });
 }
 
@@ -296,6 +302,31 @@ export function fetchPropietariosAdministracion(
   if (params.codigoMoneda) query.set("codigoMoneda", params.codigoMoneda);
   return apiRequest<{ items: PropietarioAdministracionSummary[] }>(
     `/liquidaciones/propietarios?${query}`,
+    { token },
+  );
+}
+
+export function fetchLiquidaciones(
+  token: string,
+  params?: {
+    personaId?: number;
+    anioPeriodo?: number;
+    mesPeriodo?: number;
+    estado?: LiquidacionRecord["estado"];
+    limit?: number;
+    offset?: number;
+  },
+) {
+  const query = new URLSearchParams();
+  if (params?.personaId) query.set("personaId", String(params.personaId));
+  if (params?.anioPeriodo) query.set("anioPeriodo", String(params.anioPeriodo));
+  if (params?.mesPeriodo) query.set("mesPeriodo", String(params.mesPeriodo));
+  if (params?.estado) query.set("estado", params.estado);
+  if (params?.limit) query.set("limit", String(params.limit));
+  if (params?.offset) query.set("offset", String(params.offset));
+  const suffix = query.toString();
+  return apiRequest<{ items: LiquidacionRecord[] }>(
+    `/liquidaciones${suffix ? `?${suffix}` : ""}`,
     { token },
   );
 }
@@ -336,7 +367,7 @@ export function issueLiquidacion(token: string, id: number) {
 }
 
 export function downloadLiquidacionPdf(token: string, id: number) {
-  return apiBlob(`/liquidaciones/${id}/pdf`, token);
+  return apiBlobWithFilename(`/liquidaciones/${id}/pdf`, token);
 }
 
 export function updatePersonaAdministracion(
@@ -537,6 +568,14 @@ export function fetchIndiceValores(
   const query = new URLSearchParams({ desde, hasta });
   return apiRequest<{ items: ValorIndiceRecord[] }>(`/indices/${code}/valores?${query}`, {
     token,
+  });
+}
+
+export function syncIndices(token: string) {
+  return apiRequest<SyncIndicesResponse>("/indices/sync", {
+    method: "POST",
+    token,
+    signal: AbortSignal.timeout(120_000),
   });
 }
 

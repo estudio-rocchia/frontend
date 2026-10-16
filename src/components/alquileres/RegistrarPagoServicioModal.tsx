@@ -116,6 +116,11 @@ export function RegistrarPagoServicioModal({
       }
     >
       <div className="flex flex-col gap-4">
+        <p className="rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[12px] leading-relaxed text-text-secondary">
+          Para unificar alquiler, mora, depósito y servicios en un solo recibo, usá el botón{" "}
+          <strong className="font-medium text-text-primary">Cobrar</strong> en la ficha del contrato.
+          Este formulario sirve para cobrar solo este servicio.
+        </p>
         <div className="rounded-sm bg-bg-page px-3 py-2.5 text-[12px] text-text-secondary">
           Saldo pendiente:{" "}
           <span className="font-semibold text-text-primary">

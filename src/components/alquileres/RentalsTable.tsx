@@ -15,7 +15,7 @@ import {
 } from "@/data/alquileres-rentals";
 import type { ContratoTableStats } from "@/lib/api/types";
 import { contractEndHint, moneyClassName } from "@/lib/format";
-import { isRentCollectionWindow, rentCollectionWindowHint } from "@/lib/rental-collection";
+import { rentCollectionWindowHint } from "@/lib/rental-collection";
 
 const PAGE_SIZE = 15;
 
@@ -37,7 +37,7 @@ function ContractEndCell({ row }: { row: RentalRow }) {
 }
 
 function defaultActiveChip(counts: ReturnType<typeof rentalOperationalCounts>): RentalChipId {
-  if (isRentCollectionWindow() && counts.aCobrar > 0) return "a_cobrar";
+  if (counts.aCobrar > 0) return "a_cobrar";
   if (counts.ajustePendiente > 0) return "ajuste_pendiente";
   return "todos";
 }
@@ -89,7 +89,6 @@ export function RentalsTable({
   onChipChange,
   onPageChange,
 }: RentalsTableProps) {
-  const inCollectionWindow = isRentCollectionWindow();
   const operationalCounts = serverMode && stats
     ? {
         aCobrar: stats.aCobrar,
@@ -123,9 +122,7 @@ export function RentalsTable({
         <p className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
           Filtrar contratos
         </p>
-        {inCollectionWindow ? (
-          <p className="text-xs text-text-secondary">{rentCollectionWindowHint()}</p>
-        ) : null}
+        <p className="text-xs text-text-secondary">{rentCollectionWindowHint()}</p>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
           <label className="flex min-w-0 items-center gap-2.5 rounded-sm border border-border bg-bg-page px-3 py-2.5 focus-within:border-primary lg:max-w-sm lg:shrink-0">
             <Search className="h-4 w-4 shrink-0 text-text-secondary" aria-hidden />

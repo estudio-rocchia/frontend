@@ -99,9 +99,11 @@ export function contractualAdjustmentEndForDesde(
 
 /**
  * Default "hasta":
- * - On time → desde + frequency.
- * - Overdue → latest published index (adjustment was due in the past).
- * Always capped at latest published index.
+ * - Normal → fin del período contractual (desde + frecuencia), ej. oct/2026.
+ * - Muy atrasado → último mes con índice publicado (conservador, ~2 meses de lag).
+ *
+ * No recortar al mes “publicado” si el fin contractual es posterior: eso elegía
+ * agosto cuando el ajuste debía ser octubre y el backend lo rechazaba (regla 12 meses).
  */
 export function defaultAdjustmentHastaForDesde(
   contrato: ContratoDetail,
@@ -115,7 +117,7 @@ export function defaultAdjustmentHastaForDesde(
   if (endIso < maxIso) {
     return maxPublished;
   }
-  return endIso <= maxIso ? contractualEnd : maxPublished;
+  return contractualEnd;
 }
 
 export function defaultAdjustmentHasta(

@@ -174,16 +174,35 @@ function translateMoraTargetMissing(message: string): string | null {
   return `No se encontró el registro de mora #${match[1]}. Volvé a abrir el cobro para recalcular la mora.`;
 }
 
+const INDEX_CODE_LABELS: Record<string, string> = {
+  ICL: "Índice de Contratos de Locación",
+  IPC: "Índice de Precios al Consumidor",
+  CAC: "Cámara Argentina de la Construcción",
+};
+
 const INDEX_VALUE_MISSING_RE = /^No index value for (ICL|IPC|CAC) at /;
+const PUBLISHED_INDEX_MISSING_RE =
+  /^No published index value found for the (?:rent base|adjustment) period \((\d{4}-\d{2}-\d{2})\)/;
+const ADJUSTMENT_FREQUENCY_RE =
+  /^The contract agreed to an adjustment every (\d+) months;/;
 
 export function rentalApiErrorMessage(err: unknown, fallback = "No se pudo crear el contrato"): string {
   if (err instanceof NetworkError) {
     return err.message;
   }
   if (err instanceof Error) {
+    const publishedMissing = PUBLISHED_INDEX_MISSING_RE.exec(err.message);
+    if (publishedMissing) {
+      return `No hay índice publicado para ${publishedMissing[1].slice(0, 7)}. Actualizá ICL e IPC en la pantalla Índices.`;
+    }
+    const freqMatch = ADJUSTMENT_FREQUENCY_RE.exec(err.message);
+    if (freqMatch) {
+      return `La fecha elegida no cumple la frecuencia de ajuste (cada ${freqMatch[1]} meses). Usá el mes sugerido o restaurá valores sugeridos.`;
+    }
     const indexMatch = INDEX_VALUE_MISSING_RE.exec(err.message);
     if (indexMatch) {
-      return `No hay valor ${indexMatch[1]} para ese período. Ejecutá sync de índices o cargá el monto manualmente.`;
+      const label = INDEX_CODE_LABELS[indexMatch[1]] ?? indexMatch[1];
+      return `No hay valor ${label} para ese período. Ejecutá sync de índices o cargá el monto manualmente.`;
     }
     const moraMissing = translateMoraTargetMissing(err.message);
     if (moraMissing) return moraMissing;
