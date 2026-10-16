@@ -77,6 +77,8 @@ export function ContractFichaView() {
     submitting,
     error,
     success,
+    serviciosFocusPanel,
+    clearServiciosFocusPanel,
     handleCreateServicio,
     handleUpdateServicio,
     handleDeactivateServicio,
@@ -140,19 +142,6 @@ export function ContractFichaView() {
         <ArrowLeft className="h-4 w-4" aria-hidden />
         Volver al listado
       </button>
-
-      <div className="flex flex-wrap gap-2 border-b border-border pb-1">
-        <button
-          type="button"
-          onClick={() => router.push("/alquileres")}
-          className="rounded-t-sm px-4 py-2.5 text-sm font-medium text-text-secondary hover:text-text-primary"
-        >
-          Listado
-        </button>
-        <span className="rounded-t-sm border-b-2 border-primary px-4 py-2.5 text-sm font-medium text-primary">
-          Ficha de contrato
-        </span>
-      </div>
 
       <header className="flex flex-col gap-4 rounded-md border border-border bg-bg-card p-5 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex gap-4">
@@ -264,6 +253,7 @@ export function ContractFichaView() {
 
           {activeTab === "cobranzas" ? (
             <ContractCobranzasSection
+              contrato={contrato}
               cuotas={cuotas}
               pagos={pagos}
               mediosPago={mediosPago}
@@ -304,6 +294,8 @@ export function ContractFichaView() {
               onRegisterPago={handleRegisterPago}
               mediosPago={mediosPago}
               canRegisterPago={canEdit}
+              focusPanel={serviciosFocusPanel}
+              onFocusPanelConsumed={clearServiciosFocusPanel}
             />
           ) : null}
         </div>

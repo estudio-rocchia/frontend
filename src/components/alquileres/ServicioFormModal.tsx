@@ -9,6 +9,7 @@ import { defaultModoForTipo, filterAddableTiposServicio } from "@/lib/mappers/se
 
 export type ServicioFormValues = {
   tipoServicioId: number;
+  nombrePersonalizado: string;
   provider: string;
   numeroMedidor: string;
   numeroClienteSecheep: string;
@@ -20,6 +21,7 @@ export type ServicioFormValues = {
 
 const emptyForm: ServicioFormValues = {
   tipoServicioId: 0,
+  nombrePersonalizado: "",
   provider: "",
   numeroMedidor: "",
   numeroClienteSecheep: "",
@@ -87,6 +89,7 @@ export function ServicioFormModal({
     if (editing) {
       setForm({
         tipoServicioId: editing.tipoServicioId,
+        nombrePersonalizado: editing.nombrePersonalizado ?? "",
         provider: editing.provider ?? "",
         numeroMedidor: editing.numeroMedidor ?? "",
         numeroClienteSecheep: editing.numeroClienteSecheep ?? "",
@@ -112,6 +115,7 @@ export function ServicioFormModal({
     setForm((prev) => ({
       ...prev,
       tipoServicioId: tipoId,
+      nombrePersonalizado: tipo?.code === "other" ? prev.nombrePersonalizado : "",
       modoFacturacion: tipo ? defaultModoForTipo(tipo.code) : prev.modoFacturacion,
     }));
   }
@@ -122,6 +126,10 @@ export function ServicioFormModal({
   }
 
   function handleSubmit() {
+    const tipo = tiposServicio.find((item) => item.id === form.tipoServicioId);
+    if (tipo?.code === "other" && !form.nombrePersonalizado.trim()) {
+      return;
+    }
     if (form.modoFacturacion === "fixed") {
       const monto = Number(form.montoFijo);
       if (!Number.isFinite(monto) || monto <= 0) {
@@ -136,19 +144,34 @@ export function ServicioFormModal({
   const selectedTipo = tiposServicio.find((t) => t.id === form.tipoServicioId);
   const isElectricity = selectedTipo?.code === "electricity";
   const isWater = selectedTipo?.code === "water";
+  const isOther = selectedTipo?.code === "other";
+  const modalSubtitle = selectedTipo
+    ? isOther
+      ? form.nombrePersonalizado.trim() || selectedTipo.name
+      : selectedTipo.name
+    : undefined;
 
   return (
     <Modal
       open={open}
       onClose={handleClose}
       title={title}
-      subtitle={selectedTipo?.name}
+      subtitle={modalSubtitle}
       footer={
         <>
           <ButtonOutline type="button" onClick={handleClose} disabled={submitting}>
             Cancelar
           </ButtonOutline>
-          <ButtonPrimary type="button" onClick={handleSubmit} disabled={submitting || !form.tipoServicioId || (isFixed && (!form.montoFijo || Number(form.montoFijo) <= 0))}>
+          <ButtonPrimary
+            type="button"
+            onClick={handleSubmit}
+            disabled={
+              submitting ||
+              !form.tipoServicioId ||
+              (isOther && !form.nombrePersonalizado.trim()) ||
+              (isFixed && (!form.montoFijo || Number(form.montoFijo) <= 0))
+            }
+          >
             {submitting ? "Guardando…" : editing ? "Guardar" : "Agregar"}
           </ButtonPrimary>
         </>
@@ -174,6 +197,15 @@ export function ServicioFormModal({
               )}
             </select>
           </label>
+        ) : null}
+
+        {isOther ? (
+          <Field
+            label="¿Qué servicio es?"
+            value={form.nombrePersonalizado}
+            onChange={(v) => setForm((prev) => ({ ...prev, nombrePersonalizado: v }))}
+            placeholder="Ej. Gas, Internet, Expensas"
+          />
         ) : null}
 
         <Field
@@ -229,6 +261,14 @@ export function ServicioFormModal({
             <option value="variable">Por boleta / período</option>
           </select>
         </label>
+
+        {isWater && isFixed ? (
+          <p className="rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[12px] leading-relaxed text-text-secondary">
+            Al guardar, se generan automáticamente los períodos mensuales desde el inicio del contrato hasta su
+            finalización. Si el monto sube más adelante, editá el servicio y se actualizan los períodos que todavía no
+            tienen pagos.
+          </p>
+        ) : null}
 
         {isFixed ? (
           <div className="grid gap-3 sm:grid-cols-2">

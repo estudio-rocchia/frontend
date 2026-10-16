@@ -66,6 +66,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [serviciosFocusPanel, setServiciosFocusPanel] = useState<"periodos" | null>(null);
 
   const loadServicios = useCallback(
     async (id: number) => {
@@ -158,6 +159,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
         values.modoFacturacion === "fixed"
           ? {
               tipoServicioId: values.tipoServicioId,
+              nombrePersonalizado: values.nombrePersonalizado.trim() || null,
               provider: values.provider.trim() || null,
               numeroMedidor: values.numeroMedidor.trim() || null,
               numeroClienteSecheep: values.numeroClienteSecheep.trim() || null,
@@ -168,6 +170,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
             }
           : {
               tipoServicioId: values.tipoServicioId,
+              nombrePersonalizado: values.nombrePersonalizado.trim() || null,
               provider: values.provider.trim() || null,
               numeroMedidor: values.numeroMedidor.trim() || null,
               numeroClienteSecheep: values.numeroClienteSecheep.trim() || null,
@@ -175,7 +178,15 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
               modoFacturacion: values.modoFacturacion,
             };
       await createServicio(token, contrato.id, body);
-      setSuccess("Servicio agregado.");
+      const tipoCode = tiposServicio.find((tipo) => tipo.id === values.tipoServicioId)?.code;
+      if (tipoCode === "water" && values.modoFacturacion === "fixed") {
+        setServiciosFocusPanel("periodos");
+      }
+      setSuccess(
+        tipoCode === "water" && values.modoFacturacion === "fixed"
+          ? "Servicio de agua agregado. Se generaron los períodos hasta el fin del contrato."
+          : "Servicio agregado.",
+      );
       await loadServicios(contrato.id);
     } catch (err) {
       setError(rentalApiErrorMessage(err, "No se pudo agregar el servicio"));
@@ -193,6 +204,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
       const patch =
         values.modoFacturacion === "fixed"
           ? {
+              nombrePersonalizado: values.nombrePersonalizado.trim() || null,
               provider: values.provider.trim() || null,
               numeroMedidor: values.numeroMedidor.trim() || null,
               numeroClienteSecheep: values.numeroClienteSecheep.trim() || null,
@@ -202,6 +214,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
               codigoMoneda: values.codigoMoneda,
             }
           : {
+              nombrePersonalizado: values.nombrePersonalizado.trim() || null,
               provider: values.provider.trim() || null,
               numeroMedidor: values.numeroMedidor.trim() || null,
               numeroClienteSecheep: values.numeroClienteSecheep.trim() || null,
@@ -211,7 +224,14 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
               codigoMoneda: null,
             };
       await updateServicio(token, servicioId, patch);
-      setSuccess("Servicio actualizado.");
+      const tipoCode = tiposServicio.find((tipo) => tipo.id === values.tipoServicioId)?.code;
+      setSuccess(
+        tipoCode === "water" &&
+          values.modoFacturacion === "fixed" &&
+          values.montoFijo.trim()
+          ? "Servicio actualizado. Los períodos sin pagos usan el nuevo monto."
+          : "Servicio actualizado.",
+      );
       await loadServicios(contrato.id);
     } catch (err) {
       setError(rentalApiErrorMessage(err, "No se pudo actualizar el servicio"));
@@ -417,6 +437,8 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
     submitting,
     error,
     success,
+    serviciosFocusPanel,
+    clearServiciosFocusPanel: () => setServiciosFocusPanel(null),
     refreshBilling,
     handleCobrarSuccess,
     handleCreateServicio,

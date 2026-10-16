@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import type { ServicioContratoRecord } from "@/lib/api/types";
-import { servicioBillingSummary } from "@/lib/mappers/servicios";
+import { servicioBillingSummary, servicioDisplayName } from "@/lib/mappers/servicios";
 
 export type PeriodoFormValues = {
   inicioPeriodo: string;
@@ -104,7 +104,7 @@ export function PeriodoServicioModal({
       open={open}
       onClose={onClose}
       title="Registrar período"
-      subtitle={`${servicio.tipoServicioName} · ${servicioBillingSummary(servicio)}`}
+      subtitle={`${servicioDisplayName(servicio)} · ${servicioBillingSummary(servicio)}`}
       maxWidthClass="max-w-xl"
       footer={
         <>

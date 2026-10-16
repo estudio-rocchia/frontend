@@ -52,6 +52,11 @@ export function appendDepositoImputacion(
   ];
 }
 
+export function totalSaldoPlanDeposito(plan: PlanActualizacionDepositoDetail | null | undefined): number {
+  if (!plan) return 0;
+  return plan.cuotas.reduce((sum, cuota) => sum + cuotaDepositoSaldoPendiente(cuota), 0);
+}
+
 export function planEstadoLabel(estado: PlanActualizacionDepositoDetail["estado"]): string {
   switch (estado) {
     case "active":

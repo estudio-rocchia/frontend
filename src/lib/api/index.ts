@@ -275,11 +275,15 @@ export function fetchPago(token: string, pagoId: number) {
   return apiRequest<PagoDetail>(`/pagos/${pagoId}`, { token });
 }
 
-export function issueRecibo(token: string, pagoId: number) {
+export function issueRecibo(
+  token: string,
+  pagoId: number,
+  options?: { copies?: number; additionalPagoIds?: number[] },
+) {
   return apiRequest<ReciboRecord>(`/pagos/${pagoId}/recibo`, {
     method: "POST",
     token,
-    body: JSON.stringify({}),
+    body: JSON.stringify(options ?? {}),
   });
 }
 
@@ -298,6 +302,31 @@ export function fetchPropietariosAdministracion(
   if (params.codigoMoneda) query.set("codigoMoneda", params.codigoMoneda);
   return apiRequest<{ items: PropietarioAdministracionSummary[] }>(
     `/liquidaciones/propietarios?${query}`,
+    { token },
+  );
+}
+
+export function fetchLiquidaciones(
+  token: string,
+  params?: {
+    personaId?: number;
+    anioPeriodo?: number;
+    mesPeriodo?: number;
+    estado?: LiquidacionRecord["estado"];
+    limit?: number;
+    offset?: number;
+  },
+) {
+  const query = new URLSearchParams();
+  if (params?.personaId) query.set("personaId", String(params.personaId));
+  if (params?.anioPeriodo) query.set("anioPeriodo", String(params.anioPeriodo));
+  if (params?.mesPeriodo) query.set("mesPeriodo", String(params.mesPeriodo));
+  if (params?.estado) query.set("estado", params.estado);
+  if (params?.limit) query.set("limit", String(params.limit));
+  if (params?.offset) query.set("offset", String(params.offset));
+  const suffix = query.toString();
+  return apiRequest<{ items: LiquidacionRecord[] }>(
+    `/liquidaciones${suffix ? `?${suffix}` : ""}`,
     { token },
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 
@@ -654,6 +655,12 @@ export function AlquileresWorkspace() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Link
+              href="/alquileres/liquidaciones"
+              className="inline-flex items-center justify-center rounded-sm border border-border bg-bg-card px-[18px] py-2.5 text-sm font-medium text-text-primary transition-colors"
+            >
+              Historial liquidaciones
+            </Link>
             <ButtonOutline type="button" onClick={() => setLiquidacionModalOpen(true)}>
               Liquidación propietarios
             </ButtonOutline>

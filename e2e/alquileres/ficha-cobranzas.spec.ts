@@ -14,9 +14,9 @@ test.describe("Alquileres — ficha Cobranzas", () => {
     await expect(cuotasTable).toBeVisible();
     await expect(cuotasTable.getByRole("columnheader", { name: "Período" })).toBeVisible();
     await expect(cuotasTable.getByRole("columnheader", { name: "Vencimiento" })).toBeVisible();
-    await expect(cuotasTable.getByRole("columnheader", { name: "Monto" })).toBeVisible();
+    await expect(cuotasTable.getByRole("columnheader", { name: "Alquiler actual" })).toBeVisible();
     await expect(cuotasTable.getByRole("columnheader", { name: "Pagado" })).toBeVisible();
-    await expect(cuotasTable.getByRole("columnheader", { name: "Saldo" })).toBeVisible();
+    await expect(cuotasTable.getByRole("columnheader", { name: "Por cobrar" })).toBeVisible();
     await expect(cuotasTable.getByRole("columnheader", { name: "Estado" })).toBeVisible();
     await expect(cuotasTable.getByText(/Sep 2026|Oct 2026/).first()).toBeVisible();
   });
@@ -25,6 +25,7 @@ test.describe("Alquileres — ficha Cobranzas", () => {
     authedPage,
   }) => {
     await openMixContractCobranzas(authedPage);
+    await authedPage.getByTestId("cobranzas-subtab-pagos").click();
 
     const pagosTable = authedPage.getByTestId("cobranzas-pagos-table");
     await expect(pagosTable).toBeVisible();

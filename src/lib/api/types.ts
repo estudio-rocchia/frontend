@@ -442,6 +442,7 @@ export interface ServicioContratoRecord {
   tipoServicioId: number;
   tipoServicioCode: string;
   tipoServicioName: string;
+  nombrePersonalizado: string | null;
   provider: string | null;
   numeroMedidor: string | null;
   numeroClienteSecheep: string | null;
@@ -497,6 +498,7 @@ export interface SecheepImportResult {
 
 export interface CreateServicioInput {
   tipoServicioId: number;
+  nombrePersonalizado?: string | null;
   provider?: string | null;
   numeroMedidor?: string | null;
   numeroClienteSecheep?: string | null;
@@ -507,6 +509,7 @@ export interface CreateServicioInput {
 }
 
 export interface UpdateServicioInput {
+  nombrePersonalizado?: string | null;
   provider?: string | null;
   numeroMedidor?: string | null;
   numeroClienteSecheep?: string | null;
