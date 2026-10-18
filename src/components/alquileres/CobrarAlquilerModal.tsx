@@ -20,6 +20,7 @@ import type {
   CatalogoItem,
   CuotaActualizacionDepositoDetail,
   CuotaDetail,
+  ImputacionInput,
   PeriodoServicioRecord,
   PlanActualizacionDepositoDetail,
   ServicioContratoRecord,
@@ -299,7 +300,7 @@ export function CobrarAlquilerModal({
       }
 
       for (const [moneda, periodos] of serviciosPorMoneda) {
-        let imputaciones = [];
+        let imputaciones: ImputacionInput[] = [];
         let montoTotal = 0;
         for (const periodo of periodos) {
           montoTotal += periodoSaldoPendiente(periodo);
