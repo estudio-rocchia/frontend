@@ -706,12 +706,232 @@ export interface DashboardResumen {
 }
 
 export interface InmuebleFichaPropietario {
+  id?: number;
   personaId: number;
   nombre?: string | null;
   apellido?: string | null;
   razonSocial?: string | null;
+  persona?: {
+    id: number;
+    displayName: string | null;
+  } | null;
+}
+
+export interface InmuebleCatalogRecord {
+  id: number;
+  code: string;
+  title: string;
+  description: string | null;
+  direccion: string | null;
+  notas: string | null;
+  aceptaFinanciacion: boolean;
+  aceptaPermuta: boolean;
+}
+
+export interface OfertaRecord {
+  id: number;
+  inmuebleId: number;
+  tipoOperacionId: number;
+  tipoOperacionCode: string;
+  estadoId: number;
+  estadoCode: string;
+  estadoRedesId: number | null;
+  estadoRedesCode: string | null;
+  montoPrecio: string | null;
+  codigoMoneda: string | null;
+  notasPrecio: string | null;
+  activo: boolean;
+}
+
+export interface HistorialPrecioRecord {
+  id: number;
+  ofertaId: number;
+  montoPrecio: string;
+  codigoMoneda: string;
+  vigenteDesde: string;
+  vigenteHasta: string | null;
+  nota: string | null;
+  creadoEn: string;
+}
+
+export interface HistorialEstadoRecord {
+  id: number;
+  ofertaId: number;
+  estadoId: number;
+  estadoCode: string;
+  cambiadoEn: string;
+  reason: string | null;
+}
+
+export interface CatalogSearchItem {
+  inmueble: InmuebleCatalogRecord;
+  tipoInmueble: { id: number; code: string; name: string; esTerreno: boolean };
+  localidad: { id: number; name: string; province: string } | null;
+  ofertasActivas: OfertaRecord[];
 }
 
 export interface InmuebleFicha {
+  inmueble?: InmuebleCatalogRecord;
+  tipoInmueble?: { id: number; code: string; name: string; esTerreno: boolean } | null;
+  localidad?: { id: number; name: string; province: string; country: string } | null;
   propietarios: InmuebleFichaPropietario[];
+  ofertas?: OfertaRecord[];
+}
+
+export type VentaEstado = "boleto" | "deeds_pending" | "completed" | "cancelled";
+
+export interface VentaRecord {
+  id: number;
+  inmuebleId: number;
+  montoPrecioVenta: string;
+  codigoMoneda: string;
+  condicionesPago: string | null;
+  fechaBoleto: string | null;
+  fechaEscritura: string | null;
+  nombreEscribano: string | null;
+  estado: VentaEstado;
+  notas: string | null;
+}
+
+export interface FinanciacionResumen {
+  cuotasPagadas: number;
+  cuotasTotales: number;
+  montoPagado: string;
+  saldoRestante: string;
+  codigoMoneda: string;
+}
+
+export interface VentaDetail extends VentaRecord {
+  inmueble: { id: number; code: string; title: string } | null;
+  partes: Array<{ id: number; personaId: number; rol: string; notas: string | null }>;
+  plan: PlanFinanciacionDetail | null;
+  financiacionResumen: FinanciacionResumen | null;
+}
+
+export interface CuotaFinanciacionRecord {
+  id: number;
+  numero: number;
+  fechaVencimiento: string;
+  monto: string;
+  estadoCode: string;
+  saldo: string;
+}
+
+export interface ChangePrecioOfertaInput {
+  montoPrecio: number;
+  codigoMoneda: string;
+  vigenteDesde: string;
+  nota?: string | null;
+}
+
+export type ParteVentaRol = "seller" | "buyer" | "guarantor" | "witness";
+
+export interface CreateVentaInput {
+  inmuebleId: number;
+  montoPrecioVenta: number;
+  codigoMoneda: string;
+  condicionesPago?: string | null;
+  fechaBoleto?: string | null;
+  fechaEscritura?: string | null;
+  nombreEscribano?: string | null;
+  estado?: VentaEstado;
+  notas?: string | null;
+}
+
+export interface UpdateVentaInput {
+  montoPrecioVenta?: number;
+  codigoMoneda?: string;
+  condicionesPago?: string | null;
+  fechaBoleto?: string | null;
+  fechaEscritura?: string | null;
+  nombreEscribano?: string | null;
+  estado?: VentaEstado;
+  notas?: string | null;
+}
+
+export interface AddParteVentaInput {
+  personaId: number;
+  rol: ParteVentaRol;
+  notas?: string | null;
+}
+
+export interface ChangeEstadoOfertaInput {
+  estadoId: number;
+  reason?: string | null;
+}
+
+export interface CreateOfertaInput {
+  tipoOperacionId: number;
+  estadoId: number;
+  montoPrecio?: number | null;
+  codigoMoneda?: string | null;
+  notasPrecio?: string | null;
+}
+
+export type TipoEntregaInicial = "cash" | "vehicle" | "inmueble" | "in_kind";
+
+export interface PlanFinanciacionDetail {
+  id: number;
+  montoPrecioTotal: string;
+  codigoMoneda: string;
+  montoEntregaInicial: string;
+  tipoEntregaInicial: TipoEntregaInicial | null;
+  cantidadCuotas: number;
+  tasaInteresMensual: string;
+  primerVencimiento: string;
+}
+
+export interface CreateFinanciacionInput {
+  montoPrecioTotal?: number;
+  montoEntregaInicial: number;
+  tipoEntregaInicial?: TipoEntregaInicial | null;
+  notasEntregaInicial?: string | null;
+  cantidadCuotas: number;
+  tasaInteresMensual: number;
+  primerVencimiento: string;
+}
+
+export interface CreateFinanciacionResult {
+  plan: PlanFinanciacionDetail;
+  cuotas: CuotaFinanciacionRecord[];
+  resumen: FinanciacionResumen;
+}
+
+export interface RegisterPagoVentaInput {
+  fechaPago: string;
+  monto: number;
+  codigoMoneda: string;
+  medioPagoId: number;
+  nota?: string | null;
+}
+
+export interface PagoVentaRecord {
+  id: number;
+  ventaId: number;
+  fechaPago: string;
+  monto: string;
+  codigoMoneda: string;
+  medioPagoId: number;
+  nota: string | null;
+}
+
+export interface RegisterCuotaPagoResult {
+  pago: PagoVentaRecord;
+  cuota: CuotaFinanciacionRecord;
+}
+
+export type VentaReciboEstado = "issued" | "cancelled";
+
+export interface VentaReciboRecord {
+  id: number;
+  reciboNumber: string;
+  ventaId: number | null;
+  pagoVentaId: number | null;
+  personaId: number;
+  fechaEmision: string;
+  montoTotal: string;
+  codigoMoneda: string;
+  copies: number;
+  documentoId: number | null;
+  estado: VentaReciboEstado;
 }
