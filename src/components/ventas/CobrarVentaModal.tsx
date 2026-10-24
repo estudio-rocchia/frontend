@@ -187,7 +187,7 @@ export function CobrarVentaModal({
 
       if (emitRecibo) {
         try {
-          const recibo = await issueVentaRecibo(token, pago.id, 2);
+          const recibo = await issueVentaRecibo(token, pago.id, { copies: 2 });
           const blob = await downloadVentaReciboPdf(token, recibo.id);
           downloadBlob(blob, `recibo-${recibo.reciboNumber}.pdf`);
         } catch {

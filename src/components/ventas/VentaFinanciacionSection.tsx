@@ -1,9 +1,16 @@
 "use client";
 
 import { FichaSummaryCard } from "@/components/alquileres/FichaSummaryCard";
-import { ButtonOutline } from "@/components/ui/Button";
+import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import type { CuotaFinanciacionRecord, VentaDetail } from "@/lib/api/types";
+import { proximaCuotaPendiente } from "@/lib/ventas/cobranza";
+import {
+  cuotasPagadasHint,
+  entregaInicialHint,
+  montoCobradoHint,
+  saldoCuotasHint,
+} from "@/lib/ventas/financiacion-kpis";
 import { formatDateDisplay, formatMoney, moneyClassName } from "@/lib/format";
 import { cuotaEstadoLabel, cuotaEstadoVariant } from "@/lib/mappers/cuotas";
 
@@ -12,15 +19,19 @@ export function VentaFinanciacionSection({
   cuotas,
   loading,
   editable,
+  entregaPendiente,
+  saldoEntregaInicial,
   onConfigureFinanciacion,
-  onCobrarCuota,
+  onCobrarProximo,
 }: {
   venta: VentaDetail;
   cuotas: CuotaFinanciacionRecord[];
   loading?: boolean;
   editable: boolean;
+  entregaPendiente: boolean;
+  saldoEntregaInicial: number;
   onConfigureFinanciacion: () => void;
-  onCobrarCuota: (cuotaId: number) => void;
+  onCobrarProximo: () => void;
 }) {
   const resumen = venta.financiacionResumen;
   const moneda = venta.codigoMoneda;
@@ -40,43 +51,76 @@ export function VentaFinanciacionSection({
     );
   }
 
-  const cuotasPendientes = cuotas.filter(
-    (cuota) =>
-      cuota.estadoCode === "pending" ||
-      cuota.estadoCode === "late" ||
-      cuota.estadoCode === "partial",
-  ).length;
+  const proximaCuota = proximaCuotaPendiente(cuotas);
+  const hayCobroPendiente = editable && (entregaPendiente || proximaCuota !== null);
+
+  const proximoCobroLabel = entregaPendiente
+    ? "Entrega inicial"
+    : proximaCuota
+      ? `Cuota ${proximaCuota.numero}`
+      : null;
+  const proximoCobroMonto = entregaPendiente
+    ? formatMoney(String(saldoEntregaInicial), moneda)
+    : proximaCuota
+      ? formatMoney(proximaCuota.saldo, moneda)
+      : null;
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="grid gap-3 sm:grid-cols-3">
+      {hayCobroPendiente && proximoCobroLabel && proximoCobroMonto ? (
+        <div
+          className="flex flex-col gap-4 rounded-md border border-primary/25 bg-primary-soft px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
+          data-testid="venta-financiacion-cobrar-cta"
+        >
+          <div className="flex flex-col gap-1">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-primary">
+              Próximo cobro
+            </span>
+            <p className="text-base font-semibold text-text-primary">
+              {proximoCobroLabel}
+              <span className={`ml-2 text-primary ${moneyClassName}`}>{proximoCobroMonto}</span>
+            </p>
+            {proximaCuota && !entregaPendiente ? (
+              <span className="text-[12px] text-text-secondary">
+                Vence {formatDateDisplay(proximaCuota.fechaVencimiento)}
+              </span>
+            ) : null}
+          </div>
+          <ButtonPrimary
+            type="button"
+            className="w-full px-6 py-3 text-base sm:w-auto"
+            onClick={onCobrarProximo}
+          >
+            Cobrar
+          </ButtonPrimary>
+        </div>
+      ) : null}
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <FichaSummaryCard
+          label="Monto cobrado"
+          value={resumen ? formatMoney(resumen.montoPagado, moneda) : formatMoney("0", moneda)}
+          hint={montoCobradoHint(venta.plan, resumen)}
+          valueClassName={resumen ? moneyClassName : ""}
+        />
         <FichaSummaryCard
           label="Saldo en cuotas"
           value={formatMoney(resumen?.saldoRestante ?? "0", moneda)}
-          hint={
-            cuotasPendientes > 0
-              ? `${cuotasPendientes} cuota${cuotasPendientes === 1 ? "" : "s"} pendiente${cuotasPendientes === 1 ? "" : "s"}`
-              : "Sin saldo pendiente"
-          }
+          hint={saldoCuotasHint(venta.plan, resumen)}
         />
         <FichaSummaryCard
           label="Cuotas pagadas"
           value={resumen ? `${resumen.cuotasPagadas} / ${resumen.cuotasTotales}` : `0 / ${venta.plan.cantidadCuotas}`}
-          hint="Avance del plan"
+          hint={cuotasPagadasHint(venta.plan, resumen)}
           valueClassName=""
         />
         <FichaSummaryCard
           label="Entrega inicial"
           value={formatMoney(venta.plan.montoEntregaInicial, moneda)}
-          hint={`${venta.plan.cantidadCuotas} cuotas · ${venta.plan.tasaInteresMensual}% mensual`}
+          hint={entregaInicialHint(venta.plan, moneda, entregaPendiente, saldoEntregaInicial)}
           valueClassName=""
         />
       </div>
-
-      <p className="text-[13px] text-text-secondary">
-        Plan de financiación con amortización francesa. Para registrar un cobro, usá{" "}
-        <strong className="font-medium text-text-primary">Cobrar</strong> en el encabezado o en cada fila.
-      </p>
 
       {loading ? (
         <p className="text-[13px] text-text-secondary">Cargando cuotas…</p>
@@ -97,17 +141,17 @@ export function VentaFinanciacionSection({
                 <th className="px-4 py-3 text-right">Monto</th>
                 <th className="px-4 py-3 text-right">Saldo</th>
                 <th className="px-4 py-3">Estado</th>
-                <th className="px-4 py-3 text-right">Acción</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {cuotas.map((cuota) => {
-                const pendiente =
-                  cuota.estadoCode === "pending" ||
-                  cuota.estadoCode === "late" ||
-                  cuota.estadoCode === "partial";
+                const esProxima =
+                  !entregaPendiente && proximaCuota !== null && proximaCuota.id === cuota.id;
                 return (
-                  <tr key={cuota.id} className="bg-bg-card">
+                  <tr
+                    key={cuota.id}
+                    className={esProxima ? "bg-primary-soft/40" : "bg-bg-card"}
+                  >
                     <td className="px-4 py-3 font-medium text-text-primary">{cuota.numero}</td>
                     <td className="px-4 py-3 text-text-secondary">
                       {formatDateDisplay(cuota.fechaVencimiento)}
@@ -123,17 +167,6 @@ export function VentaFinanciacionSection({
                         label={cuotaEstadoLabel(cuota.estadoCode)}
                         variant={cuotaEstadoVariant(cuota.estadoCode)}
                       />
-                    </td>
-                    <td className="px-4 py-3 text-right whitespace-nowrap">
-                      {pendiente && editable ? (
-                        <ButtonOutline
-                          type="button"
-                          className="px-3 py-1.5 text-xs"
-                          onClick={() => onCobrarCuota(cuota.id)}
-                        >
-                          Cobrar
-                        </ButtonOutline>
-                      ) : null}
                     </td>
                   </tr>
                 );

@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 
@@ -9,16 +9,16 @@ import { EditVentaModal } from "@/components/ventas/EditVentaModal";
 import type { CobrarVentaMode } from "@/components/ventas/CobrarVentaModal";
 import { ConfigurarFinanciacionModal } from "@/components/ventas/ConfigurarFinanciacionModal";
 import { VentaFinanciacionSection } from "@/components/ventas/VentaFinanciacionSection";
-import { VentaRecibosSection } from "@/components/ventas/VentaRecibosSection";
-import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
-import { FieldBlock } from "@/components/ui/FormLayout";
+import { VentaCobranzasSection } from "@/components/ventas/VentaCobranzasSection";
+import { VentaResumenSection } from "@/components/ventas/VentaResumenSection";
+import { EmitirReciboVentaModal } from "@/components/ventas/EmitirReciboVentaModal";
+import { ButtonOutline } from "@/components/ui/Button";
 import { PageHeaderSkeleton, Skeleton } from "@/components/ui/Skeleton";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useAuth } from "@/context/auth-context";
 import {
   ApiError,
   cancelVenta,
-  cancelVentaRecibo,
   downloadVentaReciboPdf,
   fetchMediosPago,
   fetchPersona,
@@ -26,7 +26,6 @@ import {
   fetchVentaCuotas,
   fetchVentaPagos,
   fetchVentaRecibos,
-  issueVentaRecibo,
 } from "@/lib/api";
 import type {
   CatalogoItem,
@@ -35,8 +34,7 @@ import type {
   VentaDetail,
   VentaReciboRecord,
 } from "@/lib/api/types";
-import { isAdmin } from "@/lib/auth/roles";
-import { ventaEsEditable, ventaNecesitaFinanciacion, ventaPuedeCobrar } from "@/lib/ventas/cobranza";
+import { entregaInicialPendiente, ventaEsEditable, ventaNecesitaFinanciacion } from "@/lib/ventas/cobranza";
 import { ventaEstadoLabel, ventaEstadoVariant } from "@/lib/ventas/status-labels";
 import { downloadBlob, formatDateDisplay, formatMoney, moneyClassName, personaDisplayName } from "@/lib/format";
 import { pagePaddingClass } from "@/lib/layout";
@@ -58,15 +56,16 @@ const tabs: { id: FichaTab; label: string }[] = [
   { id: "cobranzas", label: "Cobranzas" },
 ];
 
-function SectionTitle({ children }: { children: string }) {
-  return (
-    <h3 className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">{children}</h3>
-  );
-}
-
 function inmuebleInitials(code: string): string {
   const cleaned = code.trim();
   return cleaned.slice(0, 2).toUpperCase() || "?";
+}
+
+function tabFromQuery(value: string | null): FichaTab | null {
+  if (value === "resumen" || value === "financiacion" || value === "cobranzas") {
+    return value;
+  }
+  return null;
 }
 
 function parteNombre(
@@ -82,10 +81,16 @@ function parteNombre(
 export function VentaFichaView() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const ventaId = parseRouteId(params.id);
 
   const { token, logout, user } = useAuth();
   const [activeTab, setActiveTab] = useState<FichaTab>("resumen");
+
+  useEffect(() => {
+    const tab = tabFromQuery(searchParams.get("tab"));
+    if (tab) setActiveTab(tab);
+  }, [searchParams]);
   const [loading, setLoading] = useState(true);
   const [venta, setVenta] = useState<VentaDetail | null>(null);
   const [cuotas, setCuotas] = useState<CuotaFinanciacionRecord[]>([]);
@@ -102,11 +107,12 @@ export function VentaFichaView() {
   const [cobrarMode, setCobrarMode] = useState<CobrarVentaMode>("auto");
   const [cobrarCuotaId, setCobrarCuotaId] = useState<number | undefined>();
   const [cancelling, setCancelling] = useState(false);
-  const userIsAdmin = isAdmin(user);
+  const [emitReciboOpen, setEmitReciboOpen] = useState(false);
+  const [emitReciboPagoId, setEmitReciboPagoId] = useState<number | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (options?: { silent?: boolean }) => {
     if (ventaId === null || !token) return;
-    setLoading(true);
+    if (!options?.silent) setLoading(true);
     setError(null);
     try {
       const detail = await fetchVenta(token, ventaId);
@@ -168,6 +174,12 @@ export function VentaFichaView() {
     void load();
   }, [load, ventaId, token]);
 
+  useEffect(() => {
+    if (!success) return;
+    const timer = window.setTimeout(() => setSuccess(null), 5000);
+    return () => window.clearTimeout(timer);
+  }, [success]);
+
   const editable = venta ? ventaEsEditable(venta) : false;
   const inmuebleCode = venta?.inmueble?.code ?? `Venta #${venta?.id ?? ""}`;
   const inmuebleTitle = venta?.inmueble?.title ?? "Inmueble";
@@ -178,6 +190,11 @@ export function VentaFichaView() {
     const parts = [comprador !== "—" ? comprador : null, inmuebleTitle].filter(Boolean);
     return parts.join(" · ");
   }, [venta, parteNombres, inmuebleTitle]);
+
+  const entregaInicial = useMemo(() => {
+    if (!venta) return { pendiente: false, saldo: 0 };
+    return entregaInicialPendiente(venta, pagos);
+  }, [venta, pagos]);
 
   function openCobrar(mode: CobrarVentaMode = "auto", cuotaId?: number) {
     setCobrarMode(mode);
@@ -208,41 +225,16 @@ export function VentaFichaView() {
     }
   }
 
-  async function handleIssueRecibo(pagoId: number) {
-    if (!token) return;
-    setReciboSubmitting(true);
-    setSuccess(null);
-    setError(null);
-    try {
-      const recibo = await issueVentaRecibo(token, pagoId, 2);
-      await refreshRecibos();
-      const pdf = await downloadVentaReciboPdf(token, recibo.id);
-      downloadBlob(pdf, `recibo-${recibo.reciboNumber}.pdf`);
-      setSuccess(`Recibo ${recibo.reciboNumber} emitido.`);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo emitir el recibo.");
-    } finally {
-      setReciboSubmitting(false);
-    }
+  function openEmitReciboModal(pagoId: number) {
+    setEmitReciboPagoId(pagoId);
+    setEmitReciboOpen(true);
   }
 
-  async function handleCancelRecibo(reciboId: number) {
-    if (!token) return;
-    const recibo = recibos.find((item) => item.id === reciboId);
-    if (!window.confirm(`¿Anular el recibo ${recibo?.reciboNumber ?? reciboId}?`)) return;
-    setReciboSubmitting(true);
-    setSuccess(null);
-    setError(null);
-    try {
-      await cancelVentaRecibo(token, reciboId);
-      await refreshRecibos();
-      setSuccess("Recibo anulado.");
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo anular el recibo.");
-    } finally {
-      setReciboSubmitting(false);
-    }
-  }
+  const emitReciboPago = useMemo(
+    () => pagos.find((pago) => pago.id === emitReciboPagoId) ?? null,
+    [pagos, emitReciboPagoId],
+  );
+
 
   async function handleCancelVenta() {
     if (!token || !venta || !window.confirm("¿Cancelar esta venta? La operación quedará archivada.")) return;
@@ -268,7 +260,7 @@ export function VentaFichaView() {
     );
   }
 
-  if (loading || !venta) {
+  if (!venta) {
     return (
       <div className={`flex flex-col gap-6 ${pagePaddingClass}`}>
         <Skeleton className="h-4 w-32" />
@@ -333,11 +325,6 @@ export function VentaFichaView() {
             </span>
           </div>
           <div className="flex flex-wrap justify-end gap-2">
-            {editable && ventaPuedeCobrar(venta) ? (
-              <ButtonPrimary type="button" onClick={() => openCobrar("auto")}>
-                Cobrar
-              </ButtonPrimary>
-            ) : null}
             {editable ? (
               <>
                 {ventaNecesitaFinanciacion(venta) ? (
@@ -362,7 +349,10 @@ export function VentaFichaView() {
               key={tab.id}
               type="button"
               data-testid={`venta-ficha-tab-${tab.id}`}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                setSuccess(null);
+                setActiveTab(tab.id);
+              }}
               className={`rounded-t-sm px-3 py-2 text-sm font-medium transition-colors ${
                 activeTab === tab.id
                   ? "border-b-2 border-primary text-primary"
@@ -378,65 +368,17 @@ export function VentaFichaView() {
           {error ? (
             <p className="rounded-sm border border-danger bg-danger-bg px-3 py-2 text-sm text-danger">{error}</p>
           ) : null}
-          {success ? (
+          {activeTab === "cobranzas" && success ? (
             <p className="rounded-sm border border-success bg-success-bg px-3 py-2 text-sm text-success">{success}</p>
           ) : null}
 
           {activeTab === "resumen" ? (
-            <div className="flex flex-col gap-6">
-              <div className="flex flex-col gap-4">
-                <SectionTitle>Identificación</SectionTitle>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <FieldBlock label="Código de inmueble" value={inmuebleCode} />
-                  <FieldBlock label="Propiedad" value={inmuebleTitle} />
-                  <FieldBlock label="Operación" value={`Venta #${venta.id}`} />
-                  <FieldBlock label="Condiciones de pago" value={venta.condicionesPago?.trim() || "—"} />
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-4">
-                <SectionTitle>Partes</SectionTitle>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <FieldBlock label="Comprador" value={parteNombre(venta, "buyer", parteNombres)} />
-                  <FieldBlock label="Vendedor" value={parteNombre(venta, "seller", parteNombres)} />
-                  <FieldBlock label="Garantes" value={parteNombre(venta, "guarantor", parteNombres)} />
-                  <FieldBlock label="Testigos" value={parteNombre(venta, "witness", parteNombres)} />
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-4">
-                <SectionTitle>Trámite y fechas</SectionTitle>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <FieldBlock
-                    label="Fecha de compromiso"
-                    value={venta.fechaBoleto ? formatDateDisplay(venta.fechaBoleto) : "—"}
-                  />
-                  <FieldBlock
-                    label="Fecha de escritura"
-                    value={venta.fechaEscritura ? formatDateDisplay(venta.fechaEscritura) : "—"}
-                  />
-                  <FieldBlock label="Escribano" value={venta.nombreEscribano?.trim() || "—"} />
-                  <FieldBlock
-                    label="Saldo en cuotas"
-                    value={
-                      venta.financiacionResumen
-                        ? formatMoney(
-                            venta.financiacionResumen.saldoRestante,
-                            venta.financiacionResumen.codigoMoneda,
-                          )
-                        : "—"
-                    }
-                  />
-                </div>
-              </div>
-
-              {venta.notas ? (
-                <div className="flex flex-col gap-4">
-                  <SectionTitle>Notas</SectionTitle>
-                  <p className="whitespace-pre-wrap text-[13px] text-text-primary">{venta.notas}</p>
-                </div>
-              ) : null}
-            </div>
+            <VentaResumenSection
+              venta={venta}
+              inmuebleCode={inmuebleCode}
+              inmuebleTitle={inmuebleTitle}
+              parteNombres={parteNombres}
+            />
           ) : null}
 
           {activeTab === "financiacion" ? (
@@ -445,22 +387,22 @@ export function VentaFichaView() {
               cuotas={cuotas}
               loading={loading}
               editable={editable}
+              entregaPendiente={entregaInicial.pendiente}
+              saldoEntregaInicial={entregaInicial.saldo}
               onConfigureFinanciacion={() => setFinanciacionOpen(true)}
-              onCobrarCuota={(cuotaId) => openCobrar("cuota", cuotaId)}
+              onCobrarProximo={() => openCobrar("auto")}
             />
           ) : null}
 
           {activeTab === "cobranzas" ? (
-            <VentaRecibosSection
+            <VentaCobranzasSection
               pagos={pagos}
               recibos={recibos}
               mediosPago={mediosPago}
               loading={loading}
               submitting={reciboSubmitting}
-              isAdmin={userIsAdmin}
               onDownloadRecibo={handleDownloadRecibo}
-              onIssueRecibo={handleIssueRecibo}
-              onCancelRecibo={handleCancelRecibo}
+              onIssueRecibo={openEmitReciboModal}
             />
           ) : null}
         </div>
@@ -485,6 +427,25 @@ export function VentaFichaView() {
         }}
       />
 
+      {venta && emitReciboOpen ? (
+        <EmitirReciboVentaModal
+          open={emitReciboOpen}
+          onClose={() => {
+            setEmitReciboOpen(false);
+            setEmitReciboPagoId(null);
+          }}
+          token={token ?? ""}
+          venta={venta}
+          pago={emitReciboPago}
+          cuotas={cuotas}
+          mediosPago={mediosPago}
+          onSuccess={(recibo) => {
+            setSuccess(`Recibo ${recibo.reciboNumber} emitido.`);
+            void load({ silent: true });
+          }}
+        />
+      ) : null}
+
       {cobrarOpen ? (
         <CobrarVentaModal
           open={cobrarOpen}
@@ -496,7 +457,7 @@ export function VentaFichaView() {
           cuotaId={cobrarCuotaId}
           onSuccess={() => {
             setCobrarOpen(false);
-            void load();
+            void load({ silent: true });
           }}
         />
       ) : null}

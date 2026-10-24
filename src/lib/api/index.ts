@@ -823,11 +823,15 @@ export function fetchVentaRecibos(token: string, ventaId: number) {
   });
 }
 
-export function issueVentaRecibo(token: string, pagoVentaId: number, copies = 2) {
+export function issueVentaRecibo(
+  token: string,
+  pagoVentaId: number,
+  body: { copies?: number; description?: string } = {},
+) {
   return apiRequest<import("./types").VentaReciboRecord>(`/ventas/pagos/${pagoVentaId}/recibo`, {
     method: "POST",
     token,
-    body: JSON.stringify({ copies }),
+    body: JSON.stringify(body),
   });
 }
 
