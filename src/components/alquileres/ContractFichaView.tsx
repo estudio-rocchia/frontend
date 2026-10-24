@@ -1,8 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useParams, useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 
 import { ContractCobranzasSection } from "@/components/alquileres/ContractCobranzasSection";
@@ -52,15 +52,28 @@ function estadoVariant(estado: string): "success" | "warning" | "danger" {
   return "warning";
 }
 
+function tabFromQuery(value: string | null): FichaTab | null {
+  if (value === "resumen" || value === "cobranzas" || value === "deposito" || value === "servicios") {
+    return value;
+  }
+  return null;
+}
+
 export function ContractFichaView() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const contratoId = Number(params.id);
   const validId = Number.isInteger(contratoId) && contratoId > 0;
 
   const { token, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<FichaTab>("resumen");
   const [cobrarModalOpen, setCobrarModalOpen] = useState(false);
+
+  useEffect(() => {
+    const tab = tabFromQuery(searchParams.get("tab"));
+    if (tab) setActiveTab(tab);
+  }, [searchParams]);
 
   const {
     detail,
