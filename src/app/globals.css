@@ -25,7 +25,7 @@
   --nav-muted: #a8bfc6;
   --nav-subtitle: #a8c5ce;
   --logo-mark: #ffffff22;
-  --shadow-card: 0 2px 12px #1a2b3214;
+  --shadow-card: 0 1px 2px rgba(26, 43, 50, 0.06), 0 4px 16px rgba(26, 43, 50, 0.06);
   --radius-sm: 8px;
   --radius-md: 12px;
 }
@@ -57,8 +57,50 @@
   --radius-md: var(--radius-md);
 }
 
+html {
+  color-scheme: light;
+}
+
 body {
   background: var(--bg-page);
   color: var(--text-primary);
   font-family: var(--font-dm-sans), system-ui, sans-serif;
+}
+
+@keyframes dashboard-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes dashboard-count-pop {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.dashboard-animate-in {
+  animation: dashboard-rise-in 0.35s ease-out both;
+}
+
+.dashboard-count-pop {
+  animation: dashboard-count-pop 0.35s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-animate-in,
+  .dashboard-count-pop {
+    animation: none;
+  }
 }

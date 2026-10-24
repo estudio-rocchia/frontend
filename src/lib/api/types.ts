@@ -703,6 +703,70 @@ export interface DashboardResumen {
     fechaFin: string;
     diasHastaVencimiento: number;
   }>;
+  ventas: {
+    tarjetas: {
+      cuotaVencida: DashboardMoneyCard;
+      cuotaPorVencer: DashboardMoneyCard;
+      entregaPendiente: { count: number };
+      sinFinanciacion: { count: number };
+      cobroSinRecibo: { count: number };
+    };
+    cuotaVencida: Array<{
+      ventaId: number;
+      cuotaId: number;
+      cuotaNumero: number;
+      estadoCode: string;
+      diasAtraso?: number;
+      diasHastaVencimiento?: number;
+      saldoTotal: string;
+      codigoMoneda: string;
+      fechaVencimiento: string;
+      inmuebleCode: string;
+      inmuebleTitle: string;
+      compradorNombre: string;
+    }>;
+    cuotaPorVencer: Array<{
+      ventaId: number;
+      cuotaId: number;
+      cuotaNumero: number;
+      estadoCode: string;
+      diasAtraso?: number;
+      diasHastaVencimiento?: number;
+      saldoTotal: string;
+      codigoMoneda: string;
+      fechaVencimiento: string;
+      inmuebleCode: string;
+      inmuebleTitle: string;
+      compradorNombre: string;
+    }>;
+    entregaPendiente: Array<{
+      ventaId: number;
+      saldoEntrega: string;
+      montoEntregaInicial: string;
+      codigoMoneda: string;
+      inmuebleCode: string;
+      inmuebleTitle: string;
+      compradorNombre: string;
+    }>;
+    sinFinanciacion: Array<{
+      ventaId: number;
+      montoPrecioVenta: string;
+      codigoMoneda: string;
+      inmuebleCode: string;
+      inmuebleTitle: string;
+      compradorNombre: string;
+    }>;
+    cobroSinRecibo: Array<{
+      pagoId: number;
+      ventaId: number;
+      monto: string;
+      codigoMoneda: string;
+      fechaPago: string;
+      inmuebleCode: string;
+      inmuebleTitle: string;
+      compradorNombre: string;
+    }>;
+  };
 }
 
 export interface InmuebleFichaPropietario {

@@ -19,7 +19,7 @@ export type NavItem = {
 };
 
 export const mainNav: NavItem[] = [
-  { label: "Dashboard", href: "/", icon: LayoutDashboard },
+  { label: "Inicio", href: "/", icon: LayoutDashboard },
   { label: "Alquileres", href: "/alquileres", icon: KeyRound },
   { label: "Índices", href: "/indices", icon: TrendingUp },
   { label: "Ventas", href: "/ventas", icon: Handshake },
