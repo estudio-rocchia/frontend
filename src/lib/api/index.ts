@@ -125,6 +125,26 @@ export function resetUsuarioPassword(token: string, id: number, body: ResetUsuar
 export function fetchDashboardResumen(token: string, limit = 20) {
   return apiRequest<DashboardResumen>(`/dashboard/resumen?limit=${limit}`, { token });
 }
+export function fetchDashboardAlertasLeidas(token: string) {
+  return apiRequest<{ alertIds: string[] }>("/dashboard/alertas-leidas", { token });
+}
+
+export function markDashboardAlertasLeidas(token: string, alertIds: string[]) {
+  return apiRequest<{ alertIds: string[] }>("/dashboard/alertas-leidas", {
+    method: "POST",
+    token,
+    body: JSON.stringify({ alertIds }),
+  });
+}
+
+export function unmarkDashboardAlertaLeida(token: string, alertId: string) {
+  return apiRequest<{ alertIds: string[] }>(`/dashboard/alertas-leidas/${encodeURIComponent(alertId)}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
+
 
 export function fetchContratos(
   token: string,
