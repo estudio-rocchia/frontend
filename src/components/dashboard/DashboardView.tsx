@@ -1,17 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 
 import { DashboardAlertCard } from "@/components/dashboard/DashboardAlertCard";
 import { DashboardAnimatedCount } from "@/components/dashboard/DashboardAnimatedCount";
 import { PageHeaderSkeleton, Skeleton } from "@/components/ui/Skeleton";
 import { useAuth } from "@/context/auth-context";
+import { useDashboardAlerts } from "@/context/dashboard-alerts-context";
 import { useDashboardReadAlerts } from "@/context/dashboard-read-alerts-context";
 import type { DashboardAlertRow, DashboardAlertTier } from "@/data/dashboard-contracts";
-import { ApiError, fetchDashboardResumen } from "@/lib/api";
 import { pagePaddingClass } from "@/lib/layout";
-import { countAlertsByTier, mapDashboardAlerts } from "@/lib/mappers/dashboard";
+import { countAlertsByTier } from "@/lib/mappers/dashboard";
 
 type AlertFilter = "todos" | "urgente" | "proximo" | "admin" | "alquiler" | "venta";
 
@@ -71,35 +71,12 @@ function greetingName(username: string): string {
 }
 
 export function DashboardView() {
-  const { token, logout, user } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [rows, setRows] = useState<DashboardAlertRow[]>([]);
+  const { user } = useAuth();
+  const { rows, loading, error, refresh } = useDashboardAlerts();
   const [filter, setFilter] = useState<AlertFilter>("todos");
   const { isRead, markRead } = useDashboardReadAlerts();
 
-  const load = useCallback(async () => {
-    if (!token) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const resumen = await fetchDashboardResumen(token, 30);
-      setRows(mapDashboardAlerts(resumen));
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 401) {
-        logout();
-        return;
-      }
-      setError(err instanceof ApiError ? err.message : "Error al cargar el inicio");
-    } finally {
-      setLoading(false);
-    }
-  }, [token, logout]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
+  const showSkeleton = loading && rows.length === 0;
   const totalCounts = useMemo(() => countAlertsByTier(rows), [rows]);
   const visibleRows = useMemo(() => filterAlerts(rows, filter), [rows, filter]);
   const displayName = user ? greetingName(user.username) : "";
@@ -114,7 +91,7 @@ export function DashboardView() {
     return `${rows.length} tarea${rows.length === 1 ? "" : "s"} en seguimiento.`;
   }, [rows.length, totalCounts.urgente]);
 
-  if (loading) {
+  if (showSkeleton) {
     return (
       <div className={`flex flex-col gap-6 ${pagePaddingClass}`}>
         <PageHeaderSkeleton />
@@ -133,11 +110,11 @@ export function DashboardView() {
     );
   }
 
-  if (error) {
+  if (error && rows.length === 0) {
     return (
       <div className={pagePaddingClass}>
         <p className="rounded-lg border border-danger/30 bg-danger-bg px-4 py-3 text-sm text-danger">{error}</p>
-        <button type="button" onClick={() => void load()} className="mt-3 text-sm font-semibold text-primary">
+        <button type="button" onClick={() => void refresh()} className="mt-3 text-sm font-semibold text-primary">
           Reintentar
         </button>
       </div>

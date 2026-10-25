@@ -1,24 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Bell, CheckCircle2 } from "lucide-react";
 
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { useAuth } from "@/context/auth-context";
+import { useDashboardAlerts } from "@/context/dashboard-alerts-context";
 import { useDashboardReadAlerts } from "@/context/dashboard-read-alerts-context";
-import type { DashboardAlertRow } from "@/data/dashboard-contracts";
-import { ApiError, fetchDashboardResumen } from "@/lib/api";
-import { countAlertsByTier, filterUnreadAlerts, mapDashboardAlerts } from "@/lib/mappers/dashboard";
+import { countAlertsByTier, filterUnreadAlerts } from "@/lib/mappers/dashboard";
 
 const PANEL_LIMIT = 8;
 
 export function NotificationBell() {
-  const { token, logout } = useAuth();
+  const { rows: allAlerts, loading, refresh } = useDashboardAlerts();
   const { readIds, markRead } = useDashboardReadAlerts();
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [allAlerts, setAllAlerts] = useState<DashboardAlertRow[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const unreadAlerts = useMemo(
@@ -30,28 +26,9 @@ export function NotificationBell() {
     [allAlerts, readIds],
   );
 
-  const load = useCallback(async () => {
-    if (!token) return;
-    setLoading(true);
-    try {
-      const resumen = await fetchDashboardResumen(token, 30);
-      setAllAlerts(mapDashboardAlerts(resumen));
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 401) {
-        logout();
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [token, logout]);
-
   useEffect(() => {
-    void load();
-  }, [load]);
-
-  useEffect(() => {
-    if (open) void load();
-  }, [open, load]);
+    if (open) void refresh({ silent: true });
+  }, [open, refresh]);
 
   useEffect(() => {
     if (!open) return;
