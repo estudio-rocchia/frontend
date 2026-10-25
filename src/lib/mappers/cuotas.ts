@@ -13,6 +13,42 @@ export function computeCuotaDueDate(year: number, month: number, day: number): s
   return `${year}-${String(month).padStart(2, "0")}-${String(actualDay).padStart(2, "0")}`;
 }
 
+function firstDayOfMonthIso(year: number, month: number): string {
+  return `${year}-${String(month).padStart(2, "0")}-01`;
+}
+
+function lastDayOfMonthIso(year: number, month: number): string {
+  const actualDay = lastDayOfMonth(year, month);
+  return `${year}-${String(month).padStart(2, "0")}-${String(actualDay).padStart(2, "0")}`;
+}
+
+/** Misma regla que el backend `resolveCuotaDueDate`. */
+export function resolveCuotaDueDateForContrato(
+  anioPeriodo: number,
+  mesPeriodo: number,
+  contrato: ContratoDetail,
+): string | null {
+  const inicioPeriodo = firstDayOfMonthIso(anioPeriodo, mesPeriodo);
+  const finPeriodo = lastDayOfMonthIso(anioPeriodo, mesPeriodo);
+
+  if (finPeriodo < contrato.fechaInicio || inicioPeriodo > contrato.fechaFin) {
+    return null;
+  }
+
+  let fechaVencimiento = computeCuotaDueDate(
+    anioPeriodo,
+    mesPeriodo,
+    contrato.diaVencimientoPago,
+  );
+  if (fechaVencimiento < contrato.fechaInicio) {
+    fechaVencimiento = contrato.fechaInicio;
+  }
+  if (fechaVencimiento > contrato.fechaFin) {
+    fechaVencimiento = contrato.fechaFin;
+  }
+  return fechaVencimiento;
+}
+
 function periodKey(anioPeriodo: number, mesPeriodo: number): string {
   return `${anioPeriodo}-${mesPeriodo}`;
 }
@@ -90,13 +126,13 @@ export function buildCuotasCobranzasView(
   let cursor = periodFromIsoDate(contrato.fechaInicio);
 
   for (let guard = 0; guard < 600 && comparePeriod(cursor, capPeriod) <= 0; guard += 1) {
-    const fechaVencimiento = computeCuotaDueDate(
+    const fechaVencimiento = resolveCuotaDueDateForContrato(
       cursor.anioPeriodo,
       cursor.mesPeriodo,
-      contrato.diaVencimientoPago,
+      contrato,
     );
 
-    if (fechaVencimiento >= contrato.fechaInicio && fechaVencimiento <= contrato.fechaFin) {
+    if (fechaVencimiento) {
       const existing = cuotaByPeriod.get(periodKey(cursor.anioPeriodo, cursor.mesPeriodo));
       rows.push(
         existing
@@ -220,9 +256,30 @@ export function buildRentImputaciones(cuota: CuotaDetail, montoTotal: number): I
 }
 
 
+/** Primer período del contrato sin cuota generada y con vencimiento dentro del rango contractual. */
+export function firstBillablePeriodWithoutCuota(
+  cuotas: CuotaDetail[],
+  contrato: ContratoDetail,
+  asOf = new Date(),
+): { anioPeriodo: number; mesPeriodo: number } | null {
+  const rows = buildCuotasCobranzasView(cuotas, contrato, asOf);
+  const projected = rows
+    .filter((row) => row.projected)
+    .sort((a, b) => comparePeriod(a, b));
+  const first = projected[0];
+  if (!first) return null;
+  return { anioPeriodo: first.anioPeriodo, mesPeriodo: first.mesPeriodo };
+}
+
 /** Si el contrato activo puede abrir el flujo de cobro (cuota pendiente o mes sin generar). */
-export function canCollectRentFromCuotas(cuotas: CuotaDetail[]): boolean {
+export function canCollectRentFromCuotas(
+  cuotas: CuotaDetail[],
+  contrato?: ContratoDetail | null,
+): boolean {
   if (pickCuotaParaCobrar(cuotas)) return true;
+  if (contrato) {
+    return firstBillablePeriodWithoutCuota(cuotas, contrato) !== null;
+  }
   const period = currentBillingPeriod();
   const current = findCuotaForPeriod(cuotas, period.anioPeriodo, period.mesPeriodo);
   return !current;
