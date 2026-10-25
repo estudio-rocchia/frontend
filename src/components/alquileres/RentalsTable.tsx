@@ -196,8 +196,9 @@ export function RentalsTable({
               ) : (
                 paginated.map((row) => {
                   const showRenew = row.needsRenewal;
-                  const showAdjust = row.needsAdjustment && row.canAdjust && !showRenew;
                   const showCollect = canCollectRent(row);
+                  const showAdjust =
+                    row.needsAdjustment && row.canAdjust && !showRenew && !showCollect;
 
                   return (
                     <tr
