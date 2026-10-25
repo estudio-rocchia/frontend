@@ -410,6 +410,35 @@ export function updatePersonaAdministracion(
   });
 }
 
+export function updatePersona(
+  token: string,
+  id: number,
+  body: {
+    nombre?: string | null;
+    apellido?: string | null;
+    fechaNacimiento?: string | null;
+    estadoCivil?: "single" | "married" | "divorced" | "widowed" | "civil_union" | null;
+    tipoDocumento?: "DNI" | "CUIT" | "PASSPORT" | null;
+    numeroDocumento?: string | null;
+    razonSocial?: string | null;
+    nombreRepresentante?: string | null;
+    cuit?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    address?: string | null;
+    notas?: string | null;
+    activo?: boolean;
+    porcentajeAdministracion?: number;
+    modoHonorariosAdministracion?: "per_inmueble" | "por_cliente";
+  },
+) {
+  return apiRequest<PersonaRecord>(`/personas/${id}`, {
+    method: "PATCH",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
 export function fetchInmuebleFicha(token: string, inmuebleId: number) {
   return apiRequest<InmuebleFicha>(`/inmuebles/${inmuebleId}/ficha`, { token });
 }
@@ -433,6 +462,10 @@ export function fetchLocalidades(token: string) {
 
 export type PersonaVinculoFilter = "inquilino" | "propietario" | "moroso";
 
+export function fetchClientesKpis(token: string) {
+  return apiRequest<import("./types").ClientesKpis>("/clientes/kpis", { token });
+}
+
 export function fetchPersonas(
  token: string,
  params?: {
@@ -440,6 +473,7 @@ export function fetchPersonas(
    q?: string;
    ids?: number[];
    vinculo?: PersonaVinculoFilter;
+   withVinculos?: boolean;
    cursor?: number;
    limit?: number;
    offset?: number;
@@ -449,7 +483,8 @@ export function fetchPersonas(
  if (params?.activo !== undefined) query.set("activo", String(params.activo));
  if (params?.q) query.set("q", params.q);
  if (params?.vinculo) query.set("vinculo", params.vinculo);
- else if (params?.ids?.length) query.set("ids", params.ids.join(","));
+ if (params?.withVinculos) query.set("withVinculos", "true");
+ if (params?.ids?.length) query.set("ids", params.ids.join(","));
  if (params?.cursor !== undefined) query.set("cursor", String(params.cursor));
  query.set("limit", String(params?.limit ?? 200));
  if (params?.cursor === undefined && params?.offset !== undefined) {
@@ -504,8 +539,10 @@ export function createInmueble(
     code: string;
     tipoInmuebleId: number;
     localidadId: number;
-    title: string;
-    direccion?: string | null;
+    calle: string;
+    numero?: string | null;
+    referencia?: string | null;
+    title?: string | null;
   },
 ) {
   return apiRequest<InmuebleRecord>("/inmuebles", {
@@ -570,6 +607,18 @@ export function createContrato(
 ) {
   return apiRequest<ContratoRecord>("/contratos", {
     method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function updateContrato(
+  token: string,
+  contratoId: number,
+  body: Record<string, unknown>,
+) {
+  return apiRequest<ContratoRecord>(`/contratos/${contratoId}`, {
+    method: "PATCH",
     token,
     body: JSON.stringify(body),
   });

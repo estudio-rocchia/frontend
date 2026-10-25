@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import type { EditContractForm } from "@/components/alquileres/EditContractModal";
 import type { PlanActualizacionDepositoFormValues } from "@/components/alquileres/PlanActualizacionDepositoModal";
 import type { PeriodoFormValues } from "@/components/alquileres/PeriodoServicioModal";
 import type { ServicioFormValues } from "@/components/alquileres/ServicioFormModal";
@@ -26,6 +27,7 @@ import {
   importSecheep,
   issueRecibo,
   registerPago,
+  updateContrato,
   updateServicio,
 } from "@/lib/api";
 import type {
@@ -39,7 +41,9 @@ import type {
   SecheepImportInput,
   ServicioContratoRecord,
 } from "@/lib/api/types";
+import { useDashboardAlerts } from "@/context/dashboard-alerts-context";
 import { downloadBlob, rentalApiErrorMessage } from "@/lib/format";
+import { resolveMoraPunitoriaPayload } from "@/lib/mora-punitoria";
 import { mapContratoDetailToFicha } from "@/lib/mappers/rentals";
 import { useContratoPrefetch } from "@/lib/use-contrato-prefetch";
 
@@ -51,6 +55,7 @@ interface UseContractFichaOptions {
 }
 
 export function useContractFicha({ contratoId, validId, token, logout }: UseContractFichaOptions) {
+  const { refresh: refreshDashboardAlerts } = useDashboardAlerts();
   const { consume: consumePrefetchedContrato } = useContratoPrefetch(token);
   const [detail, setDetail] = useState<ContractDetail | null>(null);
   const [contrato, setContrato] = useState<ContratoDetail | null>(null);
@@ -382,6 +387,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
         setSuccess("Pago de servicio registrado.");
       }
 
+      void refreshDashboardAlerts({ silent: true });
       await loadServicios(contrato.id);
     } catch (err) {
       setError(rentalApiErrorMessage(err, "No se pudo registrar el pago"));
@@ -400,6 +406,91 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
     setSuccess("Cobro registrado.");
     await refreshBilling();
   }, [refreshBilling]);
+
+  async function handleUpdateContrato(form: EditContractForm): Promise<boolean> {
+    if (!token || !contrato) return false;
+    if (contrato.estado !== "active") {
+      setError("Solo se pueden editar contratos activos.");
+      return false;
+    }
+
+    setSubmitting(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const amount = Number(form.amount.replace(/\D/g, ""));
+      if (!Number.isFinite(amount) || amount <= 0) {
+        throw new ApiError(400, {
+          error: { code: "VALIDATION_ERROR", message: "Ingresá un monto mensual válido" },
+        });
+      }
+
+      const depositAmount = Number(form.depositAmount.replace(/\D/g, ""));
+      if (!Number.isFinite(depositAmount) || depositAmount <= 0) {
+        throw new ApiError(400, {
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Ingresá un depósito de garantía válido mayor a cero",
+          },
+        });
+      }
+
+      const [indices, moras] = await Promise.all([
+        fetchCatalog(token, "/catalogos/tipos-indice"),
+        fetchCatalog(token, "/catalogos/tipos-mora"),
+      ]);
+      const indexItem =
+        indices.items.find((item) => item.code === form.index) ?? indices.items[0];
+      if (!indexItem?.id) {
+        throw new ApiError(400, {
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Seleccioná un índice de ajuste válido",
+          },
+        });
+      }
+
+      let moraPayload;
+      try {
+        moraPayload = resolveMoraPunitoriaPayload(form.mora, moras.items);
+      } catch (err) {
+        throw new ApiError(400, {
+          error: {
+            code: "VALIDATION_ERROR",
+            message: err instanceof Error ? err.message : "Configuración de mora inválida",
+          },
+        });
+      }
+
+      await updateContrato(token, contrato.id, {
+        fechaInicio: form.fechaInicio,
+        fechaFin: form.fechaFin,
+        montoAlquiler: amount,
+        montoDeposito: depositAmount,
+        codigoMonedaDeposito: form.depositCurrency,
+        tipoIndiceId: indexItem.id,
+        frecuenciaAjusteMeses: form.frecuenciaAjusteMeses,
+        tipoMoraId: moraPayload.tipoMoraId,
+        tasaMora: moraPayload.tasaMora,
+        montoMoraFijo: moraPayload.montoMoraFijo,
+        diaVencimientoPago: moraPayload.diaVencimientoPago,
+      });
+
+      await loadCore();
+      void refreshDashboardAlerts();
+      setSuccess("Datos del contrato actualizados.");
+      return true;
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        logout();
+        return false;
+      }
+      setError(rentalApiErrorMessage(err, "No se pudieron guardar los cambios"));
+      return false;
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   async function handleDownloadRecibo(pagoId: number) {
     if (!token) return;
@@ -441,6 +532,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
     clearServiciosFocusPanel: () => setServiciosFocusPanel(null),
     refreshBilling,
     handleCobrarSuccess,
+    handleUpdateContrato,
     handleCreateServicio,
     handleUpdateServicio,
     handleDeactivateServicio,

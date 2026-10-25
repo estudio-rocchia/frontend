@@ -26,6 +26,14 @@ const CobrarAlquilerModal = dynamic(
   { ssr: false },
 );
 
+const EditContractModal = dynamic(
+  () =>
+    import("@/components/alquileres/EditContractModal").then((mod) => ({
+      default: mod.EditContractModal,
+    })),
+  { ssr: false },
+);
+
 type FichaTab = "resumen" | "cobranzas" | "deposito" | "servicios";
 
 const tabs: { id: FichaTab; label: string }[] = [
@@ -69,6 +77,7 @@ export function ContractFichaView() {
   const { token, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<FichaTab>("resumen");
   const [cobrarModalOpen, setCobrarModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
 
   useEffect(() => {
     const tab = tabFromQuery(searchParams.get("tab"));
@@ -101,6 +110,7 @@ export function ContractFichaView() {
     handleRegisterPago,
     handleDownloadRecibo,
     handleCobrarSuccess,
+    handleUpdateContrato,
   } = useContractFicha({ contratoId, validId, token, logout });
 
   const contratoCode = contrato?.contratoCode ?? detail?.propertyCode ?? "—";
@@ -112,7 +122,7 @@ export function ContractFichaView() {
   }, [detail]);
 
   const canEdit = contrato?.estado === "active";
-  const canCollect = canEdit && canCollectRentFromCuotas(cuotas);
+  const canCollect = canEdit && contrato && canCollectRentFromCuotas(cuotas, contrato);
   const cobrarSubtitle = detail ? `${detail.tenant} · ${detail.property}` : undefined;
 
   if (!validId || (error && !detail && !loading)) {
@@ -184,14 +194,25 @@ export function ContractFichaView() {
               {detail.previousAmount}
             </span>
           </div>
-          {canCollect ? (
-            <ButtonPrimary
-              type="button"
-              onClick={() => setCobrarModalOpen(true)}
-              disabled={serviciosLoading || submitting}
-            >
-              Cobrar
-            </ButtonPrimary>
+          {canEdit ? (
+            <div className="flex flex-wrap gap-2">
+              <ButtonOutline
+                type="button"
+                onClick={() => setEditModalOpen(true)}
+                disabled={submitting}
+              >
+                Editar datos
+              </ButtonOutline>
+              {canCollect ? (
+                <ButtonPrimary
+                  type="button"
+                  onClick={() => setCobrarModalOpen(true)}
+                  disabled={serviciosLoading || submitting}
+                >
+                  Cobrar
+                </ButtonPrimary>
+              ) : null}
+            </div>
           ) : null}
         </div>
       </header>
@@ -322,6 +343,20 @@ export function ContractFichaView() {
           subtitle={cobrarSubtitle}
           mediosPago={mediosPago}
           onSuccess={() => void handleCobrarSuccess()}
+        />
+      ) : null}
+      {editModalOpen ? (
+        <EditContractModal
+          open={editModalOpen}
+          contrato={contrato}
+          token={token}
+          submitting={submitting}
+          onClose={() => setEditModalOpen(false)}
+          onSubmit={(form) => {
+            void handleUpdateContrato(form).then((ok) => {
+              if (ok) setEditModalOpen(false);
+            });
+          }}
         />
       ) : null}
     </div>
