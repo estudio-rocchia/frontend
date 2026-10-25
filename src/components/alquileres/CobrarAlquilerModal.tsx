@@ -4,10 +4,12 @@ import { useEffect, useState } from "react";
 
 import { Modal } from "@/components/ui/Modal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
-import type { RentalRow } from "@/data/alquileres-rentals";
+import { buildCobrarModalSubtitle, type RentalRow } from "@/data/alquileres-rentals";
+import { invalidateDashboardAlerts } from "@/lib/dashboard-alerts-events";
 import {
   applyMora,
   downloadReciboPdf,
+  fetchContrato,
   fetchCuotas,
   fetchPlanesActualizacionDeposito,
   fetchServicios,
@@ -25,11 +27,17 @@ import type {
   PlanActualizacionDepositoDetail,
   ServicioContratoRecord,
 } from "@/lib/api/types";
-import { downloadBlob, formatMoney, moneyClassName, rentalApiErrorMessage } from "@/lib/format";
+import {
+  downloadBlob,
+  formatDateDisplay,
+  formatMoney,
+  moneyClassName,
+  rentalApiErrorMessage,
+} from "@/lib/format";
 import {
   buildRentImputaciones,
   cuotaPeriodLabel,
-  currentBillingPeriod,
+  firstBillablePeriodWithoutCuota,
   isCuotaOverdue,
   pickCuotaParaCobrar,
 } from "@/lib/mappers/cuotas";
@@ -126,10 +134,11 @@ export function CobrarAlquilerModal({
       setEmitRecibo(true);
 
       try {
-        const [cuotasRes, serviciosRes, periodosRes] = await Promise.all([
+        const [cuotasRes, serviciosRes, periodosRes, contratoRes] = await Promise.all([
           fetchCuotas(authToken, id),
           fetchServicios(authToken, id),
           fetchServiciosPeriodos(authToken, id),
+          fetchContrato(authToken, id),
         ]);
         let planes: PlanActualizacionDepositoDetail[] = [];
         try {
@@ -143,7 +152,10 @@ export function CobrarAlquilerModal({
 
         let target = pickCuotaParaCobrar(cuotasRes.items);
         if (!target) {
-          const period = currentBillingPeriod();
+          const period = firstBillablePeriodWithoutCuota(cuotasRes.items, contratoRes);
+          if (!period) {
+            throw new Error("No hay períodos de alquiler pendientes de cobro");
+          }
           target = await generateCuota(authToken, id, period);
         }
         const fechaCobro = todayIso();
@@ -318,6 +330,7 @@ export function CobrarAlquilerModal({
       }
 
       await issueRecibosIfRequested(pagoIds);
+      invalidateDashboardAlerts();
       onSuccess();
       onClose();
     } catch (err) {
@@ -348,6 +361,9 @@ export function CobrarAlquilerModal({
   const tieneCobroTotal =
     saldoAlquiler + saldoMora + saldoDeposito + saldoServiciosMismaMoneda + saldoServiciosOtraMoneda > 0;
   const diasMora = cuota?.mora?.diasAtraso ?? 0;
+  const cuotaVencida = cuota ? isCuotaOverdue(cuota, fechaPago) : false;
+  const modalSubtitle =
+    subtitle ?? (row ? buildCobrarModalSubtitle(row) : undefined);
   const servicioById = new Map(servicios.map((servicio) => [servicio.id, servicio]));
 
   function togglePeriodoServicio(periodoId: number, checked: boolean) {
@@ -360,8 +376,8 @@ export function CobrarAlquilerModal({
     <Modal
       open={open}
       onClose={onClose}
-      title="Cobrar"
-      subtitle={subtitle ?? (row ? `${row.tenant} · ${row.contractProperty}` : undefined)}
+      title="Cobrar alquiler"
+      subtitle={modalSubtitle}
       footer={
         <>
           <ButtonOutline type="button" onClick={onClose} disabled={submitting}>
@@ -378,17 +394,41 @@ export function CobrarAlquilerModal({
       }
     >
       {loading ? (
-        <p className="py-8 text-center text-sm text-text-secondary">Preparando cobro…</p>
+        <div className="flex flex-col gap-4 py-4">
+          {row?.month && row.month !== "—" ? (
+            <div className="rounded-md border border-border bg-bg-page px-4 py-4 text-center">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
+                Cuota a cobrar
+              </p>
+              <p className="mt-1 text-lg font-semibold text-text-primary">{row.month}</p>
+              {row.daysOverdue > 0 ? (
+                <p className="mt-1 text-[13px] font-semibold text-danger">
+                  {row.daysOverdue} día{row.daysOverdue === 1 ? "" : "s"} de mora
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+          <p className="text-center text-sm text-text-secondary">Cargando detalle del cobro…</p>
+        </div>
       ) : error && !cuota ? (
         <p className="rounded-sm border border-danger bg-danger-bg px-3 py-2 text-sm text-danger">{error}</p>
       ) : cuota ? (
         <div className="flex flex-col gap-5">
           <div className="rounded-md border border-border bg-primary-soft px-5 py-5 text-center">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
-              {cuotaPeriodLabel(cuota)}
-              {isCuotaOverdue(cuota) ? " · Vencido" : ""}
+              Cuota de alquiler
             </p>
-            <p className={`mt-2 text-[32px] font-bold leading-none text-primary ${moneyClassName}`}>
+            <p className="mt-1 text-xl font-bold text-text-primary">{cuotaPeriodLabel(cuota)}</p>
+            <p className="mt-1 text-[13px] text-text-secondary">
+              Vence el {formatDateDisplay(cuota.fechaVencimiento)}
+              {cuotaVencida ? (
+                <span className="font-semibold text-danger">
+                  {" "}
+                  · {diasMora} día{diasMora === 1 ? "" : "s"} de mora
+                </span>
+              ) : null}
+            </p>
+            <p className={`mt-4 text-[32px] font-bold leading-none text-primary ${moneyClassName}`}>
               {formatMoney(String(saldo), moneda)}
             </p>
             {saldoServiciosOtraMoneda > 0 && monedaServiciosExtra ? (

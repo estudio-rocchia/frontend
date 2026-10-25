@@ -69,15 +69,6 @@ export function rentalSummaryStats(rows: RentalRow[]) {
   };
 }
 
-/** Subtítulo del modal de cobro con inquilino, propiedad y período pendiente. */
-export function buildCobrarModalSubtitle(row: RentalRow): string {
-  const parts = [row.tenant, row.contractProperty];
-  if (row.month && row.month !== "—") {
-    parts.push(`Cuota ${row.month}`);
-  }
-  return parts.join(" · ");
-}
-
 /** Mostrar acción Cobrar mientras haya cuota del mes pendiente o esté en mora. */
 export function canCollectRent(row: RentalRow): boolean {
   if (row.needsRenewal) return false;
