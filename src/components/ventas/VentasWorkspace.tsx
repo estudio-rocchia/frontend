@@ -51,7 +51,6 @@ export function VentasWorkspace() {
   const [error, setError] = useState<string | null>(null);
   const [ventaRows, setVentaRows] = useState<VentaDetail[]>([]);
   const [catalogRows, setCatalogRows] = useState<CatalogSearchItem[]>([]);
-  const [inmueblesEnVenta, setInmueblesEnVenta] = useState<CatalogSearchItem[]>([]);
   const [estadoIds, setEstadoIds] = useState<Record<string, number>>({});
   const [tipoInmuebleIds, setTipoInmuebleIds] = useState<Record<string, number>>({});
   const [catalogFilter, setCatalogFilter] = useState<VentasCatalogFilterId>("todos");
@@ -83,14 +82,6 @@ export function VentasWorkspace() {
         setTipoInmuebleIds(tipoMap);
         const ventaTipoId = tipos.items.find((t) => t.code === "venta")?.id;
         setTipoVentaId(ventaTipoId);
-        if (map.available && ventaTipoId) {
-          const disponibles = await searchCatalogo(token, {
-            estadoOfertaId: map.available,
-            tipoOperacionId: ventaTipoId,
-            limit: 200,
-          });
-          setInmueblesEnVenta(disponibles.items);
-        }
       } catch {
         // list still works without catalog preload
       }
@@ -127,14 +118,6 @@ export function VentasWorkspace() {
         setCatalogRows(res.items);
         setVentaRows([]);
       }
-      if (estadoIds.available && tipoVentaId) {
-        const disponibles = await searchCatalogo(token, {
-          estadoOfertaId: estadoIds.available,
-          tipoOperacionId: tipoVentaId,
-          limit: 200,
-        });
-        setInmueblesEnVenta(disponibles.items);
-      }
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         logout();
@@ -163,7 +146,12 @@ export function VentasWorkspace() {
         .map((venta) => ({ kind: "venta", venta }));
     }
     return catalogRows
-      .filter((item) => matchesSearch(`${item.inmueble.code} ${item.inmueble.title}`, search))
+      .filter((item) =>
+       matchesSearch(
+         `${item.inmueble.code} ${item.inmueble.displayLabel ?? item.inmueble.title ?? ""}`,
+         search,
+       ),
+     )
       .map((item) => ({ kind: "catalog", item }));
   }, [tab, ventaRows, catalogRows, search]);
 
@@ -314,8 +302,16 @@ export function VentasWorkspace() {
           setNewVentaInmuebleId(null);
         }}
         token={token ?? ""}
-        inmueblesEnVenta={inmueblesEnVenta}
-        preselectedInmuebleId={newVentaInmuebleId}
+        catalogSearch={
+          estadoIds.available && tipoVentaId
+            ? { estadoOfertaId: estadoIds.available, tipoOperacionId: tipoVentaId }
+            : null
+        }
+        preselectedItem={
+          newVentaInmuebleId
+            ? catalogRows.find((item) => item.inmueble.id === newVentaInmuebleId) ?? null
+            : null
+        }
         onCreated={(ventaId) => {
           router.push(`/ventas/${ventaId}`);
         }}

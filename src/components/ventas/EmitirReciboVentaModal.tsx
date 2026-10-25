@@ -13,6 +13,7 @@ import type {
   VentaDetail,
   VentaReciboRecord,
 } from "@/lib/api/types";
+import { invalidateDashboardAlerts } from "@/lib/dashboard-alerts-events";
 import { defaultReciboDescription } from "@/lib/ventas/recibo-description";
 import { downloadBlob, formatDateDisplay, formatMoney, moneyClassName } from "@/lib/format";
 
@@ -81,6 +82,7 @@ export function EmitirReciboVentaModal({
       });
       const pdf = await downloadVentaReciboPdf(token, recibo.id);
       downloadBlob(pdf, `recibo-${recibo.reciboNumber}.pdf`);
+      invalidateDashboardAlerts();
       onSuccess(recibo);
       onClose();
     } catch (err) {

@@ -20,6 +20,7 @@ import type {
   CuotaFinanciacionRecord,
   VentaDetail,
 } from "@/lib/api/types";
+import { invalidateDashboardAlerts } from "@/lib/dashboard-alerts-events";
 import { cuotaEstadoLabel } from "@/lib/ventas/status-labels";
 import { todayIso } from "@/lib/ventas/catalog-helpers";
 import { downloadBlob, formatDateDisplay, formatMoney, moneyClassName } from "@/lib/format";
@@ -195,6 +196,7 @@ export function CobrarVentaModal({
         }
       }
 
+      invalidateDashboardAlerts();
       onSuccess();
       onClose();
     } catch (err) {
@@ -211,7 +213,7 @@ export function CobrarVentaModal({
       open={open}
       onClose={onClose}
       title={titulo}
-      subtitle={venta?.inmueble?.title}
+      subtitle={venta?.inmueble?.displayLabel ?? venta?.inmueble?.title ?? undefined}
       footer={
         <>
           <ButtonOutline type="button" onClick={onClose} disabled={submitting}>Cancelar</ButtonOutline>

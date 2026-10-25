@@ -78,7 +78,11 @@ export function EditVentaModal({ open, onClose, token, venta, onSaved }: EditVen
       open={open}
       onClose={onClose}
       title="Editar venta"
-      subtitle={venta?.inmueble ? `${venta.inmueble.code} — ${venta.inmueble.title}` : undefined}
+      subtitle={
+       venta?.inmueble
+         ? `${venta.inmueble.code} — ${venta.inmueble.displayLabel ?? venta.inmueble.title ?? ""}`
+         : undefined
+     }
       maxWidthClass="max-w-xl"
       footer={
         <>

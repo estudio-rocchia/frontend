@@ -122,7 +122,9 @@ export function VentasTable({
                 return (
                   <tr key={`catalog-${item.inmueble.id}`} className="border-b border-border last:border-0 hover:bg-bg-page/60">
                     <td className="px-4 py-3">
-                      <div className="font-semibold text-text-primary">{item.inmueble.title}</div>
+                      <div className="font-semibold text-text-primary">
+                       {item.inmueble.displayLabel ?? item.inmueble.title ?? item.inmueble.code}
+                     </div>
                       <div className="text-[11px] text-text-secondary">{item.inmueble.code}</div>
                     </td>
                     {tab === "fuera_mercado" ? (
