@@ -21,6 +21,7 @@ import {
   personaDisplayName,
 } from "@/lib/format";
 import { contratoSupportsIndexAdjustment } from "@/lib/rental-adjustment";
+import { contractPropertyLabel, inmuebleDisplayLabel } from "@/lib/inmuebles/display-label";
 import { serviciosSummaryFromData } from "@/lib/mappers/servicios";
 
 type BillingSnapshot = {
@@ -159,7 +160,7 @@ export function mapContratoTableItemToRentalRow(
 
     return {
       id: String(contrato.id),
-      contractProperty: `${contrato.inmuebleCode} · ${contrato.inmuebleTitle}`,
+      contractProperty: contractPropertyLabel(contrato.inmuebleCode, contrato.inmuebleTitle),
       tenant: contrato.inquilinoNombre,
       amount: formatMoney(contrato.montoAlquiler, contrato.codigoMoneda),
       currency,
@@ -201,7 +202,7 @@ export function mapContratoListItemToRentalRow(
 
   return {
     id: String(contrato.id),
-    contractProperty: `${contrato.inmuebleCode} · ${contrato.inmuebleTitle}`,
+    contractProperty: contractPropertyLabel(contrato.inmuebleCode, contrato.inmuebleTitle),
     tenant: contrato.inquilinoNombre,
     month: monthLabelFromIsoDate(meta?.fechaVencimiento),
     amount: formatMoney(contrato.montoAlquiler, contrato.codigoMoneda),
@@ -275,7 +276,7 @@ export function mapContratoToRentalRow(
 
   return {
     id: String(contrato.id),
-    contractProperty: `${code} · ${inmuebleTitle}`,
+    contractProperty: contractPropertyLabel(code, inmuebleTitle),
     tenant: inquilinoNombre,
     month: cuota ? formatMonthYear(cuota.anioPeriodo, cuota.mesPeriodo) : "—",
     amount: formatMoney(contrato.montoAlquiler, contrato.codigoMoneda),
@@ -300,7 +301,9 @@ export function mapContratoDetailToFicha(
   propietarios: InmuebleFichaPropietario[],
 ): ContractDetail {
   const code = detail.inmueble?.code ?? `REF-${detail.id}`;
-  const propertyTitle = detail.inmueble?.title ?? "Inmueble";
+  const propertyTitle = detail.inmueble
+    ? inmuebleDisplayLabel(detail.inmueble)
+    : "Inmueble";
   const propertyAddress = detail.inmueble?.direccion ?? propertyTitle;
   const tenant = detail.inquilino ? personaDisplayName(detail.inquilino) : "—";
   const owner =
@@ -330,7 +333,7 @@ export function mapContratoDetailToFicha(
 
   return {
     id: String(detail.id),
-    drawerRef: `${code} · ${propertyTitle}`,
+    drawerRef: propertyTitle,
     propertyCode: code,
     estado: estadoLabel,
     contractStart: formatDateDisplay(detail.fechaInicio),

@@ -18,6 +18,7 @@ import {
   fetchEstadosOferta,
   fetchInmuebleFicha,
   fetchOfertaHistorialPrecio,
+  fetchTiposOperacion,
   fetchVenta,
   fetchVentas,
 } from "@/lib/api";
@@ -86,6 +87,7 @@ export function CatalogInmuebleFichaView() {
   const [historial, setHistorial] = useState<HistorialPrecioRecord[]>([]);
   const [historialLoading, setHistorialLoading] = useState(false);
   const [estadoIds, setEstadoIds] = useState<Record<string, number>>({});
+  const [tipoVentaId, setTipoVentaId] = useState<number | undefined>();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [priceModalOpen, setPriceModalOpen] = useState(false);
@@ -99,13 +101,15 @@ export function CatalogInmuebleFichaView() {
     setLoading(true);
     setError(null);
     try {
-      const [detail, estadosRes] = await Promise.all([
+      const [detail, estadosRes, tiposRes] = await Promise.all([
         fetchInmuebleFicha(token, inmuebleId),
         fetchEstadosOferta(token),
+        fetchTiposOperacion(token),
       ]);
       const map: Record<string, number> = {};
       for (const item of estadosRes.items) map[item.code] = item.id;
       setEstadoIds(map);
+      setTipoVentaId(tiposRes.items.find((t) => t.code === "venta")?.id);
 
       setFicha(detail);
       const ventaOffer = ventaOferta(detail);
@@ -482,8 +486,12 @@ export function CatalogInmuebleFichaView() {
         open={newVentaOpen}
         onClose={() => setNewVentaOpen(false)}
         token={token ?? ""}
-        inmueblesEnVenta={catalogItemForVenta ? [catalogItemForVenta] : []}
-        preselectedInmuebleId={inmuebleId}
+        catalogSearch={
+          estadoIds.available && tipoVentaId
+            ? { estadoOfertaId: estadoIds.available, tipoOperacionId: tipoVentaId }
+            : null
+        }
+        preselectedItem={catalogItemForVenta}
         onCreated={(ventaId) => {
           setNewVentaOpen(false);
           router.push(`/ventas/${ventaId}`);

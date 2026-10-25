@@ -231,6 +231,7 @@ export interface InmuebleVacanteConPropietarios {
   inmuebleId: number;
   code: string;
   title: string;
+  displayLabel?: string;
   direccion: string | null;
   propietarios: InmuebleVacantePropietarioResumen[];
 }
@@ -253,6 +254,19 @@ export interface LiquidacionRecord {
   propietario?: { id: number; displayName: string; porcentajeAdministracion: string };
 }
 
+export interface PersonaVinculos {
+  inquilino: boolean;
+  propietario: boolean;
+  moroso: boolean;
+}
+
+export interface ClientesKpis {
+  total: number;
+  inquilinos: number;
+  propietarios: number;
+  morosos: number;
+}
+
 export interface PersonaRecord {
   id: number;
   tipoPersona: string;
@@ -270,15 +284,21 @@ export interface PersonaRecord {
   address?: string | null;
   notas?: string | null;
   porcentajeAdministracion?: string;
+  modoHonorariosAdministracion?: string;
   activo?: boolean;
   creadoEn?: string;
   actualizadoEn?: string;
+  vinculos?: PersonaVinculos;
 }
 
 export interface InmuebleRecord {
   id: number;
   code: string;
-  title: string;
+  title: string | null;
+  displayLabel: string;
+  calle: string | null;
+  numero: string | null;
+  referencia: string | null;
   direccion: string | null;
   localidadId: number;
 }
@@ -784,7 +804,11 @@ export interface InmuebleFichaPropietario {
 export interface InmuebleCatalogRecord {
   id: number;
   code: string;
-  title: string;
+  title: string | null;
+  displayLabel: string;
+  calle: string | null;
+  numero: string | null;
+  referencia: string | null;
   description: string | null;
   direccion: string | null;
   notas: string | null;
@@ -866,7 +890,7 @@ export interface FinanciacionResumen {
 }
 
 export interface VentaDetail extends VentaRecord {
-  inmueble: { id: number; code: string; title: string } | null;
+  inmueble: { id: number; code: string; title: string | null; displayLabel: string } | null;
   partes: Array<{ id: number; personaId: number; rol: string; notas: string | null }>;
   plan: PlanFinanciacionDetail | null;
   financiacionResumen: FinanciacionResumen | null;

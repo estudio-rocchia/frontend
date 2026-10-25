@@ -12,8 +12,14 @@ import {
   type PersonaFieldValue,
 } from "@/components/alquileres/PersonaSelectField";
 import type { AdjustmentIndex } from "@/data/alquileres-contract-details";
+import {
+  emptyInmuebleAlta,
+  InmuebleAltaFields,
+  isInmuebleAltaValid,
+  type InmuebleAltaValue,
+} from "@/components/inmuebles/InmuebleAltaFields";
 import type { CatalogoItem, PersonaRecord } from "@/lib/api/types";
-import { nextInmuebleCode, prefixForTipoInmueble } from "@/lib/codes";
+import { inmuebleDisplayLabel } from "@/lib/inmuebles/display-label";
 import { MoraPunitoriaFields } from "@/components/alquileres/MoraPunitoriaFields";
 import { DEFAULT_MORA_PUNITORIA, type MoraPunitoriaForm, isMoraPunitoriaValid } from "@/lib/mora-punitoria";
 import type { InmuebleSinAlquiler } from "@/lib/mappers/propietario-inmuebles";
@@ -23,9 +29,7 @@ import { FRECUENCIAS_AJUSTE } from "@/lib/rental-adjustment";
 export type PropertyFieldValue =
   | {
       mode: "nuevo";
-      propertyLabel: string;
-      propertyAddress: string;
-      tipoInmuebleCode: string;
+      alta: InmuebleAltaValue;
     }
   | {
       mode: "existente";
@@ -44,13 +48,15 @@ export type NewContractForm = {
   mora: MoraPunitoriaForm;
 };
 
+const MIN_VACANTE_SEARCH_LEN = 2;
+
 const emptyTenant: PersonaFieldValue = { mode: "new", fullName: "" };
 const emptyOwner: OwnerFieldValue = { mode: "new", fullName: "", porcentajeAdministracion: 6 };
 
 function emptyProperty(hasVacantes: boolean): PropertyFieldValue {
   return hasVacantes
     ? { mode: "existente", inmuebleId: null }
-    : { mode: "nuevo", propertyLabel: "", propertyAddress: "", tipoInmuebleCode: "house" };
+    : { mode: "nuevo", alta: emptyInmuebleAlta() };
 }
 
 function emptyForm(hasVacantes: boolean): NewContractForm {
@@ -79,7 +85,7 @@ function isPropertyValid(property: PropertyFieldValue): boolean {
   if (property.mode === "existente") {
     return property.inmuebleId !== null && property.inmuebleId > 0;
   }
-  return property.propertyLabel.trim().length > 0 && property.propertyAddress.trim().length > 0;
+  return isInmuebleAltaValid(property.alta);
 }
 
 function filterInmueblesSinAlquiler(
@@ -87,15 +93,10 @@ function filterInmueblesSinAlquiler(
   query: string,
 ): InmuebleSinAlquiler[] {
   const normalized = query.trim().toLowerCase();
-  if (!normalized) return inmuebles;
+  if (normalized.length < MIN_VACANTE_SEARCH_LEN) return [];
 
   return inmuebles.filter((inmueble) => {
-    const haystack = [
-      inmueble.code,
-      inmueble.title,
-      inmueble.direccion,
-      inmueble.propietarioLabel,
-    ]
+    const haystack = [inmueble.code, inmueble.direccion]
       .filter(Boolean)
       .join(" ")
       .toLowerCase();
@@ -142,6 +143,7 @@ export function NewContractModal({
   tiposInmueble = [],
   usedInmuebleCodes = [],
   personas = [],
+  token,
   inmueblesSinAlquiler = [],
 }: {
   open: boolean;
@@ -151,6 +153,7 @@ export function NewContractModal({
   tiposInmueble?: CatalogoItem[];
   usedInmuebleCodes?: string[];
   personas?: PersonaRecord[];
+  token?: string;
   inmueblesSinAlquiler?: InmuebleSinAlquiler[];
 }) {
   const hasVacantes = inmueblesSinAlquiler.length > 0;
@@ -168,13 +171,10 @@ export function NewContractModal({
     () => filterInmueblesSinAlquiler(inmueblesSinAlquiler, vacanteSearchQuery),
     [inmueblesSinAlquiler, vacanteSearchQuery],
   );
+  const vacanteQueryTooShort = vacanteSearchQuery.trim().length < MIN_VACANTE_SEARCH_LEN;
+  const showVacantesResults = !vacanteQueryTooShort;
 
   const propertyNuevo = form.property.mode === "nuevo" ? form.property : null;
-
-  const inmuebleCodePreview = useMemo(() => {
-    if (!propertyNuevo) return "";
-    return nextInmuebleCode(prefixForTipoInmueble(propertyNuevo.tipoInmuebleCode), usedInmuebleCodes);
-  }, [propertyNuevo, usedInmuebleCodes]);
 
   const selectedInmuebleId = (() => {
     if (form.property.mode === "existente") return form.property.inmuebleId;
@@ -247,7 +247,7 @@ export function NewContractModal({
       }
     >
       <div className="flex flex-col gap-8">
-        <FormSection title="Propiedad">
+        <FormSection title="Propiedad" variant="prominent">
           <div className="flex flex-col gap-4">
             <div className="flex flex-wrap gap-2">
               {(
@@ -274,12 +274,7 @@ export function NewContractModal({
                       }
                       setVacanteSearchQuery("");
                       patch({
-                        property: {
-                          mode: "nuevo",
-                          propertyLabel: "",
-                          propertyAddress: "",
-                          tipoInmuebleCode: "house",
-                        },
+                        property: { mode: "nuevo", alta: emptyInmuebleAlta() },
                         owner: emptyOwner,
                       });
                     }}
@@ -309,51 +304,50 @@ export function NewContractModal({
                         type="search"
                         value={vacanteSearchQuery}
                         onChange={(event) => setVacanteSearchQuery(event.target.value)}
-                        placeholder="Buscar por código, nombre, dirección o propietario…"
-                        aria-label="Buscar inmuebles sin alquiler"
+                        placeholder="Buscar por código o dirección…"
+                        aria-label="Buscar inmuebles por código o dirección"
                         className="min-w-0 flex-1 bg-transparent text-sm text-text-primary outline-none placeholder:text-text-secondary"
                       />
                     </label>
-                    {vacanteSearchQuery.trim() ? (
+                    {showVacantesResults ? (
                       <p className="text-[11px] text-text-secondary">
                         {vacantesFiltradas.length} de {inmueblesSinAlquiler.length} inmueble
                         {vacantesFiltradas.length === 1 ? "" : "s"}
                       </p>
                     ) : null}
-                    <ul className="flex max-h-56 flex-col gap-2 overflow-y-auto">
-                      {vacantesFiltradas.length === 0 ? (
-                        <li className="rounded-md border border-border bg-bg-page px-4 py-3 text-sm text-text-secondary">
-                          No hay inmuebles que coincidan con la búsqueda.
-                        </li>
-                      ) : (
-                        vacantesFiltradas.map((inmueble) => {
-                          const selected = selectedInmuebleId === inmueble.inmuebleId;
-                          return (
-                            <li key={inmueble.inmuebleId}>
-                              <button
-                                type="button"
-                                onClick={() => selectVacante(inmueble)}
-                                className={`flex w-full flex-col gap-1 rounded-md border px-4 py-3 text-left transition-colors ${
-                                  selected
-                                    ? "border-primary bg-primary-soft"
-                                    : "border-border bg-bg-page hover:border-primary/40"
-                                }`}
-                              >
-                                <span className="text-[13px] font-semibold text-text-primary">
-                                  {inmueble.code} — {inmueble.title}
-                                </span>
-                                <span className="text-[12px] text-text-secondary">
-                                  {inmueble.direccion?.trim() || "Sin dirección cargada"}
-                                </span>
-                                <span className="text-[11px] font-medium text-primary">
-                                  Propietario: {inmueble.propietarioLabel}
-                                </span>
-                              </button>
-                            </li>
-                          );
-                        })
-                      )}
-                    </ul>
+                    {showVacantesResults ? (
+                      <ul className="flex max-h-56 flex-col gap-2 overflow-y-auto">
+                        {vacantesFiltradas.length === 0 ? (
+                          <li className="rounded-md border border-border bg-bg-page px-4 py-3 text-sm text-text-secondary">
+                            No hay inmuebles que coincidan con &quot;{vacanteSearchQuery.trim()}&quot;.
+                          </li>
+                        ) : (
+                          vacantesFiltradas.map((inmueble) => {
+                            const selected = selectedInmuebleId === inmueble.inmuebleId;
+                            return (
+                              <li key={inmueble.inmuebleId}>
+                                <button
+                                  type="button"
+                                  onClick={() => selectVacante(inmueble)}
+                                  className={`flex w-full flex-col gap-1 rounded-md border px-4 py-3 text-left transition-colors ${
+                                    selected
+                                      ? "border-primary bg-primary-soft"
+                                      : "border-border bg-bg-page hover:border-primary/40"
+                                  }`}
+                                >
+                                  <span className="text-[13px] font-semibold text-text-primary">
+                                    {inmueble.code}
+                                    {inmueble.direccion?.trim()
+                                      ? ` · ${inmueble.direccion.trim()}`
+                                      : " · Sin dirección cargada"}
+                                  </span>
+                                </button>
+                              </li>
+                            );
+                          })
+                        )}
+                      </ul>
+                    ) : null}
                   </>
                 ) : (
                   <p className="text-sm text-text-secondary">
@@ -362,68 +356,16 @@ export function NewContractModal({
                   </p>
                 )}
               </div>
+            ) : token ? (
+              <InmuebleAltaFields
+                token={token}
+                value={propertyNuevo?.alta ?? emptyInmuebleAlta()}
+                onChange={(alta) => patch({ property: { mode: "nuevo", alta } })}
+                tiposInmueble={tiposInmueble}
+                existingCodes={usedInmuebleCodes}
+              />
             ) : (
-              <div className="flex flex-col gap-4">
-                <FormField
-                  label="Nombre corto"
-                  value={propertyNuevo?.propertyLabel ?? ""}
-                  onChange={(value) =>
-                    patch({
-                      property: {
-                        mode: "nuevo",
-                        propertyLabel: value,
-                        propertyAddress: propertyNuevo?.propertyAddress ?? "",
-                        tipoInmuebleCode: propertyNuevo?.tipoInmuebleCode ?? "house",
-                      },
-                    })
-                  }
-                  placeholder="Ej. Depto calle 23"
-                />
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-[11px] font-semibold text-text-secondary">Tipo de inmueble</span>
-                  <select
-                    value={propertyNuevo?.tipoInmuebleCode ?? "house"}
-                    onChange={(event) =>
-                      patch({
-                        property: {
-                          mode: "nuevo",
-                          propertyLabel: propertyNuevo?.propertyLabel ?? "",
-                          propertyAddress: propertyNuevo?.propertyAddress ?? "",
-                          tipoInmuebleCode: event.target.value,
-                        },
-                      })
-                    }
-                    className="rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
-                  >
-                    {(tiposInmueble.length ? tiposInmueble : [{ id: 0, code: "house", name: "Casa" }]).map(
-                      (tipo) => (
-                        <option key={tipo.code} value={tipo.code}>
-                          {tipo.name} ({prefixForTipoInmueble(tipo.code)})
-                        </option>
-                      ),
-                    )}
-                  </select>
-                </div>
-                <div className="rounded-sm border border-border bg-bg-page px-4 py-3">
-                  <p className="text-[11px] font-semibold text-text-secondary">Código asignado</p>
-                  <p className="mt-1 text-lg font-bold text-primary">{inmuebleCodePreview}</p>
-                </div>
-                <FormField
-                  label="Dirección completa"
-                  value={propertyNuevo?.propertyAddress ?? ""}
-                  onChange={(value) =>
-                    patch({
-                      property: {
-                        mode: "nuevo",
-                        propertyLabel: propertyNuevo?.propertyLabel ?? "",
-                        propertyAddress: value,
-                        tipoInmuebleCode: propertyNuevo?.tipoInmuebleCode ?? "house",
-                      },
-                    })
-                  }
-                  placeholder="Calle, número, localidad"
-                />
-              </div>
+              <p className="text-sm text-text-secondary">Iniciá sesión para dar de alta una propiedad nueva.</p>
             )}
 
             {selectedVacante ? (
@@ -435,13 +377,13 @@ export function NewContractModal({
           </div>
         </FormSection>
 
-        <FormSection title="Partes">
+        <FormSection title="Partes" variant="prominent">
           <div className="flex flex-col gap-4">
             <PersonaSelectField
               label="Inquilino"
               value={form.tenant}
               onChange={(tenant) => patch({ tenant })}
-              personas={personas}
+              token={token}
               placeholder="Buscar inquilino…"
             />
             {hasAssignedOwner ? (
@@ -466,12 +408,13 @@ export function NewContractModal({
                 value={form.owner}
                 onChange={(owner) => patch({ owner })}
                 personas={personas}
+                token={token}
               />
             ) : null}
           </div>
         </FormSection>
 
-        <FormSection title="Condiciones económicas">
+        <FormSection title="Condiciones económicas" variant="prominent">
           <div className="flex flex-col gap-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <FormField
@@ -518,7 +461,11 @@ export function NewContractModal({
           </div>
         </FormSection>
 
-        <MoraPunitoriaFields value={form.mora} onChange={(mora) => patch({ mora })} />
+        <MoraPunitoriaFields
+          value={form.mora}
+          onChange={(mora) => patch({ mora })}
+          sectionVariant="prominent"
+        />
       </div>
     </Modal>
   );
