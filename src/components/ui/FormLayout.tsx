@@ -4,18 +4,32 @@ export function FormSection({
   title,
   description,
   children,
+  variant = "default",
 }: {
   title: string;
   description?: string;
   children: ReactNode;
+  variant?: "default" | "prominent";
 }) {
+  const prominent = variant === "prominent";
+
   return (
-    <section className="flex flex-col gap-3">
-      <div className="flex flex-col gap-0.5">
-        <h3 className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
+    <section className={`flex flex-col ${prominent ? "gap-4" : "gap-3"}`}>
+      <div className={`flex flex-col ${prominent ? "gap-1" : "gap-0.5"}`}>
+        <h3
+          className={
+            prominent
+              ? "border-l-[3px] border-primary pl-3 text-[15px] font-semibold text-text-primary"
+              : "text-[11px] font-semibold uppercase tracking-wide text-text-secondary"
+          }
+        >
           {title}
         </h3>
-        {description ? <p className="text-xs text-text-secondary">{description}</p> : null}
+        {description ? (
+          <p className={`text-xs text-text-secondary ${prominent ? "pl-[15px]" : ""}`}>
+            {description}
+          </p>
+        ) : null}
       </div>
       {children}
     </section>

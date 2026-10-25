@@ -5,7 +5,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 
 import { ClienteInmobiliariaTab } from "@/components/clientes/ClienteInmobiliariaTab";
-import { ButtonOutline } from "@/components/ui/Button";
+import { EditarClienteModal } from "@/components/clientes/EditarClienteModal";
+import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { FieldBlock } from "@/components/ui/FormLayout";
 import { PageHeaderSkeleton, Skeleton } from "@/components/ui/Skeleton";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -17,6 +18,7 @@ import {
   fetchInquilinosContext,
   fetchPersona,
   fetchPropietarioPersonaIds,
+  updatePersona,
   updatePropietarioAdministracion,
 } from "@/lib/api";
 import { useClientePrefetch } from "@/lib/use-cliente-prefetch";
@@ -24,6 +26,10 @@ import type { ContratoListItem, PersonaRecord } from "@/lib/api/types";
 import { personaDisplayName } from "@/lib/format";
 import { pagePaddingClass } from "@/lib/layout";
 import { buildClientesContext, mapPersonaToClienteRow, vinculoBadgeClass } from "@/lib/mappers/clientes";
+import {
+  normalizeModoHonorariosAdministracion,
+  type ModoHonorariosAdministracion,
+} from "@/lib/honorarios-admin";
 import { loadPropiedadesAdministradas, type PropiedadAdministrada } from "@/lib/mappers/propietario-inmuebles";
 
 type FichaTab = "resumen" | "inmobiliaria" | "juridico" | "visas" | "historial";
@@ -74,10 +80,16 @@ export function ClienteFichaView() {
   const [linkedInmuebleIds, setLinkedInmuebleIds] = useState<Set<number>>(new Set());
   const [pctEdits, setPctEdits] = useState<Record<number, string>>({});
   const [savingPropietarioId, setSavingPropietarioId] = useState<number | null>(null);
+  const [clientePctEdit, setClientePctEdit] = useState("6");
+  const [savingModoHonorarios, setSavingModoHonorarios] = useState(false);
+  const [savingClientePct, setSavingClientePct] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
 
   const tienePropiedades = propiedades.length > 0;
+  const modoHonorarios = normalizeModoHonorariosAdministracion(persona?.modoHonorariosAdministracion);
+  const porcentajeCliente = persona?.porcentajeAdministracion ?? "6";
 
   const applyPropiedades = useCallback((propiedadesData: Awaited<ReturnType<typeof loadPropiedadesAdministradas>>) => {
     setPropiedades(propiedadesData.propiedades);
@@ -125,6 +137,7 @@ export function ClienteFichaView() {
     const context = buildClientesContext(inquilinosRes, propietarioIdsRes.personaIds);
     setPersona(personaDetail);
     setClienteRow(mapPersonaToClienteRow(personaDetail, context));
+    setClientePctEdit(String(Number(personaDetail.porcentajeAdministracion) || 6));
   }, [token, validId, personaId, consumePrefetchedCliente]);
 
   useEffect(() => {
@@ -196,6 +209,63 @@ export function ClienteFichaView() {
         </div>
       </div>
     );
+  }
+
+  async function handleModoHonorariosChange(nextModo: ModoHonorariosAdministracion) {
+    if (!token || !persona || nextModo === modoHonorarios) return;
+
+    setSavingModoHonorarios(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const updated = await updatePersona(token, persona.id, { modoHonorariosAdministracion: nextModo });
+      setPersona(updated);
+      setClientePctEdit(String(Number(updated.porcentajeAdministracion) || 6));
+      await loadInmobiliariaDetails();
+      setSuccess(
+        nextModo === "por_cliente"
+          ? "Honorarios configurados por cliente."
+          : "Honorarios configurados por inmueble.",
+      );
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        logout();
+        return;
+      }
+      setError(err instanceof ApiError ? err.message : "No se pudo actualizar la modalidad de honorarios");
+    } finally {
+      setSavingModoHonorarios(false);
+    }
+  }
+
+  async function handleSaveClienteHonorarios() {
+    if (!token || !persona) return;
+    const numeric = Number(clientePctEdit);
+    if (!Number.isFinite(numeric) || numeric <= 0 || numeric > 100) {
+      setError("El porcentaje debe estar entre 0 y 100.");
+      return;
+    }
+
+    setSavingClientePct(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const updated = await updatePersona(token, persona.id, { porcentajeAdministracion: numeric });
+      setPersona(updated);
+      setClientePctEdit(String(numeric));
+      await loadInmobiliariaDetails();
+      setSuccess("Porcentaje de honorarios del cliente actualizado.");
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        logout();
+        return;
+      }
+      setError(err instanceof ApiError ? err.message : "No se pudo guardar el porcentaje");
+    } finally {
+      setSavingClientePct(false);
+    }
   }
 
   async function handleSavePropiedadAdministracion(propiedad: PropiedadAdministrada) {
@@ -271,7 +341,7 @@ export function ClienteFichaView() {
       </div>
 
       <header className="flex flex-col gap-4 rounded-md border border-border bg-bg-card p-5 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex gap-4">
+        <div className="flex min-w-0 flex-1 gap-4">
           <div
             className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary-soft text-lg font-bold text-primary"
             aria-hidden
@@ -295,7 +365,37 @@ export function ClienteFichaView() {
             ) : null}
           </div>
         </div>
+        {token ? (
+          <ButtonPrimary type="button" onClick={() => setEditOpen(true)}>
+            Editar datos
+          </ButtonPrimary>
+        ) : null}
       </header>
+
+      {token && persona ? (
+        <EditarClienteModal
+          open={editOpen}
+          onClose={() => setEditOpen(false)}
+          token={token}
+          persona={persona}
+          onSaved={(updated) => {
+            setPersona(updated);
+            setClienteRow((row) => {
+              const mapped = mapPersonaToClienteRow(updated, undefined);
+              if (!row) return mapped;
+              return {
+                ...mapped,
+                vinculos: row.vinculos,
+                esInquilino: row.esInquilino,
+                esPropietario: row.esPropietario,
+                enMora: row.enMora,
+              };
+            });
+            setSuccess("Datos del cliente actualizados.");
+            setError(null);
+          }}
+        />
+      ) : null}
 
       <section className="rounded-md border border-border bg-bg-card">
         <div className="flex flex-wrap gap-2 border-b border-border px-5 pt-4">
@@ -341,9 +441,11 @@ export function ClienteFichaView() {
                 <FieldBlock
                   label="% administración"
                   value={
-                    propiedades.length === 1
-                      ? formatPorcentaje(propiedades[0]?.porcentajeAdministracion)
-                      : "Varía por propiedad"
+                    modoHonorarios === "por_cliente"
+                      ? formatPorcentaje(porcentajeCliente)
+                      : propiedades.length === 1
+                        ? formatPorcentaje(propiedades[0]?.porcentajeAdministracion)
+                        : "Varía por propiedad"
                   }
                 />
               ) : null}
@@ -363,6 +465,14 @@ export function ClienteFichaView() {
           ) : (
           <ClienteInmobiliariaTab
             personaId={persona.id}
+            modoHonorarios={modoHonorarios}
+            porcentajeCliente={porcentajeCliente}
+            clientePctEdit={clientePctEdit}
+            savingModoHonorarios={savingModoHonorarios}
+            savingClientePct={savingClientePct}
+            onModoHonorariosChange={(modo) => void handleModoHonorariosChange(modo)}
+            onClientePctChange={setClientePctEdit}
+            onSaveClientePct={() => void handleSaveClienteHonorarios()}
             propiedades={propiedades}
             contratosInquilino={contratosInquilino}
             linkedInmuebleIds={linkedInmuebleIds}

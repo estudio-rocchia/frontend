@@ -10,14 +10,7 @@ import { ApiError, createPersona } from "@/lib/api";
 import { normalizePhoneToE164, personaDisplayName } from "@/lib/format";
 import { pagePaddingClass } from "@/lib/layout";
 
-const estadoCivilOptions = ["Soltero/a", "Casado/a", "Divorciado/a", "Viudo/a", "Unión civil"] as const;
-const estadoCivilMap: Record<string, "single" | "married" | "divorced" | "widowed" | "civil_union"> = {
-  "Soltero/a": "single",
-  "Casado/a": "married",
-  "Divorciado/a": "divorced",
-  "Viudo/a": "widowed",
-  "Unión civil": "civil_union",
-};
+import { estadoCivilOptions, estadoCivilToApi } from "@/lib/clientes/persona-form";
 
 const vinculoOptions = ["Inmobiliaria", "Jurídico", "Visas"] as const;
 
@@ -66,7 +59,7 @@ export function CrearClienteView() {
         tipoDocumento: dni.trim() ? "DNI" : null,
         numeroDocumento: dni.trim() || null,
         cuit: cuil.trim() || null,
-        estadoCivil: estadoCivilMap[estadoCivil] ?? null,
+        estadoCivil: estadoCivilToApi[estadoCivil] ?? null,
         email: email.trim() || null,
         phone,
         address: direccion.trim() || null,
