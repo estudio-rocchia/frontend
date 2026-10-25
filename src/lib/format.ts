@@ -1,4 +1,8 @@
 import { NetworkError } from "@/lib/api/client";
+import {
+  adjustmentCycleUnpaidToastMessage,
+  parseAdjustmentCycleUnpaidMessage,
+} from "@/lib/rental-adjustment-errors";
 
 const MONTHS_ES = [
   "Ene", "Feb", "Mar", "Abr", "May", "Jun",
@@ -198,6 +202,10 @@ export function rentalApiErrorMessage(err: unknown, fallback = "No se pudo crear
     const freqMatch = ADJUSTMENT_FREQUENCY_RE.exec(err.message);
     if (freqMatch) {
       return `La fecha elegida no cumple la frecuencia de ajuste (cada ${freqMatch[1]} meses). Usá el mes sugerido o restaurá valores sugeridos.`;
+    }
+    const unpaidPeriods = parseAdjustmentCycleUnpaidMessage(err.message);
+    if (unpaidPeriods?.length) {
+      return adjustmentCycleUnpaidToastMessage(unpaidPeriods);
     }
     const indexMatch = INDEX_VALUE_MISSING_RE.exec(err.message);
     if (indexMatch) {

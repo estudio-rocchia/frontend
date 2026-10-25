@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
+import { AdjustmentUnpaidCuotasNotice } from "@/components/alquileres/AdjustmentUnpaidCuotasNotice";
 import { useContratoAdjustmentPreview } from "@/components/alquileres/useContratoAdjustmentPreview";
 import type { ContratoDetail } from "@/lib/api/types";
 import {
@@ -116,7 +117,7 @@ export function AdjustContractModal({
 
   const fechaAjuste = fechaAjusteMonth ? toIsoMonthDate(fechaAjusteMonth) : null;
 
-  const { preview, loading, error } = useContratoAdjustmentPreview({
+  const { preview, loading, error, unpaidPeriods } = useContratoAdjustmentPreview({
     open,
     contratoId: contrato?.id ?? null,
     token,
@@ -182,6 +183,7 @@ export function AdjustContractModal({
             disabled={
               !preview ||
               Boolean(error) ||
+              Boolean(unpaidPeriods?.length) ||
               loading ||
               submitting ||
               !fechaAjuste ||
@@ -210,6 +212,10 @@ export function AdjustContractModal({
           {freq} meses
         </p>
 
+        {unpaidPeriods?.length ? (
+          <AdjustmentUnpaidCuotasNotice periods={unpaidPeriods} />
+        ) : null}
+
         <div className="rounded-md border border-border bg-primary-soft px-5 py-6 text-center shadow-[var(--shadow-card)]">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
             Alquiler actual
@@ -220,8 +226,14 @@ export function AdjustContractModal({
 
           {loading ? (
             <p className="mt-6 text-sm text-text-secondary">Calculando nuevo alquiler…</p>
+          ) : unpaidPeriods?.length ? (
+            <p className="mt-6 text-sm text-text-secondary">
+              El nuevo monto se calculará cuando estén cobradas las cuotas pendientes.
+            </p>
           ) : error ? (
-            <p className="mt-6 text-sm text-danger">{error}</p>
+            <p className="mt-6 rounded-sm border border-danger/20 bg-danger-bg/40 px-3 py-2 text-sm text-danger">
+              {error}
+            </p>
           ) : preview ? (
             <>
               <p className="mt-6 text-[11px] font-semibold uppercase tracking-wide text-primary">
