@@ -5,6 +5,13 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 
+import {
+  VENTA_FICHA_PANEL_ID,
+  VentaFichaTabs,
+  ventaFichaTabDomId,
+  type VentaFichaTabId,
+} from "@/components/ventas/VentaFichaTabs";
+import { VentasKpiStrip } from "@/components/ventas/VentasKpiStrip";
 import { EditVentaModal } from "@/components/ventas/EditVentaModal";
 import type { CobrarVentaMode } from "@/components/ventas/CobrarVentaModal";
 import { ConfigurarFinanciacionModal } from "@/components/ventas/ConfigurarFinanciacionModal";
@@ -12,7 +19,7 @@ import { VentaFinanciacionSection } from "@/components/ventas/VentaFinanciacionS
 import { VentaCobranzasSection } from "@/components/ventas/VentaCobranzasSection";
 import { VentaResumenSection } from "@/components/ventas/VentaResumenSection";
 import { EmitirReciboVentaModal } from "@/components/ventas/EmitirReciboVentaModal";
-import { ButtonOutline } from "@/components/ui/Button";
+import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { PageHeaderSkeleton, Skeleton } from "@/components/ui/Skeleton";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useAuth } from "@/context/auth-context";
@@ -34,11 +41,20 @@ import type {
   VentaDetail,
   VentaReciboRecord,
 } from "@/lib/api/types";
-import { entregaInicialPendiente, ventaEsEditable, ventaNecesitaFinanciacion } from "@/lib/ventas/cobranza";
+import {
+  entregaInicialPendiente,
+  proximaCuotaPendiente,
+  ventaEsEditable,
+  ventaNecesitaFinanciacion,
+  ventaPuedeCobrar,
+} from "@/lib/ventas/cobranza";
 import { ventaEstadoLabel, ventaEstadoVariant } from "@/lib/ventas/status-labels";
-import { downloadBlob, formatDateDisplay, formatMoney, moneyClassName, personaDisplayName } from "@/lib/format";
+import { downloadBlob, formatMoney, moneyClassName, personaDisplayName } from "@/lib/format";
 import { pagePaddingClass } from "@/lib/layout";
 import { parseRouteId } from "@/lib/parse-route-id";
+import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
+import { VENTA_EMPTY_FIELD } from "@/lib/ventas/empty-field";
+import { parteNombre } from "@/lib/ventas/partes";
 
 const CobrarVentaModal = dynamic(
   () =>
@@ -48,34 +64,16 @@ const CobrarVentaModal = dynamic(
   { ssr: false },
 );
 
-type FichaTab = "resumen" | "financiacion" | "cobranzas";
-
-const tabs: { id: FichaTab; label: string }[] = [
-  { id: "resumen", label: "Resumen" },
-  { id: "financiacion", label: "Financiación" },
-  { id: "cobranzas", label: "Cobranzas" },
-];
-
 function inmuebleInitials(code: string): string {
   const cleaned = code.trim();
   return cleaned.slice(0, 2).toUpperCase() || "?";
 }
 
-function tabFromQuery(value: string | null): FichaTab | null {
+function tabFromQuery(value: string | null): VentaFichaTabId | null {
   if (value === "resumen" || value === "financiacion" || value === "cobranzas") {
     return value;
   }
   return null;
-}
-
-function parteNombre(
-  venta: VentaDetail,
-  rol: string,
-  nombres: Record<number, string>,
-): string {
-  const partes = venta.partes.filter((parte) => parte.rol === rol);
-  if (partes.length === 0) return "—";
-  return partes.map((parte) => nombres[parte.personaId] ?? "—").join(", ");
 }
 
 export function VentaFichaView() {
@@ -85,7 +83,7 @@ export function VentaFichaView() {
   const ventaId = parseRouteId(params.id);
 
   const { token, logout, user } = useAuth();
-  const [activeTab, setActiveTab] = useState<FichaTab>("resumen");
+  const [activeTab, setActiveTab] = useState<VentaFichaTabId>("resumen");
 
   useEffect(() => {
     const tab = tabFromQuery(searchParams.get("tab"));
@@ -187,14 +185,44 @@ export function VentaFichaView() {
   const metaLine = useMemo(() => {
     if (!venta) return "";
     const comprador = parteNombre(venta, "buyer", parteNombres);
-    const parts = [comprador !== "—" ? comprador : null, inmuebleTitle].filter(Boolean);
+    const parts = [comprador !== VENTA_EMPTY_FIELD ? comprador : null, inmuebleTitle].filter(Boolean);
     return parts.join(" · ");
   }, [venta, parteNombres, inmuebleTitle]);
+
+  const fichaKpis = useMemo(() => {
+    if (!venta?.financiacionResumen) return [];
+    const resumen = venta.financiacionResumen;
+    const moneda = resumen.codigoMoneda;
+    return [
+      {
+        label: "Saldo pendiente",
+        value: formatMoney(resumen.saldoRestante, moneda),
+        hint: "Por cobrar en cuotas y entrega",
+      },
+      {
+        label: "Cobrado",
+        value: formatMoney(resumen.montoPagado, moneda),
+        hint: `${resumen.cuotasPagadas} de ${resumen.cuotasTotales} cuotas`,
+      },
+    ];
+  }, [venta]);
+
+  function selectTab(tab: VentaFichaTabId) {
+    setSuccess(null);
+    setActiveTab(tab);
+    if (ventaId !== null) {
+      router.replace(`/ventas/${ventaId}?tab=${tab}`, { scroll: false });
+    }
+  }
 
   const entregaInicial = useMemo(() => {
     if (!venta) return { pendiente: false, saldo: 0 };
     return entregaInicialPendiente(venta, pagos);
   }, [venta, pagos]);
+
+  const puedeCobrar = venta ? ventaPuedeCobrar(venta) : false;
+  const proximaCuota = useMemo(() => proximaCuotaPendiente(cuotas), [cuotas]);
+  const hayCobroPendiente = editable && (entregaInicial.pendiente || proximaCuota !== null);
 
   function openCobrar(mode: CobrarVentaMode = "auto", cuotaId?: number) {
     setCobrarMode(mode);
@@ -281,14 +309,25 @@ export function VentaFichaView() {
 
   return (
     <div className={`flex flex-col gap-6 ${pagePaddingClass}`}>
-      <button
-        type="button"
-        onClick={() => router.push("/ventas")}
-        className="flex w-fit items-center gap-2 text-sm font-medium text-text-secondary transition-colors hover:text-primary"
-      >
-        <ArrowLeft className="h-4 w-4" aria-hidden />
-        Volver al listado
-      </button>
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={() => router.push("/ventas?tab=en_operacion")}
+          className={`flex w-fit items-center gap-2 text-sm font-medium text-text-secondary transition-colors hover:text-primary ${interactiveFocusClass}`}
+        >
+          <ArrowLeft className="h-4 w-4" aria-hidden />
+          Volver a ventas
+        </button>
+        {venta.inmueble?.id ? (
+          <button
+            type="button"
+            onClick={() => router.push(`/ventas/inmueble/${venta.inmueble!.id}?from=en_operacion`)}
+            className={`text-sm font-medium text-primary hover:underline ${interactiveFocusClass}`}
+          >
+            Ver inmueble en catálogo
+          </button>
+        ) : null}
+      </div>
 
       <header className="flex flex-col gap-4 rounded-md border border-border bg-bg-card p-5 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex gap-4">
@@ -325,6 +364,11 @@ export function VentaFichaView() {
             </span>
           </div>
           <div className="flex flex-wrap justify-end gap-2">
+            {editable && puedeCobrar && hayCobroPendiente ? (
+              <ButtonPrimary type="button" onClick={() => openCobrar("auto")}>
+                Cobrar
+              </ButtonPrimary>
+            ) : null}
             {editable ? (
               <>
                 {ventaNecesitaFinanciacion(venta) ? (
@@ -333,7 +377,12 @@ export function VentaFichaView() {
                   </ButtonOutline>
                 ) : null}
                 <ButtonOutline type="button" onClick={() => setEditOpen(true)}>Editar</ButtonOutline>
-                <ButtonOutline type="button" onClick={() => void handleCancelVenta()} disabled={cancelling}>
+                <ButtonOutline
+                  type="button"
+                  className="border-danger/40 text-danger hover:bg-danger-bg"
+                  onClick={() => void handleCancelVenta()}
+                  disabled={cancelling}
+                >
                   {cancelling ? "Cancelando..." : "Cancelar venta"}
                 </ButtonOutline>
               </>
@@ -342,34 +391,37 @@ export function VentaFichaView() {
         </div>
       </header>
 
-      <section className="rounded-md border border-border bg-bg-card">
-        <div className="flex flex-wrap gap-2 border-b border-border px-5 pt-4">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              data-testid={`venta-ficha-tab-${tab.id}`}
-              onClick={() => {
-                setSuccess(null);
-                setActiveTab(tab.id);
-              }}
-              className={`rounded-t-sm px-3 py-2 text-sm font-medium transition-colors ${
-                activeTab === tab.id
-                  ? "border-b-2 border-primary text-primary"
-                  : "text-text-secondary hover:text-text-primary"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+      {fichaKpis.length > 0 ? <VentasKpiStrip kpis={fichaKpis} loading={loading} /> : null}
 
-        <div className="flex flex-col gap-6 p-5">
+      <section className="rounded-md border border-border bg-bg-card">
+        <VentaFichaTabs
+          active={activeTab}
+          onChange={selectTab}
+          cobranzasCount={pagos.length}
+        />
+
+        <div
+          id={VENTA_FICHA_PANEL_ID}
+          role="tabpanel"
+          aria-labelledby={ventaFichaTabDomId(activeTab)}
+          className="flex flex-col gap-6 p-5"
+        >
           {error ? (
-            <p className="rounded-sm border border-danger bg-danger-bg px-3 py-2 text-sm text-danger">{error}</p>
+            <p
+              className="rounded-sm border border-danger bg-danger-bg px-3 py-2 text-sm text-danger"
+              role="alert"
+            >
+              {error}
+            </p>
           ) : null}
-          {activeTab === "cobranzas" && success ? (
-            <p className="rounded-sm border border-success bg-success-bg px-3 py-2 text-sm text-success">{success}</p>
+          {success ? (
+            <p
+              className="rounded-sm border border-success bg-success-bg px-3 py-2 text-sm text-success"
+              role="status"
+              aria-live="polite"
+            >
+              {success}
+            </p>
           ) : null}
 
           {activeTab === "resumen" ? (
@@ -390,7 +442,6 @@ export function VentaFichaView() {
               entregaPendiente={entregaInicial.pendiente}
               saldoEntregaInicial={entregaInicial.saldo}
               onConfigureFinanciacion={() => setFinanciacionOpen(true)}
-              onCobrarProximo={() => openCobrar("auto")}
             />
           ) : null}
 

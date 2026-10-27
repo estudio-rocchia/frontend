@@ -1,7 +1,7 @@
 "use client";
 
 import { FichaSummaryCard } from "@/components/alquileres/FichaSummaryCard";
-import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
+import { ButtonOutline } from "@/components/ui/Button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import type { CuotaFinanciacionRecord, VentaDetail } from "@/lib/api/types";
 import { proximaCuotaPendiente } from "@/lib/ventas/cobranza";
@@ -22,7 +22,6 @@ export function VentaFinanciacionSection({
   entregaPendiente,
   saldoEntregaInicial,
   onConfigureFinanciacion,
-  onCobrarProximo,
 }: {
   venta: VentaDetail;
   cuotas: CuotaFinanciacionRecord[];
@@ -31,7 +30,6 @@ export function VentaFinanciacionSection({
   entregaPendiente: boolean;
   saldoEntregaInicial: number;
   onConfigureFinanciacion: () => void;
-  onCobrarProximo: () => void;
 }) {
   const resumen = venta.financiacionResumen;
   const moneda = venta.codigoMoneda;
@@ -52,50 +50,9 @@ export function VentaFinanciacionSection({
   }
 
   const proximaCuota = proximaCuotaPendiente(cuotas);
-  const hayCobroPendiente = editable && (entregaPendiente || proximaCuota !== null);
-
-  const proximoCobroLabel = entregaPendiente
-    ? "Entrega inicial"
-    : proximaCuota
-      ? `Cuota ${proximaCuota.numero}`
-      : null;
-  const proximoCobroMonto = entregaPendiente
-    ? formatMoney(String(saldoEntregaInicial), moneda)
-    : proximaCuota
-      ? formatMoney(proximaCuota.saldo, moneda)
-      : null;
 
   return (
     <div className="flex flex-col gap-5">
-      {hayCobroPendiente && proximoCobroLabel && proximoCobroMonto ? (
-        <div
-          className="flex flex-col gap-4 rounded-md border border-primary/25 bg-primary-soft px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
-          data-testid="venta-financiacion-cobrar-cta"
-        >
-          <div className="flex flex-col gap-1">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-primary">
-              Próximo cobro
-            </span>
-            <p className="text-base font-semibold text-text-primary">
-              {proximoCobroLabel}
-              <span className={`ml-2 text-primary ${moneyClassName}`}>{proximoCobroMonto}</span>
-            </p>
-            {proximaCuota && !entregaPendiente ? (
-              <span className="text-[12px] text-text-secondary">
-                Vence {formatDateDisplay(proximaCuota.fechaVencimiento)}
-              </span>
-            ) : null}
-          </div>
-          <ButtonPrimary
-            type="button"
-            className="w-full px-6 py-3 text-base sm:w-auto"
-            onClick={onCobrarProximo}
-          >
-            Cobrar
-          </ButtonPrimary>
-        </div>
-      ) : null}
-
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <FichaSummaryCard
           label="Monto cobrado"

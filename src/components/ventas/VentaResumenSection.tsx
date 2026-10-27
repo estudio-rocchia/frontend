@@ -4,6 +4,9 @@ import type { ReactNode } from "react";
 
 import type { VentaDetail } from "@/lib/api/types";
 import { formatDateDisplay, moneyClassName } from "@/lib/format";
+import { VENTA_EMPTY_FIELD } from "@/lib/ventas/empty-field";
+import { formaPagoLabel } from "@/lib/ventas/forma-pago";
+import { parteNombre } from "@/lib/ventas/partes";
 
 const PARTE_ROLES: { rol: string; label: string }[] = [
   { rol: "buyer", label: "Comprador" },
@@ -11,16 +14,6 @@ const PARTE_ROLES: { rol: string; label: string }[] = [
   { rol: "guarantor", label: "Garantes" },
   { rol: "witness", label: "Testigos" },
 ];
-
-function parteNombre(
-  venta: VentaDetail,
-  rol: string,
-  nombres: Record<number, string>,
-): string {
-  const partes = venta.partes.filter((parte) => parte.rol === rol);
-  if (partes.length === 0) return "—";
-  return partes.map((parte) => nombres[parte.personaId] ?? "—").join(", ");
-}
 
 function ResumenPanel({
   title,
@@ -40,7 +33,7 @@ function ResumenPanel({
 }
 
 function DetailTile({ label, value, emphasize = false }: { label: string; value: string; emphasize?: boolean }) {
-  const empty = value === "—";
+  const empty = value === VENTA_EMPTY_FIELD;
   return (
     <div className="rounded-sm border border-border/70 bg-bg-card px-3 py-2.5">
       <p className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">{label}</p>
@@ -60,7 +53,7 @@ function DetailTile({ label, value, emphasize = false }: { label: string; value:
 }
 
 function ParteTile({ label, value }: { label: string; value: string }) {
-  const empty = value === "—";
+  const empty = value === VENTA_EMPTY_FIELD;
   return (
     <div className="flex flex-col gap-1 rounded-sm border border-border/70 bg-bg-card px-3 py-3">
       <span className="text-[10px] font-semibold uppercase tracking-wide text-primary">{label}</span>
@@ -69,6 +62,10 @@ function ParteTile({ label, value }: { label: string; value: string }) {
       </span>
     </div>
   );
+}
+
+function formatOptionalDate(value: string | null | undefined): string {
+  return value ? formatDateDisplay(value) : VENTA_EMPTY_FIELD;
 }
 
 export function VentaResumenSection({
@@ -100,17 +97,13 @@ export function VentaResumenSection({
 
         <ResumenPanel title="Trámite y escritura">
           <div className="grid gap-3 sm:grid-cols-2">
+            <DetailTile label="Fecha de compromiso" value={formatOptionalDate(venta.fechaBoleto)} />
+            <DetailTile label="Fecha de escritura" value={formatOptionalDate(venta.fechaEscritura)} />
+            <DetailTile label="Forma de pago" value={formaPagoLabel(venta.formaPagoCode)} />
             <DetailTile
-              label="Fecha de compromiso"
-              value={venta.fechaBoleto ? formatDateDisplay(venta.fechaBoleto) : "—"}
+              label="Escribano"
+              value={venta.nombreEscribano?.trim() || VENTA_EMPTY_FIELD}
             />
-            <DetailTile
-              label="Fecha de escritura"
-              value={venta.fechaEscritura ? formatDateDisplay(venta.fechaEscritura) : "—"}
-            />
-            <div className="sm:col-span-2">
-              <DetailTile label="Escribano" value={venta.nombreEscribano?.trim() || "—"} />
-            </div>
           </div>
         </ResumenPanel>
       </div>
