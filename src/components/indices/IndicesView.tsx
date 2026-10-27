@@ -9,6 +9,15 @@ import { useAuth } from "@/context/auth-context";
 import { ApiError, fetchIndiceValores, NetworkError, syncIndices } from "@/lib/api";
 import type { IndiceCode, SyncIndicesResponse, ValorIndiceRecord } from "@/lib/api/types";
 import { formatIndexValue, formatPeriodoIndice } from "@/lib/format";
+import {
+  buildValorMap,
+  computeIndexVariations,
+  computeLatestVariations,
+  earlierIsoDate,
+  periodoInUserRange,
+  subtractMonthsFromDate,
+} from "@/lib/indices/variations";
+import { VariationValue } from "@/components/indices/VariationValue";
 import { pagePaddingClass } from "@/lib/layout";
 import { ADJUSTMENT_INDICES } from "@/lib/rental-adjustment";
 
@@ -28,16 +37,6 @@ function defaultDateRange() {
 
 function sortByPeriodoDesc(items: ValorIndiceRecord[]) {
   return [...items].sort((a, b) => b.periodo.localeCompare(a.periodo));
-}
-
-function monthOverMonthVariation(rows: ValorIndiceRecord[]): string | null {
-  if (rows.length < 2) return null;
-  const latest = Number.parseFloat(rows[0].valor);
-  const previous = Number.parseFloat(rows[1].valor);
-  if (!Number.isFinite(latest) || !Number.isFinite(previous) || previous === 0) return null;
-  const pct = ((latest - previous) / previous) * 100;
-  const sign = pct > 0 ? "+" : "";
-  return `${sign}${pct.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
 }
 
 function IndexSelector({
@@ -76,7 +75,7 @@ export function IndicesView() {
   const [indice, setIndice] = useState<IndiceCode>("ICL");
   const [desde, setDesde] = useState(defaults.desde);
   const [hasta, setHasta] = useState(defaults.hasta);
-  const [rows, setRows] = useState<ValorIndiceRecord[]>([]);
+  const [allRows, setAllRows] = useState<ValorIndiceRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -87,15 +86,16 @@ export function IndicesView() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetchIndiceValores(token, indice, desde, hasta);
-      setRows(sortByPeriodoDesc(response.items));
+      const desdeFetch = earlierIsoDate(desde, subtractMonthsFromDate(hasta, 14));
+      const response = await fetchIndiceValores(token, indice, desdeFetch, hasta);
+      setAllRows(sortByPeriodoDesc(response.items));
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         logout();
         return;
       }
       setError(err instanceof ApiError ? err.message : "Error al cargar los índices");
-      setRows([]);
+      setAllRows([]);
     } finally {
       setLoading(false);
     }
@@ -153,13 +153,18 @@ export function IndicesView() {
     }
   }, [token, syncing, load, logout]);
 
+  const rows = useMemo(
+    () => allRows.filter((row) => periodoInUserRange(row.periodo, desde, hasta)),
+    [allRows, desde, hasta],
+  );
+
+  const valorMap = useMemo(() => buildValorMap(allRows), [allRows]);
+
   const latest = rows[0] ?? null;
-  const variation = useMemo(() => monthOverMonthVariation(rows), [rows]);
-  const rangeLabel = useMemo(() => {
-    if (rows.length === 0) return "Sin datos";
-    const oldest = rows[rows.length - 1];
-    return `${formatPeriodoIndice(oldest.periodo)} — ${formatPeriodoIndice(rows[0].periodo)}`;
-  }, [rows]);
+  const latestVariations = useMemo(
+    () => (latest ? computeIndexVariations(valorMap, latest.periodo) : computeLatestVariations([])),
+    [latest, valorMap],
+  );
 
   return (
     <div className={`flex flex-col gap-6 sm:gap-8 ${pagePaddingClass}`}>
@@ -193,7 +198,7 @@ export function IndicesView() {
       </section>
 
       {!loading && !error && rows.length > 0 ? (
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <KpiCard
             label={`Último valor · ${indice}`}
             value={latest ? formatIndexValue(latest.valor) : "—"}
@@ -201,17 +206,18 @@ export function IndicesView() {
           />
           <KpiCard
             label="Variación mensual"
-            value={variation ?? "—"}
-            hint={
-              rows.length >= 2
-                ? `${formatPeriodoIndice(rows[1].periodo)} → ${formatPeriodoIndice(rows[0].periodo)}`
-                : "Se necesitan al menos dos meses"
-            }
+            value={latestVariations.mensual ?? "—"}
+            hint="Respecto al mes anterior"
           />
           <KpiCard
-            label="Períodos en rango"
-            value={String(rows.length)}
-            hint={rangeLabel}
+            label="Variación interanual"
+            value={latestVariations.interanual ?? "—"}
+            hint="Respecto al mismo mes del año anterior"
+          />
+          <KpiCard
+            label="Variación acumulada"
+            value={latestVariations.acumulada ?? "—"}
+            hint="Desde diciembre del año anterior (criterio INDEC)"
           />
         </div>
       ) : null}
@@ -273,15 +279,20 @@ export function IndicesView() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[400px] text-left text-[13px]">
+            <table className="w-full min-w-[640px] text-left text-[13px]">
               <thead>
                 <tr className="h-11 bg-bg-cream text-xs font-semibold text-text-secondary">
-                  <th className="w-1/2 px-5">Período</th>
+                  <th className="px-5">Período</th>
                   <th className="px-5 text-right">Valor</th>
+                  <th className="px-5 text-right">Mensual</th>
+                  <th className="px-5 text-right">Interanual</th>
+                  <th className="px-5 text-right">Acumulada</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row, index) => (
+                {rows.map((row, index) => {
+                  const variations = computeIndexVariations(valorMap, row.periodo);
+                  return (
                   <tr
                     key={row.periodo}
                     className={`border-b border-border ${
@@ -299,8 +310,18 @@ export function IndicesView() {
                     <td className="px-5 py-4 text-right text-[15px] font-bold text-primary">
                       {formatIndexValue(row.valor)}
                     </td>
+                    <td className="px-5 py-4 text-right">
+                      <VariationValue value={variations.mensual} />
+                    </td>
+                    <td className="px-5 py-4 text-right">
+                      <VariationValue value={variations.interanual} />
+                    </td>
+                    <td className="px-5 py-4 text-right">
+                      <VariationValue value={variations.acumulada} />
+                    </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
