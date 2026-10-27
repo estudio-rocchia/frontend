@@ -1,7 +1,6 @@
 import type { OwnerFieldValue, PersonaFieldValue } from "@/components/alquileres/PersonaSelectField";
 import { createPersona, fetchPersona } from "@/lib/api";
 import type { PersonaRecord } from "@/lib/api/types";
-import { parsePersonName } from "@/lib/format";
 
 export async function resolveTenantPersona(
   token: string,
@@ -10,11 +9,10 @@ export async function resolveTenantPersona(
   if (field.mode === "existing") {
     return fetchPersona(token, field.personaId);
   }
-  const parts = parsePersonName(field.fullName);
   return createPersona(token, {
     tipoPersona: "natural",
-    nombre: parts.nombre,
-    apellido: parts.apellido,
+    nombre: field.nombre.trim() || "Sin nombre",
+    apellido: field.apellido.trim() || null,
   });
 }
 
@@ -25,11 +23,10 @@ export async function resolveOwnerPersona(
   if (field.mode === "existing") {
     return fetchPersona(token, field.personaId);
   }
-  const parts = parsePersonName(field.fullName);
   return createPersona(token, {
     tipoPersona: "natural",
-    nombre: parts.nombre,
-    apellido: parts.apellido,
+    nombre: field.nombre.trim() || "Sin nombre",
+    apellido: field.apellido.trim() || null,
   });
 }
 
@@ -37,4 +34,3 @@ export function ownerPorcentajeAdministracion(field: OwnerFieldValue): number {
   if (field.mode === "new") return field.porcentajeAdministracion;
   return field.porcentajeAdministracion ?? 6;
 }
-

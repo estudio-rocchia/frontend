@@ -5,6 +5,8 @@ import { Search } from "lucide-react";
 
 import {
   PersonaSelectField,
+  emptyNewPersonaField,
+  isNewPersonaFieldValid,
   type PersonaFieldValue,
 } from "@/components/alquileres/PersonaSelectField";
 import {
@@ -32,7 +34,7 @@ import { resolvePartePersona } from "@/lib/ventas/persona-resolve";
 import { todayIso } from "@/lib/ventas/catalog-helpers";
 import { nextInmuebleCode, prefixForTipoInmueble } from "@/lib/codes";
 
-const emptyPersona: PersonaFieldValue = { mode: "new", fullName: "" };
+const emptyPersona: PersonaFieldValue = emptyNewPersonaField();
 const MIN_SEARCH_LEN = 2;
 
 type InmuebleSource = "catalogo" | "nuevo";
@@ -229,7 +231,7 @@ export function NewVentaModal({
   }
 
   function isPersonaValid(field: PersonaFieldValue): boolean {
-    return field.mode === "existing" ? field.personaId > 0 : field.fullName.trim().length > 0;
+    return isNewPersonaFieldValid(field);
   }
 
   async function resolveInmuebleId(): Promise<number> {
