@@ -1,44 +1,80 @@
 "use client";
 
-import {
-  visibleFilterChips,
-  type RentalChipId,
-} from "@/data/alquileres-rentals";
+import type { ContratoTableStats } from "@/lib/api/types";
+import { rentalSecondaryFilterChips, type RentalChipId } from "@/data/alquileres-rentals";
+
+function chipCount(
+  id: RentalChipId,
+  stats?: ContratoTableStats,
+): number | undefined {
+  if (!stats) return undefined;
+  switch (id) {
+    case "a_cobrar":
+      return stats.aCobrar;
+    case "ajuste_pendiente":
+      return stats.ajustePendiente;
+    case "renovacion_proxima":
+      return stats.renovacionProxima;
+    case "todos":
+      return stats.total;
+    default:
+      return undefined;
+  }
+}
+
+function FilterChip({
+  id,
+  label,
+  selected,
+  count,
+  onSelect,
+}: {
+  id: RentalChipId;
+  label: string;
+  selected: boolean;
+  count?: number;
+  onSelect: (id: RentalChipId) => void;
+}) {
+  const showCount = count !== undefined && count > 0;
+
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(id)}
+      aria-pressed={selected}
+      className={`rounded-full border border-border px-3.5 py-2 text-[13px] transition-colors ${
+        selected
+          ? "bg-primary-soft font-semibold text-primary"
+          : "bg-bg-card font-normal text-text-secondary hover:text-text-primary"
+      }`}
+    >
+      {label}
+      {showCount ? ` (${count})` : ""}
+    </button>
+  );
+}
 
 export function RentalFilterChips({
   active,
-  counts,
+  stats,
   onChange,
 }: {
   active: RentalChipId;
-  counts?: Partial<Record<RentalChipId, number>>;
+  stats?: ContratoTableStats;
   onChange: (id: RentalChipId) => void;
 }) {
-  const chips = visibleFilterChips();
-
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      {chips.map(({ id, label }) => {
-        const selected = active === id;
-        const count = counts?.[id];
-        const showCount = count !== undefined && count > 0;
-
-        return (
-          <button
-            key={id}
-            type="button"
-            onClick={() => onChange(id)}
-            className={`rounded-full border border-border px-3.5 py-2 text-[13px] transition-colors ${
-              selected
-                ? "bg-primary-soft font-semibold text-primary"
-                : "bg-bg-card font-normal text-text-secondary hover:text-text-primary"
-            }`}
-          >
-            {label}
-            {showCount ? ` (${count})` : ""}
-          </button>
-        );
-      })}
+    <div className="flex shrink-0 flex-wrap items-center gap-2">
+      {rentalSecondaryFilterChips.map(({ id, label }) => (
+        <FilterChip
+          key={id}
+          id={id}
+          label={label}
+          selected={active === id}
+          count={chipCount(id, stats)}
+          onSelect={onChange}
+        />
+      ))}
     </div>
   );
 }

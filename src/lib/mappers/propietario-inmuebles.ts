@@ -84,7 +84,7 @@ export async function loadInmueblesSinAlquiler(
     return {
       inmuebleId: inmueble.inmuebleId,
       code: inmueble.code,
-      title: inmueble.title,
+      title: inmueble.displayLabel ?? inmueble.title ?? inmueble.code,
       direccion: inmueble.direccion,
       propietarioIds,
       propietarios: links,

@@ -20,7 +20,17 @@ import {
   formatMonthYear,
   personaDisplayName,
 } from "@/lib/format";
-import { contratoSupportsIndexAdjustment } from "@/lib/rental-adjustment";
+import {
+  adjustmentIndexFromCatalogCode,
+  adjustmentIndexLabel,
+  contratoSupportsIndexAdjustment,
+} from "@/lib/rental-adjustment";
+import {
+  contractPropertyLabel,
+  inmuebleDisplayLabel,
+  inmueblePropiedadNombre,
+  inmuebleUbicacionCompleta,
+} from "@/lib/inmuebles/display-label";
 import { serviciosSummaryFromData } from "@/lib/mappers/servicios";
 
 type BillingSnapshot = {
@@ -159,7 +169,7 @@ export function mapContratoTableItemToRentalRow(
 
     return {
       id: String(contrato.id),
-      contractProperty: `${contrato.inmuebleCode} · ${contrato.inmuebleTitle}`,
+      contractProperty: contractPropertyLabel(contrato.inmuebleCode, contrato.inmuebleTitle),
       tenant: contrato.inquilinoNombre,
       amount: formatMoney(contrato.montoAlquiler, contrato.codigoMoneda),
       currency,
@@ -201,7 +211,7 @@ export function mapContratoListItemToRentalRow(
 
   return {
     id: String(contrato.id),
-    contractProperty: `${contrato.inmuebleCode} · ${contrato.inmuebleTitle}`,
+    contractProperty: contractPropertyLabel(contrato.inmuebleCode, contrato.inmuebleTitle),
     tenant: contrato.inquilinoNombre,
     month: monthLabelFromIsoDate(meta?.fechaVencimiento),
     amount: formatMoney(contrato.montoAlquiler, contrato.codigoMoneda),
@@ -275,7 +285,7 @@ export function mapContratoToRentalRow(
 
   return {
     id: String(contrato.id),
-    contractProperty: `${code} · ${inmuebleTitle}`,
+    contractProperty: contractPropertyLabel(code, inmuebleTitle),
     tenant: inquilinoNombre,
     month: cuota ? formatMonthYear(cuota.anioPeriodo, cuota.mesPeriodo) : "—",
     amount: formatMoney(contrato.montoAlquiler, contrato.codigoMoneda),
@@ -298,17 +308,29 @@ export function mapContratoToRentalRow(
 export function mapContratoDetailToFicha(
   detail: ContratoDetail,
   propietarios: InmuebleFichaPropietario[],
+  inmuebleContext?: {
+    localidad?: { name: string; province?: string | null } | null;
+    tipoName?: string | null;
+  } | null,
 ): ContractDetail {
   const code = detail.inmueble?.code ?? `REF-${detail.id}`;
-  const propertyTitle = detail.inmueble?.title ?? "Inmueble";
-  const propertyAddress = detail.inmueble?.direccion ?? propertyTitle;
+  const propertyName = detail.inmueble
+    ? inmueblePropiedadNombre(detail.inmueble, inmuebleContext?.tipoName)
+    : "Inmueble";
+  const propertyLocation = detail.inmueble
+    ? inmuebleUbicacionCompleta(detail.inmueble, inmuebleContext?.localidad)
+    : "—";
+  const drawerRef = detail.inmueble ? inmuebleDisplayLabel(detail.inmueble) : "Inmueble";
   const tenant = detail.inquilino ? personaDisplayName(detail.inquilino) : "—";
   const owner =
     propietarios
       .map((p) => personaDisplayName(p))
       .filter((name) => name !== "—")
       .join(" · ") || "—";
-  const indexCode = (detail.tipoIndice?.code?.toUpperCase() ?? "ICL") as AdjustmentIndex;
+  const indexCode =
+    adjustmentIndexFromCatalogCode(detail.tipoIndice?.code) ??
+    (detail.tipoIndice?.code?.toUpperCase() as AdjustmentIndex | undefined) ??
+    "ICL";
   const moraPercent = detail.tasaMora ? `${(Number(detail.tasaMora) * 100).toFixed(1).replace(".", ",")}%` : "2,5%";
   const depositMonto = detail.deposito?.monto ?? detail.montoDeposito;
   const depositMoneda = detail.deposito?.codigoMoneda ?? detail.codigoMonedaDeposito;
@@ -330,12 +352,13 @@ export function mapContratoDetailToFicha(
 
   return {
     id: String(detail.id),
-    drawerRef: `${code} · ${propertyTitle}`,
+    drawerRef,
     propertyCode: code,
     estado: estadoLabel,
     contractStart: formatDateDisplay(detail.fechaInicio),
     contractEnd: formatDateDisplay(detail.fechaFin),
-    property: propertyAddress,
+    property: propertyName,
+    propertyLocation,
     tenant,
     owner,
     guarantors: detail.garantes.length ? `${detail.garantes.length} garante(s)` : "—",
@@ -347,8 +370,8 @@ export function mapContratoDetailToFicha(
     calculatedNewAmount: formatMoney(detail.montoAlquiler, detail.codigoMoneda),
     daysSince10: "—",
     surchargePercent: moraPercent,
-    punitiveHint: detail.tipoIndice?.name
-      ? `Índice: ${detail.tipoIndice.name}`
+    punitiveHint: detail.tipoIndice?.code
+      ? `Índice: ${adjustmentIndexLabel(indexCode)}`
       : `Contrato ${estadoLabel}`,
   };
 }

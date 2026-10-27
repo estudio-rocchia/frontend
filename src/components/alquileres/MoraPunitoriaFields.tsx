@@ -11,9 +11,11 @@ import {
 export function MoraPunitoriaFields({
   value,
   onChange,
+  sectionVariant = "default",
 }: {
   value: MoraPunitoriaForm;
   onChange: (next: MoraPunitoriaForm) => void;
+  sectionVariant?: "default" | "prominent";
 }) {
   function patch(partial: Partial<MoraPunitoriaForm>) {
     onChange({ ...value, ...partial });
@@ -22,6 +24,7 @@ export function MoraPunitoriaFields({
   return (
     <FormSection
       title="Mora punitoria"
+      variant={sectionVariant}
       description="Recargo por pagos después del día de vencimiento del mes (habitualmente el día 10)."
     >
       <div className="flex flex-col gap-4">

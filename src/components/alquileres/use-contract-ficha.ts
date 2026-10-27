@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import type { EditContractForm } from "@/components/alquileres/EditContractModal";
 import type { PlanActualizacionDepositoFormValues } from "@/components/alquileres/PlanActualizacionDepositoModal";
 import type { PeriodoFormValues } from "@/components/alquileres/PeriodoServicioModal";
 import type { ServicioFormValues } from "@/components/alquileres/ServicioFormModal";
@@ -26,6 +27,7 @@ import {
   importSecheep,
   issueRecibo,
   registerPago,
+  updateContrato,
   updateServicio,
 } from "@/lib/api";
 import type {
@@ -39,7 +41,9 @@ import type {
   SecheepImportInput,
   ServicioContratoRecord,
 } from "@/lib/api/types";
+import { useDashboardAlerts } from "@/context/dashboard-alerts-context";
 import { downloadBlob, rentalApiErrorMessage } from "@/lib/format";
+import { resolveMoraPunitoriaPayload } from "@/lib/mora-punitoria";
 import { mapContratoDetailToFicha } from "@/lib/mappers/rentals";
 import { useContratoPrefetch } from "@/lib/use-contrato-prefetch";
 
@@ -51,6 +55,7 @@ interface UseContractFichaOptions {
 }
 
 export function useContractFicha({ contratoId, validId, token, logout }: UseContractFichaOptions) {
+  const { refresh: refreshDashboardAlerts } = useDashboardAlerts();
   const { consume: consumePrefetchedContrato } = useContratoPrefetch(token);
   const [detail, setDetail] = useState<ContractDetail | null>(null);
   const [contrato, setContrato] = useState<ContratoDetail | null>(null);
@@ -110,15 +115,20 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
     setContrato(detailRes);
 
     let propietarios = cached?.propietarios ?? [];
+    let inmuebleContext = cached?.inmuebleContext ?? null;
     if (!cached && detailRes.inmueble?.id) {
       try {
         const ficha = await fetchInmuebleFicha(token, detailRes.inmueble.id);
         propietarios = ficha.propietarios;
+        inmuebleContext = {
+          localidad: ficha.localidad ?? null,
+          tipoName: ficha.tipoInmueble?.name ?? null,
+        };
       } catch {
         // staff may lack owner detail permission
       }
     }
-    setDetail(mapContratoDetailToFicha(detailRes, propietarios));
+    setDetail(mapContratoDetailToFicha(detailRes, propietarios, inmuebleContext ?? undefined));
     await loadServicios(contratoId);
   }, [token, validId, contratoId, consumePrefetchedContrato, loadServicios]);
 
@@ -179,12 +189,9 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
             };
       await createServicio(token, contrato.id, body);
       const tipoCode = tiposServicio.find((tipo) => tipo.id === values.tipoServicioId)?.code;
-      if (tipoCode === "water" && values.modoFacturacion === "fixed") {
-        setServiciosFocusPanel("periodos");
-      }
       setSuccess(
-        tipoCode === "water" && values.modoFacturacion === "fixed"
-          ? "Servicio de agua agregado. Se generaron los períodos hasta el fin del contrato."
+        tipoCode === "water"
+          ? "Servicio de agua configurado. Registrá los períodos cuando quieras cobrarlos."
           : "Servicio agregado.",
       );
       await loadServicios(contrato.id);
@@ -226,10 +233,8 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
       await updateServicio(token, servicioId, patch);
       const tipoCode = tiposServicio.find((tipo) => tipo.id === values.tipoServicioId)?.code;
       setSuccess(
-        tipoCode === "water" &&
-          values.modoFacturacion === "fixed" &&
-          values.montoFijo.trim()
-          ? "Servicio actualizado. Los períodos sin pagos usan el nuevo monto."
+        tipoCode === "water" && values.modoFacturacion === "fixed" && values.montoFijo.trim()
+          ? "Servicio de agua actualizado. Los períodos sin pagos usan el nuevo monto."
           : "Servicio actualizado.",
       );
       await loadServicios(contrato.id);
@@ -372,8 +377,8 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
       if (values.emitRecibo) {
         try {
           const recibo = await issueRecibo(token, result.pago.id);
-          const pdf = await downloadReciboPdf(token, recibo.id);
-          downloadBlob(pdf, `recibo-${recibo.reciboNumber}.pdf`);
+          const { blob, filename } = await downloadReciboPdf(token, recibo.id);
+          downloadBlob(blob, filename ?? `recibo-${recibo.reciboNumber}.pdf`);
           setSuccess(`Pago registrado. Recibo ${recibo.reciboNumber} descargado.`);
         } catch (reciboErr) {
           setError(rentalApiErrorMessage(reciboErr, "Pago registrado, pero no se pudo emitir el recibo."));
@@ -382,6 +387,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
         setSuccess("Pago de servicio registrado.");
       }
 
+      void refreshDashboardAlerts({ silent: true });
       await loadServicios(contrato.id);
     } catch (err) {
       setError(rentalApiErrorMessage(err, "No se pudo registrar el pago"));
@@ -401,6 +407,98 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
     await refreshBilling();
   }, [refreshBilling]);
 
+  async function handleUpdateContrato(form: EditContractForm): Promise<boolean> {
+    if (!token || !contrato) return false;
+    if (contrato.estado !== "active") {
+      setError("Solo se pueden editar contratos activos.");
+      return false;
+    }
+
+    setSubmitting(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const amount = Number(form.amount.replace(/\D/g, ""));
+      if (!Number.isFinite(amount) || amount <= 0) {
+        throw new ApiError(400, {
+          error: { code: "VALIDATION_ERROR", message: "Ingresá un monto mensual válido" },
+        });
+      }
+
+      const depositAmount = Number(form.depositAmount.replace(/\D/g, ""));
+      if (!Number.isFinite(depositAmount) || depositAmount <= 0) {
+        throw new ApiError(400, {
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Ingresá un depósito de garantía válido mayor a cero",
+          },
+        });
+      }
+
+      const [indices, moras] = await Promise.all([
+        fetchCatalog(token, "/catalogos/tipos-indice"),
+        fetchCatalog(token, "/catalogos/tipos-mora"),
+      ]);
+      const { isPublishedAdjustmentIndex, resolveTipoIndiceItem } = await import(
+        "@/lib/rental-adjustment"
+      );
+      const indexItem = resolveTipoIndiceItem(indices.items, form.index);
+      if (!indexItem?.id) {
+        throw new ApiError(400, {
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Seleccioná un índice de ajuste válido",
+          },
+        });
+      }
+      const notasIndice =
+        !isPublishedAdjustmentIndex(form.index) && form.notasIndice.trim()
+          ? form.notasIndice.trim()
+          : null;
+
+      let moraPayload;
+      try {
+        moraPayload = resolveMoraPunitoriaPayload(form.mora, moras.items);
+      } catch (err) {
+        throw new ApiError(400, {
+          error: {
+            code: "VALIDATION_ERROR",
+            message: err instanceof Error ? err.message : "Configuración de mora inválida",
+          },
+        });
+      }
+
+      await updateContrato(token, contrato.id, {
+        fechaInicio: form.fechaInicio,
+        fechaFin: form.fechaFin,
+        montoAlquiler: amount,
+        montoDeposito: depositAmount,
+        codigoMonedaDeposito: form.depositCurrency,
+        tipoIndiceId: indexItem.id,
+        notasIndice,
+        frecuenciaAjusteMeses: form.frecuenciaAjusteMeses,
+        tipoMoraId: moraPayload.tipoMoraId,
+        tasaMora: moraPayload.tasaMora,
+        montoMoraFijo: moraPayload.montoMoraFijo,
+        diaVencimientoPago: moraPayload.diaVencimientoPago,
+      });
+
+      await loadCore();
+      void refreshDashboardAlerts();
+      setSuccess("Datos del contrato actualizados.");
+      return true;
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        logout();
+        return false;
+      }
+      setError(rentalApiErrorMessage(err, "No se pudieron guardar los cambios"));
+      return false;
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   async function handleDownloadRecibo(pagoId: number) {
     if (!token) return;
     setSubmitting(true);
@@ -412,8 +510,8 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
       if (!recibo) {
         recibo = await issueRecibo(token, pagoId);
       }
-      const pdf = await downloadReciboPdf(token, recibo.id);
-      downloadBlob(pdf, `recibo-${recibo.reciboNumber}.pdf`);
+      const { blob, filename } = await downloadReciboPdf(token, recibo.id);
+      downloadBlob(blob, filename ?? `recibo-${recibo.reciboNumber}.pdf`);
       setSuccess(`Recibo ${recibo.reciboNumber} descargado.`);
     } catch (err) {
       setError(rentalApiErrorMessage(err, "No se pudo obtener el recibo"));
@@ -441,6 +539,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
     clearServiciosFocusPanel: () => setServiciosFocusPanel(null),
     refreshBilling,
     handleCobrarSuccess,
+    handleUpdateContrato,
     handleCreateServicio,
     handleUpdateServicio,
     handleDeactivateServicio,

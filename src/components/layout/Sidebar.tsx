@@ -9,6 +9,7 @@ import { X } from "lucide-react";
 import rocchiaLogo from "@/assets/rocchia-logo.png";
 import { useAuth } from "@/context/auth-context";
 import { mainNav } from "@/config/navigation";
+import { prefetchClientesList } from "@/lib/api/clientes-list";
 import { canManageUsers } from "@/lib/auth/roles";
 
 function isActive(pathname: string, href: string) {
@@ -18,7 +19,7 @@ function isActive(pathname: string, href: string) {
 
 function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const navItems = mainNav.filter((item) => !item.adminOnly || canManageUsers(user));
 
   return (
@@ -45,6 +46,11 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
               key={href}
               href={href}
               onClick={onNavigate}
+              onMouseEnter={() => {
+                if (href === "/clientes" && token) {
+                  void prefetchClientesList(token);
+                }
+              }}
               className={`flex items-center gap-3 rounded-sm px-3.5 py-2.5 text-sm font-medium transition-colors ${
                 active
                   ? "text-text-on-primary"

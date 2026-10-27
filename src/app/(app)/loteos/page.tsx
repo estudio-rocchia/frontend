@@ -1,5 +1,5 @@
-import { PlaceholderPage } from "@/components/PlaceholderPage";
+import { redirect } from "next/navigation";
 
-export default function LoteosPage() {
-  return <PlaceholderPage title="Loteos Financiación" />;
+export default function LoteosRedirectPage() {
+  redirect("/ventas");
 }

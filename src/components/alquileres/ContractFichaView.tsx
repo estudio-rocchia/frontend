@@ -1,8 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useParams, useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 
 import { ContractCobranzasSection } from "@/components/alquileres/ContractCobranzasSection";
@@ -22,6 +22,14 @@ const CobrarAlquilerModal = dynamic(
   () =>
     import("@/components/alquileres/CobrarAlquilerModal").then((mod) => ({
       default: mod.CobrarAlquilerModal,
+    })),
+  { ssr: false },
+);
+
+const EditContractModal = dynamic(
+  () =>
+    import("@/components/alquileres/EditContractModal").then((mod) => ({
+      default: mod.EditContractModal,
     })),
   { ssr: false },
 );
@@ -52,15 +60,29 @@ function estadoVariant(estado: string): "success" | "warning" | "danger" {
   return "warning";
 }
 
+function tabFromQuery(value: string | null): FichaTab | null {
+  if (value === "resumen" || value === "cobranzas" || value === "deposito" || value === "servicios") {
+    return value;
+  }
+  return null;
+}
+
 export function ContractFichaView() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const contratoId = Number(params.id);
   const validId = Number.isInteger(contratoId) && contratoId > 0;
 
   const { token, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<FichaTab>("resumen");
   const [cobrarModalOpen, setCobrarModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+
+  useEffect(() => {
+    const tab = tabFromQuery(searchParams.get("tab"));
+    if (tab) setActiveTab(tab);
+  }, [searchParams]);
 
   const {
     detail,
@@ -88,18 +110,24 @@ export function ContractFichaView() {
     handleRegisterPago,
     handleDownloadRecibo,
     handleCobrarSuccess,
+    handleUpdateContrato,
   } = useContractFicha({ contratoId, validId, token, logout });
 
   const contratoCode = contrato?.contratoCode ?? detail?.propertyCode ?? "—";
   const metaLine = useMemo(() => {
     if (!detail) return "";
-    return [detail.tenant, detail.property, detail.contractStart !== "—" ? `desde ${detail.contractStart}` : null]
+    return [
+      detail.tenant,
+      detail.property,
+      detail.propertyLocation !== "—" ? detail.propertyLocation : null,
+      detail.contractStart !== "—" ? `desde ${detail.contractStart}` : null,
+    ]
       .filter(Boolean)
       .join(" · ");
   }, [detail]);
 
   const canEdit = contrato?.estado === "active";
-  const canCollect = canEdit && canCollectRentFromCuotas(cuotas);
+  const canCollect = canEdit && contrato && canCollectRentFromCuotas(cuotas, contrato);
   const cobrarSubtitle = detail ? `${detail.tenant} · ${detail.property}` : undefined;
 
   if (!validId || (error && !detail && !loading)) {
@@ -171,14 +199,25 @@ export function ContractFichaView() {
               {detail.previousAmount}
             </span>
           </div>
-          {canCollect ? (
-            <ButtonPrimary
-              type="button"
-              onClick={() => setCobrarModalOpen(true)}
-              disabled={serviciosLoading || submitting}
-            >
-              Cobrar
-            </ButtonPrimary>
+          {canEdit ? (
+            <div className="flex flex-wrap gap-2">
+              <ButtonOutline
+                type="button"
+                onClick={() => setEditModalOpen(true)}
+                disabled={submitting}
+              >
+                Editar datos
+              </ButtonOutline>
+              {canCollect ? (
+                <ButtonPrimary
+                  type="button"
+                  onClick={() => setCobrarModalOpen(true)}
+                  disabled={serviciosLoading || submitting}
+                >
+                  Cobrar
+                </ButtonPrimary>
+              ) : null}
+            </div>
           ) : null}
         </div>
       </header>
@@ -217,6 +256,9 @@ export function ContractFichaView() {
                 <div className="grid gap-4 sm:grid-cols-2">
                   <FieldBlock label="Código de propiedad" value={detail.propertyCode} />
                   <FieldBlock label="Propiedad" value={detail.property} />
+                  <div className="sm:col-span-2">
+                    <FieldBlock label="Ubicación" value={detail.propertyLocation} />
+                  </div>
                   <FieldBlock label="Inicio" value={detail.contractStart} />
                   <FieldBlock label="Fin" value={detail.contractEnd} />
                 </div>
@@ -309,6 +351,20 @@ export function ContractFichaView() {
           subtitle={cobrarSubtitle}
           mediosPago={mediosPago}
           onSuccess={() => void handleCobrarSuccess()}
+        />
+      ) : null}
+      {editModalOpen ? (
+        <EditContractModal
+          open={editModalOpen}
+          contrato={contrato}
+          token={token}
+          submitting={submitting}
+          onClose={() => setEditModalOpen(false)}
+          onSubmit={(form) => {
+            void handleUpdateContrato(form).then((ok) => {
+              if (ok) setEditModalOpen(false);
+            });
+          }}
         />
       ) : null}
     </div>

@@ -3,6 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
+import { FormField } from "@/components/ui/FormLayout";
+import { AdjustmentIndicesReference } from "@/components/alquileres/AdjustmentIndicesReference";
+import { AdjustmentUnpaidCuotasNotice } from "@/components/alquileres/AdjustmentUnpaidCuotasNotice";
 import { useContratoAdjustmentPreview } from "@/components/alquileres/useContratoAdjustmentPreview";
 import type { ContratoDetail } from "@/lib/api/types";
 import {
@@ -17,11 +20,15 @@ import {
   type DepositoPlanChoice,
 } from "@/lib/alquileres/deposito-plan";
 import {
+  adjustmentIndexLabel,
   contractualAdjustmentEnd,
   defaultAdjustmentHasta,
   fromIsoMonthDate,
   indexYearRange,
+  indiceCodeFromContrato,
+  isAgreedAdjustmentContrato,
   isAdjustmentOverdue,
+  isPublishedAdjustmentIndex,
   latestPublishedIndexMonth,
   rentVigenteDesde,
   toIsoMonthDate,
@@ -31,6 +38,7 @@ import {
 
 export type AdjustContractSubmitInput = {
   fechaAjuste: string;
+  montoNuevo?: number;
   depositoPlan?: DepositoPlanChoice;
 };
 
@@ -100,6 +108,7 @@ export function AdjustContractModal({
   submitting?: boolean;
 }) {
   const [fechaAjusteMonth, setFechaAjusteMonth] = useState<MonthYear | null>(null);
+  const [montoNuevoInput, setMontoNuevoInput] = useState("");
   const [showDetails, setShowDetails] = useState(false);
   const [crearPlanDeposito, setCrearPlanDeposito] = useState(true);
   const [cantidadCuotasDeposito, setCantidadCuotasDeposito] = useState(
@@ -109,18 +118,27 @@ export function AdjustContractModal({
   useEffect(() => {
     if (!open || !contrato) return;
     setFechaAjusteMonth(defaultFechaAjusteMonth(contrato, ultimoAjusteEn));
+    setMontoNuevoInput("");
     setShowDetails(false);
     setCrearPlanDeposito(true);
     setCantidadCuotasDeposito(String(DEFAULT_DEPOSITO_PLAN_CUOTAS));
   }, [contrato, open, ultimoAjusteEn]);
 
   const fechaAjuste = fechaAjusteMonth ? toIsoMonthDate(fechaAjusteMonth) : null;
+  const requiresManualMonto = contrato ? isAgreedAdjustmentContrato(contrato) : false;
+  const montoNuevoParsed = Number(montoNuevoInput.replace(/\D/g, ""));
+  const montoNuevo =
+    requiresManualMonto && Number.isFinite(montoNuevoParsed) && montoNuevoParsed > 0
+      ? montoNuevoParsed
+      : null;
 
-  const { preview, loading, error } = useContratoAdjustmentPreview({
+  const { preview, loading, error, unpaidPeriods } = useContratoAdjustmentPreview({
     open,
     contratoId: contrato?.id ?? null,
     token,
     fechaAjuste,
+    montoNuevo,
+    requiresManualMonto,
   });
 
   const periodoDesde = useMemo(
@@ -135,7 +153,10 @@ export function AdjustContractModal({
     : "Inmueble";
   const inquilinoLabel = contrato.inquilino ? personaDisplayName(contrato.inquilino) : "—";
   const currency = contrato.codigoMoneda.trim();
-  const indiceCode = contrato.tipoIndice?.code ?? "ICL";
+  const contratoIndex = indiceCodeFromContrato(contrato);
+  const indiceCode = adjustmentIndexLabel(contratoIndex ?? "ICL");
+  const highlightIndex =
+    contratoIndex && isPublishedAdjustmentIndex(contratoIndex) ? contratoIndex : null;
   const freq = contrato.frecuenciaAjusteMeses ?? 12;
   const years = indexYearRange(contrato);
   const vigenteDesde = rentVigenteDesde(contrato, ultimoAjusteEn);
@@ -157,9 +178,11 @@ export function AdjustContractModal({
     crearPlanDeposito &&
     !cuotasDepositoValidas;
 
-  const detailsNote = overdue
-    ? `El ajuste debía aplicarse en ${formatMonthYear(contractualEnd.anio, contractualEnd.mes)}. Podés usar el último ${indiceCode} publicado (${formatMonthYear(maxPublished.anio, maxPublished.mes)}).`
-    : `Período de ${freq} meses desde ${formatMonthYear(vigenteDesde.anio, vigenteDesde.mes)}.`;
+  const detailsNote = requiresManualMonto
+    ? `Ingresá el nuevo alquiler acordado entre las partes para el período de ${freq} meses.`
+    : overdue
+      ? `El ajuste debía aplicarse en ${formatMonthYear(contractualEnd.anio, contractualEnd.mes)}. Podés usar el último ${indiceCode} publicado (${formatMonthYear(maxPublished.anio, maxPublished.mes)}).`
+      : `Período de ${freq} meses desde ${formatMonthYear(vigenteDesde.anio, vigenteDesde.mes)}.`;
 
   function resetSuggested() {
     setFechaAjusteMonth(defaultFechaAjusteMonth(contrato!, ultimoAjusteEn));
@@ -182,6 +205,7 @@ export function AdjustContractModal({
             disabled={
               !preview ||
               Boolean(error) ||
+              Boolean(unpaidPeriods?.length) ||
               loading ||
               submitting ||
               !fechaAjuste ||
@@ -189,7 +213,10 @@ export function AdjustContractModal({
             }
             onClick={() => {
               if (!preview || !fechaAjuste || depositoPlanInvalido) return;
-              const input: AdjustContractSubmitInput = { fechaAjuste: preview.fechaAjuste };
+              const input: AdjustContractSubmitInput = {
+                fechaAjuste: preview.fechaAjuste,
+                montoNuevo: requiresManualMonto ? montoNuevo ?? undefined : undefined,
+              };
               if (preview.actualizacionDeposito.requiereCobro) {
                 input.depositoPlan = {
                   crearPlan: crearPlanDeposito,
@@ -206,9 +233,36 @@ export function AdjustContractModal({
     >
       <div className="flex flex-col gap-6">
         <p className="text-sm text-text-secondary">
-          Índice <span className="font-semibold text-text-primary">{indiceCode}</span> · cada{" "}
-          {freq} meses
+          {requiresManualMonto ? (
+            <>
+              Ajuste <span className="font-semibold text-text-primary">acordado entre partes</span>
+            </>
+          ) : (
+            <>
+              Índice <span className="font-semibold text-text-primary">{indiceCode}</span>
+            </>
+          )}{" "}
+          · cada {freq} meses
         </p>
+
+        <AdjustmentIndicesReference
+          open={open}
+          token={token}
+          highlightCode={highlightIndex}
+        />
+
+        {requiresManualMonto ? (
+          <FormField
+            label={`Nuevo alquiler mensual (${currency})`}
+            value={montoNuevoInput}
+            onChange={setMontoNuevoInput}
+            placeholder="Monto acordado con inquilino y propietario"
+          />
+        ) : null}
+
+        {unpaidPeriods?.length ? (
+          <AdjustmentUnpaidCuotasNotice periods={unpaidPeriods} />
+        ) : null}
 
         <div className="rounded-md border border-border bg-primary-soft px-5 py-6 text-center shadow-[var(--shadow-card)]">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
@@ -220,8 +274,14 @@ export function AdjustContractModal({
 
           {loading ? (
             <p className="mt-6 text-sm text-text-secondary">Calculando nuevo alquiler…</p>
+          ) : unpaidPeriods?.length ? (
+            <p className="mt-6 text-sm text-text-secondary">
+              El nuevo monto se calculará cuando estén cobradas las cuotas pendientes.
+            </p>
           ) : error ? (
-            <p className="mt-6 text-sm text-danger">{error}</p>
+            <p className="mt-6 rounded-sm border border-danger/20 bg-danger-bg/40 px-3 py-2 text-sm text-danger">
+              {error}
+            </p>
           ) : preview ? (
             <>
               <p className="mt-6 text-[11px] font-semibold uppercase tracking-wide text-primary">
@@ -232,7 +292,8 @@ export function AdjustContractModal({
               </p>
               <p className="mt-3 text-[15px] font-semibold text-text-primary">
                 {Number.parseFloat(preview.variacionPct) >= 0 ? "+" : ""}
-                {preview.variacionPct}% según {indiceCode}
+                {preview.variacionPct}%
+                {requiresManualMonto ? " respecto al alquiler actual" : ` según ${indiceCode}`}
               </p>
             </>
           ) : null}

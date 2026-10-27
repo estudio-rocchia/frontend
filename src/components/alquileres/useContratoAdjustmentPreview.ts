@@ -4,33 +4,51 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, previewContratoAjuste } from "@/lib/api";
 import type { ContratoAjustePreviewResponse } from "@/lib/api/types";
 import { rentalApiErrorMessage } from "@/lib/format";
+import {
+  type AdjustmentPreviewError,
+  parseAdjustmentCycleUnpaidMessage,
+} from "@/lib/rental-adjustment-errors";
 
 export function useContratoAdjustmentPreview({
   open,
   contratoId,
   token,
   fechaAjuste,
+  montoNuevo,
+  requiresManualMonto = false,
 }: {
   open: boolean;
   contratoId: number | null;
   token: string | null;
   fechaAjuste: string | null;
+  montoNuevo?: number | null;
+  requiresManualMonto?: boolean;
 }) {
   const [preview, setPreview] = useState<ContratoAjustePreviewResponse | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [previewError, setPreviewError] = useState<AdjustmentPreviewError | null>(null);
   const requestId = useRef(0);
 
-  const canCalculate = Boolean(open && contratoId && token && fechaAjuste);
+  const manualMontoReady =
+    !requiresManualMonto ||
+    (montoNuevo !== undefined && montoNuevo !== null && montoNuevo > 0);
+  const canCalculate = Boolean(open && contratoId && token && fechaAjuste && manualMontoReady);
 
   const runPreview = useCallback(() => {
     if (!canCalculate || !contratoId || !token || !fechaAjuste) return;
 
     const id = ++requestId.current;
     setLoading(true);
-    setError(null);
+    setPreviewError(null);
 
-    void previewContratoAjuste(token, contratoId, fechaAjuste)
+    void previewContratoAjuste(
+      token,
+      contratoId,
+      fechaAjuste,
+      requiresManualMonto && montoNuevo !== undefined && montoNuevo !== null
+        ? montoNuevo
+        : undefined,
+    )
       .then((result) => {
         if (id !== requestId.current) return;
         setPreview(result);
@@ -38,31 +56,56 @@ export function useContratoAdjustmentPreview({
       .catch((err) => {
         if (id !== requestId.current) return;
         setPreview(null);
-        setError(
-          err instanceof ApiError
-            ? rentalApiErrorMessage(err, "No se pudo calcular el ajuste")
-            : "No se pudo calcular el ajuste",
-        );
+        if (err instanceof ApiError) {
+          const unpaid = parseAdjustmentCycleUnpaidMessage(err.message);
+          if (unpaid?.length) {
+            setPreviewError({ kind: "unpaid_cycle", periods: unpaid });
+            return;
+          }
+          setPreviewError({
+            kind: "generic",
+            message: rentalApiErrorMessage(err, "No se pudo calcular el ajuste"),
+          });
+          return;
+        }
+        setPreviewError({ kind: "generic", message: "No se pudo calcular el ajuste" });
       })
       .finally(() => {
         if (id === requestId.current) setLoading(false);
       });
-  }, [canCalculate, contratoId, token, fechaAjuste]);
+  }, [canCalculate, contratoId, token, fechaAjuste, montoNuevo, requiresManualMonto]);
 
   useEffect(() => {
     if (!open) {
       setPreview(null);
-      setError(null);
+      setPreviewError(null);
       return;
     }
     if (!canCalculate) {
       setPreview(null);
-      setError("Seleccioná una fecha de ajuste válida.");
+      if (requiresManualMonto && (montoNuevo === undefined || montoNuevo === null)) {
+        setPreviewError({
+          kind: "generic",
+          message: "Ingresá el nuevo monto acordado entre las partes.",
+        });
+      } else if (requiresManualMonto && montoNuevo !== undefined && montoNuevo !== null && montoNuevo <= 0) {
+        setPreviewError({
+          kind: "generic",
+          message: "Ingresá un nuevo alquiler mayor a cero.",
+        });
+      } else {
+        setPreviewError({ kind: "generic", message: "Seleccioná una fecha de ajuste válida." });
+      }
       return;
     }
     const timer = window.setTimeout(runPreview, 300);
     return () => window.clearTimeout(timer);
   }, [open, canCalculate, runPreview]);
 
-  return { preview, loading, error };
+  const error =
+    previewError?.kind === "generic" ? previewError.message : null;
+  const unpaidPeriods =
+    previewError?.kind === "unpaid_cycle" ? previewError.periods : null;
+
+  return { preview, loading, error, unpaidPeriods, previewError };
 }

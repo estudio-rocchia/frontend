@@ -1,6 +1,6 @@
 import type { ClienteFilterId, ClienteRow, ClienteVinculoBadge } from "@/data/clientes";
 import type { PersonaVinculoFilter } from "@/lib/api";
-import type { InquilinosContext, PersonaRecord } from "@/lib/api/types";
+import type { ClientesKpis, InquilinosContext, PersonaRecord, PersonaVinculos } from "@/lib/api/types";
 import { personaDisplayName } from "@/lib/format";
 
 export interface ClientesContext {
@@ -15,23 +15,43 @@ function formatDocumento(persona: PersonaRecord): string {
   return "—";
 }
 
-function buildVinculos(personaId: number, context: ClientesContext): ClienteVinculoBadge[] {
+function buildVinculosFromFlags(flags: PersonaVinculos): ClienteVinculoBadge[] {
   const badges: ClienteVinculoBadge[] = [];
-  if (context.inquilinoIds.has(personaId)) {
+  if (flags.inquilino) {
     badges.push({ id: "inquilino", label: "Inquilino" });
   }
-  if (context.propietarioIds.has(personaId)) {
+  if (flags.propietario) {
     badges.push({ id: "propietario", label: "Propietario" });
     badges.push({ id: "alquiler", label: "Alquiler" });
   }
-  if (context.morosoIds.has(personaId)) {
+  if (flags.moroso) {
     badges.push({ id: "mora", label: "Mora" });
   }
   return badges;
 }
 
-function buildEstado(persona: PersonaRecord, context: ClientesContext) {
-  if (context.morosoIds.has(persona.id)) {
+function buildVinculos(personaId: number, context: ClientesContext): ClienteVinculoBadge[] {
+  return buildVinculosFromFlags({
+    inquilino: context.inquilinoIds.has(personaId),
+    propietario: context.propietarioIds.has(personaId),
+    moroso: context.morosoIds.has(personaId),
+  });
+}
+
+function resolveVinculos(persona: PersonaRecord, context?: ClientesContext): PersonaVinculos {
+  if (persona.vinculos) return persona.vinculos;
+  if (!context) {
+    return { inquilino: false, propietario: false, moroso: false };
+  }
+  return {
+    inquilino: context.inquilinoIds.has(persona.id),
+    propietario: context.propietarioIds.has(persona.id),
+    moroso: context.morosoIds.has(persona.id),
+  };
+}
+
+function buildEstado(persona: PersonaRecord, vinculos: PersonaVinculos) {
+  if (vinculos.moroso) {
     return { label: "Alerta", variant: "danger" as const };
   }
   if (persona.activo === false) {
@@ -64,39 +84,48 @@ export function buildClientesContext(
   };
 }
 
-export function mapClientesKpisFromContext(
-  totalPersonas: number,
-  context: ClientesContext,
-) {
-  const total = Number.isFinite(totalPersonas) ? totalPersonas : 0;
+export function mapClientesKpisFromCounts(kpis: ClientesKpis) {
   return [
     {
       label: "Total clientes",
-      value: total.toLocaleString("es-AR"),
+      value: kpis.total.toLocaleString("es-AR"),
       hint: "Registro unificado",
     },
     {
       label: "Con contrato activo",
-      value: context.inquilinoIds.size.toLocaleString("es-AR"),
+      value: kpis.inquilinos.toLocaleString("es-AR"),
       hint: "Inmobiliaria",
     },
     {
       label: "Propietarios",
-      value: context.propietarioIds.size.toLocaleString("es-AR"),
+      value: kpis.propietarios.toLocaleString("es-AR"),
       hint: "En administración",
     },
     {
       label: "En mora",
-      value: context.morosoIds.size.toLocaleString("es-AR"),
+      value: kpis.morosos.toLocaleString("es-AR"),
       hint: "Requieren gestión",
     },
   ];
 }
 
-export function mapPersonaToClienteRow(persona: PersonaRecord, context: ClientesContext): ClienteRow {
-  const esInquilino = context.inquilinoIds.has(persona.id);
-  const esPropietario = context.propietarioIds.has(persona.id);
-  const enMora = context.morosoIds.has(persona.id);
+export function mapClientesKpisFromContext(
+  totalPersonas: number,
+  context: ClientesContext,
+) {
+  return mapClientesKpisFromCounts({
+    total: Number.isFinite(totalPersonas) ? totalPersonas : 0,
+    inquilinos: context.inquilinoIds.size,
+    propietarios: context.propietarioIds.size,
+    morosos: context.morosoIds.size,
+  });
+}
+
+export function mapPersonaToClienteRow(
+  persona: PersonaRecord,
+  context?: ClientesContext,
+): ClienteRow {
+  const vinculos = resolveVinculos(persona, context);
 
   return {
     id: persona.id,
@@ -104,12 +133,12 @@ export function mapPersonaToClienteRow(persona: PersonaRecord, context: Clientes
     documento: formatDocumento(persona),
     email: persona.email?.trim() || "—",
     telefono: persona.phone?.trim() || "—",
-    vinculos: buildVinculos(persona.id, context),
-    estado: buildEstado(persona, context),
+    vinculos: buildVinculosFromFlags(vinculos),
+    estado: buildEstado(persona, vinculos),
     activo: persona.activo ?? true,
-    esInquilino,
-    esPropietario,
-    enMora,
+    esInquilino: vinculos.inquilino,
+    esPropietario: vinculos.propietario,
+    enMora: vinculos.moroso,
     porcentajeAdministracion: persona.porcentajeAdministracion ?? null,
   };
 }

@@ -10,8 +10,8 @@ export function useCursorPagination() {
   const pageIndex = cursorStack.length;
 
   const reset = useCallback(() => {
-    setCursorStack([]);
-    setNextCursor(null);
+    setCursorStack((stack) => (stack.length === 0 ? stack : []));
+    setNextCursor((cursor) => (cursor === null ? cursor : null));
   }, []);
 
   const applyResponse = useCallback((cursor: number | null | undefined) => {

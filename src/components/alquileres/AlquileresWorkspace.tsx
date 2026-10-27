@@ -21,16 +21,16 @@ import {
   applyContratoAjuste,
   changeContratoEstado,
   createContrato,
-  createInmueble,
-  createLocalidad,
   fetchCatalog,
   fetchContrato,
   fetchContratos,
   fetchInmuebles,
-  fetchLocalidades,
   fetchPersonas,
   previewActualizacionDeposito,
 } from "@/lib/api";
+import { altaInmuebleCatalogo } from "@/lib/inmuebles/alta-inmueble";
+import type { InmuebleRecord } from "@/lib/api/types";
+import { invalidateDashboardAlerts } from "@/lib/dashboard-alerts-events";
 import { addYears, createAutoPlanActualizacionDeposito } from "@/lib/alquileres/deposito-plan";
 import {
   ownerPorcentajeAdministracion,
@@ -51,6 +51,10 @@ import {
   loadInmueblesSinAlquiler,
   type InmuebleSinAlquiler,
 } from "@/lib/mappers/propietario-inmuebles";
+import {
+  isPublishedAdjustmentIndex,
+  resolveTipoIndiceItem,
+} from "@/lib/rental-adjustment";
 
 const AdjustContractModal = dynamic(
   () =>
@@ -103,8 +107,10 @@ export function AlquileresWorkspace() {
     goPrev,
     searchQuery,
     setSearchQuery,
+    isSearchPending,
     activeChip,
     setActiveChip,
+    clearFilters,
     tableTotal,
     tableStats,
     stats,
@@ -184,8 +190,7 @@ export function AlquileresWorkspace() {
         fetchCatalog(token, "/catalogos/tipos-indice"),
         fetchCatalog(token, "/catalogos/tipos-mora"),
       ]);
-      const indexItem =
-        indices.items.find((item) => item.code === form.index) ?? indices.items[0];
+      const indexItem = resolveTipoIndiceItem(indices.items, form.index);
       if (!indexItem?.id) {
         throw new ApiError(400, {
           error: {
@@ -194,6 +199,10 @@ export function AlquileresWorkspace() {
           },
         });
       }
+      const notasIndice =
+        !isPublishedAdjustmentIndex(form.index) && form.notasIndice.trim()
+          ? form.notasIndice.trim()
+          : null;
 
       let moraPayload;
       try {
@@ -235,6 +244,7 @@ export function AlquileresWorkspace() {
             diaVencimientoPago: moraPayload.diaVencimientoPago,
             frecuenciaAjusteMeses: form.frecuenciaAjusteMeses,
             tipoIndiceId: indexItem.id,
+            notasIndice,
             tipoMoraId: moraPayload.tipoMoraId,
             tasaMora: moraPayload.tasaMora,
             montoMoraFijo: moraPayload.montoMoraFijo,
@@ -333,6 +343,7 @@ export function AlquileresWorkspace() {
 
   async function handleAdjustContract(input: {
     fechaAjuste: string;
+    montoNuevo?: number;
     depositoPlan?: { crearPlan: boolean; cantidadCuotas: number };
   }) {
     if (!token || !selectedContrato) return;
@@ -345,6 +356,7 @@ export function AlquileresWorkspace() {
     try {
       const result = await applyContratoAjuste(token, selectedContrato.id, {
         fechaAjuste: input.fechaAjuste,
+        montoNuevo: input.montoNuevo,
       });
 
       const planChoice = input.depositoPlan;
@@ -371,6 +383,7 @@ export function AlquileresWorkspace() {
             ? `Ajuste aplicado para ${inmuebleCode}. Podés crear el plan de depósito desde la ficha.`
             : `Ajuste aplicado para ${inmuebleCode}.`,
       );
+      invalidateDashboardAlerts();
       await loadRows();
     } catch (err) {
       showToast(rentalApiErrorMessage(err, "No se pudo aplicar el ajuste"));
@@ -406,15 +419,14 @@ export function AlquileresWorkspace() {
     if (!token) return;
     setSubmitting(true);
     try {
-      const [indices, moras, localidades, inmueblesRes, contratosRes] = await Promise.all([
+      const [indices, moras, inmueblesRes, contratosRes] = await Promise.all([
         fetchCatalog(token, "/catalogos/tipos-indice"),
         fetchCatalog(token, "/catalogos/tipos-mora"),
-        fetchLocalidades(token),
         fetchInmuebles(token, { limit: 200 }),
         fetchContratos(token, { limit: 200 }),
       ]);
 
-      const indexItem = indices.items.find((item) => item.code === form.index) ?? indices.items[0];
+      const indexItem = resolveTipoIndiceItem(indices.items, form.index);
 
       if (!indexItem?.id) {
         throw new ApiError(400, {
@@ -424,6 +436,10 @@ export function AlquileresWorkspace() {
           },
         });
       }
+      const notasIndice =
+        !isPublishedAdjustmentIndex(form.index) && form.notasIndice.trim()
+          ? form.notasIndice.trim()
+          : null;
 
       const usedInmuebleCodes = inmueblesRes.items.map((item) => item.code);
       const usedContratoCodes = contratosRes.items.map((item) => item.contratoCode);
@@ -466,7 +482,7 @@ export function AlquileresWorkspace() {
         });
       }
 
-      let inmueble: Awaited<ReturnType<typeof createInmueble>> | null = null;
+      let inmueble: InmuebleRecord | null = null;
 
       if (form.property.mode === "existente") {
         const inmuebleId = form.property.inmuebleId;
@@ -515,62 +531,17 @@ export function AlquileresWorkspace() {
           });
         }
       } else if (form.property.mode === "nuevo") {
-        const property = form.property;
-        const tiposInmueble = codeContext?.tiposInmueble.length
-          ? codeContext.tiposInmueble
-          : (await fetchCatalog(token, "/catalogos/tipos-inmueble")).items;
-        const tipoInmueble =
-          tiposInmueble.find((item) => item.code === property.tipoInmuebleCode) ??
-          tiposInmueble.find((item) => item.code === "house") ??
-          tiposInmueble[0];
-
-        if (!tipoInmueble) {
-          throw new ApiError(400, {
-            error: {
-              code: "VALIDATION_ERROR",
-              message: "No se pudo cargar el catálogo de tipos de inmueble",
-            },
-          });
-        }
-
-        let localidad = localidades.items.find((item) => item.name.toLowerCase().includes("bre"));
-        if (!localidad) {
-          localidad = await createLocalidad(token, {
-            name: "Las Breñas",
-            province: "Chaco",
-          });
-        }
-
-        const inmueblePrefix = prefixForTipoInmueble(property.tipoInmuebleCode);
-        const reservedInmuebleCodes = [...usedInmuebleCodes];
-        for (let attempt = 0; attempt < 5; attempt += 1) {
-          const inmuebleCode = nextInmuebleCode(inmueblePrefix, reservedInmuebleCodes);
-          try {
-            inmueble = await createInmueble(token, {
-              code: inmuebleCode,
-              tipoInmuebleId: tipoInmueble.id,
-              localidadId: localidad.id,
-              title: property.propertyLabel.trim(),
-              direccion: property.propertyAddress.trim(),
-            });
-            break;
-          } catch (err) {
-            if (err instanceof ApiError && err.status === 409) {
-              reservedInmuebleCodes.push(inmuebleCode);
-              continue;
-            }
-            throw err;
-          }
-        }
-
-        if (!inmueble) {
-          throw new ApiError(409, {
-            error: {
-              code: "CONFLICT",
-              message: "No se pudo reservar un código de inmueble. Reintentá.",
-            },
-          });
-        }
+        const { alta } = form.property;
+        inmueble = await altaInmuebleCatalogo(token, {
+          localidadId: Number(alta.direccion.localidadId),
+          calle: alta.direccion.calle,
+          numero: alta.direccion.numero,
+          referencia: alta.direccion.referencia,
+          alias: alta.alias,
+          tipoInmuebleCode: alta.tipoInmuebleCode,
+          reservedCodes: usedInmuebleCodes,
+          tiposInmueble: codeContext?.tiposInmueble,
+        });
 
         await addInmueblePropietario(token, inmueble.id, {
           personaId: propietario.id,
@@ -604,6 +575,7 @@ export function AlquileresWorkspace() {
             diaVencimientoPago: moraPayload.diaVencimientoPago,
             frecuenciaAjusteMeses: form.frecuenciaAjusteMeses,
             tipoIndiceId: indexItem.id,
+            notasIndice,
             tipoMoraId: moraPayload.tipoMoraId,
             tasaMora: moraPayload.tasaMora,
             montoMoraFijo: moraPayload.montoMoraFijo,
@@ -675,6 +647,8 @@ export function AlquileresWorkspace() {
           hasStats={tableStats !== null}
           error={error}
           stats={stats}
+          activeChip={activeChip}
+          onChipSelect={setActiveChip}
         />
 
         {error ? (
@@ -688,6 +662,7 @@ export function AlquileresWorkspace() {
           <RentalsTable
             rows={rows}
             loading={loading}
+            isSearchPending={isSearchPending}
             serverMode
             total={tableTotal}
             page={pageIndex + 1}
@@ -701,6 +676,7 @@ export function AlquileresWorkspace() {
             activeChip={activeChip}
             onSearchChange={setSearchQuery}
             onChipChange={setActiveChip}
+            onClearFilters={clearFilters}
             onPrefetch={(row) => prefetchContrato(Number(row.id))}
             onViewFicha={(row) => openFicha(row.id)}
             onCollect={(row) => void openCollectFromRow(row)}
@@ -767,6 +743,7 @@ export function AlquileresWorkspace() {
         tiposInmueble={codeContext?.tiposInmueble ?? []}
         usedInmuebleCodes={codeContext?.inmuebleCodes ?? []}
         personas={codeContext?.personas ?? []}
+        token={token ?? undefined}
         inmueblesSinAlquiler={codeContext?.inmueblesSinAlquiler ?? []}
         />
       ) : null}

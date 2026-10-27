@@ -42,3 +42,19 @@ next-env.d.ts
 /test-results/
 /playwright-report/
 /blob-report/
+
+# ux-ui-agent-skills (local dev only — do not commit)
+/accessibility/
+/content/
+/design-systems/
+/examples/
+/frameworks/
+/taste/
+/templates/
+/tokens/
+/workflows/
+/scripts/
+/components/
+/CLAUDE.md
+/frontend-design-principles.md
+/.ds-receipts/

@@ -6,21 +6,19 @@ import { Search } from "lucide-react";
 
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { KpiCard } from "@/components/ui/KpiCard";
-import { KpiSkeletonRow, PageHeaderSkeleton, TableSkeleton } from "@/components/ui/Skeleton";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useAuth } from "@/context/auth-context";
 import { clienteFilters, type ClienteFilterId, type ClienteRow } from "@/data/clientes";
-import { ApiError, fetchPersonas } from "@/lib/api";
-import { fetchClientesContext } from "@/lib/api/clientes-context";
-import type { PersonaRecord } from "@/lib/api/types";
+import { ApiError, fetchClientesKpis, fetchPersonas } from "@/lib/api";
+import { prefetchClientesList } from "@/lib/api/clientes-list";
+import type { ClientesKpis } from "@/lib/api/types";
 import { useCursorPagination } from "@/lib/hooks/use-cursor-pagination";
 import { pagePaddingClass } from "@/lib/layout";
 import { useClientePrefetch } from "@/lib/use-cliente-prefetch";
 import {
-  type ClientesContext,
   clienteFilterToVinculo,
   filterClientes,
-  mapClientesKpisFromContext,
+  mapClientesKpisFromCounts,
   mapPersonaToClienteRow,
   vinculoBadgeClass,
 } from "@/lib/mappers/clientes";
@@ -51,7 +49,7 @@ export function ClientesView() {
     goPrev,
   } = useCursorPagination();
   const [totalPersonas, setTotalPersonas] = useState(0);
-  const [context, setContext] = useState<ClientesContext | null>(null);
+  const [kpis, setKpis] = useState<ClientesKpis | null>(null);
   const [listTab, setListTab] = useState<"listado" | "nuevo">("listado");
 
   const load = useCallback(async () => {
@@ -61,26 +59,33 @@ export function ClientesView() {
 
     try {
       if (activeFilter === "juridico" || activeFilter === "visas") {
-        const clientesContext = await fetchClientesContext(token);
-        setContext(clientesContext);
+        const counts = await fetchClientesKpis(token);
+        setKpis(counts);
         setClienteRows([]);
         setTotalPersonas(0);
         return;
       }
 
-      const clientesContext = await fetchClientesContext(token);
       const vinculo = clienteFilterToVinculo(activeFilter);
+      const search = debouncedSearch.trim() || undefined;
+      const isDefaultList = activeFilter === "todos" && !currentCursor && !search;
 
-      const personasRes = await fetchPersonas(token, {
-        limit: PAGE_SIZE,
-        cursor: currentCursor,
-        q: debouncedSearch.trim() || undefined,
-        vinculo,
-      });
+      const [counts, personasRes] = isDefaultList
+        ? await prefetchClientesList(token, PAGE_SIZE).then((cached) => [cached.kpis, cached.personas] as const)
+        : await Promise.all([
+            fetchClientesKpis(token),
+            fetchPersonas(token, {
+              limit: PAGE_SIZE,
+              cursor: currentCursor,
+              q: search,
+              vinculo,
+              withVinculos: true,
+            }),
+          ]);
 
-      const rows = personasRes.items.map((persona) => mapPersonaToClienteRow(persona, clientesContext));
+      const rows = personasRes.items.map((persona) => mapPersonaToClienteRow(persona));
 
-      setContext(clientesContext);
+      setKpis(counts);
       setClienteRows(rows);
       setTotalPersonas(personasRes.total ?? personasRes.items.length);
       applyResponse(personasRes.nextCursor);
@@ -115,16 +120,12 @@ export function ClientesView() {
     router.replace("/clientes");
   }, [searchParams, router]);
 
-  const kpis = useMemo(
+  const kpiCards = useMemo(
     () =>
-      context
-        ? mapClientesKpisFromContext(totalPersonas, context)
-        : mapClientesKpisFromContext(0, {
-            inquilinoIds: new Set(),
-            propietarioIds: new Set(),
-            morosoIds: new Set(),
-          }),
-    [context, totalPersonas],
+      kpis
+        ? mapClientesKpisFromCounts(kpis)
+        : mapClientesKpisFromCounts({ total: 0, inquilinos: 0, propietarios: 0, morosos: 0 }),
+    [kpis],
   );
 
   const filteredRows = useMemo(
@@ -137,14 +138,14 @@ export function ClientesView() {
 
   const filterCounts = useMemo(
     () => ({
-      todos: totalPersonas,
-      inquilinos: context?.inquilinoIds.size ?? 0,
-      propietarios: context?.propietarioIds.size ?? 0,
+      todos: kpis?.total ?? totalPersonas,
+      inquilinos: kpis?.inquilinos ?? 0,
+      propietarios: kpis?.propietarios ?? 0,
       juridico: 0,
       visas: 0,
-      morosos: context?.morosoIds.size ?? 0,
+      morosos: kpis?.morosos ?? 0,
     }),
-    [context, totalPersonas],
+    [kpis, totalPersonas],
   );
 
   const hasSearch = searchQuery.trim().length > 0;
@@ -161,17 +162,7 @@ export function ClientesView() {
     return `${countLabel} · ${filterLabel}`;
   }, [filteredRows.length, hasSearch, activeFilter, totalPersonas]);
 
-  if (loading && !context) {
-    return (
-      <div className={`flex flex-col gap-6 ${pagePaddingClass}`}>
-        <PageHeaderSkeleton />
-        <KpiSkeletonRow />
-        <TableSkeleton rows={8} columns={6} />
-      </div>
-    );
-  }
-
-  if (error) {
+  if (error && clienteRows.length === 0 && !kpis) {
     return (
       <div className={pagePaddingClass}>
         <p className="rounded-sm border border-danger bg-danger-bg px-3 py-2 text-sm text-danger">{error}</p>
@@ -229,9 +220,11 @@ export function ClientesView() {
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {kpis.map((kpi) => (
-            <KpiCard key={kpi.label} {...kpi} />
-          ))}
+          {loading && !kpis
+            ? Array.from({ length: 4 }).map((_, index) => (
+                <div key={index} className="h-[88px] animate-pulse rounded-md border border-border bg-bg-card" />
+              ))
+            : kpiCards.map((kpi) => <KpiCard key={kpi.label} {...kpi} />)}
         </div>
 
         <section className="overflow-hidden rounded-md border border-border bg-bg-card">

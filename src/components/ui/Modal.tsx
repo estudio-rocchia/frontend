@@ -3,6 +3,7 @@
 import { X } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 import { useScrollLock } from "@/lib/use-scroll-lock";
 
 export function Modal({
@@ -30,7 +31,7 @@ export function Modal({
     <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden p-4">
       <button
         type="button"
-        className="absolute inset-0 bg-[#1a2b3266]"
+        className={`absolute inset-0 bg-[#1a2b3266] ${interactiveFocusClass}`}
         aria-label="Cerrar"
         onClick={onClose}
       />
@@ -52,7 +53,7 @@ export function Modal({
           <button
             type="button"
             onClick={onClose}
-            className="text-text-secondary hover:text-text-primary"
+            className={`rounded-sm p-1 text-text-secondary hover:text-text-primary ${interactiveFocusClass}`}
             aria-label="Cerrar"
           >
             <X className="h-5 w-5" />

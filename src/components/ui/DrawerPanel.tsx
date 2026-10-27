@@ -13,6 +13,8 @@ export function DrawerPanel({
   footer,
   children,
   banner,
+  size = "default",
+  headerMode = "default",
 }: {
   open: boolean;
   onClose: () => void;
@@ -21,7 +23,11 @@ export function DrawerPanel({
   footer?: ReactNode;
   banner?: ReactNode;
   children: ReactNode;
+  size?: "default" | "wide";
+  headerMode?: "default" | "minimal";
 }) {
+  const widthClass =
+    size === "wide" ? "sm:max-w-[min(720px,100vw)]" : "sm:max-w-[min(520px,100vw)]";
   useScrollLock(open);
 
   useEffect(() => {
@@ -44,23 +50,28 @@ export function DrawerPanel({
         onClick={onClose}
       />
       <aside
-        className="relative flex h-full max-h-[100dvh] w-full max-w-full flex-col overflow-hidden border-l border-border bg-bg-card shadow-[-4px_0_24px_#1a2b3228] sm:max-w-[min(520px,100vw)]"
+        className={`relative flex h-full max-h-[100dvh] w-full max-w-full flex-col overflow-hidden border-l border-border bg-bg-page shadow-[-4px_0_24px_#1a2b3228] ${widthClass}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="drawer-title"
       >
-        <header className="flex shrink-0 items-center justify-between border-b border-border px-4 py-4 sm:px-6 sm:py-5">
-          <div className="flex flex-col gap-1">
-            <h2
-              id="drawer-title"
-              className="text-lg font-bold text-text-primary"
-            >
-              {title}
-            </h2>
-            {subtitle ? (
-              <p className="text-[13px] text-text-secondary">{subtitle}</p>
-            ) : null}
-          </div>
+        <header
+          className={`flex shrink-0 items-center border-b border-border ${
+            headerMode === "minimal"
+              ? "justify-end px-4 py-3 sm:px-5"
+              : "justify-between px-4 py-4 sm:px-6 sm:py-5"
+          }`}
+        >
+          {headerMode === "default" ? (
+            <div className="flex flex-col gap-1">
+              <h2 id="drawer-title" className="text-lg font-bold text-text-primary">
+                {title}
+              </h2>
+              {subtitle ? <p className="text-[13px] text-text-secondary">{subtitle}</p> : null}
+            </div>
+          ) : (
+            <span id="drawer-title" className="sr-only">{title}</span>
+          )}
           <button
             type="button"
             onClick={onClose}
@@ -71,7 +82,7 @@ export function DrawerPanel({
           </button>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-5 sm:py-5">
           {banner ? <div className="mb-6">{banner}</div> : null}
           {children}
         </div>

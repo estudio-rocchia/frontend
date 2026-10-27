@@ -1,0 +1,5 @@
+export const MOTIVOS_FUERA_MERCADO = [
+  "SALIÓ DE LA VENTA",
+  "VENDIDO DE MANERA PARTICULAR",
+  "VENDIDO POR RBR",
+] as const;

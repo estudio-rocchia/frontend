@@ -13,6 +13,15 @@ type PrefetchEntry = {
     apellido?: string | null;
     razonSocial?: string | null;
   }>;
+  inmuebleContext: {
+    localidad: {
+      id: number;
+      name: string;
+      province: string;
+      country: string;
+    } | null;
+    tipoName: string | null;
+  } | null;
 };
 
 const cache = new Map<number, Promise<PrefetchEntry>>();
@@ -26,15 +35,20 @@ export function useContratoPrefetch(token: string | null) {
 
       const promise = fetchContrato(token, contratoId).then(async (detail) => {
         let propietarios: PrefetchEntry["propietarios"] = [];
+        let inmuebleContext: PrefetchEntry["inmuebleContext"] = null;
         if (detail.inmueble?.id) {
           try {
             const ficha = await fetchInmuebleFicha(token, detail.inmueble.id);
             propietarios = ficha.propietarios;
+            inmuebleContext = {
+              localidad: ficha.localidad ?? null,
+              tipoName: ficha.tipoInmueble?.name ?? null,
+            };
           } catch {
             // staff may lack owner detail permission
           }
         }
-        return { detail, propietarios };
+        return { detail, propietarios, inmuebleContext };
       });
 
       inflight.current.set(contratoId, promise);

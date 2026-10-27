@@ -3,7 +3,7 @@ import {
   CalendarDays,
   KeyRound,
   LayoutDashboard,
-  Map,
+  Handshake,
   Scale,
   ShieldCheck,
   Stamp,
@@ -19,10 +19,10 @@ export type NavItem = {
 };
 
 export const mainNav: NavItem[] = [
-  { label: "Dashboard", href: "/", icon: LayoutDashboard },
+  { label: "Inicio", href: "/", icon: LayoutDashboard },
   { label: "Alquileres", href: "/alquileres", icon: KeyRound },
   { label: "Índices", href: "/indices", icon: TrendingUp },
-  { label: "Loteos", href: "/loteos", icon: Map },
+  { label: "Ventas", href: "/ventas", icon: Handshake },
   { label: "Jurídico", href: "/juridico", icon: Scale },
   { label: "Visas", href: "/visas", icon: Stamp },
   { label: "Clientes", href: "/clientes", icon: Users },

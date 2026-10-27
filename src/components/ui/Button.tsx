@@ -1,7 +1,9 @@
 import type { ButtonHTMLAttributes } from "react";
 
+import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
+
 const base =
-  "inline-flex items-center justify-center rounded-sm px-[18px] py-2.5 text-sm font-medium transition-colors";
+  `inline-flex items-center justify-center rounded-sm px-[18px] py-2.5 text-sm font-medium transition-colors ${interactiveFocusClass}`;
 
 export function ButtonOutline({
   className = "",

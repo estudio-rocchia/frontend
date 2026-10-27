@@ -1,20 +1,21 @@
-import type { AdjustmentIndex } from "@/data/alquileres-contract-details";
 import type { ContratoDetail } from "@/lib/api/types";
 
-export const ADJUSTMENT_INDICES: AdjustmentIndex[] = ["ICL", "IPC", "CAC"];
+export {
+  ADJUSTMENT_INDICES,
+  ADJUSTMENT_INDEX_CHIP_OPTIONS,
+  PUBLISHED_ADJUSTMENT_INDICES,
+  adjustmentIndexFromCatalogCode,
+  adjustmentIndexLabel,
+  catalogCodeFromAdjustmentIndex,
+  indiceCodeFromContrato,
+  isAgreedAdjustmentContrato,
+  isPublishedAdjustmentIndex,
+  resolveTipoIndiceItem,
+} from "@/lib/rental-adjustment-index";
+
 export const FRECUENCIAS_AJUSTE = [3, 4, 6, 12] as const;
 
 export type MonthYear = { mes: number; anio: number };
-
-const INDICE_CODES = ADJUSTMENT_INDICES;
-
-export function indiceCodeFromContrato(contrato: ContratoDetail): AdjustmentIndex | null {
-  const code = contrato.tipoIndice?.code?.toUpperCase();
-  if (code && INDICE_CODES.includes(code as AdjustmentIndex)) {
-    return code as AdjustmentIndex;
-  }
-  return null;
-}
 
 function toIsoMonthStart(date: Date): string {
   const year = date.getFullYear();

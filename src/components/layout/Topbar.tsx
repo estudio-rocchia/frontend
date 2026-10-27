@@ -1,7 +1,8 @@
 "use client";
 
-import { Bell, Menu } from "lucide-react";
+import { Menu } from "lucide-react";
 
+import { NotificationBell } from "@/components/layout/NotificationBell";
 import { useAuth } from "@/context/auth-context";
 import { ButtonOutline } from "@/components/ui/Button";
 
@@ -21,13 +22,7 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
       </button>
 
       <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
-        <button
-          type="button"
-          className="text-text-secondary hover:text-text-primary"
-          aria-label="Notificaciones"
-        >
-          <Bell className="h-5 w-5" />
-        </button>
+        <NotificationBell />
         <div className="flex items-center gap-2 rounded-full bg-primary-soft py-1.5 pl-1.5 pr-2 sm:pr-3">
           <div className="h-7 w-7 shrink-0 rounded-full bg-accent-sky" aria-hidden />
           <span className="hidden max-w-[120px] truncate text-[13px] font-semibold text-text-primary sm:inline md:max-w-none">
