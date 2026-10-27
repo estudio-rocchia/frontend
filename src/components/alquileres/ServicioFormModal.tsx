@@ -37,12 +37,14 @@ function Field({
   onChange,
   placeholder,
   type = "text",
+  hint,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
   type?: string;
+  hint?: string;
 }) {
   return (
     <label className="flex flex-col gap-1.5">
@@ -54,7 +56,61 @@ function Field({
         placeholder={placeholder}
         className="rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
       />
+      {hint ? <span className="text-[11px] text-text-secondary">{hint}</span> : null}
     </label>
+  );
+}
+
+function ModoFacturacionToggle({
+  value,
+  onChange,
+  isWater,
+}: {
+  value: ModoFacturacion;
+  onChange: (mode: ModoFacturacion) => void;
+  isWater?: boolean;
+}) {
+  const options: { id: ModoFacturacion; label: string; description: string }[] = [
+    {
+      id: "fixed",
+      label: "Monto fijo mensual",
+      description: isWater
+        ? "Usás este monto al registrar cada período"
+        : "Mismo importe cada mes",
+    },
+    {
+      id: "variable",
+      label: "Por boleta",
+      description: "Cargás el monto de cada período manualmente",
+    },
+  ];
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-[11px] font-semibold text-text-secondary">Modo de facturación</span>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {options.map((option) => {
+          const selected = value === option.id;
+          return (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => onChange(option.id)}
+              className={`rounded-sm border px-3 py-2.5 text-left transition-colors ${
+                selected
+                  ? "border-primary bg-primary/10"
+                  : "border-border bg-bg-page hover:border-primary/40"
+              }`}
+            >
+              <p className={`text-[13px] font-medium ${selected ? "text-primary" : "text-text-primary"}`}>
+                {option.label}
+              </p>
+              <p className="mt-0.5 text-[11px] leading-relaxed text-text-secondary">{option.description}</p>
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -67,6 +123,7 @@ export function ServicioFormModal({
   activeServicios,
   editing,
   defaultCurrency = "ARS",
+  defaultTipoCode = null,
 }: {
   open: boolean;
   onClose: () => void;
@@ -76,6 +133,7 @@ export function ServicioFormModal({
   activeServicios: ServicioContratoRecord[];
   editing?: ServicioContratoRecord | null;
   defaultCurrency?: "ARS" | "USD";
+  defaultTipoCode?: string | null;
 }) {
   const [form, setForm] = useState<ServicioFormValues>(emptyForm);
 
@@ -100,15 +158,18 @@ export function ServicioFormModal({
       });
       return;
     }
-    const first = availableTipos[0];
-    const modo = first ? defaultModoForTipo(first.code) : "variable";
+    const preferred =
+      (defaultTipoCode
+        ? availableTipos.find((tipo) => tipo.code === defaultTipoCode)
+        : null) ?? availableTipos[0];
+    const modo = preferred ? defaultModoForTipo(preferred.code) : "variable";
     setForm({
       ...emptyForm,
-      tipoServicioId: first?.id ?? 0,
+      tipoServicioId: preferred?.id ?? 0,
       modoFacturacion: modo,
       codigoMoneda: defaultCurrency,
     });
-  }, [open, editing, availableTipos, defaultCurrency]);
+  }, [open, editing, availableTipos, defaultCurrency, defaultTipoCode]);
 
   function handleTipoChange(tipoId: number) {
     const tipo = tiposServicio.find((t) => t.id === tipoId);
@@ -139,17 +200,36 @@ export function ServicioFormModal({
     onSubmit(form);
   }
 
-  const isFixed = form.modoFacturacion === "fixed";
-  const title = editing ? "Editar servicio" : "Agregar servicio";
   const selectedTipo = tiposServicio.find((t) => t.id === form.tipoServicioId);
   const isElectricity = selectedTipo?.code === "electricity";
   const isWater = selectedTipo?.code === "water";
   const isOther = selectedTipo?.code === "other";
+  const isFixed = form.modoFacturacion === "fixed";
+  const lockTipoSelect = !editing && defaultTipoCode === "water" && isWater;
+
+  const title = editing
+    ? isWater
+      ? "Editar servicio de agua"
+      : "Editar servicio"
+    : isWater || defaultTipoCode === "water"
+      ? "Configurar servicio de agua"
+      : "Agregar servicio";
+
   const modalSubtitle = selectedTipo
     ? isOther
       ? form.nombrePersonalizado.trim() || selectedTipo.name
-      : selectedTipo.name
+      : isWater && !editing
+        ? "Definí el monto mensual de referencia para los períodos que registres"
+        : selectedTipo.name
     : undefined;
+
+  const submitLabel = submitting
+    ? "Guardando…"
+    : editing
+      ? "Guardar"
+      : isWater
+        ? "Configurar agua"
+        : "Agregar";
 
   return (
     <Modal
@@ -172,13 +252,13 @@ export function ServicioFormModal({
               (isFixed && (!form.montoFijo || Number(form.montoFijo) <= 0))
             }
           >
-            {submitting ? "Guardando…" : editing ? "Guardar" : "Agregar"}
+            {submitLabel}
           </ButtonPrimary>
         </>
       }
     >
       <div className="flex flex-col gap-4">
-        {!editing ? (
+        {!editing && !lockTipoSelect ? (
           <label className="flex flex-col gap-1.5">
             <span className="text-[11px] font-semibold text-text-secondary">Tipo de servicio</span>
             <select
@@ -208,72 +288,93 @@ export function ServicioFormModal({
           />
         ) : null}
 
-        <Field
-          label="Proveedor"
-          value={form.provider}
-          onChange={(v) => setForm((prev) => ({ ...prev, provider: v }))}
-          placeholder="Ej. Aguas Chaqueñas, Cooperativa"
-        />
         {isWater ? (
-          <Field
-            label="Nº medidor / cuenta"
-            value={form.numeroMedidor}
-            onChange={(v) => setForm((prev) => ({ ...prev, numeroMedidor: v }))}
-            placeholder="Ej. medidor agua"
-          />
-        ) : isElectricity ? (
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="flex flex-col gap-3 rounded-md border border-border bg-bg-page p-3">
+            <p className="text-[12px] font-semibold text-text-primary">Datos del suministro</p>
             <Field
-              label="Nº cliente SECHEEP"
-              value={form.numeroClienteSecheep}
-              onChange={(v) => setForm((prev) => ({ ...prev, numeroClienteSecheep: v }))}
-              placeholder="Ej. 189424"
+              label="Proveedor"
+              value={form.provider}
+              onChange={(v) => setForm((prev) => ({ ...prev, provider: v }))}
+              placeholder="Ej. Aguas Chaqueñas"
             />
             <Field
-              label="Nº suministro SECHEEP"
-              value={form.numeroSuministroSecheep}
-              onChange={(v) => setForm((prev) => ({ ...prev, numeroSuministroSecheep: v }))}
-              placeholder="Ej. 4"
+              label="Nº medidor o cuenta"
+              value={form.numeroMedidor}
+              onChange={(v) => setForm((prev) => ({ ...prev, numeroMedidor: v }))}
+              placeholder="Opcional"
+              hint="Referencia para identificar el suministro en el contrato"
             />
           </div>
         ) : (
-          <Field
-            label="Referencia / cuenta"
-            value={form.numeroMedidor}
-            onChange={(v) => setForm((prev) => ({ ...prev, numeroMedidor: v }))}
-            placeholder="Nº de cuenta, contrato u otro dato"
-          />
+          <>
+            <Field
+              label="Proveedor"
+              value={form.provider}
+              onChange={(v) => setForm((prev) => ({ ...prev, provider: v }))}
+              placeholder="Ej. Aguas Chaqueñas, Cooperativa"
+            />
+            {isElectricity ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field
+                  label="Nº cliente SECHEEP"
+                  value={form.numeroClienteSecheep}
+                  onChange={(v) => setForm((prev) => ({ ...prev, numeroClienteSecheep: v }))}
+                  placeholder="Ej. 189424"
+                />
+                <Field
+                  label="Nº suministro SECHEEP"
+                  value={form.numeroSuministroSecheep}
+                  onChange={(v) => setForm((prev) => ({ ...prev, numeroSuministroSecheep: v }))}
+                  placeholder="Ej. 4"
+                />
+              </div>
+            ) : (
+              <Field
+                label="Referencia / cuenta"
+                value={form.numeroMedidor}
+                onChange={(v) => setForm((prev) => ({ ...prev, numeroMedidor: v }))}
+                placeholder="Nº de cuenta, contrato u otro dato"
+              />
+            )}
+          </>
         )}
 
-        <label className="flex flex-col gap-1.5">
-          <span className="text-[11px] font-semibold text-text-secondary">Modo de facturación</span>
-          <select
+        {isWater ? (
+          <ModoFacturacionToggle
             value={form.modoFacturacion}
-            onChange={(e) =>
-              setForm((prev) => ({
-                ...prev,
-                modoFacturacion: e.target.value as ModoFacturacion,
-              }))
-            }
-            className="rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
-          >
-            <option value="fixed">Monto fijo mensual</option>
-            <option value="variable">Por boleta / período</option>
-          </select>
-        </label>
+            onChange={(mode) => setForm((prev) => ({ ...prev, modoFacturacion: mode }))}
+            isWater
+          />
+        ) : (
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[11px] font-semibold text-text-secondary">Modo de facturación</span>
+            <select
+              value={form.modoFacturacion}
+              onChange={(e) =>
+                setForm((prev) => ({
+                  ...prev,
+                  modoFacturacion: e.target.value as ModoFacturacion,
+                }))
+              }
+              className="rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
+            >
+              <option value="fixed">Monto fijo mensual</option>
+              <option value="variable">Por boleta / período</option>
+            </select>
+          </label>
+        )}
 
         {isWater && isFixed ? (
-          <p className="rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[12px] leading-relaxed text-text-secondary">
-            Al guardar, se generan automáticamente los períodos mensuales desde el inicio del contrato hasta su
-            finalización. Si el monto sube más adelante, editá el servicio y se actualizan los períodos que todavía no
-            tienen pagos.
+          <p className="rounded-sm border border-primary/20 bg-primary/5 px-3 py-2.5 text-[12px] leading-relaxed text-text-secondary">
+            El monto fijo se aplica cuando registrás un período (no se crean boletas solas). Si sube el precio,
+            editá el servicio: los períodos sin pagos usan el nuevo monto.
           </p>
         ) : null}
 
         {isFixed ? (
           <div className="grid gap-3 sm:grid-cols-2">
             <Field
-              label="Monto fijo"
+              label={isWater ? "Monto mensual" : "Monto fijo"}
               value={form.montoFijo}
               onChange={(v) => setForm((prev) => ({ ...prev, montoFijo: v }))}
               placeholder="10000"
@@ -296,11 +397,11 @@ export function ServicioFormModal({
               </select>
             </label>
           </div>
-        ) : (
+        ) : !isWater ? (
           <p className="rounded-sm bg-bg-page px-3 py-2.5 text-[12px] text-text-secondary">
             El monto se carga al registrar cada boleta/período (útil cuando llegan atrasadas).
           </p>
-        )}
+        ) : null}
       </div>
     </Modal>
   );

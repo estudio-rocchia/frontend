@@ -158,7 +158,6 @@ export function ContractServiciosSection({
   const [pagoServicio, setPagoServicio] = useState<ServicioContratoRecord | null>(null);
   const [secheepModalOpen, setSecheepModalOpen] = useState(false);
   const [secheepServicio, setSecheepServicio] = useState<ServicioContratoRecord | null>(null);
-
   const activeServicios = useMemo(() => servicios.filter((s) => s.activo), [servicios]);
   const inactiveServicios = useMemo(() => servicios.filter((s) => !s.activo), [servicios]);
   const saldoTotal = useMemo(() => totalSaldoPendiente(periodos, servicios), [periodos, servicios]);
@@ -236,19 +235,19 @@ export function ContractServiciosSection({
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <p className="text-[13px] text-text-secondary">
-          Agua y otros cargos que cobra la inmobiliaria. La luz se controla por SECHEEP (no se cobra acá).
+          El agua se cobra desde acá. La luz se controla por SECHEEP y otros cargos se gestionan aparte.
         </p>
         {canEdit ? (
-          <ButtonPrimary
+          <ButtonOutline
             type="button"
             onClick={() => {
               setEditingServicio(null);
-              setServicioModalOpen(true);
+                        setServicioModalOpen(true);
             }}
             disabled={submitting || !canAddServicio}
           >
-            Agregar servicio
-          </ButtonPrimary>
+            Agregar otro servicio
+          </ButtonOutline>
         ) : null}
       </div>
 
@@ -278,6 +277,7 @@ export function ContractServiciosSection({
           hint="En servicios activos"
         />
       </div>
+
 
       <div className="flex flex-wrap gap-2 border-b border-border">
         {subTabs.map((tab) => (
@@ -369,8 +369,8 @@ export function ContractServiciosSection({
                               }}
                             >
                               {servicioPeriodos.length > 0
-                                ? `${servicioPeriodos.length} período${servicioPeriodos.length === 1 ? "" : "s"} generados · Ver listado`
-                                : "Sin períodos generados todavía"}
+                                ? `${servicioPeriodos.length} período${servicioPeriodos.length === 1 ? "" : "s"} cargados · Ver listado`
+                                : "Sin períodos cargados todavía"}
                             </button>
                           ) : null}
                           {servicio.secheepConsultadoEn ? (
@@ -402,7 +402,7 @@ export function ContractServiciosSection({
                         {canEdit ? (
                           <td className="px-4 py-3">
                             <div className="flex flex-wrap justify-end gap-1.5">
-                              {servicio.modoFacturacion === "variable" ? (
+                              {servicioEsCobrable(servicio) ? (
                                 <ButtonOutline
                                   type="button"
                                   className="px-2.5 py-1 text-xs"
