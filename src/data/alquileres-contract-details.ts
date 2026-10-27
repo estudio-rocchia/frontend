@@ -1,4 +1,4 @@
-export type AdjustmentIndex = "ICL" | "IPC" | "CAC";
+export type AdjustmentIndex = "ICL" | "IPC" | "CAC" | "ACUERDO";
 
 export type ContractDetail = {
   id: string;
@@ -8,6 +8,7 @@ export type ContractDetail = {
   contractStart: string;
   contractEnd: string;
   property: string;
+  propertyLocation: string;
   tenant: string;
   owner: string;
   guarantors: string;
