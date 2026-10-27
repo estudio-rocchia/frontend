@@ -1,5 +1,8 @@
 import type { ReactNode } from "react";
 
+import { formInputClass, interactiveFocusClass } from "@/lib/ui/interactive-focus";
+import { VENTA_EMPTY_FIELD } from "@/lib/ventas/empty-field";
+
 export function FormSection({
   title,
   description,
@@ -37,10 +40,13 @@ export function FormSection({
 }
 
 export function FieldBlock({ label, value }: { label: string; value: string }) {
+  const empty = value === VENTA_EMPTY_FIELD;
   return (
-    <div className="flex flex-col gap-1">
-      <span className="text-[11px] font-semibold text-text-secondary">{label}</span>
-      <span className="text-[13px] text-text-primary">{value}</span>
+    <div className="flex flex-col gap-1 rounded-sm border border-border/70 bg-bg-card px-3 py-2.5">
+      <span className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">{label}</span>
+      <span className={`text-[13px] ${empty ? "text-text-secondary" : "font-medium text-text-primary"}`}>
+        {value}
+      </span>
     </div>
   );
 }
@@ -66,7 +72,7 @@ export function FormField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
-        className="rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
+        className={formInputClass}
       />
     </label>
   );
@@ -90,7 +96,7 @@ export function ChipToggle({
             key={option}
             type="button"
             onClick={() => onChange(option)}
-            className={`rounded-full border border-border px-3.5 py-2 text-[13px] transition-colors ${
+            className={`rounded-full border border-border px-3.5 py-2 text-[13px] transition-colors ${interactiveFocusClass} ${
               selected
                 ? "bg-primary-soft font-semibold text-primary"
                 : "bg-bg-card font-normal text-text-secondary hover:text-text-primary"
