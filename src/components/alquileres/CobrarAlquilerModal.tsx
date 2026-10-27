@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Modal } from "@/components/ui/Modal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
@@ -56,6 +56,7 @@ import {
   periodosServiciosParaCobroCuota,
   servicioPeriodoCobroLabel,
 } from "@/lib/mappers/servicios";
+import { defaultMedioPagoParaCobro, mediosPagoParaCobro } from "@/lib/mappers/medios-pago";
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -92,6 +93,8 @@ export function CobrarAlquilerModal({
   mediosPago: CatalogoItem[];
   onSuccess: () => void;
 }) {
+  const mediosPagoOpciones = useMemo(() => mediosPagoParaCobro(mediosPago), [mediosPago]);
+
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -126,10 +129,7 @@ export function CobrarAlquilerModal({
       setLoading(true);
       setError(null);
       setFechaPago(todayIso());
-      const defaultMedio =
-        mediosPago.find((m) => m.code === "transfer") ??
-        mediosPago.find((m) => m.code === "cash") ??
-        mediosPago[0];
+      const defaultMedio = defaultMedioPagoParaCobro(mediosPago);
       setMedioPagoId(defaultMedio?.id ?? 0);
       setEmitRecibo(true);
 
@@ -228,8 +228,8 @@ export function CobrarAlquilerModal({
       const recibo = await issueRecibo(token, primaryPagoId, {
         additionalPagoIds: additionalPagoIds.length > 0 ? additionalPagoIds : undefined,
       });
-      const pdf = await downloadReciboPdf(token, recibo.id);
-      downloadBlob(pdf, `recibo-${recibo.reciboNumber}.pdf`);
+      const { blob, filename } = await downloadReciboPdf(token, recibo.id);
+      downloadBlob(blob, filename ?? `recibo-${recibo.reciboNumber}.pdf`);
     } catch {
       // pago ok, recibo falló — el workspace refresca igual
     }
@@ -549,7 +549,7 @@ export function CobrarAlquilerModal({
                 onChange={(e) => setMedioPagoId(Number(e.target.value))}
                 className="rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
               >
-                {mediosPago.map((medio) => (
+                {mediosPagoOpciones.map((medio) => (
                   <option key={medio.id} value={medio.id}>
                     {medio.name}
                   </option>

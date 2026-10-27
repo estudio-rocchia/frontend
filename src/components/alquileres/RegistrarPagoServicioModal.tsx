@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Modal } from "@/components/ui/Modal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import type { CatalogoItem, PeriodoServicioRecord } from "@/lib/api/types";
 import { formatMoney } from "@/lib/format";
+import { defaultMedioPagoParaCobro, mediosPagoParaCobro } from "@/lib/mappers/medios-pago";
 import { periodoRangeLabel } from "@/lib/mappers/servicios";
 
 export type RegistrarPagoServicioFormValues = {
@@ -65,6 +66,8 @@ export function RegistrarPagoServicioModal({
   servicioLabel: string;
   mediosPago: CatalogoItem[];
 }) {
+  const mediosPagoOpciones = useMemo(() => mediosPagoParaCobro(mediosPago), [mediosPago]);
+
   const [form, setForm] = useState<RegistrarPagoServicioFormValues>({
     fechaPago: todayIso(),
     monto: "",
@@ -76,8 +79,7 @@ export function RegistrarPagoServicioModal({
 
   useEffect(() => {
     if (!open || !periodo) return;
-    const defaultMedio =
-      mediosPago.find((m) => m.code === "transfer") ?? mediosPago.find((m) => m.code === "cash") ?? mediosPago[0];
+    const defaultMedio = defaultMedioPagoParaCobro(mediosPago);
     setForm({
       fechaPago: todayIso(),
       monto: String(Number(periodo.saldo) || Number(periodo.monto)),
@@ -152,10 +154,10 @@ export function RegistrarPagoServicioModal({
             onChange={(e) => setForm((prev) => ({ ...prev, medioPagoId: Number(e.target.value) }))}
             className="rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
           >
-            {mediosPago.length === 0 ? (
+            {mediosPagoOpciones.length === 0 ? (
               <option value="">Sin medios disponibles</option>
             ) : (
-              mediosPago.map((medio) => (
+              mediosPagoOpciones.map((medio) => (
                 <option key={medio.id} value={medio.id}>
                   {medio.name}
                 </option>
