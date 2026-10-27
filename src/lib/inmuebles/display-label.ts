@@ -37,6 +37,51 @@ export function inmuebleDisplayLabel(inmueble: {
   return inmueble.displayLabel?.trim() || inmueble.title?.trim() || inmueble.code?.trim() || "Inmueble";
 }
 
+/** Calle, número, referencia y localidad (sin código ni tipo). */
+export function inmuebleUbicacionCompleta(
+  inmueble: {
+    calle?: string | null;
+    numero?: string | null;
+    referencia?: string | null;
+    direccion?: string | null;
+    displayLabel?: string | null;
+    title?: string | null;
+  },
+  localidad?: { name: string; province?: string | null } | null,
+): string {
+  const calle = inmueble.calle?.trim();
+  const addressFromParts = buildInmuebleDireccion({
+    calle: calle || inmueble.direccion?.trim() || "",
+    ...(inmueble.numero ? { numero: inmueble.numero } : {}),
+    ...(inmueble.referencia ? { referencia: inmueble.referencia } : {}),
+  });
+  const addressLine = addressFromParts || inmueble.direccion?.trim() || "";
+
+  const localityLabel = localidad
+    ? [localidad.name, localidad.province].filter(Boolean).join(", ")
+    : "";
+
+  const full = [addressLine, localityLabel].filter(Boolean).join(" · ");
+  return full || "—";
+}
+
+/** Código, tipo y alias de publicación (sin dirección). */
+export function inmueblePropiedadNombre(
+  inmueble: { code?: string | null; title?: string | null },
+  tipoName?: string | null,
+): string {
+  const code = inmueble.code?.trim() || "";
+  const title = inmueble.title?.trim() || "";
+  const tipo = tipoName?.trim() || "";
+
+  const main = [code, tipo].filter(Boolean).join(" · ");
+  if (main && title && !main.toLowerCase().includes(title.toLowerCase())) {
+    return `${main} — ${title}`;
+  }
+  if (main) return main;
+  return title || code || "Inmueble";
+}
+
 /** Etiqueta de propiedad en listados de contratos (evita duplicar el código). */
 export function contractPropertyLabel(inmuebleCode: string, inmuebleTitle: string): string {
   const code = inmuebleCode.trim();

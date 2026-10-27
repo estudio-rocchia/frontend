@@ -41,7 +41,8 @@ export async function altaInmuebleCatalogo(
   const reservedCodes = [...input.reservedCodes];
   const alias = input.alias?.trim() || null;
 
-  for (let attempt = 0; attempt < 5; attempt += 1) {
+  const maxAttempts = Math.max(50, reservedCodes.length + 25);
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     const code = nextInmuebleCode(prefix, reservedCodes);
     try {
       return await createInmueble(token, {
