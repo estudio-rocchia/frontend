@@ -1,6 +1,6 @@
 "use client";
 
-import { Search } from "lucide-react";
+import { Loader2, Search, X } from "lucide-react";
 import { RentalFilterChips } from "@/components/alquileres/RentalFilterChips";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -8,6 +8,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import {
   canCollectRent,
   filterRentals,
+  rentalChipLabel,
   searchRentals,
   rentalOperationalCounts,
   type RentalChipId,
@@ -16,6 +17,7 @@ import {
 import type { ContratoTableStats } from "@/lib/api/types";
 import { contractEndHint, moneyClassName } from "@/lib/format";
 import { rentCollectionWindowHint } from "@/lib/rental-collection";
+import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 
 const PAGE_SIZE = 15;
 
@@ -51,6 +53,7 @@ type RentalsTableProps = {
   onPrefetch?: (row: RentalRow) => void;
   serverMode?: boolean;
   loading?: boolean;
+  isSearchPending?: boolean;
   total?: number;
   page?: number;
   pageSize?: number;
@@ -63,6 +66,7 @@ type RentalsTableProps = {
   activeChip?: RentalChipId;
   onSearchChange?: (query: string) => void;
   onChipChange?: (chip: RentalChipId) => void;
+  onClearFilters?: () => void;
   onPageChange?: (page: number) => void;
 };
 
@@ -75,6 +79,7 @@ export function RentalsTable({
   onPrefetch,
   serverMode = false,
   loading = false,
+  isSearchPending = false,
   total = 0,
   page = 1,
   pageSize = PAGE_SIZE,
@@ -87,6 +92,7 @@ export function RentalsTable({
   activeChip: controlledChip,
   onSearchChange,
   onChipChange,
+  onClearFilters,
   onPageChange,
 }: RentalsTableProps) {
   const operationalCounts = serverMode && stats
@@ -99,6 +105,9 @@ export function RentalsTable({
 
   const activeChip = controlledChip ?? defaultActiveChip(operationalCounts);
   const searchQuery = controlledSearch;
+  const hasActiveSearch = searchQuery.trim().length > 0;
+  const hasActiveChip = activeChip !== "todos";
+  const hasActiveFilters = hasActiveSearch || hasActiveChip;
 
   const filtered = serverMode
     ? rows
@@ -118,46 +127,89 @@ export function RentalsTable({
 
   return (
     <div className="flex flex-col gap-5">
-      <section className="flex flex-col gap-3">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
-          Filtrar contratos
-        </p>
-        <p className="text-xs text-text-secondary">{rentCollectionWindowHint()}</p>
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
-          <label className="flex min-w-0 items-center gap-2.5 rounded-sm border border-border bg-bg-page px-3 py-2.5 focus-within:border-primary lg:max-w-sm lg:shrink-0">
-            <Search className="h-4 w-4 shrink-0 text-text-secondary" aria-hidden />
-            <input
-              type="search"
-              value={searchQuery}
-              onChange={(event) => onSearchChange?.(event.target.value)}
-              placeholder="Contrato, propiedad o inquilino…"
-              aria-label="Buscar contratos"
-              className="min-w-0 flex-1 bg-transparent text-sm text-text-primary outline-none placeholder:text-text-secondary"
+      <section className="flex flex-col gap-4 rounded-md border border-border bg-bg-card p-4 shadow-[var(--shadow-card)] sm:p-5">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <div className="relative min-w-0 flex-1 lg:max-w-md">
+              <Search
+                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary"
+                aria-hidden
+              />
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(event) => onSearchChange?.(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape" && searchQuery) {
+                    event.preventDefault();
+                    onSearchChange?.("");
+                  }
+                }}
+                placeholder="Código, dirección, propiedad o inquilino…"
+                aria-label="Buscar contratos"
+                className={`w-full rounded-sm border border-border bg-bg-page py-2.5 pl-9 pr-9 text-[13px] text-text-primary placeholder:text-text-secondary focus:border-primary ${interactiveFocusClass}`}
+              />
+              {isSearchPending ? (
+                <Loader2
+                  className="absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-text-secondary"
+                  aria-hidden
+                />
+              ) : hasActiveSearch ? (
+                <button
+                  type="button"
+                  onClick={() => onSearchChange?.("")}
+                  className={`absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-sm text-text-secondary hover:bg-bg-cream hover:text-text-primary ${interactiveFocusClass}`}
+                  aria-label="Limpiar búsqueda"
+                >
+                  <X className="h-4 w-4" aria-hidden />
+                </button>
+              ) : null}
+            </div>
+
+            <RentalFilterChips
+              active={activeChip}
+              stats={stats}
+              onChange={(chip) => {
+                onChipChange?.(chip);
+                onPageChange?.(1);
+              }}
             />
-          </label>
-          <RentalFilterChips
-            active={activeChip}
-            counts={{
-              a_cobrar: operationalCounts.aCobrar,
-              ajuste_pendiente: operationalCounts.ajustePendiente,
-              renovacion_proxima: operationalCounts.renovacionProxima,
-            }}
-            onChange={(chip) => {
-              onChipChange?.(chip);
-              onPageChange?.(1);
-            }}
-          />
+          </div>
         </div>
+
+        {hasActiveFilters ? (
+          <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+            <span className="text-[12px] text-text-secondary">Filtros activos:</span>
+            {hasActiveSearch ? (
+              <span className="rounded-full bg-bg-page px-2.5 py-1 text-[12px] text-text-primary">
+                Búsqueda: «{searchQuery.trim()}»
+              </span>
+            ) : null}
+            {hasActiveChip ? (
+              <span className="rounded-full bg-primary-soft px-2.5 py-1 text-[12px] font-medium text-primary">
+                {rentalChipLabel(activeChip)}
+              </span>
+            ) : null}
+            {onClearFilters ? (
+              <button
+                type="button"
+                onClick={onClearFilters}
+                className="text-[12px] font-semibold text-primary underline-offset-2 hover:underline"
+              >
+                Limpiar todo
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+
+        {activeChip === "a_cobrar" ? (
+          <p className="text-[12px] text-text-secondary">{rentCollectionWindowHint()}</p>
+        ) : null}
       </section>
 
       <section className="flex min-h-[400px] flex-1 flex-col overflow-hidden rounded-md border border-border bg-bg-card shadow-[var(--shadow-card)]">
         <div className="border-b border-border px-4 py-4 sm:px-5">
           <h2 className="text-[15px] font-semibold text-text-primary">Listado de contratos</h2>
-          <p className="text-xs text-text-secondary">
-            {searchQuery.trim()
-              ? `Resultados de búsqueda · ${filteredTotal} contrato${filteredTotal === 1 ? "" : "s"}`
-              : `${filteredTotal} contrato${filteredTotal === 1 ? "" : "s"} en el filtro actual`}
-          </p>
         </div>
 
         <div className="overflow-x-auto">
@@ -166,7 +218,12 @@ export function RentalsTable({
               <tr className="h-11 bg-bg-cream text-xs font-semibold text-text-secondary">
                 <th className="px-3 sm:px-5">Contrato / Propiedad</th>
                 <th className="px-3 sm:px-5">Inquilino</th>
-                <th className="hidden px-3 sm:px-5 2xl:table-cell">Mes</th>
+                <th
+                  className="hidden px-3 sm:px-5 2xl:table-cell"
+                  title="Mes de la cuota pendiente o en mora"
+                >
+                  Período a cobrar
+                </th>
                 <th className="px-3 text-right sm:px-5">Alquiler actual</th>
                 <th className="hidden px-3 text-right sm:px-5 lg:table-cell">Días mora</th>
                 <th className="px-3 text-center sm:px-5">Estado</th>
@@ -189,8 +246,26 @@ export function RentalsTable({
                 ))
               ) : paginated.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-5 py-14 text-center text-sm text-text-secondary">
-                    No hay contratos para mostrar con este filtro.
+                  <td colSpan={10} className="px-5 py-14">
+                    <div className="mx-auto flex max-w-sm flex-col items-center gap-3 text-center">
+                      <p className="text-sm font-medium text-text-primary">
+                        {hasActiveFilters
+                          ? "No hay contratos con estos criterios"
+                          : "No hay contratos para mostrar"}
+                      </p>
+                      <p className="text-sm text-text-secondary">
+                        {hasActiveSearch
+                          ? "Probá con otro código, inmueble o nombre de inquilino."
+                          : hasActiveChip
+                            ? `Ningún contrato coincide con «${rentalChipLabel(activeChip)}».`
+                            : "Cuando haya contratos activos van a aparecer acá."}
+                      </p>
+                      {hasActiveFilters && onClearFilters ? (
+                        <ButtonOutline type="button" onClick={onClearFilters}>
+                          Limpiar filtros
+                        </ButtonOutline>
+                      ) : null}
+                    </div>
                   </td>
                 </tr>
               ) : (

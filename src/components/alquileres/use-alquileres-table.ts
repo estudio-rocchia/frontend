@@ -57,10 +57,17 @@ export function useAlquileresTable(token: string | null, logout: () => void) {
     }
   }, [token, logout, currentCursor, debouncedSearch, activeChip, applyResponse]);
 
+  const isSearchPending = searchQuery !== debouncedSearch;
+
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(searchQuery), 300);
     return () => window.clearTimeout(timer);
   }, [searchQuery]);
+
+  const clearFilters = useCallback(() => {
+    setSearchQuery("");
+    setActiveChip("todos");
+  }, []);
 
   useEffect(() => {
     resetPagination();
@@ -89,8 +96,10 @@ export function useAlquileresTable(token: string | null, logout: () => void) {
     goPrev,
     searchQuery,
     setSearchQuery,
+    isSearchPending,
     activeChip,
     setActiveChip,
+    clearFilters,
     tableTotal,
     tableStats,
     stats,

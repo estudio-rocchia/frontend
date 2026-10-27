@@ -13,7 +13,7 @@ test.describe("Alquileres — listado", () => {
     await expect(authedPage.getByRole("button", { name: "Ver ficha" }).first()).toBeVisible();
   });
 
-  test("filtra por chip A cobrar y muestra contratos con acción Cobrar", async ({ authedPage }) => {
+  test("filtra por KPI A cobrar y muestra contratos con acción Cobrar", async ({ authedPage }) => {
     await Promise.all([
       authedPage.waitForResponse(
         (res) =>
@@ -23,7 +23,6 @@ test.describe("Alquileres — listado", () => {
       ),
       authedPage.getByRole("button", { name: /^A cobrar/ }).click(),
     ]);
-    await expect(authedPage.getByText(/contratos en el filtro actual/)).toBeVisible();
     await expect(authedPage.getByRole("button", { name: "Cobrar" }).first()).toBeVisible();
   });
 

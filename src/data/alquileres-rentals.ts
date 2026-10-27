@@ -90,6 +90,14 @@ export function visibleFilterChips() {
   return rentalFilterChips;
 }
 
+export const rentalSecondaryFilterChips = rentalFilterChips.filter((chip) =>
+  ["USD", "ARS"].includes(chip.id),
+);
+
+export function rentalChipLabel(chip: RentalChipId): string {
+  return rentalFilterChips.find((item) => item.id === chip)?.label ?? chip;
+}
+
 export type RentalChipId = (typeof rentalFilterChips)[number]["id"];
 
 function normalizeSearchText(value: string): string {
