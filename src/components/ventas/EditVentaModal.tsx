@@ -5,9 +5,12 @@ import { useEffect, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { ChipToggle, FormField, FormSection } from "@/components/ui/FormLayout";
-import { ApiError, updateVenta } from "@/lib/api";
-import type { VentaDetail, VentaEstado } from "@/lib/api/types";
+import { ApiError, fetchFormasPago, updateVenta } from "@/lib/api";
+import type { CatalogoItem, VentaDetail, VentaEstado } from "@/lib/api/types";
 import { ventaEstadoLabel } from "@/lib/ventas/status-labels";
+
+const selectClassName =
+  "rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary";
 
 const ESTADOS: VentaEstado[] = ["boleto", "deeds_pending"];
 
@@ -26,10 +29,19 @@ export function EditVentaModal({ open, onClose, token, venta, onSaved }: EditVen
   const [fechaEscritura, setFechaEscritura] = useState("");
   const [escribano, setEscribano] = useState("");
   const [condiciones, setCondiciones] = useState("");
+  const [formaPagoId, setFormaPagoId] = useState("");
+  const [formasPago, setFormasPago] = useState<CatalogoItem[]>([]);
   const [notas, setNotas] = useState("");
   const [estado, setEstado] = useState<VentaEstado>("boleto");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open || !token) return;
+    void fetchFormasPago(token)
+      .then((res) => setFormasPago(res.items))
+      .catch(() => setFormasPago([]));
+  }, [open, token]);
 
   useEffect(() => {
     if (!open || !venta) return;
@@ -39,6 +51,7 @@ export function EditVentaModal({ open, onClose, token, venta, onSaved }: EditVen
     setFechaEscritura(venta.fechaEscritura ?? "");
     setEscribano(venta.nombreEscribano ?? "");
     setCondiciones(venta.condicionesPago ?? "");
+    setFormaPagoId(venta.formaPagoId ? String(venta.formaPagoId) : "");
     setNotas(venta.notas ?? "");
     setEstado(venta.estado === "deeds_pending" ? "deeds_pending" : "boleto");
     setError(null);
@@ -61,6 +74,7 @@ export function EditVentaModal({ open, onClose, token, venta, onSaved }: EditVen
         fechaEscritura: fechaEscritura || null,
         nombreEscribano: escribano.trim() || null,
         condicionesPago: condiciones.trim() || null,
+        formaPagoId: formaPagoId ? Number(formaPagoId) : null,
         notas: notas.trim() || null,
         estado,
       });
@@ -127,6 +141,21 @@ export function EditVentaModal({ open, onClose, token, venta, onSaved }: EditVen
               </div>
             </div>
           </div>
+          <label className="flex flex-col gap-1.5 sm:col-span-2">
+            <span className="text-[11px] font-semibold text-text-secondary">Forma de pago</span>
+            <select
+              value={formaPagoId}
+              onChange={(event) => setFormaPagoId(event.target.value)}
+              className={selectClassName}
+            >
+              <option value="">Sin especificar</option>
+              {formasPago.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+          </label>
           <FormField label="Condiciones de pago" value={condiciones} onChange={setCondiciones} />
           <FormField label="Notas" value={notas} onChange={setNotas} />
         </FormSection>

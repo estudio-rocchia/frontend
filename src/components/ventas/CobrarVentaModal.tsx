@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { FormField, FormSection } from "@/components/ui/FormLayout";
+import { formInputClass } from "@/lib/ui/interactive-focus";
 import {
   ApiError,
   downloadVentaReciboPdf,
@@ -233,14 +234,28 @@ export function CobrarVentaModal({
         <p className="text-sm text-text-secondary">Configurá la financiación antes de cobrar.</p>
       ) : (
         <div className="flex flex-col gap-4">
-          {pagoTipo === "cuota" && cuotaTarget ? (
-            <FormSection title="Cuota">
-              <p className="text-sm text-text-secondary">
-                Vence {formatDateDisplay(cuotaTarget.fechaVencimiento)} —{" "}
-                <span className={moneyClassName}>{formatMoney(cuotaTarget.saldo, venta?.codigoMoneda)}</span>{" "}
-                ({cuotaEstadoLabel(cuotaTarget.estadoCode)})
+          {pagoTipo === "sena" ? (
+            <div className="rounded-md border border-primary/20 bg-primary-soft/40 px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">Entrega inicial</p>
+              <p className="mt-1 text-sm text-text-primary">
+                Registrá el pago de la seña o entrega inicial de esta venta.
               </p>
-            </FormSection>
+            </div>
+          ) : null}
+
+          {pagoTipo === "cuota" && cuotaTarget ? (
+            <div className="rounded-md border border-primary/20 bg-primary-soft/40 px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">
+                Cuota {cuotaTarget.numero}
+              </p>
+              <p className="mt-1 text-sm text-text-primary">
+                Vence {formatDateDisplay(cuotaTarget.fechaVencimiento)}. Saldo:{" "}
+                <span className={`font-semibold ${moneyClassName}`}>
+                  {formatMoney(cuotaTarget.saldo, venta?.codigoMoneda)}
+                </span>
+                <span className="text-text-secondary"> ({cuotaEstadoLabel(cuotaTarget.estadoCode)})</span>
+              </p>
+            </div>
           ) : null}
 
           <FormField label="Fecha de pago" value={fechaPago} onChange={setFechaPago} type="date" />
@@ -250,7 +265,7 @@ export function CobrarVentaModal({
             <select
               value={medioPagoId || ""}
               onChange={(e) => setMedioPagoId(Number(e.target.value))}
-              className="rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] outline-none focus:border-primary"
+              className={formInputClass}
             >
               <option value="">Seleccionar...</option>
               {mediosPago.map((medio) => (
@@ -268,7 +283,11 @@ export function CobrarVentaModal({
             />
             Emitir recibo y descargar PDF
           </label>
-          {error ? <p className="text-sm text-danger">{error}</p> : null}
+          {error ? (
+            <p className="rounded-sm border border-danger bg-danger-bg px-3 py-2 text-sm text-danger" role="alert">
+              {error}
+            </p>
+          ) : null}
         </div>
       )}
     </Modal>

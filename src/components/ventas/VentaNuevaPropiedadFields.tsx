@@ -26,6 +26,7 @@ export function VentaNuevaPropiedadFields({
   existingCodes,
   loadingTipos,
   onLoadTipos,
+  intro = "La propiedad se dará de alta en el catálogo al crear la venta. El código se asigna automáticamente.",
 }: {
   token: string;
   value: VentaNuevaPropiedadValue;
@@ -34,6 +35,7 @@ export function VentaNuevaPropiedadFields({
   existingCodes: string[];
   loadingTipos: boolean;
   onLoadTipos: () => void;
+  intro?: string;
 }) {
   return (
     <div className="rounded-md border border-dashed border-primary/30 bg-primary-soft/10 p-4">
@@ -45,7 +47,7 @@ export function VentaNuevaPropiedadFields({
         existingCodes={existingCodes}
         loadingTipos={loadingTipos}
         onLoadTipos={onLoadTipos}
-        intro="La propiedad se dará de alta en el catálogo al crear la venta. El código se asigna automáticamente."
+        intro={intro}
       />
     </div>
   );
