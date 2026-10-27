@@ -51,6 +51,10 @@ import {
   loadInmueblesSinAlquiler,
   type InmuebleSinAlquiler,
 } from "@/lib/mappers/propietario-inmuebles";
+import {
+  isPublishedAdjustmentIndex,
+  resolveTipoIndiceItem,
+} from "@/lib/rental-adjustment";
 
 const AdjustContractModal = dynamic(
   () =>
@@ -103,8 +107,10 @@ export function AlquileresWorkspace() {
     goPrev,
     searchQuery,
     setSearchQuery,
+    isSearchPending,
     activeChip,
     setActiveChip,
+    clearFilters,
     tableTotal,
     tableStats,
     stats,
@@ -184,8 +190,7 @@ export function AlquileresWorkspace() {
         fetchCatalog(token, "/catalogos/tipos-indice"),
         fetchCatalog(token, "/catalogos/tipos-mora"),
       ]);
-      const indexItem =
-        indices.items.find((item) => item.code === form.index) ?? indices.items[0];
+      const indexItem = resolveTipoIndiceItem(indices.items, form.index);
       if (!indexItem?.id) {
         throw new ApiError(400, {
           error: {
@@ -194,6 +199,10 @@ export function AlquileresWorkspace() {
           },
         });
       }
+      const notasIndice =
+        !isPublishedAdjustmentIndex(form.index) && form.notasIndice.trim()
+          ? form.notasIndice.trim()
+          : null;
 
       let moraPayload;
       try {
@@ -235,6 +244,7 @@ export function AlquileresWorkspace() {
             diaVencimientoPago: moraPayload.diaVencimientoPago,
             frecuenciaAjusteMeses: form.frecuenciaAjusteMeses,
             tipoIndiceId: indexItem.id,
+            notasIndice,
             tipoMoraId: moraPayload.tipoMoraId,
             tasaMora: moraPayload.tasaMora,
             montoMoraFijo: moraPayload.montoMoraFijo,
@@ -333,6 +343,7 @@ export function AlquileresWorkspace() {
 
   async function handleAdjustContract(input: {
     fechaAjuste: string;
+    montoNuevo?: number;
     depositoPlan?: { crearPlan: boolean; cantidadCuotas: number };
   }) {
     if (!token || !selectedContrato) return;
@@ -345,6 +356,7 @@ export function AlquileresWorkspace() {
     try {
       const result = await applyContratoAjuste(token, selectedContrato.id, {
         fechaAjuste: input.fechaAjuste,
+        montoNuevo: input.montoNuevo,
       });
 
       const planChoice = input.depositoPlan;
@@ -414,7 +426,7 @@ export function AlquileresWorkspace() {
         fetchContratos(token, { limit: 200 }),
       ]);
 
-      const indexItem = indices.items.find((item) => item.code === form.index) ?? indices.items[0];
+      const indexItem = resolveTipoIndiceItem(indices.items, form.index);
 
       if (!indexItem?.id) {
         throw new ApiError(400, {
@@ -424,6 +436,10 @@ export function AlquileresWorkspace() {
           },
         });
       }
+      const notasIndice =
+        !isPublishedAdjustmentIndex(form.index) && form.notasIndice.trim()
+          ? form.notasIndice.trim()
+          : null;
 
       const usedInmuebleCodes = inmueblesRes.items.map((item) => item.code);
       const usedContratoCodes = contratosRes.items.map((item) => item.contratoCode);
@@ -559,6 +575,7 @@ export function AlquileresWorkspace() {
             diaVencimientoPago: moraPayload.diaVencimientoPago,
             frecuenciaAjusteMeses: form.frecuenciaAjusteMeses,
             tipoIndiceId: indexItem.id,
+            notasIndice,
             tipoMoraId: moraPayload.tipoMoraId,
             tasaMora: moraPayload.tasaMora,
             montoMoraFijo: moraPayload.montoMoraFijo,
@@ -630,6 +647,8 @@ export function AlquileresWorkspace() {
           hasStats={tableStats !== null}
           error={error}
           stats={stats}
+          activeChip={activeChip}
+          onChipSelect={setActiveChip}
         />
 
         {error ? (
@@ -643,6 +662,7 @@ export function AlquileresWorkspace() {
           <RentalsTable
             rows={rows}
             loading={loading}
+            isSearchPending={isSearchPending}
             serverMode
             total={tableTotal}
             page={pageIndex + 1}
@@ -656,6 +676,7 @@ export function AlquileresWorkspace() {
             activeChip={activeChip}
             onSearchChange={setSearchQuery}
             onChipChange={setActiveChip}
+            onClearFilters={clearFilters}
             onPrefetch={(row) => prefetchContrato(Number(row.id))}
             onViewFicha={(row) => openFicha(row.id)}
             onCollect={(row) => void openCollectFromRow(row)}

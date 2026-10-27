@@ -116,7 +116,12 @@ export function ContractFichaView() {
   const contratoCode = contrato?.contratoCode ?? detail?.propertyCode ?? "—";
   const metaLine = useMemo(() => {
     if (!detail) return "";
-    return [detail.tenant, detail.property, detail.contractStart !== "—" ? `desde ${detail.contractStart}` : null]
+    return [
+      detail.tenant,
+      detail.property,
+      detail.propertyLocation !== "—" ? detail.propertyLocation : null,
+      detail.contractStart !== "—" ? `desde ${detail.contractStart}` : null,
+    ]
       .filter(Boolean)
       .join(" · ");
   }, [detail]);
@@ -251,6 +256,9 @@ export function ContractFichaView() {
                 <div className="grid gap-4 sm:grid-cols-2">
                   <FieldBlock label="Código de propiedad" value={detail.propertyCode} />
                   <FieldBlock label="Propiedad" value={detail.property} />
+                  <div className="sm:col-span-2">
+                    <FieldBlock label="Ubicación" value={detail.propertyLocation} />
+                  </div>
                   <FieldBlock label="Inicio" value={detail.contractStart} />
                   <FieldBlock label="Fin" value={detail.contractEnd} />
                 </div>
