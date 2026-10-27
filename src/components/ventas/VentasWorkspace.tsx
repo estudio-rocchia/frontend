@@ -4,11 +4,18 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { NewVentaModal } from "@/components/ventas/NewVentaModal";
+import { PublicarEnVentaModal } from "@/components/ventas/PublicarEnVentaModal";
 import { VentasCatalogFilterChips } from "@/components/ventas/VentasCatalogFilterChips";
-import { VentasFilterChips, type VentasTabId } from "@/components/ventas/VentasFilterChips";
+import { VentasCreateActions } from "@/components/ventas/VentasCreateActions";
+import {
+  VENTAS_MAIN_PANEL_ID,
+  VentasFilterChips,
+  ventasTabDomId,
+  type VentasTabId,
+} from "@/components/ventas/VentasFilterChips";
+import { VentasKpiStrip } from "@/components/ventas/VentasKpiStrip";
 import { VentasTable, type VentasTableRow } from "@/components/ventas/VentasTable";
-import { ButtonPrimary } from "@/components/ui/Button";
-import { KpiCard } from "@/components/ui/KpiCard";
+import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 import { useAuth } from "@/context/auth-context";
 import {
   ApiError,
@@ -25,6 +32,7 @@ import {
   catalogFilterSearchParams,
   type VentasCatalogFilterId,
 } from "@/lib/ventas/catalog-filters";
+import { VENTAS_TAB_COPY, ventasEmptyHint } from "@/lib/ventas/workspace-copy";
 
 function isVentasTabId(value: string | null): value is VentasTabId {
   return (
@@ -51,11 +59,13 @@ export function VentasWorkspace() {
   const [error, setError] = useState<string | null>(null);
   const [ventaRows, setVentaRows] = useState<VentaDetail[]>([]);
   const [catalogRows, setCatalogRows] = useState<CatalogSearchItem[]>([]);
+  const [tabCounts, setTabCounts] = useState<Partial<Record<VentasTabId, number>>>({});
   const [estadoIds, setEstadoIds] = useState<Record<string, number>>({});
   const [tipoInmuebleIds, setTipoInmuebleIds] = useState<Record<string, number>>({});
   const [catalogFilter, setCatalogFilter] = useState<VentasCatalogFilterId>("todos");
   const [tipoVentaId, setTipoVentaId] = useState<number | undefined>();
   const [newVentaOpen, setNewVentaOpen] = useState(false);
+  const [publicarOpen, setPublicarOpen] = useState(false);
   const [newVentaInmuebleId, setNewVentaInmuebleId] = useState<number | null>(null);
 
   useEffect(() => {
@@ -88,6 +98,51 @@ export function VentasWorkspace() {
     })();
   }, [token]);
 
+  const loadTabCounts = useCallback(async () => {
+    if (!token || !tipoVentaId || Object.keys(estadoIds).length === 0) return;
+    try {
+      const [ventasRes, availableRes, offMarketRes, soldRes] = await Promise.all([
+        fetchVentas(token, { limit: 100 }),
+        estadoIds.available
+          ? searchCatalogo(token, {
+              estadoOfertaId: estadoIds.available,
+              tipoOperacionId: tipoVentaId,
+              limit: 200,
+            })
+          : Promise.resolve({ items: [] }),
+        estadoIds.off_market
+          ? searchCatalogo(token, {
+              estadoOfertaId: estadoIds.off_market,
+              tipoOperacionId: tipoVentaId,
+              limit: 200,
+            })
+          : Promise.resolve({ items: [] }),
+        estadoIds.sold
+          ? searchCatalogo(token, {
+              estadoOfertaId: estadoIds.sold,
+              tipoOperacionId: tipoVentaId,
+              limit: 200,
+            })
+          : Promise.resolve({ items: [] }),
+      ]);
+      const activas = ventasRes.items.filter(
+        (v) => v.estado !== "completed" && v.estado !== "cancelled",
+      );
+      setTabCounts({
+        en_operacion: activas.length,
+        a_la_venta: availableRes.items.length,
+        fuera_mercado: offMarketRes.items.length,
+        vendidos: soldRes.items.length,
+      });
+    } catch {
+      // counts are optional UX enhancement
+    }
+  }, [token, tipoVentaId, estadoIds]);
+
+  useEffect(() => {
+    void loadTabCounts();
+  }, [loadTabCounts]);
+
   const load = useCallback(async () => {
     if (!token) return;
     setLoading(true);
@@ -99,6 +154,7 @@ export function VentasWorkspace() {
         const details = await Promise.all(activas.map((v) => fetchVenta(token, v.id)));
         setVentaRows(details);
         setCatalogRows([]);
+        setTabCounts((prev) => ({ ...prev, en_operacion: details.length }));
       } else {
         const estadoCode =
           tab === "fuera_mercado" ? "off_market" : tab === "vendidos" ? "sold" : "available";
@@ -117,6 +173,7 @@ export function VentasWorkspace() {
         });
         setCatalogRows(res.items);
         setVentaRows([]);
+        setTabCounts((prev) => ({ ...prev, [tab]: res.items.length }));
       }
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
@@ -147,32 +204,23 @@ export function VentasWorkspace() {
     }
     return catalogRows
       .filter((item) =>
-       matchesSearch(
-         `${item.inmueble.code} ${item.inmueble.displayLabel ?? item.inmueble.title ?? ""}`,
-         search,
-       ),
-     )
+        matchesSearch(
+          `${item.inmueble.code} ${item.inmueble.displayLabel ?? item.inmueble.title ?? ""}`,
+          search,
+        ),
+      )
       .map((item) => ({ kind: "catalog", item }));
   }, [tab, ventaRows, catalogRows, search]);
 
-  const emptyHint = useMemo(() => {
-    if (tab === "en_operacion") {
-      return "Si cancelaste la venta demo, ejecutá npm run db:seed-demo en el backend para restaurar L001.";
-    }
-    if (tab === "a_la_venta") {
-      if (catalogFilter === "lotes_menos_10k_usd") {
-        return "No hay lotes con oferta en USD por menos de USD 10.000.";
-      }
-      return "No hay inmuebles con oferta de venta disponible. Importá el catálogo o creá ofertas desde el backend.";
-    }
-    if (tab === "fuera_mercado") {
-      return "No hay inmuebles fuera de mercado. Ejecutá npm run db:import-precios-ventas o npm run db:seed-demo en el backend.";
-    }
-    if (tab === "vendidos") {
-      return "No hay inmuebles marcados como vendidos en el catálogo.";
-    }
-    return undefined;
-  }, [tab, catalogFilter]);
+  const emptyHint = useMemo(
+    () => ventasEmptyHint(tab, catalogFilter),
+    [tab, catalogFilter],
+  );
+
+  function openNewVenta(inmuebleId?: number) {
+    setNewVentaInmuebleId(inmuebleId ?? null);
+    setNewVentaOpen(true);
+  }
 
   const kpis = useMemo(() => {
     if (tab === "en_operacion") {
@@ -215,6 +263,12 @@ export function VentasWorkspace() {
     ];
   }, [tab, ventaRows, catalogRows, catalogFilter]);
 
+  function changeTab(next: VentasTabId) {
+    setTab(next);
+    setSearch("");
+    router.replace(`/ventas?tab=${next}`, { scroll: false });
+  }
+
   async function handleOpenRow(row: VentasTableRow) {
     if (row.kind === "venta") {
       const id = row.venta.id;
@@ -246,26 +300,24 @@ export function VentasWorkspace() {
     }
   }
 
-  function openNewVenta(inmuebleId?: number) {
-    setNewVentaInmuebleId(inmuebleId ?? null);
-    setNewVentaOpen(true);
-  }
+  const tabCopy = VENTAS_TAB_COPY[tab];
 
   return (
     <div className={`flex flex-col gap-6 ${pagePaddingClass}`}>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-bold text-text-primary">Ventas</h1>
-          <p className="text-sm text-text-secondary">
-            Operaciones en curso, inventario a la venta y archivo fuera de mercado.
-          </p>
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex max-w-2xl flex-col gap-1.5">
+          <h1 className="text-2xl font-bold tracking-tight text-text-primary">Ventas</h1>
+          <p className="text-sm leading-relaxed text-text-secondary">{tabCopy.description}</p>
         </div>
-        <ButtonPrimary type="button" onClick={() => openNewVenta()}>
-          Nueva venta
-        </ButtonPrimary>
-      </div>
+        <VentasCreateActions
+          tab={tab}
+          onPublicar={() => setPublicarOpen(true)}
+          onNuevaVenta={() => openNewVenta()}
+          disabled={loading}
+        />
+      </header>
 
-      <VentasFilterChips active={tab} onChange={(next) => { setTab(next); setSearch(""); }} />
+      <VentasFilterChips active={tab} onChange={changeTab} counts={tabCounts} />
 
       {tab !== "en_operacion" ? (
         <VentasCatalogFilterChips
@@ -277,22 +329,50 @@ export function VentasWorkspace() {
         />
       ) : null}
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        {kpis.map((kpi) => (
-          <KpiCard key={kpi.label} label={kpi.label} value={kpi.value} hint={kpi.hint} />
-        ))}
+      <div
+        id={VENTAS_MAIN_PANEL_ID}
+        role="tabpanel"
+        aria-labelledby={ventasTabDomId(tab)}
+        className="flex flex-col gap-6"
+      >
+        <VentasKpiStrip kpis={kpis} loading={loading} />
+
+        {error ? (
+          <div className="flex flex-col gap-2">
+            <p className="rounded-sm border border-danger bg-danger-bg px-3 py-2 text-sm text-danger">
+              {error}
+            </p>
+            <button
+              type="button"
+              onClick={() => void load()}
+              className={`self-start text-sm font-semibold text-primary ${interactiveFocusClass}`}
+            >
+              Reintentar
+            </button>
+          </div>
+        ) : (
+          <VentasTable
+            tab={tab}
+            rows={tableRows}
+            loading={loading}
+            search={search}
+            searchPlaceholder={tabCopy.searchPlaceholder}
+            emptyHint={emptyHint}
+            onSearchChange={setSearch}
+            onOpenRow={handleOpenRow}
+          />
+        )}
       </div>
 
-      {error ? <p className="text-sm text-danger">{error}</p> : null}
-
-      <VentasTable
-        tab={tab}
-        rows={tableRows}
-        loading={loading}
-        search={search}
-        emptyHint={tableRows.length === 0 && !loading ? emptyHint : undefined}
-        onSearchChange={setSearch}
-        onOpenRow={handleOpenRow}
+      <PublicarEnVentaModal
+        open={publicarOpen}
+        onClose={() => setPublicarOpen(false)}
+        token={token ?? ""}
+        estadoOfertaAvailableId={estadoIds.available ?? null}
+        tipoOperacionVentaId={tipoVentaId ?? null}
+        onPublished={(inmuebleId) => {
+          router.push(`/ventas/inmueble/${inmuebleId}?from=a_la_venta`);
+        }}
       />
 
       <NewVentaModal

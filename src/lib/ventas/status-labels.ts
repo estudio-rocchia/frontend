@@ -22,6 +22,7 @@ export function ventaEstadoLabel(estado: VentaEstado): string {
 }
 
 export function ofertaEstadoLabel(code: string): string {
+  if (!code.trim()) return "Sin estado";
   return OFERTA_ESTADO_LABELS[code] ?? code;
 }
 
