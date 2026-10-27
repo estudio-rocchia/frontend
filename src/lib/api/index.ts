@@ -316,7 +316,7 @@ export function issueRecibo(
 }
 
 export function downloadReciboPdf(token: string, reciboId: number) {
-  return apiBlob(`/recibos/${reciboId}/pdf`, token);
+  return apiBlobWithFilename(`/recibos/${reciboId}/pdf`, token);
 }
 
 export function fetchPropietariosAdministracion(
@@ -443,9 +443,12 @@ export function fetchInmuebleFicha(token: string, inmuebleId: number) {
   return apiRequest<InmuebleFicha>(`/inmuebles/${inmuebleId}/ficha`, { token });
 }
 
-export function fetchInmuebles(token: string, params?: { limit?: number }) {
+export function fetchInmuebles(token: string, params?: { limit?: number; offset?: number }) {
   const query = new URLSearchParams();
   query.set("limit", String(params?.limit ?? 200));
+  if (params?.offset !== undefined) {
+    query.set("offset", String(params.offset));
+  }
   return apiRequest<{ items: InmuebleRecord[] }>(`/inmuebles?${query}`, { token });
 }
 
@@ -664,8 +667,16 @@ export function previewAjusteIndice(token: string, body: PreviewAjusteInput) {
   });
 }
 
-export function previewContratoAjuste(token: string, contratoId: number, fechaAjuste: string) {
+export function previewContratoAjuste(
+  token: string,
+  contratoId: number,
+  fechaAjuste: string,
+  montoNuevo?: number,
+) {
   const query = new URLSearchParams({ fechaAjuste });
+  if (montoNuevo !== undefined && Number.isFinite(montoNuevo) && montoNuevo > 0) {
+    query.set("montoNuevo", String(montoNuevo));
+  }
   return apiRequest<ContratoAjustePreviewResponse>(
     `/contratos/${contratoId}/ajustes/preview?${query}`,
     { token },
@@ -760,6 +771,10 @@ export function fetchTiposOperacion(token: string) {
   return fetchCatalog<CatalogoItem>(token, "/catalogos/tipos-operacion");
 }
 
+export function fetchFormasPago(token: string) {
+  return fetchCatalog<CatalogoItem>(token, "/catalogos/formas-pago");
+}
+
 export function fetchOfertaHistorialPrecio(token: string, ofertaId: number) {
   return apiRequest<{ items: HistorialPrecioRecord[] }>(
     `/ofertas/${ofertaId}/historial-precio`,
@@ -830,12 +845,32 @@ export function changeOfertaEstado(
   });
 }
 
+export function updateOferta(
+  token: string,
+  ofertaId: number,
+  body: import("./types").UpdateOfertaInput,
+) {
+  return apiRequest<OfertaRecord>(`/ofertas/${ofertaId}`, {
+    method: "PATCH",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
 export function createOferta(
   token: string,
   inmuebleId: number,
   body: import("./types").CreateOfertaInput,
 ) {
   return apiRequest<OfertaRecord>(`/inmuebles/${inmuebleId}/ofertas`, {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function publishEnVenta(token: string, body: import("./types").PublishEnVentaInput) {
+  return apiRequest<import("./types").PublishEnVentaResult>("/inmuebles/en-venta", {
     method: "POST",
     token,
     body: JSON.stringify(body),

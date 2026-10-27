@@ -154,6 +154,7 @@ export interface ContratoAjustePreviewResponse {
 export interface ApplyAjusteInput {
   fechaAjuste: string;
   nota?: string | null;
+  montoNuevo?: number;
 }
 
 export interface ApplyAjusteResponse {
@@ -315,6 +316,7 @@ export interface ContratoRecord {
   diaVencimientoPago: number;
   frecuenciaAjusteMeses: number | null;
   tipoIndiceId: number | null;
+  notasIndice: string | null;
   tasaMora: string | null;
   montoMoraFijo: string | null;
   montoDeposito: string | null;
@@ -828,6 +830,9 @@ export interface OfertaRecord {
   montoPrecio: string | null;
   codigoMoneda: string | null;
   notasPrecio: string | null;
+  formaPagoId: number | null;
+  formaPagoCode: string | null;
+  condicionesFinanciacion: string | null;
   activo: boolean;
 }
 
@@ -874,9 +879,13 @@ export interface VentaRecord {
   montoPrecioVenta: string;
   codigoMoneda: string;
   condicionesPago: string | null;
+  formaPagoId: number | null;
+  formaPagoCode: string | null;
   fechaBoleto: string | null;
   fechaEscritura: string | null;
   nombreEscribano: string | null;
+  tieneBoleto: boolean;
+  tieneEscritura: boolean;
   estado: VentaEstado;
   notas: string | null;
 }
@@ -901,6 +910,7 @@ export interface CuotaFinanciacionRecord {
   numero: number;
   fechaVencimiento: string;
   monto: string;
+  pagadoEn: string | null;
   estadoCode: string;
   saldo: string;
 }
@@ -919,9 +929,12 @@ export interface CreateVentaInput {
   montoPrecioVenta: number;
   codigoMoneda: string;
   condicionesPago?: string | null;
+  formaPagoId?: number | null;
   fechaBoleto?: string | null;
   fechaEscritura?: string | null;
   nombreEscribano?: string | null;
+  tieneBoleto?: boolean;
+  tieneEscritura?: boolean;
   estado?: VentaEstado;
   notas?: string | null;
 }
@@ -930,9 +943,12 @@ export interface UpdateVentaInput {
   montoPrecioVenta?: number;
   codigoMoneda?: string;
   condicionesPago?: string | null;
+  formaPagoId?: number | null;
   fechaBoleto?: string | null;
   fechaEscritura?: string | null;
   nombreEscribano?: string | null;
+  tieneBoleto?: boolean;
+  tieneEscritura?: boolean;
   estado?: VentaEstado;
   notas?: string | null;
 }
@@ -948,12 +964,70 @@ export interface ChangeEstadoOfertaInput {
   reason?: string | null;
 }
 
+export interface UpdateOfertaInput {
+  formaPagoId?: number | null;
+  condicionesFinanciacion?: string | null;
+  notasPrecio?: string | null;
+}
+
 export interface CreateOfertaInput {
   tipoOperacionId: number;
   estadoId: number;
   montoPrecio?: number | null;
   codigoMoneda?: string | null;
   notasPrecio?: string | null;
+  formaPagoId?: number | null;
+  condicionesFinanciacion?: string | null;
+}
+
+export interface PublishEnVentaPersonaInput {
+  personaId?: number | null;
+  tipoPersona?: "natural" | "juridica";
+  nombre?: string | null;
+  apellido?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  localidadId?: number | null;
+}
+
+export interface PublishEnVentaInmuebleInput {
+  code: string;
+  tipoInmuebleId: number;
+  localidadId: number;
+  calle: string;
+  numero?: string | null;
+  referencia?: string | null;
+  title?: string | null;
+  description?: string | null;
+  aceptaPermuta?: boolean;
+  aceptaFinanciacion?: boolean;
+  aceptaVehiculo?: boolean;
+  acceptsInmueble?: boolean;
+  notas?: string | null;
+}
+
+export interface PublishEnVentaOfertaInput {
+  tipoOperacionId?: number;
+  estadoId?: number;
+  estadoRedesId?: number | null;
+  montoPrecio: number;
+  codigoMoneda: string;
+  formaPagoId?: number | null;
+  condicionesFinanciacion?: string | null;
+  notasPrecio?: string | null;
+  autorizadoPor?: string | null;
+}
+
+export interface PublishEnVentaInput {
+  inmueble: PublishEnVentaInmuebleInput;
+  propietario: PublishEnVentaPersonaInput;
+  oferta: PublishEnVentaOfertaInput;
+}
+
+export interface PublishEnVentaResult {
+  inmueble: InmuebleCatalogRecord;
+  oferta: OfertaRecord;
+  persona: PersonaRecord;
 }
 
 export type TipoEntregaInicial = "cash" | "vehicle" | "inmueble" | "in_kind";
