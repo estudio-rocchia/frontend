@@ -15,11 +15,8 @@ import {
   isMoraPunitoriaValid,
   moraPunitoriaFromContrato,
 } from "@/lib/mora-punitoria";
-import {
-  FRECUENCIAS_AJUSTE,
-  defaultFrecuenciaAjuste,
-  indiceCodeFromContrato,
-} from "@/lib/rental-adjustment";
+import { ContractAdjustmentFields } from "@/components/alquileres/ContractAdjustmentFields";
+import { defaultFrecuenciaAjuste, indiceCodeFromContrato } from "@/lib/rental-adjustment";
 
 export type RenewContractForm = {
   fechaInicio: string;
@@ -29,6 +26,7 @@ export type RenewContractForm = {
   currency: "ARS" | "USD";
   index: AdjustmentIndex;
   frecuenciaAjusteMeses: number;
+  notasIndice: string;
   mora: MoraPunitoriaForm;
 };
 
@@ -78,6 +76,7 @@ function buildFormFromContrato(contrato: ContratoDetail): RenewContractForm {
     currency,
     index: indiceCodeFromContrato(contrato) ?? "ICL",
     frecuenciaAjusteMeses: defaultFrecuenciaAjuste(contrato),
+    notasIndice: contrato.notasIndice ?? "",
     mora: moraPunitoriaFromContrato(contrato),
   };
 }
@@ -90,6 +89,7 @@ const emptyForm: RenewContractForm = {
   currency: "ARS",
   index: "ICL",
   frecuenciaAjusteMeses: 12,
+  notasIndice: "",
   mora: DEFAULT_MORA_PUNITORIA,
 };
 
@@ -270,26 +270,14 @@ export function RenewContractModal({
                   . Se creará un plan de cuotas automáticamente.
                 </div>
               ) : null}
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[11px] font-semibold text-text-secondary">Índice de ajuste</span>
-                <ChipToggle
-                  options={["ICL", "IPC", "CAC"]}
-                  value={form.index}
-                  onChange={(idx) => patch({ index: idx as AdjustmentIndex })}
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[11px] font-semibold text-text-secondary">
-                  Frecuencia de ajuste
-                </span>
-                <ChipToggle
-                  options={FRECUENCIAS_AJUSTE.map((meses) => `${meses} meses`)}
-                  value={`${form.frecuenciaAjusteMeses} meses`}
-                  onChange={(label) =>
-                    patch({ frecuenciaAjusteMeses: Number.parseInt(label, 10) })
-                  }
-                />
-              </div>
+              <ContractAdjustmentFields
+                value={{
+                  index: form.index,
+                  frecuenciaAjusteMeses: form.frecuenciaAjusteMeses,
+                  notasIndice: form.notasIndice,
+                }}
+                onChange={(partial) => patch(partial)}
+              />
             </div>
           </FormSection>
 

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
+import { ContractAdjustmentFields } from "@/components/alquileres/ContractAdjustmentFields";
 import { ChipToggle, FieldBlock, FormField, FormSection } from "@/components/ui/FormLayout";
 import type { AdjustmentIndex } from "@/data/alquileres-contract-details";
 import type { ContratoDetail } from "@/lib/api/types";
@@ -30,6 +31,7 @@ export type EditContractForm = {
   depositCurrency: "ARS" | "USD";
   index: AdjustmentIndex;
   frecuenciaAjusteMeses: number;
+  notasIndice: string;
   mora: MoraPunitoriaForm;
 };
 
@@ -46,6 +48,7 @@ function buildFormFromContrato(contrato: ContratoDetail): EditContractForm {
     depositCurrency,
     index: indiceCodeFromContrato(contrato) ?? "ICL",
     frecuenciaAjusteMeses: defaultFrecuenciaAjuste(contrato),
+    notasIndice: contrato.notasIndice ?? "",
     mora: moraPunitoriaFromContrato(contrato),
   };
 }
@@ -58,6 +61,7 @@ const emptyForm: EditContractForm = {
   depositCurrency: "ARS",
   index: "ICL",
   frecuenciaAjusteMeses: 12,
+  notasIndice: "",
   mora: DEFAULT_MORA_PUNITORIA,
 };
 
@@ -228,26 +232,15 @@ export function EditContractModal({
                   .
                 </div>
               ) : null}
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[11px] font-semibold text-text-secondary">Índice de ajuste</span>
-                <ChipToggle
-                  options={["ICL", "IPC", "CAC"]}
-                  value={form.index}
-                  onChange={(idx) => patch({ index: idx as AdjustmentIndex })}
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[11px] font-semibold text-text-secondary">
-                  Frecuencia de ajuste
-                </span>
-                <ChipToggle
-                  options={freqOptions.map((meses) => `${meses} meses`)}
-                  value={`${form.frecuenciaAjusteMeses} meses`}
-                  onChange={(label) =>
-                    patch({ frecuenciaAjusteMeses: Number.parseInt(label, 10) })
-                  }
-                />
-              </div>
+              <ContractAdjustmentFields
+                value={{
+                  index: form.index,
+                  frecuenciaAjusteMeses: form.frecuenciaAjusteMeses,
+                  notasIndice: form.notasIndice,
+                }}
+                onChange={(partial) => patch(partial)}
+                frecuenciaOptions={freqOptions}
+              />
             </div>
           </FormSection>
 

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AdjustmentIndex } from "@/data/alquileres-contract-details";
 import { ApiError, previewAjusteIndice } from "@/lib/api";
-import type { ContratoDetail, PreviewAjusteResponse } from "@/lib/api/types";
+import type { ContratoDetail, IndiceCode, PreviewAjusteResponse } from "@/lib/api/types";
 import { formatMoney, formatMonthYear, rentalApiErrorMessage } from "@/lib/format";
 import {
   ADJUSTMENT_INDICES,
@@ -13,6 +13,7 @@ import {
   fromIsoMonthDate,
   indiceCodeFromContrato,
   indexYearRange,
+  isPublishedAdjustmentIndex,
   defaultAdjustmentMonthPeriod,
   suggestedIndexMonthPeriod,
   toIsoMonthDate,
@@ -218,7 +219,14 @@ export function ContractIndexCalculator({
     setPreviewError(null);
 
     const montoAnterior = Number.parseFloat(contrato.montoAlquiler);
-    const tipoIndiceCode = isAdjust ? (contractIndice ?? value.tipoIndice) : value.tipoIndice;
+    const selectedIndex = isAdjust ? (contractIndice ?? value.tipoIndice) : value.tipoIndice;
+    if (!isPublishedAdjustmentIndex(selectedIndex)) {
+      setPreview(null);
+      setPreviewLoading(false);
+      onPreviewChange(null, "Este contrato usa un ajuste acordado entre partes.");
+      return;
+    }
+    const tipoIndiceCode: IndiceCode = selectedIndex;
     void previewAjusteIndice(token, {
       tipoIndiceCode,
       montoAnterior,

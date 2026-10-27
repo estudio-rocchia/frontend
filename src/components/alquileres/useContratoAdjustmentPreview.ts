@@ -14,18 +14,25 @@ export function useContratoAdjustmentPreview({
   contratoId,
   token,
   fechaAjuste,
+  montoNuevo,
+  requiresManualMonto = false,
 }: {
   open: boolean;
   contratoId: number | null;
   token: string | null;
   fechaAjuste: string | null;
+  montoNuevo?: number | null;
+  requiresManualMonto?: boolean;
 }) {
   const [preview, setPreview] = useState<ContratoAjustePreviewResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [previewError, setPreviewError] = useState<AdjustmentPreviewError | null>(null);
   const requestId = useRef(0);
 
-  const canCalculate = Boolean(open && contratoId && token && fechaAjuste);
+  const manualMontoReady =
+    !requiresManualMonto ||
+    (montoNuevo !== undefined && montoNuevo !== null && montoNuevo > 0);
+  const canCalculate = Boolean(open && contratoId && token && fechaAjuste && manualMontoReady);
 
   const runPreview = useCallback(() => {
     if (!canCalculate || !contratoId || !token || !fechaAjuste) return;
@@ -34,7 +41,14 @@ export function useContratoAdjustmentPreview({
     setLoading(true);
     setPreviewError(null);
 
-    void previewContratoAjuste(token, contratoId, fechaAjuste)
+    void previewContratoAjuste(
+      token,
+      contratoId,
+      fechaAjuste,
+      requiresManualMonto && montoNuevo !== undefined && montoNuevo !== null
+        ? montoNuevo
+        : undefined,
+    )
       .then((result) => {
         if (id !== requestId.current) return;
         setPreview(result);
@@ -59,7 +73,7 @@ export function useContratoAdjustmentPreview({
       .finally(() => {
         if (id === requestId.current) setLoading(false);
       });
-  }, [canCalculate, contratoId, token, fechaAjuste]);
+  }, [canCalculate, contratoId, token, fechaAjuste, montoNuevo, requiresManualMonto]);
 
   useEffect(() => {
     if (!open) {
@@ -69,7 +83,19 @@ export function useContratoAdjustmentPreview({
     }
     if (!canCalculate) {
       setPreview(null);
-      setPreviewError({ kind: "generic", message: "Seleccioná una fecha de ajuste válida." });
+      if (requiresManualMonto && (montoNuevo === undefined || montoNuevo === null)) {
+        setPreviewError({
+          kind: "generic",
+          message: "Ingresá el nuevo monto acordado entre las partes.",
+        });
+      } else if (requiresManualMonto && montoNuevo !== undefined && montoNuevo !== null && montoNuevo <= 0) {
+        setPreviewError({
+          kind: "generic",
+          message: "Ingresá un nuevo alquiler mayor a cero.",
+        });
+      } else {
+        setPreviewError({ kind: "generic", message: "Seleccioná una fecha de ajuste válida." });
+      }
       return;
     }
     const timer = window.setTimeout(runPreview, 300);
