@@ -1,10 +1,17 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Lock, Search } from "lucide-react";
 
-import { UsuarioFichaDrawer } from "@/components/usuarios/UsuarioFichaDrawer";
+const UsuarioFichaDrawer = dynamic(
+  () =>
+    import("@/components/usuarios/UsuarioFichaDrawer").then((mod) => ({
+      default: mod.UsuarioFichaDrawer,
+    })),
+  { ssr: false },
+);
 import { ButtonPrimary } from "@/components/ui/Button";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
