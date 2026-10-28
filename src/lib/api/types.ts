@@ -684,6 +684,7 @@ export interface DashboardResumen {
     enMora: DashboardMoneyCard;
     ajustePendiente: { count: number };
     renovacionProxima: { count: number };
+    citasProximas: { count: number };
   };
   cobrarEsteMes: Array<{
     contratoId: number;
@@ -724,6 +725,20 @@ export interface DashboardResumen {
     codigoMoneda: string;
     fechaFin: string;
     diasHastaVencimiento: number;
+  }>;
+  citasProximas: Array<{
+    citaId: number;
+    tipo: CitaTipo;
+    titulo: string | null;
+    visitanteNombre: string | null;
+    programadaEn: string;
+    duracionMinutos: number;
+    estado: CitaEstado;
+    minutosHasta: number;
+    inmuebleCode: string | null;
+    inmuebleTitle: string | null;
+    personaNombre: string | null;
+    asignadoUsername: string | null;
   }>;
   ventas: {
     tarjetas: {
@@ -1096,4 +1111,58 @@ export interface VentaReciboRecord {
   copies: number;
   documentoId: number | null;
   estado: VentaReciboEstado;
+}
+
+export type CitaEstado = "programada" | "confirmada" | "realizada" | "cancelada";
+
+export type CitaTipo = "visita_inmueble" | "visa" | "juridico" | "reunion" | "otro";
+
+export interface CitaDetail {
+  id: number;
+  tipo: CitaTipo;
+  inmuebleId: number | null;
+  personaId: number | null;
+  asignadoUsuarioId: number | null;
+  creadoPorUsuarioId: number;
+  titulo: string | null;
+  visitanteNombre: string | null;
+  visitanteTelefono: string | null;
+  programadaEn: string;
+  duracionMinutos: number;
+  estado: CitaEstado;
+  notas: string | null;
+  creadoEn: string;
+  actualizadoEn: string;
+  canceladaEn: string | null;
+  inmueble: { id: number; code: string; title: string | null } | null;
+  persona: { id: number; nombre: string | null; apellido: string | null; phone: string | null } | null;
+  asignadoUsuario: { id: number; username: string } | null;
+  creadoPorUsuario: { id: number; username: string };
+}
+
+export interface CreateCitaInput {
+  tipo: CitaTipo;
+  inmuebleId?: number | null;
+  personaId?: number | null;
+  asignadoUsuarioId?: number | null;
+  titulo?: string | null;
+  visitanteNombre?: string | null;
+  visitanteTelefono?: string | null;
+  programadaEn: string;
+  duracionMinutos?: number;
+  notas?: string | null;
+}
+
+export interface UpdateCitaInput {
+  tipo?: CitaTipo;
+  inmuebleId?: number | null;
+  personaId?: number | null;
+  asignadoUsuarioId?: number | null;
+  titulo?: string | null;
+  visitanteNombre?: string | null;
+  visitanteTelefono?: string | null;
+  programadaEn?: string;
+  duracionMinutos?: number;
+  estado?: CitaEstado;
+  notas?: string | null;
 }

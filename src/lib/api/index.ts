@@ -62,6 +62,9 @@ import type {
   CuotaFinanciacionRecord,
   ChangePrecioOfertaInput,
   OfertaRecord,
+  CitaDetail,
+  CreateCitaInput,
+  UpdateCitaInput,
 } from "./types";
 
 export { ApiError, NetworkError, getApiBaseUrl } from "./client";
@@ -452,15 +455,26 @@ export function fetchInmuebles(token: string, params?: { limit?: number; offset?
   return apiRequest<{ items: InmuebleRecord[] }>(`/inmuebles?${query}`, { token });
 }
 
+const CATALOG_CACHE_TTL_MS = 5 * 60 * 1000;
+
 export function fetchCatalog<T extends CatalogoItem>(token: string, path: string) {
-  return withCache(`catalog:${path}`, () => apiRequest<{ items: T[] }>(path, { token }));
+ return withCache(
+   `catalog:${path}`,
+   () => apiRequest<{ items: T[] }>(path, { token }),
+   { ttlMs: CATALOG_CACHE_TTL_MS },
+ );
 }
 
 export function fetchLocalidades(token: string) {
-  return apiRequest<{ items: Array<{ id: number; name: string; province: string; country: string }> }>(
-    "/localidades",
-    { token },
-  );
+ return withCache(
+   "localidades",
+   () =>
+     apiRequest<{ items: Array<{ id: number; name: string; province: string; country: string }> }>(
+       "/localidades",
+       { token },
+     ),
+   { ttlMs: CATALOG_CACHE_TTL_MS },
+ );
 }
 
 export type PersonaVinculoFilter = "inquilino" | "propietario" | "moroso";
@@ -952,4 +966,45 @@ export function cancelVentaRecibo(token: string, reciboId: number) {
 
 export function fetchMediosPago(token: string) {
   return fetchCatalog<CatalogoItem>(token, "/catalogos/medios-pago");
+}
+
+export function fetchCitas(
+  token: string,
+  params: { desde: string; hasta: string; incluirCanceladas?: boolean },
+) {
+  const query = new URLSearchParams({
+    desde: params.desde,
+    hasta: params.hasta,
+  });
+  if (params.incluirCanceladas) {
+    query.set("incluirCanceladas", "true");
+  }
+  return apiRequest<{ items: CitaDetail[] }>(`/citas?${query}`, { token });
+}
+
+export function fetchCita(token: string, id: number) {
+  return apiRequest<CitaDetail>(`/citas/${id}`, { token });
+}
+
+export function createCita(token: string, body: CreateCitaInput) {
+  return apiRequest<CitaDetail>("/citas", {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function updateCita(token: string, id: number, body: UpdateCitaInput) {
+  return apiRequest<CitaDetail>(`/citas/${id}`, {
+    method: "PATCH",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function cancelCita(token: string, id: number) {
+  return apiRequest<CitaDetail>(`/citas/${id}/cancelar`, {
+    method: "POST",
+    token,
+  });
 }

@@ -1,5 +1,10 @@
-import { PlaceholderPage } from "@/components/PlaceholderPage";
+import { lazyWorkspace } from "@/lib/lazy-workspace";
+
+const CalendarioView = lazyWorkspace(
+  () => import("@/components/calendario/CalendarioView"),
+  "CalendarioView",
+);
 
 export default function CalendarioPage() {
-  return <PlaceholderPage title="Calendario Interno" />;
+  return <CalendarioView />;
 }
