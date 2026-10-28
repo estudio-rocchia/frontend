@@ -1,6 +1,11 @@
 import { Suspense } from "react";
 
-import { VentaFichaView } from "@/components/ventas/VentaFichaView";
+import { lazyWorkspace } from "@/lib/lazy-workspace";
+
+const VentaFichaView = lazyWorkspace(
+  () => import("@/components/ventas/VentaFichaView"),
+  "VentaFichaView",
+);
 
 export default function VentaFichaPage() {
   return (

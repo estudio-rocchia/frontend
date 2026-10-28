@@ -1,11 +1,24 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 
-import { ClienteInmobiliariaTab } from "@/components/clientes/ClienteInmobiliariaTab";
-import { EditarClienteModal } from "@/components/clientes/EditarClienteModal";
+const ClienteInmobiliariaTab = dynamic(
+  () =>
+    import("@/components/clientes/ClienteInmobiliariaTab").then((mod) => ({
+      default: mod.ClienteInmobiliariaTab,
+    })),
+  { ssr: false },
+);
+const EditarClienteModal = dynamic(
+  () =>
+    import("@/components/clientes/EditarClienteModal").then((mod) => ({
+      default: mod.EditarClienteModal,
+    })),
+  { ssr: false },
+);
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { FieldBlock } from "@/components/ui/FormLayout";
 import { PageHeaderSkeleton, Skeleton } from "@/components/ui/Skeleton";
@@ -372,7 +385,7 @@ export function ClienteFichaView() {
         ) : null}
       </header>
 
-      {token && persona ? (
+      {editOpen && token && persona ? (
         <EditarClienteModal
           open={editOpen}
           onClose={() => setEditOpen(false)}

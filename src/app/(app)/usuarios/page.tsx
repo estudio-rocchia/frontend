@@ -1,10 +1,10 @@
-import { AdminGate } from "@/components/auth/AdminGate";
-import { UsuariosView } from "@/components/usuarios/UsuariosView";
+import { lazyWorkspace } from "@/lib/lazy-workspace";
+
+const UsuariosView = lazyWorkspace(
+  () => import("@/components/usuarios/UsuariosView"),
+  "UsuariosView",
+);
 
 export default function UsuariosPage() {
-  return (
-    <AdminGate>
-      <UsuariosView />
-    </AdminGate>
-  );
+  return <UsuariosView />;
 }

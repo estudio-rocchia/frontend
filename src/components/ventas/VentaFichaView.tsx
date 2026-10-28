@@ -12,13 +12,10 @@ import {
   type VentaFichaTabId,
 } from "@/components/ventas/VentaFichaTabs";
 import { VentasKpiStrip } from "@/components/ventas/VentasKpiStrip";
-import { EditVentaModal } from "@/components/ventas/EditVentaModal";
 import type { CobrarVentaMode } from "@/components/ventas/CobrarVentaModal";
-import { ConfigurarFinanciacionModal } from "@/components/ventas/ConfigurarFinanciacionModal";
 import { VentaFinanciacionSection } from "@/components/ventas/VentaFinanciacionSection";
 import { VentaCobranzasSection } from "@/components/ventas/VentaCobranzasSection";
 import { VentaResumenSection } from "@/components/ventas/VentaResumenSection";
-import { EmitirReciboVentaModal } from "@/components/ventas/EmitirReciboVentaModal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { PageHeaderSkeleton, Skeleton } from "@/components/ui/Skeleton";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -60,6 +57,27 @@ const CobrarVentaModal = dynamic(
   () =>
     import("@/components/ventas/CobrarVentaModal").then((mod) => ({
       default: mod.CobrarVentaModal,
+    })),
+  { ssr: false },
+);
+const EditVentaModal = dynamic(
+  () =>
+    import("@/components/ventas/EditVentaModal").then((mod) => ({
+      default: mod.EditVentaModal,
+    })),
+  { ssr: false },
+);
+const ConfigurarFinanciacionModal = dynamic(
+  () =>
+    import("@/components/ventas/ConfigurarFinanciacionModal").then((mod) => ({
+      default: mod.ConfigurarFinanciacionModal,
+    })),
+  { ssr: false },
+);
+const EmitirReciboVentaModal = dynamic(
+  () =>
+    import("@/components/ventas/EmitirReciboVentaModal").then((mod) => ({
+      default: mod.EmitirReciboVentaModal,
     })),
   { ssr: false },
 );

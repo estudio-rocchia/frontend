@@ -1,10 +1,22 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { NewVentaModal } from "@/components/ventas/NewVentaModal";
-import { PublicarEnVentaModal } from "@/components/ventas/PublicarEnVentaModal";
+import { useSyncScope } from "@/lib/sync/use-sync-scope";
+
+const NewVentaModal = dynamic(
+  () => import("@/components/ventas/NewVentaModal").then((mod) => ({ default: mod.NewVentaModal })),
+  { ssr: false },
+);
+const PublicarEnVentaModal = dynamic(
+  () =>
+    import("@/components/ventas/PublicarEnVentaModal").then((mod) => ({
+      default: mod.PublicarEnVentaModal,
+    })),
+  { ssr: false },
+);
 import { VentasCatalogFilterChips } from "@/components/ventas/VentasCatalogFilterChips";
 import { VentasCreateActions } from "@/components/ventas/VentasCreateActions";
 import {
@@ -143,9 +155,12 @@ export function VentasWorkspace() {
     void loadTabCounts();
   }, [loadTabCounts]);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (options?: { silent?: boolean }) => {
     if (!token) return;
-    setLoading(true);
+    const silent = options?.silent ?? false;
+    if (!silent) {
+      setLoading(true);
+    }
     setError(null);
     try {
       if (tab === "en_operacion") {
@@ -184,9 +199,13 @@ export function VentasWorkspace() {
       setVentaRows([]);
       setCatalogRows([]);
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, [token, tab, estadoIds, tipoInmuebleIds, catalogFilter, tipoVentaId, logout]);
+
+  useSyncScope("ventas", () => void load({ silent: true }), Boolean(token));
 
   useEffect(() => {
     if (tab !== "en_operacion" && Object.keys(estadoIds).length === 0) return;
