@@ -7,6 +7,9 @@ const backendUrl = (process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:3000").
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1", "localhost"],
+  experimental: {
+    optimizePackageImports: ["lucide-react"],
+  },
   async rewrites() {
     return [
       {
