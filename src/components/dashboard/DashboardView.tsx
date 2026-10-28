@@ -1,19 +1,19 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 
 import { DashboardAlertCard } from "@/components/dashboard/DashboardAlertCard";
 import { DashboardAnimatedCount } from "@/components/dashboard/DashboardAnimatedCount";
 import { PageHeaderSkeleton, Skeleton } from "@/components/ui/Skeleton";
 import { useAuth } from "@/context/auth-context";
-import { useDashboardAlerts } from "@/context/dashboard-alerts-context";
+import { useDashboardAlertsActions, useDashboardAlertsState } from "@/context/dashboard-alerts-context";
 import { useDashboardReadAlerts } from "@/context/dashboard-read-alerts-context";
 import type { DashboardAlertRow, DashboardAlertTier } from "@/data/dashboard-contracts";
 import { pagePaddingClass } from "@/lib/layout";
 import { countAlertsByTier } from "@/lib/mappers/dashboard";
 
-type AlertFilter = "todos" | "urgente" | "proximo" | "admin" | "alquiler" | "venta";
+type AlertFilter = "todos" | "urgente" | "proximo" | "admin" | "alquiler" | "venta" | "calendario";
 
 const filters: { id: AlertFilter; label: string }[] = [
   { id: "todos", label: "Todas" },
@@ -22,6 +22,7 @@ const filters: { id: AlertFilter; label: string }[] = [
   { id: "admin", label: "Administrativas" },
   { id: "alquiler", label: "Alquileres" },
   { id: "venta", label: "Ventas" },
+  { id: "calendario", label: "Calendario" },
 ];
 
 const summaryCards: {
@@ -60,7 +61,9 @@ const summaryCards: {
 
 function filterAlerts(rows: DashboardAlertRow[], filter: AlertFilter): DashboardAlertRow[] {
   if (filter === "todos") return rows;
-  if (filter === "alquiler" || filter === "venta") return rows.filter((row) => row.modulo === filter);
+  if (filter === "alquiler" || filter === "venta" || filter === "calendario") {
+    return rows.filter((row) => row.modulo === filter);
+  }
   return rows.filter((row) => row.tier === filter);
 }
 
@@ -72,9 +75,15 @@ function greetingName(username: string): string {
 
 export function DashboardView() {
   const { user } = useAuth();
-  const { rows, loading, error, refresh } = useDashboardAlerts();
+  const { rows, loading, error } = useDashboardAlertsState();
+  const { activate, refresh } = useDashboardAlertsActions();
   const [filter, setFilter] = useState<AlertFilter>("todos");
-  const { isRead, markRead } = useDashboardReadAlerts();
+  const { isRead, markRead, ensureLoaded } = useDashboardReadAlerts();
+
+  useEffect(() => {
+    activate();
+    ensureLoaded();
+  }, [activate, ensureLoaded]);
 
   const showSkeleton = loading && rows.length === 0;
   const totalCounts = useMemo(() => countAlertsByTier(rows), [rows]);
