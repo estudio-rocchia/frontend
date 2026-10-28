@@ -2,6 +2,8 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+
+import { useSyncScope } from "@/lib/sync/use-sync-scope";
 import { Search } from "lucide-react";
 
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
@@ -52,9 +54,12 @@ export function ClientesView() {
   const [kpis, setKpis] = useState<ClientesKpis | null>(null);
   const [listTab, setListTab] = useState<"listado" | "nuevo">("listado");
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (options?: { silent?: boolean }) => {
     if (!token) return;
-    setLoading(true);
+    const silent = options?.silent ?? false;
+    if (!silent) {
+      setLoading(true);
+    }
     setError(null);
 
     try {
@@ -96,9 +101,13 @@ export function ClientesView() {
       }
       setError(err instanceof ApiError ? err.message : "No se pudieron cargar los clientes");
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, [token, logout, currentCursor, debouncedSearch, activeFilter, applyResponse]);
+
+  useSyncScope("clientes", () => void load({ silent: true }), Boolean(token));
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(searchQuery), 300);

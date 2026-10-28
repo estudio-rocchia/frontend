@@ -1,10 +1,18 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { ArrowLeft, Building2, Plus } from "lucide-react";
 
-import { ClienteInmobiliariaAgregarSection } from "@/components/clientes/ClienteInmobiliariaAgregarSection";
 import { ClienteInmobiliariaPropiedadesSection } from "@/components/clientes/ClienteInmobiliariaPropiedadesSection";
+
+const ClienteInmobiliariaAgregarSection = dynamic(
+  () =>
+    import("@/components/clientes/ClienteInmobiliariaAgregarSection").then((mod) => ({
+      default: mod.ClienteInmobiliariaAgregarSection,
+    })),
+  { ssr: false },
+);
 import { useAuth } from "@/context/auth-context";
 import type { ContratoListItem, InmuebleRecord } from "@/lib/api/types";
 import type { ModoHonorariosAdministracion } from "@/lib/honorarios-admin";

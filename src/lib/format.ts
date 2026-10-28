@@ -1,4 +1,4 @@
-import { NetworkError } from "@/lib/api/client";
+import { ApiError, NetworkError } from "@/lib/api/client";
 import {
   adjustmentCycleUnpaidToastMessage,
   parseAdjustmentCycleUnpaidMessage,
@@ -191,6 +191,9 @@ const ADJUSTMENT_FREQUENCY_RE =
   /^The contract agreed to an adjustment every (\d+) months;/;
 
 export function rentalApiErrorMessage(err: unknown, fallback = "No se pudo crear el contrato"): string {
+  if (err instanceof ApiError && err.status === 409) {
+    return `${err.message} Otro usuario modificó este registro; la lista se actualizará sola.`;
+  }
   if (err instanceof NetworkError) {
     return err.message;
   }

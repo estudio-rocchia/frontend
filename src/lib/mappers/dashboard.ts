@@ -1,5 +1,8 @@
 import type { DashboardAlertRow, DashboardAlertTier } from "@/data/dashboard-contracts";
-import type { DashboardResumen } from "@/lib/api/types";
+import type { CitaEstado, DashboardResumen } from "@/lib/api/types";
+import { citaDurationLabel, citaEstadoLabel, citaTimeLabel } from "@/lib/calendar/labels";
+import { formatDateKey } from "@/lib/calendar/month";
+import { citaTipoLabel } from "@/lib/calendar/tipos";
 import { formatDateDisplay, formatMoney } from "@/lib/format";
 
 const PRIORITY = {
@@ -11,6 +14,8 @@ const PRIORITY = {
   alquilerAjuste: 30,
   ventaSinFinanciacion: 31,
   ventaCobroSinRecibo: 32,
+  citaUrgente: 14,
+  citaProxima: 22,
   alquilerRenovacion: 40,
 } as const;
 
@@ -26,6 +31,40 @@ function tierFromPriority(priority: number): DashboardAlertTier {
   if (priority < 20) return "urgente";
   if (priority < 30) return "proximo";
   return "admin";
+}
+
+function citaProximaTitle(item: DashboardResumen["citasProximas"][number]): string {
+  if (item.titulo?.trim()) return item.titulo.trim();
+  if (item.inmuebleTitle?.trim()) return item.inmuebleTitle.trim();
+  if (item.inmuebleCode) return item.inmuebleCode;
+  return citaTipoLabel(item.tipo);
+}
+
+function citaProximaParty(item: DashboardResumen["citasProximas"][number]): string {
+  if (item.visitanteNombre?.trim()) return item.visitanteNombre.trim();
+  if (item.personaNombre?.trim()) return item.personaNombre.trim();
+  if (item.asignadoUsername) return item.asignadoUsername;
+  return "Sin asignar";
+}
+
+function citaProximaRelative(minutosHasta: number): string {
+  if (minutosHasta < 60) {
+    return `en ${minutosHasta} min`;
+  }
+  const horas = Math.floor(minutosHasta / 60);
+  const mins = minutosHasta % 60;
+  if (horas < 24) {
+    return mins > 0 ? `en ${horas} h ${mins} min` : `en ${horas} h`;
+  }
+  const dias = Math.floor(horas / 24);
+  const horasRestantes = horas % 24;
+  return horasRestantes > 0 ? `en ${dias} día${dias === 1 ? "" : "s"} ${horasRestantes} h` : `en ${dias} día${dias === 1 ? "" : "s"}`;
+}
+
+function citaEstadoBadgeVariant(estado: CitaEstado): "success" | "warning" | "danger" {
+  if (estado === "confirmada") return "success";
+  if (estado === "cancelada") return "danger";
+  return "warning";
 }
 
 function emptyVentas(resumen: DashboardResumen): DashboardResumen["ventas"] {
@@ -239,6 +278,29 @@ export function mapDashboardAlerts(resumen: DashboardResumen): DashboardAlertRow
       status: { label: "Renovación", variant: "warning" },
       action: "Revisar contrato",
       priority: PRIORITY.alquilerRenovacion,
+    });
+  }
+
+  for (const item of resumen.citasProximas ?? []) {
+    const programada = new Date(item.programadaEn);
+    const fecha = programada.toLocaleDateString("es-AR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+    const priority = item.minutosHasta <= 24 * 60 ? PRIORITY.citaUrgente : PRIORITY.citaProxima;
+    rows.push({
+      id: `cita-proxima-${item.citaId}`,
+      modulo: "calendario",
+      moduloLabel: "Calendario",
+      href: `/calendario?fecha=${formatDateKey(new Date(item.programadaEn))}`,
+      property: citaProximaTitle(item),
+      party: citaProximaParty(item),
+      amount: citaTimeLabel(item.programadaEn),
+      dueDate: `${fecha} ${citaTimeLabel(item.programadaEn)} · ${citaProximaRelative(item.minutosHasta)} · ${citaDurationLabel(item.duracionMinutos)}`,
+      status: { label: citaEstadoLabel(item.estado), variant: citaEstadoBadgeVariant(item.estado) },
+      action: "Ver cita",
+      priority,
     });
   }
 

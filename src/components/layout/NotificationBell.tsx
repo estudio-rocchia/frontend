@@ -1,34 +1,49 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Bell, CheckCircle2 } from "lucide-react";
 
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { useDashboardAlerts } from "@/context/dashboard-alerts-context";
+import {
+  useDashboardAlertsActions,
+  useDashboardAlertsState,
+} from "@/context/dashboard-alerts-context";
 import { useDashboardReadAlerts } from "@/context/dashboard-read-alerts-context";
 import { countAlertsByTier, filterUnreadAlerts } from "@/lib/mappers/dashboard";
 
 const PANEL_LIMIT = 8;
 
-export function NotificationBell() {
-  const { rows: allAlerts, loading, refresh } = useDashboardAlerts();
-  const { readIds, markRead } = useDashboardReadAlerts();
+export const NotificationBell = memo(function NotificationBell() {
+  const { rows: allAlerts, loading, loaded } = useDashboardAlertsState();
+  const { activate, refresh } = useDashboardAlertsActions();
+  const { readIds, markRead, ensureLoaded } = useDashboardReadAlerts();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const unreadAlerts = useMemo(
-    () => filterUnreadAlerts(allAlerts, readIds).slice(0, PANEL_LIMIT),
+  const unreadAll = useMemo(
+    () => filterUnreadAlerts(allAlerts, readIds),
     [allAlerts, readIds],
   );
-  const urgentCount = useMemo(
-    () => countAlertsByTier(filterUnreadAlerts(allAlerts, readIds)).urgente,
-    [allAlerts, readIds],
-  );
+  const unreadAlerts = useMemo(() => unreadAll.slice(0, PANEL_LIMIT), [unreadAll]);
+  const urgentCount = useMemo(() => countAlertsByTier(unreadAll).urgente, [unreadAll]);
 
   useEffect(() => {
-    if (open) void refresh({ silent: true });
-  }, [open, refresh]);
+    if (open && loaded) {
+      void refresh({ silent: true });
+    }
+  }, [open, loaded, refresh]);
+
+  function handleToggle() {
+    setOpen((current) => {
+      const next = !current;
+      if (next) {
+        activate();
+        ensureLoaded();
+      }
+      return next;
+    });
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -53,7 +68,7 @@ export function NotificationBell() {
   }
 
   async function handleMarkAllRead() {
-    const ids = filterUnreadAlerts(allAlerts, readIds).map((alert) => alert.id);
+    const ids = unreadAll.map((alert) => alert.id);
     if (ids.length === 0) return;
     await markRead(ids);
   }
@@ -62,7 +77,7 @@ export function NotificationBell() {
     <div ref={containerRef} className="relative">
       <button
         type="button"
-        onClick={() => setOpen((value) => !value)}
+        onClick={handleToggle}
         className="relative rounded-sm p-1.5 text-text-secondary hover:bg-bg-page hover:text-text-primary"
         aria-label="Notificaciones"
         aria-expanded={open}
@@ -149,4 +164,4 @@ export function NotificationBell() {
       ) : null}
     </div>
   );
-}
+});

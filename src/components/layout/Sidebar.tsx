@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect } from "react";
+import { memo, useEffect } from "react";
 import { X } from "lucide-react";
 
 import rocchiaLogo from "@/assets/rocchia-logo.png";
@@ -17,7 +17,7 @@ function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
+const SidebarNav = memo(function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const { user, token } = useAuth();
   const navItems = mainNav.filter((item) => !item.adminOnly || canManageUsers(user));
@@ -29,8 +29,9 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
           <Image
             src={rocchiaLogo}
             alt=""
-            width={882}
-            height={882}
+            width={88}
+            height={88}
+            sizes="44px"
             priority
             className="h-full w-full object-cover"
           />
@@ -65,7 +66,7 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
       </nav>
     </>
   );
-}
+});
 
 export function Sidebar({
   mobileOpen,

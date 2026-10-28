@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ArrowUpRight, Handshake, KeyRound } from "lucide-react";
+import { memo } from "react";
+import { ArrowUpRight, CalendarDays, Handshake, KeyRound } from "lucide-react";
 
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import type { DashboardAlertRow } from "@/data/dashboard-contracts";
@@ -11,7 +12,7 @@ const tierAccent: Record<DashboardAlertRow["tier"], { rail: string; amount: stri
   admin: { rail: "bg-primary", amount: "text-text-primary" },
 };
 
-export function DashboardAlertCard({
+export const DashboardAlertCard = memo(function DashboardAlertCard({
   alert,
   index = 0,
   read = false,
@@ -23,7 +24,8 @@ export function DashboardAlertCard({
   onMarkRead?: () => void;
 }) {
   const accent = tierAccent[alert.tier];
-  const ModuloIcon = alert.modulo === "venta" ? Handshake : KeyRound;
+  const ModuloIcon =
+    alert.modulo === "venta" ? Handshake : alert.modulo === "calendario" ? CalendarDays : KeyRound;
 
   return (
     <div
@@ -65,4 +67,4 @@ export function DashboardAlertCard({
       </Link>
     </div>
   );
-}
+});

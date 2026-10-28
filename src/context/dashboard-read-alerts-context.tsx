@@ -11,12 +11,18 @@ import {
 } from "react";
 
 import { useAuth } from "@/context/auth-context";
-import { ApiError, fetchDashboardAlertasLeidas, markDashboardAlertasLeidas, unmarkDashboardAlertaLeida } from "@/lib/api";
+import {
+  ApiError,
+  fetchDashboardAlertasLeidas,
+  markDashboardAlertasLeidas,
+  unmarkDashboardAlertaLeida,
+} from "@/lib/api";
 
 type DashboardReadAlertsContextValue = {
   readIds: ReadonlySet<string>;
   loaded: boolean;
   isRead: (alertId: string) => boolean;
+  ensureLoaded: () => void;
   markRead: (alertIds: string[]) => Promise<void>;
   unmarkRead: (alertId: string) => Promise<void>;
   refresh: () => Promise<void>;
@@ -49,9 +55,14 @@ export function DashboardReadAlertsProvider({ children }: { children: ReactNode 
   }, [token, logout]);
 
   useEffect(() => {
+    setReadIds(new Set());
     setLoaded(false);
+  }, [token]);
+
+  const ensureLoaded = useCallback(() => {
+    if (!token || loaded) return;
     void refresh();
-  }, [refresh]);
+  }, [token, loaded, refresh]);
 
   const markRead = useCallback(
     async (alertIds: string[]) => {
@@ -102,11 +113,12 @@ export function DashboardReadAlertsProvider({ children }: { children: ReactNode 
       readIds,
       loaded,
       isRead: (alertId: string) => readIds.has(alertId),
+      ensureLoaded,
       markRead,
       unmarkRead,
       refresh,
     }),
-    [readIds, loaded, markRead, unmarkRead, refresh],
+    [readIds, loaded, ensureLoaded, markRead, unmarkRead, refresh],
   );
 
   return <DashboardReadAlertsContext.Provider value={value}>{children}</DashboardReadAlertsContext.Provider>;

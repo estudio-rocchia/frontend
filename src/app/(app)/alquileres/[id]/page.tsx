@@ -1,6 +1,11 @@
 import { Suspense } from "react";
 
-import { ContractFichaView } from "@/components/alquileres/ContractFichaView";
+import { lazyWorkspace } from "@/lib/lazy-workspace";
+
+const ContractFichaView = lazyWorkspace(
+  () => import("@/components/alquileres/ContractFichaView"),
+  "ContractFichaView",
+);
 
 export default function ContratoFichaPage() {
   return (

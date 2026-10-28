@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 
+import { useSyncScope } from "@/lib/sync/use-sync-scope";
+
 import { AlquileresKpiSection } from "@/components/alquileres/AlquileresKpiSection";
 import { RentalsTable } from "@/components/alquileres/RentalsTable";
 import type { NewContractForm } from "@/components/alquileres/NewContractModal";
@@ -116,6 +118,8 @@ export function AlquileresWorkspace() {
     stats,
     loadRows,
   } = useAlquileresTable(token, logout);
+
+  useSyncScope("contratos", () => void loadRows({ silent: true }), Boolean(token));
 
   const [newModalOpen, setNewModalOpen] = useState(false);
   const [renewModalOpen, setRenewModalOpen] = useState(false);
