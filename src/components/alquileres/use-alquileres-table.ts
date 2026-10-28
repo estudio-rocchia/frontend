@@ -30,9 +30,12 @@ export function useAlquileresTable(token: string | null, logout: () => void) {
     goPrev,
   } = useCursorPagination();
 
-  const loadRows = useCallback(async () => {
+  const loadRows = useCallback(async (options?: { silent?: boolean }) => {
     if (!token) return;
-    setLoading(true);
+    const silent = options?.silent ?? false;
+    if (!silent) {
+      setLoading(true);
+    }
     setError(null);
     try {
       const contratosRes = await fetchContratosTableSummary(token, {
@@ -53,7 +56,9 @@ export function useAlquileresTable(token: string | null, logout: () => void) {
       }
       setError(err instanceof ApiError ? err.message : "Error al cargar alquileres");
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, [token, logout, currentCursor, debouncedSearch, activeChip, applyResponse]);
 

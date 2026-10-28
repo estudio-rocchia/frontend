@@ -41,7 +41,7 @@ import type {
   SecheepImportInput,
   ServicioContratoRecord,
 } from "@/lib/api/types";
-import { useDashboardAlerts } from "@/context/dashboard-alerts-context";
+import { invalidateDashboardAlerts } from "@/lib/dashboard-alerts-events";
 import { downloadBlob, rentalApiErrorMessage } from "@/lib/format";
 import { resolveMoraPunitoriaPayload } from "@/lib/mora-punitoria";
 import { mapContratoDetailToFicha } from "@/lib/mappers/rentals";
@@ -55,7 +55,6 @@ interface UseContractFichaOptions {
 }
 
 export function useContractFicha({ contratoId, validId, token, logout }: UseContractFichaOptions) {
-  const { refresh: refreshDashboardAlerts } = useDashboardAlerts();
   const { consume: consumePrefetchedContrato } = useContratoPrefetch(token);
   const [detail, setDetail] = useState<ContractDetail | null>(null);
   const [contrato, setContrato] = useState<ContratoDetail | null>(null);
@@ -387,7 +386,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
         setSuccess("Pago de servicio registrado.");
       }
 
-      void refreshDashboardAlerts({ silent: true });
+      invalidateDashboardAlerts();
       await loadServicios(contrato.id);
     } catch (err) {
       setError(rentalApiErrorMessage(err, "No se pudo registrar el pago"));
@@ -484,7 +483,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
       });
 
       await loadCore();
-      void refreshDashboardAlerts();
+      invalidateDashboardAlerts();
       setSuccess("Datos del contrato actualizados.");
       return true;
     } catch (err) {
