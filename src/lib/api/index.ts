@@ -871,6 +871,18 @@ export function updateVenta(token: string, id: number, body: import("./types").U
   });
 }
 
+export function completarVenta(
+  token: string,
+  id: number,
+  body: { fechaEscritura: string; nombreEscribano?: string | null },
+) {
+  return apiRequest<import("./types").VentaRecord>(`/ventas/${id}/completar`, {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
 export function cancelVenta(token: string, id: number) {
   return apiRequest<import("./types").VentaRecord>(`/ventas/${id}/cancelar`, {
     method: "POST",
