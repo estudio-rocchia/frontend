@@ -11,6 +11,7 @@ import type { CatalogSearchItem, VentaDetail } from "@/lib/api/types";
 import { formatMoney, moneyClassName } from "@/lib/format";
 import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 import { catalogMotivo, saleOferta } from "@/lib/ventas/catalog-helpers";
+import { formatDetalleSummary } from "@/lib/ventas/detalle-labels";
 import {
   ofertaEstadoLabel,
   ofertaEstadoVariant,
@@ -95,6 +96,7 @@ function VentaMobileCard({
   const moneda = oferta?.codigoMoneda ?? "ARS";
   const estadoCode = oferta?.estadoCode ?? "";
   const title = item.inmueble.displayLabel ?? item.inmueble.title ?? item.inmueble.code;
+  const detalleSummary = formatDetalleSummary(item.detalle, item.tipoInmueble.code);
 
   return (
     <button
@@ -106,6 +108,9 @@ function VentaMobileCard({
       <div className="min-w-0 flex-1">
         <div className="font-semibold text-text-primary">{title}</div>
         <div className="mt-0.5 text-[11px] text-text-secondary">{item.inmueble.code}</div>
+        {detalleSummary ? (
+          <p className="mt-1 text-[11px] text-text-secondary">{detalleSummary}</p>
+        ) : null}
         {tab === "fuera_mercado" ? (
           <p className="mt-2 line-clamp-2 text-xs text-text-secondary">{catalogMotivo(item)}</p>
         ) : null}
@@ -131,7 +136,7 @@ export function VentasTable({
   rows,
   loading,
   search,
-  searchPlaceholder = "Buscar por inmueble o código…",
+  searchPlaceholder = "Código, calle, alias u observación del detalle…",
   onSearchChange,
   emptyHint,
   emptyActions,
@@ -293,6 +298,7 @@ export function VentasTable({
                   const precio = oferta?.montoPrecio ?? null;
                   const moneda = oferta?.codigoMoneda ?? "ARS";
                   const estadoCode = oferta?.estadoCode ?? "";
+                  const detalleSummary = formatDetalleSummary(item.detalle, item.tipoInmueble.code);
 
                   return (
                     <tr
@@ -314,6 +320,9 @@ export function VentasTable({
                           {item.inmueble.displayLabel ?? item.inmueble.title ?? item.inmueble.code}
                         </div>
                         <div className="text-[11px] text-text-secondary">{item.inmueble.code}</div>
+                        {detalleSummary ? (
+                          <div className="mt-0.5 text-[11px] text-text-secondary">{detalleSummary}</div>
+                        ) : null}
                       </td>
                       {tab === "fuera_mercado" ? (
                         <td

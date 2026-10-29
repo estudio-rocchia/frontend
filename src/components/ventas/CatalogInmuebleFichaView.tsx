@@ -13,6 +13,7 @@ import {
 import { ActualizarPrecioModal } from "@/components/ventas/ActualizarPrecioModal";
 import { CambiarEstadoOfertaModal, type CambiarEstadoMode } from "@/components/ventas/CambiarEstadoOfertaModal";
 import { EditarFormaPagoOfertaModal } from "@/components/ventas/EditarFormaPagoOfertaModal";
+import { InmuebleDetalleSection } from "@/components/ventas/InmuebleDetalleSection";
 import { NewVentaModal } from "@/components/ventas/NewVentaModal";
 import { PrecioHistorialSection } from "@/components/ventas/PrecioHistorialSection";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
@@ -70,15 +71,6 @@ function isVentasTabId(value: string | null): value is VentasTabId {
   );
 }
 
-function cleanInmuebleNotas(notas: string | null | undefined): string | null {
-  if (!notas?.trim()) return null;
-  const cleaned = notas
-    .replace(/\[import:excel-fuera-mercado[^\]]*\]\s*/gi, "")
-    .replace(/Motivo:\s*.+(\n|$)/i, "")
-    .trim();
-  return cleaned || null;
-}
-
 function ventaOferta(ficha: InmuebleFicha): OfertaRecord | null {
   const fromFicha = ficha.ofertas?.find((o) => o.tipoOperacionCode === "venta" && o.activo);
   if (fromFicha) return fromFicha;
@@ -92,7 +84,8 @@ export function CatalogInmuebleFichaView() {
   const inmuebleId = parseRouteId(params.id);
   const fromTab = isVentasTabId(searchParams.get("from")) ? searchParams.get("from")! : "a_la_venta";
 
-  const { token, logout } = useAuth();
+  const { token, user, logout } = useAuth();
+  const canEditDetalle = Boolean(user?.roles.some((role) => role === "admin" || role === "staff"));
   const [activeTab, setActiveTab] = useState<CatalogInmuebleFichaTabId>("resumen");
   const [loading, setLoading] = useState(true);
   const [ficha, setFicha] = useState<InmuebleFicha | null>(null);
@@ -212,7 +205,6 @@ export function CatalogInmuebleFichaView() {
     return parts.join(" · ");
   }, [propietario, inmuebleTitle]);
 
-  const notasLimpias = cleanInmuebleNotas(inmueble?.notas);
   const estadoCode = oferta?.estadoCode ?? "available";
   const isOffMarket = estadoCode === "off_market";
   const isAvailable = estadoCode === "available";
@@ -243,8 +235,9 @@ export function CatalogInmuebleFichaView() {
         ? { id: ficha.localidad.id, name: ficha.localidad.name, province: ficha.localidad.province }
         : null,
       ofertasActivas: [oferta],
+      detalle: ficha.detalle ?? null,
     };
-  }, [inmueble, oferta, ficha?.tipoInmueble, ficha?.localidad]);
+  }, [inmueble, oferta, ficha?.tipoInmueble, ficha?.localidad, ficha?.detalle]);
 
   function openEstadoModal(mode: CambiarEstadoMode) {
     setEstadoModalMode(mode);
@@ -452,11 +445,18 @@ export function CatalogInmuebleFichaView() {
                 </div>
               </div>
 
-              {inmueble.description ? (
-                <div className="flex flex-col gap-4">
-                  <SectionTitle>Características</SectionTitle>
-                  <p className="whitespace-pre-wrap text-[13px] text-text-primary">{inmueble.description}</p>
-                </div>
+              {token && inmuebleId !== null ? (
+                <InmuebleDetalleSection
+                  token={token}
+                  inmuebleId={inmuebleId}
+                  tipoInmuebleCode={ficha.tipoInmueble?.code}
+                  detalle={ficha.detalle}
+                  canEdit={canEditDetalle}
+                  onSaved={() => {
+                    setSuccess("Detalle edilicio actualizado.");
+                    void load();
+                  }}
+                />
               ) : null}
 
               {ventaVinculada ? (
@@ -468,7 +468,7 @@ export function CatalogInmuebleFichaView() {
                       value={`Venta #${ventaVinculada.id} · ${ventaEstadoLabel(ventaVinculada.estado)}`}
                     />
                     <FieldBlock
-                      label="Fecha de compromiso"
+                      label="Fecha de boleto"
                       value={
                         ventaVinculada.fechaBoleto
                           ? formatDateDisplay(ventaVinculada.fechaBoleto)
@@ -492,13 +492,6 @@ export function CatalogInmuebleFichaView() {
                       Abrir ficha de operación
                     </ButtonOutline>
                   </div>
-                </div>
-              ) : null}
-
-              {notasLimpias ? (
-                <div className="flex flex-col gap-4">
-                  <SectionTitle>Notas</SectionTitle>
-                  <p className="whitespace-pre-wrap text-[13px] text-text-primary">{notasLimpias}</p>
                 </div>
               ) : null}
             </div>
