@@ -12,7 +12,6 @@ const PARTE_ROLES: { rol: string; label: string }[] = [
   { rol: "buyer", label: "Comprador" },
   { rol: "seller", label: "Vendedor" },
   { rol: "guarantor", label: "Garantes" },
-  { rol: "witness", label: "Testigos" },
 ];
 
 function ResumenPanel({
@@ -97,7 +96,7 @@ export function VentaResumenSection({
 
         <ResumenPanel title="Trámite y escritura">
           <div className="grid gap-3 sm:grid-cols-2">
-            <DetailTile label="Fecha de compromiso" value={formatOptionalDate(venta.fechaBoleto)} />
+            <DetailTile label="Fecha de boleto" value={formatOptionalDate(venta.fechaBoleto)} />
             <DetailTile label="Fecha de escritura" value={formatOptionalDate(venta.fechaEscritura)} />
             <DetailTile label="Forma de pago" value={formaPagoLabel(venta.formaPagoCode)} />
             <DetailTile
