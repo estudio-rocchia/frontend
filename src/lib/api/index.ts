@@ -887,6 +887,13 @@ export function addVentaParte(token: string, ventaId: number, body: import("./ty
   });
 }
 
+export function removeVentaParte(token: string, ventaId: number, parteId: number) {
+  return apiRequest<void>(`/ventas/${ventaId}/partes/${parteId}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
 export function changeOfertaEstado(
   token: string,
   ofertaId: number,

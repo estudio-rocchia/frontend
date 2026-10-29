@@ -448,6 +448,9 @@ export function VentaFichaView() {
               inmuebleCode={inmuebleCode}
               inmuebleTitle={inmuebleTitle}
               parteNombres={parteNombres}
+              editable={editable}
+              token={token ?? ""}
+              onPartesChanged={() => void load({ silent: true })}
             />
           ) : null}
 

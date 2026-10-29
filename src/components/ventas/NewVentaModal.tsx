@@ -73,6 +73,7 @@ export function NewVentaModal({
   const [inmuebleSearchFocused, setInmuebleSearchFocused] = useState(false);
   const [buyer, setBuyer] = useState<PersonaFieldValue>(emptyPersona);
   const [seller, setSeller] = useState<PersonaFieldValue>(emptyPersona);
+  const [garantes, setGarantes] = useState<Array<{ key: string; field: PersonaFieldValue }>>([]);
   const [monto, setMonto] = useState("");
   const [moneda, setMoneda] = useState("USD");
   const [fechaBoleto, setFechaBoleto] = useState("");
@@ -98,6 +99,7 @@ export function NewVentaModal({
     setInmuebleSearchFocused(false);
     setBuyer(emptyPersona);
     setSeller(emptyPersona);
+    setGarantes([]);
     setFechaBoleto("");
     setFechaEscritura("");
     setEscribano("");
@@ -269,15 +271,26 @@ export function NewVentaModal({
       setError("Completá comprador y vendedor.");
       return;
     }
+    if (garantes.some((garante) => !isPersonaValid(garante.field))) {
+      setError("Completá cada garante o quitalo de la lista.");
+      return;
+    }
 
     setSaving(true);
     setError(null);
     try {
       const inmuebleId = await resolveInmuebleId();
-      const [buyerPersona, sellerPersona] = await Promise.all([
+      const [buyerPersona, sellerPersona, ...garantePersonas] = await Promise.all([
         resolvePartePersona(token, buyer),
         resolvePartePersona(token, seller),
+        ...garantes.map((garante) => resolvePartePersona(token, garante.field)),
       ]);
+      const garanteIds = garantePersonas.map((persona) => persona.id);
+      if (new Set(garanteIds).size !== garanteIds.length) {
+        setError("Hay garantes repetidos.");
+        setSaving(false);
+        return;
+      }
       const venta = await createVenta(token, {
         inmuebleId,
         montoPrecioVenta,
@@ -292,6 +305,9 @@ export function NewVentaModal({
       await Promise.all([
         addVentaParte(token, venta.id, { personaId: buyerPersona.id, rol: "buyer" }),
         addVentaParte(token, venta.id, { personaId: sellerPersona.id, rol: "seller" }),
+        ...garantePersonas.map((persona) =>
+          addVentaParte(token, venta.id, { personaId: persona.id, rol: "guarantor" }),
+        ),
       ]);
       if (!Number.isInteger(venta.id) || venta.id <= 0) {
         setError("La venta se creó pero no se recibió un identificador válido.");
@@ -483,6 +499,62 @@ export function NewVentaModal({
                 searchId="venta-vendedor-search"
                 placeholder="Nombre, apellido o documento del vendedor…"
               />
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-[11px] font-semibold text-text-secondary">Garantes</span>
+                  <button
+                    type="button"
+                    className="text-[13px] font-semibold text-primary"
+                    onClick={() =>
+                      setGarantes((current) => [
+                        ...current,
+                        { key: crypto.randomUUID(), field: emptyPersona },
+                      ])
+                    }
+                  >
+                    Agregar garante
+                  </button>
+                </div>
+                {garantes.length === 0 ? (
+                  <p className="text-[12px] text-text-secondary">
+                    Opcional. Podés sumar uno o más garantes a la operación.
+                  </p>
+                ) : (
+                  garantes.map((garante, index) => (
+                    <div
+                      key={garante.key}
+                      className="flex flex-col gap-2 rounded-sm border border-border bg-bg-page p-3"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-[12px] font-semibold text-text-primary">
+                          Garante {index + 1}
+                        </span>
+                        <button
+                          type="button"
+                          className="text-[12px] font-semibold text-danger"
+                          onClick={() =>
+                            setGarantes((current) => current.filter((item) => item.key !== garante.key))
+                          }
+                        >
+                          Quitar
+                        </button>
+                      </div>
+                      <PersonaSelectField
+                        label="Persona"
+                        value={garante.field}
+                        onChange={(field) =>
+                          setGarantes((current) =>
+                            current.map((item) => (item.key === garante.key ? { ...item, field } : item)),
+                          )
+                        }
+                        token={token}
+                        searchId={`venta-garante-${garante.key}`}
+                        placeholder="Nombre, apellido o documento del garante…"
+                      />
+                    </div>
+                  ))
+                )}
+              </div>
             </FormSection>
 
             <FormSection title="Condiciones">

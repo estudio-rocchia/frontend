@@ -6,13 +6,7 @@ import type { VentaDetail } from "@/lib/api/types";
 import { formatDateDisplay, moneyClassName } from "@/lib/format";
 import { VENTA_EMPTY_FIELD } from "@/lib/ventas/empty-field";
 import { formaPagoLabel } from "@/lib/ventas/forma-pago";
-import { parteNombre } from "@/lib/ventas/partes";
-
-const PARTE_ROLES: { rol: string; label: string }[] = [
-  { rol: "buyer", label: "Comprador" },
-  { rol: "seller", label: "Vendedor" },
-  { rol: "guarantor", label: "Garantes" },
-];
+import { VentaPartesSection } from "@/components/ventas/VentaPartesSection";
 
 function ResumenPanel({
   title,
@@ -51,18 +45,6 @@ function DetailTile({ label, value, emphasize = false }: { label: string; value:
   );
 }
 
-function ParteTile({ label, value }: { label: string; value: string }) {
-  const empty = value === VENTA_EMPTY_FIELD;
-  return (
-    <div className="flex flex-col gap-1 rounded-sm border border-border/70 bg-bg-card px-3 py-3">
-      <span className="text-[10px] font-semibold uppercase tracking-wide text-primary">{label}</span>
-      <span className={`text-[13px] ${empty ? "text-text-secondary" : "font-medium text-text-primary"}`}>
-        {value}
-      </span>
-    </div>
-  );
-}
-
 function formatOptionalDate(value: string | null | undefined): string {
   return value ? formatDateDisplay(value) : VENTA_EMPTY_FIELD;
 }
@@ -72,11 +54,17 @@ export function VentaResumenSection({
   inmuebleCode,
   inmuebleTitle,
   parteNombres,
+  editable = false,
+  token = "",
+  onPartesChanged,
 }: {
   venta: VentaDetail;
   inmuebleCode: string;
   inmuebleTitle: string;
   parteNombres: Record<number, string>;
+  editable?: boolean;
+  token?: string;
+  onPartesChanged?: () => void;
 }) {
   const moneda = venta.codigoMoneda;
   const condiciones = venta.condicionesPago?.trim() || null;
@@ -109,9 +97,13 @@ export function VentaResumenSection({
 
       <ResumenPanel title="Partes">
         <div className="grid gap-3 sm:grid-cols-2">
-          {PARTE_ROLES.map(({ rol, label }) => (
-            <ParteTile key={rol} label={label} value={parteNombre(venta, rol, parteNombres)} />
-          ))}
+          <VentaPartesSection
+            venta={venta}
+            parteNombres={parteNombres}
+            editable={editable}
+            token={token}
+            onChanged={() => onPartesChanged?.()}
+          />
         </div>
       </ResumenPanel>
 
