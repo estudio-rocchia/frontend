@@ -69,6 +69,7 @@ export function VentasWorkspace() {
   const searchParams = useSearchParams();
   const { token, logout } = useAuth();
   const [tab, setTab] = useState<VentasTabId>("en_operacion");
+  const [urlTabReady, setUrlTabReady] = useState(false);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -88,6 +89,7 @@ export function VentasWorkspace() {
   const characteristicFiltersRef = useRef(characteristicFilters);
   characteristicFiltersRef.current = characteristicFilters;
   const skipFilterReloadRef = useRef(true);
+  const loadGenerationRef = useRef(0);
 
   useEffect(() => {
     skipFilterReloadRef.current = true;
@@ -98,6 +100,7 @@ export function VentasWorkspace() {
     if (isVentasTabId(tabParam)) {
       setTab(tabParam);
     }
+    setUrlTabReady(true);
   }, [searchParams]);
 
   useEffect(() => {
@@ -171,6 +174,8 @@ export function VentasWorkspace() {
 
   const load = useCallback(async (options?: { silent?: boolean }) => {
     if (!token) return;
+    const generation = ++loadGenerationRef.current;
+    const stillCurrent = () => generation === loadGenerationRef.current;
     const silent = options?.silent ?? false;
     if (!silent) {
       setLoading(true);
@@ -185,6 +190,7 @@ export function VentasWorkspace() {
           venta.partes.filter((parte) => parte.rol === "buyer").map((parte) => parte.personaId),
         );
         const nombres = await fetchParteNombres(token, buyerIds).catch(() => ({}));
+        if (!stillCurrent()) return;
         setParteNombres(nombres);
         setVentaRows(details);
         setCatalogRows([]);
@@ -194,6 +200,7 @@ export function VentasWorkspace() {
           tab === "fuera_mercado" ? "off_market" : tab === "vendidos" ? "sold" : "available";
         const estadoOfertaId = estadoIds[estadoCode];
         if (!estadoOfertaId) {
+          if (!stillCurrent()) return;
           setCatalogRows([]);
           setVentaRows([]);
           setError("Catálogo de estados no disponible. Recargá la página.");
@@ -205,10 +212,12 @@ export function VentasWorkspace() {
           ...characteristicFiltersSearchParams(characteristicFiltersRef.current, tipoInmuebleIds),
           limit: 200,
         });
+        if (!stillCurrent()) return;
         setCatalogRows(res.items);
         setVentaRows([]);
       }
     } catch (err) {
+      if (!stillCurrent()) return;
       if (err instanceof ApiError && err.status === 401) {
         logout();
         return;
@@ -217,7 +226,7 @@ export function VentasWorkspace() {
       setVentaRows([]);
       setCatalogRows([]);
     } finally {
-      if (!silent) {
+      if (stillCurrent() && !silent) {
         setLoading(false);
       }
     }
@@ -226,9 +235,10 @@ export function VentasWorkspace() {
   useSyncScope("ventas", () => void load({ silent: true }), Boolean(token));
 
   useEffect(() => {
+    if (!urlTabReady) return;
     if (tab !== "en_operacion" && Object.keys(estadoIds).length === 0) return;
     void load();
-  }, [load, tab, estadoIds]);
+  }, [load, tab, estadoIds, urlTabReady]);
 
   useEffect(() => {
     if (tab === "en_operacion") return;
