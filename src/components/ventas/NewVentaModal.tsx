@@ -18,7 +18,8 @@ import {
 import { formatInmuebleDisplayLabel, inmuebleDisplayLabel } from "@/lib/inmuebles/display-label";
 import { Modal } from "@/components/ui/Modal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
-import { ChipToggle, FormField, FormSection } from "@/components/ui/FormLayout";
+import { ChipToggle, FieldBlock, FormField, FormSection } from "@/components/ui/FormLayout";
+import { formatMoney } from "@/lib/format";
 import {
   ApiError,
   addVentaParte,
@@ -266,8 +267,22 @@ export function NewVentaModal({
     return created.id;
   }
 
+  function precioDeLaOferta(): { monto: string; moneda: "USD" | "ARS" } | null {
+    if (!selectedItem) return null;
+    const oferta = saleOferta(selectedItem);
+    const raw = oferta?.montoPrecio?.trim() ?? "";
+    const amount = Number.parseFloat(raw.replace(",", "."));
+    if (!raw || !Number.isFinite(amount) || amount <= 0) return null;
+    return {
+      monto: raw,
+      moneda: oferta?.codigoMoneda?.trim() === "ARS" ? "ARS" : "USD",
+    };
+  }
+
   async function handleSubmit() {
-    const montoPrecioVenta = Number.parseFloat(monto.replace(",", "."));
+    const publicado = precioDeLaOferta();
+    const montoPrecioVenta = Number.parseFloat((publicado?.monto ?? monto).replace(",", "."));
+    const codigoMoneda = publicado?.moneda ?? moneda;
     if (!Number.isFinite(montoPrecioVenta) || montoPrecioVenta <= 0) {
       setError("Ingresá un precio válido.");
       return;
@@ -299,7 +314,7 @@ export function NewVentaModal({
       const venta = await createVenta(token, {
         inmuebleId,
         montoPrecioVenta,
-        codigoMoneda: moneda,
+        codigoMoneda,
         fechaBoleto: fechaBoleto || null,
         fechaEscritura: fechaEscritura || null,
         nombreEscribano: escribano.trim() || null,
@@ -327,6 +342,7 @@ export function NewVentaModal({
     }
   }
 
+  const precioPublicado = precioDeLaOferta();
   const trimmedQuery = inmuebleQuery.trim();
   const queryTooShort = trimmedQuery.length < MIN_SEARCH_LEN;
   const queryPending = trimmedQuery !== debouncedQuery;
@@ -565,11 +581,22 @@ export function NewVentaModal({
 
             <FormSection title="Condiciones">
               <div className="grid gap-3 sm:grid-cols-2">
-                <FormField label="Precio de venta" value={monto} onChange={setMonto} type="number" />
-                <div className="flex flex-col gap-1.5 sm:col-span-2">
-                  <span className="text-[11px] font-semibold text-text-secondary">Moneda</span>
-                  <ChipToggle options={["USD", "ARS"]} value={moneda} onChange={setMoneda} />
-                </div>
+                {precioPublicado ? (
+                  <div className="sm:col-span-2">
+                    <FieldBlock
+                      label="Precio de venta"
+                      value={formatMoney(precioPublicado.monto, precioPublicado.moneda)}
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <FormField label="Precio de venta" value={monto} onChange={setMonto} type="number" />
+                    <div className="flex flex-col gap-1.5 sm:col-span-2">
+                      <span className="text-[11px] font-semibold text-text-secondary">Moneda</span>
+                      <ChipToggle options={["USD", "ARS"]} value={moneda} onChange={setMoneda} />
+                    </div>
+                  </>
+                )}
                 <FormField label="Fecha de boleto (opcional)" value={fechaBoleto} onChange={setFechaBoleto} type="date" />
                 <FormField label="Fecha escritura (opcional)" value={fechaEscritura} onChange={setFechaEscritura} type="date" />
                 <FormField label="Escribano (opcional)" value={escribano} onChange={setEscribano} />
