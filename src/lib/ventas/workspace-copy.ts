@@ -31,7 +31,7 @@ export const VENTAS_TAB_COPY: Record<
 
 export function ventasEmptyHint(tab: VentasTabId): string {
   if (tab === "en_operacion") {
-    return "Usá «Nueva venta» arriba para registrar la primera operación con comprador.";
+    return "Las operaciones aparecen acá cuando iniciás una venta desde una propiedad a la venta.";
   }
   if (tab === "a_la_venta") {
     return "Usá «Nueva publicación» arriba para sumar propiedades al catálogo.";

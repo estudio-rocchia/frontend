@@ -68,35 +68,28 @@ export function VentasCreateActions({
   onNuevaVenta,
   disabled = false,
 }: VentasCreateActionsProps) {
-  if (tab === "vendidos" || tab === "fuera_mercado") {
+  if (tab !== "a_la_venta") {
     return null;
   }
 
-  const showPublicar = tab === "a_la_venta";
-  const showNuevaVenta = tab === "en_operacion" || tab === "a_la_venta";
-
   return (
     <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-stretch">
-      {showPublicar ? (
-        <CreateActionButton
-          title="Nueva publicación"
-          hint="Sumar una propiedad al catálogo"
-          icon={Building2}
-          emphasis="primary"
-          onClick={onPublicar}
-          disabled={disabled}
-        />
-      ) : null}
-      {showNuevaVenta ? (
-        <CreateActionButton
-          title="Nueva venta"
-          hint="Registrar una operación con comprador"
-          icon={Handshake}
-          emphasis={showPublicar ? "secondary" : "primary"}
-          onClick={onNuevaVenta}
-          disabled={disabled}
-        />
-      ) : null}
+      <CreateActionButton
+        title="Nueva publicación"
+        hint="Sumar una propiedad al catálogo"
+        icon={Building2}
+        emphasis="primary"
+        onClick={onPublicar}
+        disabled={disabled}
+      />
+      <CreateActionButton
+        title="Nueva venta"
+        hint="Registrar una operación con comprador"
+        icon={Handshake}
+        emphasis="secondary"
+        onClick={onNuevaVenta}
+        disabled={disabled}
+      />
     </div>
   );
 }
