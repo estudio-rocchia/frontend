@@ -871,17 +871,48 @@ export interface HistorialEstadoRecord {
   reason: string | null;
 }
 
+export interface DetalleInmuebleRecord {
+  inmuebleId: number;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  rooms: number | null;
+  superficieCubiertaM2: string | null;
+  tienePileta: boolean;
+  tieneParrilla: boolean;
+  tieneCochera: boolean;
+  lugaresCochera: number | null;
+  tieneDeposito: boolean;
+  observacion: string | null;
+  services: Record<string, unknown>;
+}
+
+export interface UpsertDetalleInput {
+  bedrooms?: number | null;
+  bathrooms?: number | null;
+  rooms?: number | null;
+  superficieCubiertaM2?: number | string | null;
+  tienePileta?: boolean;
+  tieneParrilla?: boolean;
+  tieneCochera?: boolean;
+  lugaresCochera?: number | null;
+  tieneDeposito?: boolean;
+  observacion?: string | null;
+  services?: Record<string, unknown>;
+}
+
 export interface CatalogSearchItem {
   inmueble: InmuebleCatalogRecord;
   tipoInmueble: { id: number; code: string; name: string; esTerreno: boolean };
   localidad: { id: number; name: string; province: string } | null;
   ofertasActivas: OfertaRecord[];
+  detalle?: DetalleInmuebleRecord | null;
 }
 
 export interface InmuebleFicha {
   inmueble?: InmuebleCatalogRecord;
   tipoInmueble?: { id: number; code: string; name: string; esTerreno: boolean } | null;
   localidad?: { id: number; name: string; province: string; country: string } | null;
+  detalle?: DetalleInmuebleRecord | null;
   propietarios: InmuebleFichaPropietario[];
   ofertas?: OfertaRecord[];
 }
@@ -937,7 +968,7 @@ export interface ChangePrecioOfertaInput {
   nota?: string | null;
 }
 
-export type ParteVentaRol = "seller" | "buyer" | "guarantor" | "witness";
+export type ParteVentaRol = "seller" | "buyer" | "guarantor";
 
 export interface CreateVentaInput {
   inmuebleId: number;

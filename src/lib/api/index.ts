@@ -446,6 +446,18 @@ export function fetchInmuebleFicha(token: string, inmuebleId: number) {
   return apiRequest<InmuebleFicha>(`/inmuebles/${inmuebleId}/ficha`, { token });
 }
 
+export function upsertInmuebleDetalle(
+  token: string,
+  inmuebleId: number,
+  body: import("./types").UpsertDetalleInput,
+) {
+  return apiRequest<import("./types").DetalleInmuebleRecord>(`/inmuebles/${inmuebleId}/detalle`, {
+    method: "PUT",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
 export function fetchInmuebles(token: string, params?: { limit?: number; offset?: number }) {
   const query = new URLSearchParams();
   query.set("limit", String(params?.limit ?? 200));
@@ -756,6 +768,16 @@ export function searchCatalogo(
     codigoMoneda?: string;
     aceptaFinanciacion?: boolean;
     aceptaPermuta?: boolean;
+    bedroomsMin?: number;
+    bathroomsMin?: number;
+    tieneCochera?: boolean;
+    tienePileta?: boolean;
+    superficieTotalMin?: number;
+    superficieTotalMax?: number;
+    frenteMin?: number;
+    fondoMin?: number;
+    tieneEscritura?: boolean;
+    tieneConstruccion?: boolean;
     limit?: number;
     offset?: number;
   },
@@ -772,6 +794,24 @@ export function searchCatalogo(
     query.set("aceptaFinanciacion", String(params.aceptaFinanciacion));
   }
   if (params?.aceptaPermuta !== undefined) query.set("aceptaPermuta", String(params.aceptaPermuta));
+  if (params?.bedroomsMin !== undefined) query.set("bedroomsMin", String(params.bedroomsMin));
+  if (params?.bathroomsMin !== undefined) query.set("bathroomsMin", String(params.bathroomsMin));
+  if (params?.tieneCochera !== undefined) query.set("tieneCochera", String(params.tieneCochera));
+  if (params?.tienePileta !== undefined) query.set("tienePileta", String(params.tienePileta));
+  if (params?.superficieTotalMin !== undefined) {
+    query.set("superficieTotalMin", String(params.superficieTotalMin));
+  }
+  if (params?.superficieTotalMax !== undefined) {
+    query.set("superficieTotalMax", String(params.superficieTotalMax));
+  }
+  if (params?.frenteMin !== undefined) query.set("frenteMin", String(params.frenteMin));
+  if (params?.fondoMin !== undefined) query.set("fondoMin", String(params.fondoMin));
+  if (params?.tieneEscritura !== undefined) {
+    query.set("tieneEscritura", String(params.tieneEscritura));
+  }
+  if (params?.tieneConstruccion !== undefined) {
+    query.set("tieneConstruccion", String(params.tieneConstruccion));
+  }
   query.set("limit", String(params?.limit ?? 100));
   if (params?.offset) query.set("offset", String(params.offset));
   return apiRequest<{ items: CatalogSearchItem[] }>(`/catalogo/buscar?${query}`, { token });
