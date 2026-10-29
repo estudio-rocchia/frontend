@@ -78,7 +78,6 @@ export function NewVentaModal({
   const [monto, setMonto] = useState("");
   const [moneda, setMoneda] = useState("USD");
   const [fechaBoleto, setFechaBoleto] = useState("");
-  const [fechaEscritura, setFechaEscritura] = useState("");
   const [escribano, setEscribano] = useState("");
   const [condiciones, setCondiciones] = useState("");
   const [notas, setNotas] = useState("");
@@ -102,7 +101,6 @@ export function NewVentaModal({
     setSeller(emptyPersona);
     setGarantes([]);
     setFechaBoleto("");
-    setFechaEscritura("");
     setEscribano("");
     setCondiciones("");
     setNotas("");
@@ -316,7 +314,6 @@ export function NewVentaModal({
         montoPrecioVenta,
         codigoMoneda,
         fechaBoleto: fechaBoleto || null,
-        fechaEscritura: fechaEscritura || null,
         nombreEscribano: escribano.trim() || null,
         condicionesPago: condiciones.trim() || null,
         notas: notas.trim() || null,
@@ -598,7 +595,6 @@ export function NewVentaModal({
                   </>
                 )}
                 <FormField label="Fecha de boleto (opcional)" value={fechaBoleto} onChange={setFechaBoleto} type="date" />
-                <FormField label="Fecha escritura (opcional)" value={fechaEscritura} onChange={setFechaEscritura} type="date" />
                 <FormField label="Escribano (opcional)" value={escribano} onChange={setEscribano} />
               </div>
               <FormField label="Condiciones de pago" value={condiciones} onChange={setCondiciones} />
