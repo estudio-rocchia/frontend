@@ -348,6 +348,7 @@ export function AlquileresWorkspace() {
   async function handleAdjustContract(input: {
     fechaAjuste: string;
     montoNuevo?: number;
+    actualizarDeposito?: boolean;
     depositoPlan?: { crearPlan: boolean; cantidadCuotas: number };
   }) {
     if (!token || !selectedContrato) return;
@@ -361,11 +362,14 @@ export function AlquileresWorkspace() {
       const result = await applyContratoAjuste(token, selectedContrato.id, {
         fechaAjuste: input.fechaAjuste,
         montoNuevo: input.montoNuevo,
+        actualizarDeposito: input.actualizarDeposito,
       });
 
       const planChoice = input.depositoPlan;
       const creoPlan =
-        result.actualizacionDeposito?.requiereCobro && planChoice?.crearPlan !== false;
+        input.actualizarDeposito === true &&
+        result.actualizacionDeposito?.requiereCobro &&
+        planChoice?.crearPlan !== false;
 
       if (creoPlan && result.actualizacionDeposito) {
         await createAutoPlanActualizacionDeposito(

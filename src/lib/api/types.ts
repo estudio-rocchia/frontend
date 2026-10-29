@@ -155,6 +155,7 @@ export interface ApplyAjusteInput {
   fechaAjuste: string;
   nota?: string | null;
   montoNuevo?: number;
+  actualizarDeposito?: boolean;
 }
 
 export interface ApplyAjusteResponse {
