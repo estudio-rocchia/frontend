@@ -70,7 +70,7 @@ export function NewVentaModal({
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [searchResults, setSearchResults] = useState<CatalogSearchItem[]>([]);
   const [searching, setSearching] = useState(false);
-  const [inmuebleSearchFocused, setInmuebleSearchFocused] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [buyer, setBuyer] = useState<PersonaFieldValue>(emptyPersona);
   const [seller, setSeller] = useState<PersonaFieldValue>(emptyPersona);
   const [garantes, setGarantes] = useState<Array<{ key: string; field: PersonaFieldValue }>>([]);
@@ -96,7 +96,7 @@ export function NewVentaModal({
     setInmuebleQuery("");
     setDebouncedQuery("");
     setSearchResults([]);
-    setInmuebleSearchFocused(false);
+    setSearchError(null);
     setBuyer(emptyPersona);
     setSeller(emptyPersona);
     setGarantes([]);
@@ -121,36 +121,40 @@ export function NewVentaModal({
       .catch(() => setExistingCodes([]));
   }, [open, token, inmuebleSource]);
 
+  const estadoOfertaId = catalogSearch?.estadoOfertaId;
+  const tipoOperacionId = catalogSearch?.tipoOperacionId;
+
   useEffect(() => {
-    if (!open || !token || !catalogSearch || inmuebleSource !== "catalogo" || selectedItem) {
+    if (!open || !token || !estadoOfertaId || !tipoOperacionId || inmuebleSource !== "catalogo" || selectedItem) {
       setSearchResults([]);
       setSearching(false);
-      return;
-    }
-    if (!inmuebleSearchFocused) {
-      setSearchResults([]);
-      setSearching(false);
+      setSearchError(null);
       return;
     }
     if (debouncedQuery.length < MIN_SEARCH_LEN) {
       setSearchResults([]);
       setSearching(false);
+      setSearchError(null);
       return;
     }
 
     let cancelled = false;
     setSearching(true);
+    setSearchError(null);
     void searchCatalogo(token, {
       q: debouncedQuery,
-      estadoOfertaId: catalogSearch.estadoOfertaId,
-      tipoOperacionId: catalogSearch.tipoOperacionId,
+      estadoOfertaId,
+      tipoOperacionId,
       limit: 10,
     })
       .then((res) => {
         if (!cancelled) setSearchResults(res.items);
       })
       .catch(() => {
-        if (!cancelled) setSearchResults([]);
+        if (!cancelled) {
+          setSearchResults([]);
+          setSearchError("No se pudo buscar el inmueble. Reintentá.");
+        }
       })
       .finally(() => {
         if (!cancelled) setSearching(false);
@@ -162,10 +166,10 @@ export function NewVentaModal({
   }, [
     open,
     token,
-    catalogSearch,
+    estadoOfertaId,
+    tipoOperacionId,
     debouncedQuery,
     selectedItem,
-    inmuebleSearchFocused,
     inmuebleSource,
   ]);
 
@@ -200,7 +204,7 @@ export function NewVentaModal({
     setInmuebleQuery("");
     setDebouncedQuery("");
     setSearchResults([]);
-    setInmuebleSearchFocused(false);
+    setSearchError(null);
   }
 
   function switchToNuevaPropiedad() {
@@ -208,6 +212,7 @@ export function NewVentaModal({
     setSelectedItem(null);
     setInmuebleQuery("");
     setSearchResults([]);
+    setSearchError(null);
     setError(null);
     void ensureTiposInmueble();
   }
@@ -322,7 +327,9 @@ export function NewVentaModal({
     }
   }
 
-  const queryTooShort = inmuebleQuery.trim().length < MIN_SEARCH_LEN;
+  const trimmedQuery = inmuebleQuery.trim();
+  const queryTooShort = trimmedQuery.length < MIN_SEARCH_LEN;
+  const queryPending = trimmedQuery !== debouncedQuery;
 
   return (
     <Modal
@@ -381,10 +388,6 @@ export function NewVentaModal({
                     name="venta-inmueble-search"
                     value={inmuebleQuery}
                     onChange={(e) => setInmuebleQuery(e.target.value)}
-                    onFocus={() => setInmuebleSearchFocused(true)}
-                    onBlur={() => {
-                      window.setTimeout(() => setInmuebleSearchFocused(false), 150);
-                    }}
                     placeholder="Código o dirección del inmueble..."
                     autoComplete="off"
                     autoCorrect="off"
@@ -395,18 +398,20 @@ export function NewVentaModal({
                     autoFocus
                   />
                 </div>
-                {inmuebleSearchFocused ? (
+                {trimmedQuery.length > 0 ? (
                   <div className="rounded-sm border border-border">
                     {queryTooShort ? (
                       <p className="px-3 py-3 text-sm text-text-secondary">
                         Escribí al menos {MIN_SEARCH_LEN} caracteres para buscar inmuebles a la venta.
                       </p>
-                    ) : searching ? (
+                    ) : queryPending || searching ? (
                       <p className="px-3 py-3 text-sm text-text-secondary">Buscando inmuebles...</p>
+                    ) : searchError ? (
+                      <p className="px-3 py-3 text-sm text-danger">{searchError}</p>
                     ) : searchResults.length === 0 ? (
                       <div className="flex flex-col gap-2 px-3 py-3">
                         <p className="text-sm text-text-secondary">
-                          Sin inmuebles para &quot;{inmuebleQuery.trim()}&quot;.
+                          Sin inmuebles para &quot;{trimmedQuery}&quot;.
                         </p>
                         <button
                           type="button"
@@ -424,6 +429,7 @@ export function NewVentaModal({
                             <button
                               type="button"
                               className="w-full px-3 py-2 text-left text-[13px] hover:bg-bg-page"
+                              onMouseDown={(event) => event.preventDefault()}
                               onClick={() => selectInmueble(item)}
                             >
                               <span className="font-medium">{item.inmueble.code}</span>
