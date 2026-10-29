@@ -115,7 +115,7 @@ export function EditVentaModal({ open, onClose, token, venta, onSaved }: EditVen
               <span className="text-[11px] font-semibold text-text-secondary">Moneda</span>
               <ChipToggle options={["USD", "ARS"]} value={moneda} onChange={setMoneda} />
             </div>
-            <FormField label="Fecha de compromiso" value={fechaBoleto} onChange={setFechaBoleto} type="date" />
+            <FormField label="Fecha de boleto (opcional)" value={fechaBoleto} onChange={setFechaBoleto} type="date" />
             <FormField label="Fecha escritura" value={fechaEscritura} onChange={setFechaEscritura} type="date" />
             <FormField label="Escribano" value={escribano} onChange={setEscribano} />
             <div className="flex flex-col gap-1.5">

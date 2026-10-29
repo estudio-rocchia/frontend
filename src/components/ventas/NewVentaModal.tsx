@@ -31,7 +31,6 @@ import type { CatalogSearchItem, CatalogoItem, InmuebleRecord } from "@/lib/api/
 import { altaInmuebleCatalogo } from "@/lib/inmuebles/alta-inmueble";
 import { saleOferta } from "@/lib/ventas/catalog-helpers";
 import { resolvePartePersona } from "@/lib/ventas/persona-resolve";
-import { todayIso } from "@/lib/ventas/catalog-helpers";
 import { nextInmuebleCode, prefixForTipoInmueble } from "@/lib/codes";
 
 const emptyPersona: PersonaFieldValue = emptyNewPersonaField();
@@ -76,7 +75,7 @@ export function NewVentaModal({
   const [seller, setSeller] = useState<PersonaFieldValue>(emptyPersona);
   const [monto, setMonto] = useState("");
   const [moneda, setMoneda] = useState("USD");
-  const [fechaBoleto, setFechaBoleto] = useState(todayIso());
+  const [fechaBoleto, setFechaBoleto] = useState("");
   const [fechaEscritura, setFechaEscritura] = useState("");
   const [escribano, setEscribano] = useState("");
   const [condiciones, setCondiciones] = useState("");
@@ -99,7 +98,7 @@ export function NewVentaModal({
     setInmuebleSearchFocused(false);
     setBuyer(emptyPersona);
     setSeller(emptyPersona);
-    setFechaBoleto(todayIso());
+    setFechaBoleto("");
     setFechaEscritura("");
     setEscribano("");
     setCondiciones("");
@@ -493,7 +492,7 @@ export function NewVentaModal({
                   <span className="text-[11px] font-semibold text-text-secondary">Moneda</span>
                   <ChipToggle options={["USD", "ARS"]} value={moneda} onChange={setMoneda} />
                 </div>
-                <FormField label="Fecha de compromiso" value={fechaBoleto} onChange={setFechaBoleto} type="date" />
+                <FormField label="Fecha de boleto (opcional)" value={fechaBoleto} onChange={setFechaBoleto} type="date" />
                 <FormField label="Fecha escritura (opcional)" value={fechaEscritura} onChange={setFechaEscritura} type="date" />
                 <FormField label="Escribano (opcional)" value={escribano} onChange={setEscribano} />
               </div>
