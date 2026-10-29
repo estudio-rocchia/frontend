@@ -41,7 +41,6 @@ export function buildPropietarioInput(
 export function buildPublishEnVentaPayload(params: {
   propiedad: VentaNuevaPropiedadValue;
   tipoInmuebleId: number;
-  description: string;
   aceptaPermuta: boolean;
   aceptaFinanciacion: boolean;
   aceptaVehiculo: boolean;
@@ -65,7 +64,6 @@ export function buildPublishEnVentaPayload(params: {
       numero: params.propiedad.direccion.numero.trim() || null,
       referencia: params.propiedad.direccion.referencia.trim() || null,
       title: params.propiedad.alias.trim() || null,
-      description: params.description.trim() || null,
       aceptaPermuta: params.aceptaPermuta,
       aceptaFinanciacion: params.aceptaFinanciacion,
       aceptaVehiculo: params.aceptaVehiculo,
