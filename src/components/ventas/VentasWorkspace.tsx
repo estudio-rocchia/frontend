@@ -340,7 +340,6 @@ export function VentasWorkspace() {
           tab={tab}
           onPublicar={() => setPublicarOpen(true)}
           onNuevaVenta={() => openNewVenta()}
-          disabled={loading}
         />
       </header>
 

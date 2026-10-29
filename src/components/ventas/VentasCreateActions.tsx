@@ -1,7 +1,9 @@
 "use client";
 
+import { Building2, Handshake, type LucideIcon } from "lucide-react";
+
 import type { VentasTabId } from "@/components/ventas/VentasFilterChips";
-import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
+import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 
 type VentasCreateActionsProps = {
   tab: VentasTabId;
@@ -9,6 +11,56 @@ type VentasCreateActionsProps = {
   onNuevaVenta: () => void;
   disabled?: boolean;
 };
+
+function CreateActionButton({
+  title,
+  hint,
+  icon: Icon,
+  emphasis,
+  onClick,
+  disabled,
+}: {
+  title: string;
+  hint: string;
+  icon: LucideIcon;
+  emphasis: "primary" | "secondary";
+  onClick: () => void;
+  disabled: boolean;
+}) {
+  const primary = emphasis === "primary";
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`flex w-full items-center gap-3 rounded-md border px-3 py-2.5 text-left shadow-[var(--shadow-card)] transition-colors disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:min-w-[15.5rem] ${interactiveFocusClass} ${
+        primary
+          ? "border-primary bg-primary text-text-on-primary hover:bg-primary-dark"
+          : "border-border bg-bg-card text-text-primary hover:border-primary/40 hover:bg-primary-soft/60"
+      }`}
+    >
+      <span
+        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-sm ${
+          primary ? "bg-white/15 text-text-on-primary" : "bg-primary-soft text-primary"
+        }`}
+        aria-hidden
+      >
+        <Icon className="h-4 w-4" />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-sm font-semibold leading-tight">{title}</span>
+        <span
+          className={`mt-0.5 block text-[11px] leading-snug ${
+            primary ? "text-white/80" : "text-text-secondary"
+          }`}
+        >
+          {hint}
+        </span>
+      </span>
+    </button>
+  );
+}
 
 export function VentasCreateActions({
   tab,
@@ -24,30 +76,26 @@ export function VentasCreateActions({
   const showNuevaVenta = tab === "en_operacion" || tab === "a_la_venta";
 
   return (
-    <div className="flex flex-col items-stretch gap-2 sm:items-end">
-      <div className="flex flex-wrap gap-2">
-        {showPublicar ? (
-          <ButtonPrimary type="button" onClick={onPublicar} disabled={disabled}>
-            Nueva publicación
-          </ButtonPrimary>
-        ) : null}
-        {showNuevaVenta ? (
-          showPublicar ? (
-            <ButtonOutline type="button" onClick={onNuevaVenta} disabled={disabled}>
-              Nueva venta
-            </ButtonOutline>
-          ) : (
-            <ButtonPrimary type="button" onClick={onNuevaVenta} disabled={disabled}>
-              Nueva venta
-            </ButtonPrimary>
-          )
-        ) : null}
-      </div>
-      {showPublicar && showNuevaVenta ? (
-        <p className="text-xs text-text-secondary sm:max-w-xs sm:text-right">
-          <span className="font-medium text-text-primary">Publicación</span> = catálogo a la venta ·{" "}
-          <span className="font-medium text-text-primary">Venta</span> = operación con comprador
-        </p>
+    <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-stretch">
+      {showPublicar ? (
+        <CreateActionButton
+          title="Nueva publicación"
+          hint="Sumar una propiedad al catálogo"
+          icon={Building2}
+          emphasis="primary"
+          onClick={onPublicar}
+          disabled={disabled}
+        />
+      ) : null}
+      {showNuevaVenta ? (
+        <CreateActionButton
+          title="Nueva venta"
+          hint="Registrar una operación con comprador"
+          icon={Handshake}
+          emphasis={showPublicar ? "secondary" : "primary"}
+          onClick={onNuevaVenta}
+          disabled={disabled}
+        />
       ) : null}
     </div>
   );
