@@ -10,7 +10,7 @@ export const VENTAS_TAB_COPY: Record<
   en_operacion: {
     label: "En operación",
     description: "Operaciones con boleto, escritura o cuotas en curso.",
-    searchPlaceholder: "Código o título del inmueble…",
+    searchPlaceholder: "Código, título o comprador…",
   },
   a_la_venta: {
     label: "A la venta",

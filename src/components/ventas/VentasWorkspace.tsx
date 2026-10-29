@@ -38,6 +38,7 @@ import {
   fetchVenta,
   searchCatalogo,
 } from "@/lib/api";
+import { buyerSearchText, fetchParteNombres } from "@/lib/ventas/partes";
 import type { CatalogSearchItem, CatalogoItem, VentaDetail } from "@/lib/api/types";
 import { pagePaddingClass } from "@/lib/layout";
 import {
@@ -72,6 +73,7 @@ export function VentasWorkspace() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [ventaRows, setVentaRows] = useState<VentaDetail[]>([]);
+  const [parteNombres, setParteNombres] = useState<Record<number, string>>({});
   const [catalogRows, setCatalogRows] = useState<CatalogSearchItem[]>([]);
   const [tabCounts, setTabCounts] = useState<Partial<Record<VentasTabId, number>>>({});
   const [estadoIds, setEstadoIds] = useState<Record<string, number>>({});
@@ -179,6 +181,11 @@ export function VentasWorkspace() {
         const res = await fetchVentas(token, { limit: 100 });
         const activas = res.items.filter((v) => v.estado !== "completed" && v.estado !== "cancelled");
         const details = await Promise.all(activas.map((v) => fetchVenta(token, v.id)));
+        const buyerIds = details.flatMap((venta) =>
+          venta.partes.filter((parte) => parte.rol === "buyer").map((parte) => parte.personaId),
+        );
+        const nombres = await fetchParteNombres(token, buyerIds).catch(() => ({}));
+        setParteNombres(nombres);
         setVentaRows(details);
         setCatalogRows([]);
         setTabCounts((prev) => ({ ...prev, en_operacion: details.length }));
@@ -240,7 +247,7 @@ export function VentasWorkspace() {
     if (tab === "en_operacion") {
       return ventaRows
         .filter((venta) => {
-          const label = `${venta.inmueble?.code ?? ""} ${venta.inmueble?.title ?? ""}`;
+          const label = `${venta.inmueble?.code ?? ""} ${venta.inmueble?.title ?? ""} ${buyerSearchText(venta, parteNombres)}`;
           return matchesSearch(label, search);
         })
         .map((venta) => ({ kind: "venta", venta }));
@@ -248,7 +255,7 @@ export function VentasWorkspace() {
     return catalogRows
       .filter((item) => matchesSearch(catalogItemSearchText(item), search))
       .map((item) => ({ kind: "catalog", item }));
-  }, [tab, ventaRows, catalogRows, search]);
+  }, [tab, ventaRows, catalogRows, search, parteNombres]);
 
   const emptyHint = useMemo(() => ventasEmptyHint(tab), [tab]);
 
@@ -388,6 +395,7 @@ export function VentasWorkspace() {
             search={search}
             searchPlaceholder={tabCopy.searchPlaceholder}
             emptyHint={emptyHint}
+            parteNombres={parteNombres}
             onSearchChange={setSearch}
             onOpenRow={handleOpenRow}
           />
