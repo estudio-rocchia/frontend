@@ -549,7 +549,7 @@ export function NewVentaModal({
                         }
                         token={token}
                         searchId={`venta-garante-${garante.key}`}
-                        placeholder="Nombre, apellido o documento del garante…"
+                        placeholder="Nombre o apellido del garante…"
                       />
                     </div>
                   ))

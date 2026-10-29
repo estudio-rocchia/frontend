@@ -49,7 +49,7 @@ const ROLES: Array<{
     addLabel: "Agregar garante",
     changeLabel: "Agregar garante",
     emptyEditable: "Todavía no hay garantes en esta venta.",
-    placeholder: "Nombre, apellido o documento del garante…",
+    placeholder: "Nombre o apellido del garante…",
     allowMultiple: true,
     wide: true,
   },
