@@ -47,12 +47,14 @@ export function useCitaForm({
   const [visitanteTelefono, setVisitanteTelefono] = useState("");
   const [notas, setNotas] = useState("");
   const [estado, setEstado] = useState<CitaEstado>("programada");
+  const [scheduledDateKey, setScheduledDateKey] = useState(dateKey);
   const [inmuebles, setInmuebles] = useState<InmuebleRecord[]>([]);
   const [usuarios, setUsuarios] = useState<UsuarioRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const readOnly = cita?.estado === "cancelada" || cita?.estado === "realizada";
+  const readOnly = cita?.estado === "realizada";
+  const isCancelled = cita?.estado === "cancelada";
 
   useEffect(() => {
     if (!open) return;
@@ -69,6 +71,7 @@ export function useCitaForm({
     if (!open) return;
     if (cita) {
       const parts = splitProgramadaEn(cita.programadaEn);
+      setScheduledDateKey(parts.dateKey);
       setTipo(cita.tipo);
       setTime(normalizeCitaTime(parts.time));
       setDuracionMinutos(cita.duracionMinutos);
@@ -78,8 +81,9 @@ export function useCitaForm({
       setVisitanteNombre(cita.visitanteNombre ?? "");
       setVisitanteTelefono(cita.visitanteTelefono ?? "");
       setNotas(cita.notas ?? "");
-      setEstado(cita.estado);
+      setEstado(cita.estado === "cancelada" ? "programada" : cita.estado);
     } else {
+      setScheduledDateKey(dateKey);
       setTipo("reunion");
       setTime("10:00");
       setDuracionMinutos(60);
@@ -92,15 +96,15 @@ export function useCitaForm({
       setEstado("programada");
     }
     setError(null);
-  }, [open, cita, userId]);
+  }, [open, cita, userId, dateKey]);
 
   const resolvedAsignadoId = asignadoUsuarioId ? Number(asignadoUsuarioId) : userId;
   const assigneeName =
     usuarios.find((user) => user.id === resolvedAsignadoId)?.username ?? "Responsable";
 
   const programadaEn = useMemo(
-    () => combineDateAndTime(dateKey, time),
-    [dateKey, time],
+    () => combineDateAndTime(scheduledDateKey, time),
+    [scheduledDateKey, time],
   );
 
   const scheduleConflict = useMemo(() => {
@@ -156,7 +160,8 @@ export function useCitaForm({
       const payload = buildPayload();
 
       if (isEdit && cita) {
-        await updateCita(token, cita.id, { ...payload, estado });
+        const nextEstado = cita.estado === "cancelada" ? "programada" : estado;
+        await updateCita(token, cita.id, { ...payload, estado: nextEstado });
       } else {
         await createCita(token, payload);
       }
@@ -196,6 +201,7 @@ export function useCitaForm({
   return {
     isEdit,
     readOnly,
+    isCancelled,
     cita,
     tipo,
     setTipo,
@@ -217,6 +223,8 @@ export function useCitaForm({
     setNotas,
     estado,
     setEstado,
+    scheduledDateKey,
+    setScheduledDateKey,
     inmuebles,
     usuarios,
     error,

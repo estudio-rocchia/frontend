@@ -243,9 +243,9 @@ export function CitaEditDrawer(props: CitaEditDrawerProps) {
       banner={
         <CitaEditHero
           cita={props.cita}
-          estado={form.estado}
+          estado={form.isCancelled ? props.cita.estado : form.estado}
           assigneeName={form.assigneeName}
-          dateKey={props.dateKey}
+          dateKey={form.scheduledDateKey}
           programadaEn={form.programadaEn}
           duracionMinutos={form.duracionMinutos}
         />
@@ -272,7 +272,11 @@ export function CitaEditDrawer(props: CitaEditDrawerProps) {
                 onClick={() => void form.handleSubmit()}
                 disabled={form.saving || form.hasScheduleConflict}
               >
-                {form.saving ? "Guardando…" : "Guardar cambios"}
+                {form.saving
+                  ? "Guardando…"
+                  : form.isCancelled
+                    ? "Reprogramar cita"
+                    : "Guardar cambios"}
               </ButtonPrimary>
             ) : null}
           </div>
@@ -283,6 +287,12 @@ export function CitaEditDrawer(props: CitaEditDrawerProps) {
         {form.error ? (
           <p className="rounded-sm border border-danger bg-danger-bg px-3 py-2 text-sm text-danger">
             {form.error}
+          </p>
+        ) : null}
+
+        {form.isCancelled ? (
+          <p className="rounded-sm border border-border bg-bg-page px-3 py-2 text-sm text-text-secondary">
+            Esta cita está cancelada. Cambiá la fecha u horario y guardá para reprogramarla.
           </p>
         ) : null}
 
@@ -308,16 +318,22 @@ export function CitaEditDrawer(props: CitaEditDrawerProps) {
           </EditSection>
         ) : (
           <>
-            <EditSection
-              title="Seguimiento"
-              description="Marcá en qué etapa está la cita."
-            >
-              <CitaEstadoPicker value={form.estado} onChange={form.setEstado} />
-            </EditSection>
+            {!form.isCancelled ? (
+              <EditSection
+                title="Seguimiento"
+                description="Marcá en qué etapa está la cita."
+              >
+                <CitaEstadoPicker value={form.estado} onChange={form.setEstado} />
+              </EditSection>
+            ) : null}
 
             <EditSection
-              title="Reprogramar"
-              description="Ajustá responsable, hora o duración."
+              title={form.isCancelled ? "Reprogramar cita" : "Reprogramar"}
+              description={
+                form.isCancelled
+                  ? "Elegí un nuevo horario y guardá para volver a dejarla programada."
+                  : "Ajustá responsable, hora o duración."
+              }
             >
               <FieldLabel label="Responsable">
                 <CitaResponsableSelect
@@ -333,7 +349,8 @@ export function CitaEditDrawer(props: CitaEditDrawerProps) {
                 onDuracionChange={form.setDuracionMinutos}
                 showAgenda
                 citas={props.citas}
-                dateKey={props.dateKey}
+                dateKey={form.scheduledDateKey}
+                onDateKeyChange={form.setScheduledDateKey}
                 asignadoUsuarioId={form.resolvedAsignadoId}
                 assigneeName={form.assigneeName}
                 programadaEn={form.programadaEn}
