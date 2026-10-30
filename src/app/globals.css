@@ -28,6 +28,11 @@
   --shadow-card: 0 1px 2px rgba(26, 43, 50, 0.06), 0 4px 16px rgba(26, 43, 50, 0.06);
   --radius-sm: 8px;
   --radius-md: 12px;
+  --login-accent: #c4a574;
+  --login-accent-hover: #b8935e;
+  --login-input-border: #d1d5db;
+  --login-shadow-card: 0 8px 32px rgba(0, 0, 0, 0.18);
+  --login-shadow-logo: 0 4px 24px rgba(0, 0, 0, 0.25);
 }
 
 @theme inline {
@@ -52,6 +57,8 @@
   --color-danger: var(--danger);
   --color-danger-bg: var(--danger-bg);
   --color-nav-muted: var(--nav-muted);
+  --color-login-accent: var(--login-accent);
+  --color-login-accent-hover: var(--login-accent-hover);
   --font-sans: var(--font-dm-sans);
   --radius-sm: var(--radius-sm);
   --radius-md: var(--radius-md);
@@ -100,7 +107,12 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .dashboard-animate-in,
-  .dashboard-count-pop {
+  .dashboard-count-pop,
+  .login-alert-enter {
     animation: none;
   }
+}
+
+.login-alert-enter {
+  animation: dashboard-rise-in 0.25s ease-out both;
 }
