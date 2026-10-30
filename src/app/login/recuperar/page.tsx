@@ -59,8 +59,8 @@ export default function RecuperarCuentaPage() {
           role="status"
           className="login-alert-enter mt-7 rounded-lg border border-success bg-success-bg px-4 py-3 text-sm text-success"
         >
-          Si existe una cuenta asociada a <span className="font-semibold">{email.trim()}</span>,
-          recibirás un correo con los pasos para restablecer tu contraseña.
+          Enviamos las instrucciones a <span className="font-semibold">{email.trim()}</span>.
+          Revisá tu bandeja de entrada y el correo no deseado. El enlace vence en 1 hora.
         </div>
       ) : (
         <div className="mt-7 flex flex-col gap-5">

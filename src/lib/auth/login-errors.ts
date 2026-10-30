@@ -25,6 +25,14 @@ export function getLoginErrorPresentation(error: unknown): LoginErrorPresentatio
       };
     }
 
+    if (error.status === 404 || error.code === "NOT_FOUND") {
+      return {
+        title: "No hay una cuenta con ese correo",
+        description:
+          "No hay un usuario asociado a este correo. Revisá el email e intentá de nuevo.",
+      };
+    }
+
     if (error.status === 400 && error.message.includes("reset token")) {
       return {
         title: "Enlace inválido o vencido",
