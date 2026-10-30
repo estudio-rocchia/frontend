@@ -33,6 +33,7 @@ test.describe("Alquileres — ajustar", () => {
 
     const dialog = authedPage.getByRole("dialog");
     await expect(dialog.getByText("Nuevo alquiler")).toBeVisible();
+    await dialog.getByRole("button", { name: "Sí, actualizar" }).click();
 
     const cuotasInput = dialog.getByRole("spinbutton");
     await cuotasInput.fill("0");
@@ -50,6 +51,10 @@ test.describe("Alquileres — ajustar", () => {
 
     const dialog = authedPage.getByRole("dialog");
     await expect(dialog.getByText("Nuevo alquiler")).toBeVisible();
+    const noActualizar = dialog.getByRole("button", { name: "No actualizar" });
+    if (await noActualizar.isVisible()) {
+      await noActualizar.click();
+    }
 
     await Promise.all([
       authedPage.waitForResponse(

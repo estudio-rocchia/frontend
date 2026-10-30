@@ -53,6 +53,13 @@ export function periodoRangeLabel(periodo: PeriodoServicioRecord): string {
   return `${formatDateDisplay(periodo.inicioPeriodo)} – ${formatDateDisplay(periodo.finPeriodo)}`;
 }
 
+/** Mes y año del inicio del período, por ejemplo "10/2026". */
+export function periodoMonthYearLabel(periodo: Pick<PeriodoServicioRecord, "inicioPeriodo">): string {
+  const match = /^(\d{4})-(\d{2})/.exec(periodo.inicioPeriodo);
+  if (!match) return periodo.inicioPeriodo;
+  return `${match[2]}/${match[1]}`;
+}
+
 export function periodoSaldoPendiente(periodo: PeriodoServicioRecord): number {
   const saldo = Number(periodo.saldo);
   return Number.isFinite(saldo) && saldo > 0 ? saldo : 0;

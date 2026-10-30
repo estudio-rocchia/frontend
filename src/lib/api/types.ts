@@ -155,6 +155,7 @@ export interface ApplyAjusteInput {
   fechaAjuste: string;
   nota?: string | null;
   montoNuevo?: number;
+  actualizarDeposito?: boolean;
 }
 
 export interface ApplyAjusteResponse {
@@ -359,6 +360,16 @@ export interface ContratoTableItem extends ContratoListItem {
   operativa?: ContratoOperativa;
 }
 
+export interface MotivoCierreContrato {
+  codigo: "estado" | "ventana" | "mora" | "servicios" | "deposito";
+  mensaje: string;
+}
+
+export interface PreviewFinalizarContrato {
+  puedeFinalizar: boolean;
+  motivos: MotivoCierreContrato[];
+}
+
 export type ContratoOperativaFilter =
   | "todos"
   | "a_cobrar"
@@ -458,6 +469,40 @@ export interface SecheepSyncSnapshot {
   totalPendiente: number;
 }
 
+export interface AguaSyncSnapshot {
+  consultadoEn: string;
+  socio: string;
+  servicio: number;
+  titular: string | null;
+  direccion: string | null;
+  servicios: number[];
+  vencidas: number;
+  pendientes: number;
+  totalVencido: number;
+  totalPendiente: number;
+}
+
+export interface AguaConsultaInput {
+  captchaToken?: string;
+  captchaAnswer?: string;
+}
+
+export type AguaConsultaResult =
+  | {
+      captchaRequired: true;
+      message: string;
+      captcha: { token: string; image: string } | null;
+    }
+  | {
+      captchaRequired: false;
+      servicio: ServicioContratoRecord;
+      creados: number;
+      actualizados: number;
+      omitidos: number;
+      compartidos: number;
+      sync: AguaSyncSnapshot;
+    };
+
 export interface ServicioContratoRecord {
   id: number;
   contratoId: number;
@@ -471,6 +516,13 @@ export interface ServicioContratoRecord {
   numeroSuministroSecheep: string | null;
   secheepConsultadoEn: string | null;
   secheepSync: SecheepSyncSnapshot | null;
+  numeroSocioAgua: string | null;
+  numeroServicioAgua: number | null;
+  proveedorAgua: "cooperativa" | "sameep" | null;
+  numeroClienteSameep: string | null;
+  numeroSuministroSameep: string | null;
+  aguaConsultadoEn: string | null;
+  aguaSync: AguaSyncSnapshot | null;
   modoFacturacion: ModoFacturacion;
   montoFijo: string | null;
   codigoMoneda: string | null;
@@ -525,6 +577,11 @@ export interface CreateServicioInput {
   numeroMedidor?: string | null;
   numeroClienteSecheep?: string | null;
   numeroSuministroSecheep?: string | null;
+  numeroSocioAgua?: string | null;
+  numeroServicioAgua?: number | null;
+  proveedorAgua?: "cooperativa" | "sameep" | null;
+  numeroClienteSameep?: string | null;
+  numeroSuministroSameep?: string | null;
   modoFacturacion: ModoFacturacion;
   montoFijo?: number | string | null;
   codigoMoneda?: string | null;
@@ -536,6 +593,11 @@ export interface UpdateServicioInput {
   numeroMedidor?: string | null;
   numeroClienteSecheep?: string | null;
   numeroSuministroSecheep?: string | null;
+  numeroSocioAgua?: string | null;
+  numeroServicioAgua?: number | null;
+  proveedorAgua?: "cooperativa" | "sameep" | null;
+  numeroClienteSameep?: string | null;
+  numeroSuministroSameep?: string | null;
   modoFacturacion?: ModoFacturacion;
   montoFijo?: number | string | null;
   codigoMoneda?: string | null;
@@ -871,17 +933,48 @@ export interface HistorialEstadoRecord {
   reason: string | null;
 }
 
+export interface DetalleInmuebleRecord {
+  inmuebleId: number;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  rooms: number | null;
+  superficieCubiertaM2: string | null;
+  tienePileta: boolean;
+  tieneParrilla: boolean;
+  tieneCochera: boolean;
+  lugaresCochera: number | null;
+  tieneDeposito: boolean;
+  observacion: string | null;
+  services: Record<string, unknown>;
+}
+
+export interface UpsertDetalleInput {
+  bedrooms?: number | null;
+  bathrooms?: number | null;
+  rooms?: number | null;
+  superficieCubiertaM2?: number | string | null;
+  tienePileta?: boolean;
+  tieneParrilla?: boolean;
+  tieneCochera?: boolean;
+  lugaresCochera?: number | null;
+  tieneDeposito?: boolean;
+  observacion?: string | null;
+  services?: Record<string, unknown>;
+}
+
 export interface CatalogSearchItem {
   inmueble: InmuebleCatalogRecord;
   tipoInmueble: { id: number; code: string; name: string; esTerreno: boolean };
   localidad: { id: number; name: string; province: string } | null;
   ofertasActivas: OfertaRecord[];
+  detalle?: DetalleInmuebleRecord | null;
 }
 
 export interface InmuebleFicha {
   inmueble?: InmuebleCatalogRecord;
   tipoInmueble?: { id: number; code: string; name: string; esTerreno: boolean } | null;
   localidad?: { id: number; name: string; province: string; country: string } | null;
+  detalle?: DetalleInmuebleRecord | null;
   propietarios: InmuebleFichaPropietario[];
   ofertas?: OfertaRecord[];
 }
@@ -937,7 +1030,7 @@ export interface ChangePrecioOfertaInput {
   nota?: string | null;
 }
 
-export type ParteVentaRol = "seller" | "buyer" | "guarantor" | "witness";
+export type ParteVentaRol = "seller" | "buyer" | "guarantor";
 
 export interface CreateVentaInput {
   inmuebleId: number;
@@ -1058,14 +1151,17 @@ export interface PlanFinanciacionDetail {
   primerVencimiento: string;
 }
 
+export type VentaModalidadPago = "financiado" | "contado";
+
 export interface CreateFinanciacionInput {
+  modalidadPago?: VentaModalidadPago;
   montoPrecioTotal?: number;
-  montoEntregaInicial: number;
+  montoEntregaInicial?: number;
   tipoEntregaInicial?: TipoEntregaInicial | null;
   notasEntregaInicial?: string | null;
-  cantidadCuotas: number;
-  tasaInteresMensual: number;
-  primerVencimiento: string;
+  cantidadCuotas?: number;
+  tasaInteresMensual?: number;
+  primerVencimiento?: string;
 }
 
 export interface CreateFinanciacionResult {

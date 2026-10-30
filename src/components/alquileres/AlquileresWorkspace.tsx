@@ -1,19 +1,18 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 
 import { useSyncScope } from "@/lib/sync/use-sync-scope";
 
 import { AlquileresKpiSection } from "@/components/alquileres/AlquileresKpiSection";
+import { AlquileresPageActions } from "@/components/alquileres/AlquileresPageActions";
 import { RentalsTable } from "@/components/alquileres/RentalsTable";
 import type { NewContractForm } from "@/components/alquileres/NewContractModal";
 import type { RenewContractForm } from "@/components/alquileres/RenewContractModal";
 import { ALQUILERES_PAGE_SIZE, useAlquileresTable } from "@/components/alquileres/use-alquileres-table";
 import { useAlquileresDrawer } from "@/components/alquileres/use-alquileres-drawer";
-import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { useAuth } from "@/context/auth-context";
 import { type RentalRow } from "@/data/alquileres-rentals";
 import {
@@ -86,6 +85,13 @@ const NewContractModal = dynamic(
     })),
   { ssr: false },
 );
+const FinalizarContratoModal = dynamic(
+  () =>
+    import("@/components/alquileres/FinalizarContratoModal").then((mod) => ({
+      default: mod.FinalizarContratoModal,
+    })),
+  { ssr: false },
+);
 const RenewContractModal = dynamic(
   () =>
     import("@/components/alquileres/RenewContractModal").then((mod) => ({
@@ -123,6 +129,7 @@ export function AlquileresWorkspace() {
 
   const [newModalOpen, setNewModalOpen] = useState(false);
   const [renewModalOpen, setRenewModalOpen] = useState(false);
+  const [finishTarget, setFinishTarget] = useState<{ id: number; subtitle: string } | null>(null);
   const [adjustModalOpen, setAdjustModalOpen] = useState(false);
   const [selectedUltimoAjusteEn, setSelectedUltimoAjusteEn] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -302,6 +309,17 @@ export function AlquileresWorkspace() {
     }
   }
 
+  function openFinishFromRow(row: RentalRow) {
+    if (!row.needsRenewal) {
+      showToast("Este contrato no está en fecha de cierre.");
+      return;
+    }
+    setFinishTarget({
+      id: Number(row.id),
+      subtitle: `${row.tenant} · ${row.contractProperty}`,
+    });
+  }
+
   async function openRenewFromRow(row: RentalRow) {
     if (!token) return;
     if (!row.needsRenewal) {
@@ -348,6 +366,7 @@ export function AlquileresWorkspace() {
   async function handleAdjustContract(input: {
     fechaAjuste: string;
     montoNuevo?: number;
+    actualizarDeposito?: boolean;
     depositoPlan?: { crearPlan: boolean; cantidadCuotas: number };
   }) {
     if (!token || !selectedContrato) return;
@@ -361,11 +380,14 @@ export function AlquileresWorkspace() {
       const result = await applyContratoAjuste(token, selectedContrato.id, {
         fechaAjuste: input.fechaAjuste,
         montoNuevo: input.montoNuevo,
+        actualizarDeposito: input.actualizarDeposito,
       });
 
       const planChoice = input.depositoPlan;
       const creoPlan =
-        result.actualizacionDeposito?.requiereCobro && planChoice?.crearPlan !== false;
+        input.actualizarDeposito === true &&
+        result.actualizacionDeposito?.requiereCobro &&
+        planChoice?.crearPlan !== false;
 
       if (creoPlan && result.actualizacionDeposito) {
         await createAutoPlanActualizacionDeposito(
@@ -448,10 +470,20 @@ export function AlquileresWorkspace() {
       const usedInmuebleCodes = inmueblesRes.items.map((item) => item.code);
       const usedContratoCodes = contratosRes.items.map((item) => item.contratoCode);
 
-      const [inquilino, propietario] = await Promise.all([
+      const [inquilino, propietario, ...garantePersonas] = await Promise.all([
         resolveTenantPersona(token, form.tenant),
         resolveOwnerPersona(token, form.owner),
+        ...form.garantes.map((garante) => resolveTenantPersona(token, garante.field)),
       ]);
+      const garanteIds = garantePersonas.map((persona) => persona.id);
+      if (garanteIds.includes(inquilino.id) || new Set(garanteIds).size !== garanteIds.length) {
+        throw new ApiError(400, {
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Revisá los garantes: no pueden repetirse ni ser el mismo inquilino.",
+          },
+        });
+      }
 
       const today = new Date().toISOString().slice(0, 10);
       const amount = Number(form.amount.replace(/\D/g, ""));
@@ -585,6 +617,7 @@ export function AlquileresWorkspace() {
             montoMoraFijo: moraPayload.montoMoraFijo,
             montoDeposito: depositAmount,
             codigoMonedaDeposito: form.currency,
+            garantes: garanteIds.map((personaId) => ({ personaId })),
           });
           break;
         } catch (err) {
@@ -623,27 +656,18 @@ export function AlquileresWorkspace() {
   return (
     <>
       <div className={`flex flex-col gap-6 sm:gap-8 ${pagePaddingClass}`}>
-        <header className="flex flex-wrap items-center justify-between gap-4">
+        <header className="flex flex-col gap-4">
           <div className="flex max-w-2xl flex-col gap-1">
             <h1 className="text-[22px] font-bold text-text-primary">Gestión de alquileres</h1>
             <p className="text-sm text-text-secondary">
               Operá contratos activos, ajustes por índice y renovaciones.
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href="/alquileres/liquidaciones"
-              className="inline-flex items-center justify-center rounded-sm border border-border bg-bg-card px-[18px] py-2.5 text-sm font-medium text-text-primary transition-colors"
-            >
-              Historial liquidaciones
-            </Link>
-            <ButtonOutline type="button" onClick={() => setLiquidacionModalOpen(true)}>
-              Liquidación propietarios
-            </ButtonOutline>
-            <ButtonPrimary type="button" onClick={() => void openNewContractModal()} disabled={submitting}>
-              Nuevo contrato
-            </ButtonPrimary>
-          </div>
+          <AlquileresPageActions
+            onNewContract={() => void openNewContractModal()}
+            onLiquidacion={() => setLiquidacionModalOpen(true)}
+            disabled={submitting}
+          />
         </header>
 
         <AlquileresKpiSection
@@ -686,6 +710,7 @@ export function AlquileresWorkspace() {
             onCollect={(row) => void openCollectFromRow(row)}
             onAdjust={(row) => void openAdjustFromRow(row)}
             onRenew={(row) => void openRenewFromRow(row)}
+            onFinish={openFinishFromRow}
           />
         )}
       </div>
@@ -724,6 +749,22 @@ export function AlquileresWorkspace() {
         onClose={() => setAdjustModalOpen(false)}
         onSubmit={(input) => void handleAdjustContract(input)}
         submitting={submitting}
+        />
+      ) : null}
+
+      {finishTarget ? (
+        <FinalizarContratoModal
+          open
+          contratoId={finishTarget.id}
+          subtitle={finishTarget.subtitle}
+          token={token}
+          onClose={() => setFinishTarget(null)}
+          onFinished={() => {
+            const subtitle = finishTarget.subtitle;
+            setFinishTarget(null);
+            showToast(`Contrato finalizado para ${subtitle}.`);
+            void loadRows();
+          }}
         />
       ) : null}
 

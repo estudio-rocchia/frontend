@@ -74,6 +74,13 @@ const ConfigurarFinanciacionModal = dynamic(
     })),
   { ssr: false },
 );
+const RegistrarEscrituraModal = dynamic(
+  () =>
+    import("@/components/ventas/RegistrarEscrituraModal").then((mod) => ({
+      default: mod.RegistrarEscrituraModal,
+    })),
+  { ssr: false },
+);
 const EmitirReciboVentaModal = dynamic(
   () =>
     import("@/components/ventas/EmitirReciboVentaModal").then((mod) => ({
@@ -118,6 +125,7 @@ export function VentaFichaView() {
   const [success, setSuccess] = useState<string | null>(null);
   const [reciboSubmitting, setReciboSubmitting] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [escrituraOpen, setEscrituraOpen] = useState(false);
   const [financiacionOpen, setFinanciacionOpen] = useState(false);
   const [cobrarOpen, setCobrarOpen] = useState(false);
   const [cobrarMode, setCobrarMode] = useState<CobrarVentaMode>("auto");
@@ -388,10 +396,21 @@ export function VentaFichaView() {
               </ButtonPrimary>
             ) : null}
             {editable ? (
+              venta.estado === "deeds_pending" && !(puedeCobrar && hayCobroPendiente) ? (
+                <ButtonPrimary type="button" onClick={() => setEscrituraOpen(true)}>
+                  Registrar escritura
+                </ButtonPrimary>
+              ) : (
+                <ButtonOutline type="button" onClick={() => setEscrituraOpen(true)}>
+                  Registrar escritura
+                </ButtonOutline>
+              )
+            ) : null}
+            {editable ? (
               <>
                 {ventaNecesitaFinanciacion(venta) ? (
                   <ButtonOutline type="button" onClick={() => setFinanciacionOpen(true)}>
-                    Configurar financiación
+                    Configurar forma de pago
                   </ButtonOutline>
                 ) : null}
                 <ButtonOutline type="button" onClick={() => setEditOpen(true)}>Editar</ButtonOutline>
@@ -448,6 +467,9 @@ export function VentaFichaView() {
               inmuebleCode={inmuebleCode}
               inmuebleTitle={inmuebleTitle}
               parteNombres={parteNombres}
+              editable={editable}
+              token={token ?? ""}
+              onPartesChanged={() => void load({ silent: true })}
             />
           ) : null}
 
@@ -476,6 +498,17 @@ export function VentaFichaView() {
           ) : null}
         </div>
       </section>
+
+      <RegistrarEscrituraModal
+        open={escrituraOpen}
+        onClose={() => setEscrituraOpen(false)}
+        token={token ?? ""}
+        venta={venta}
+        onSaved={() => {
+          setSuccess("Escritura registrada. La venta quedó completada y el inmueble pasó a Vendidos.");
+          void load();
+        }}
+      />
 
       <EditVentaModal
         open={editOpen}

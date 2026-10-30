@@ -3,13 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
-import { FormField } from "@/components/ui/FormLayout";
+import { ChipToggle, FormField } from "@/components/ui/FormLayout";
 import { AdjustmentIndicesReference } from "@/components/alquileres/AdjustmentIndicesReference";
 import { AdjustmentUnpaidCuotasNotice } from "@/components/alquileres/AdjustmentUnpaidCuotasNotice";
 import { useContratoAdjustmentPreview } from "@/components/alquileres/useContratoAdjustmentPreview";
 import type { ContratoDetail } from "@/lib/api/types";
 import {
   formatIndexValue,
+  formatIndicePunto,
   formatMoney,
   formatMonthYear,
   moneyClassName,
@@ -39,8 +40,12 @@ import {
 export type AdjustContractSubmitInput = {
   fechaAjuste: string;
   montoNuevo?: number;
+  actualizarDeposito?: boolean;
   depositoPlan?: DepositoPlanChoice;
 };
+
+const DEPOSITO_NO = "No actualizar";
+const DEPOSITO_SI = "Sí, actualizar";
 
 const MONTHS = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -110,6 +115,7 @@ export function AdjustContractModal({
   const [fechaAjusteMonth, setFechaAjusteMonth] = useState<MonthYear | null>(null);
   const [montoNuevoInput, setMontoNuevoInput] = useState("");
   const [showDetails, setShowDetails] = useState(false);
+  const [depositoChoice, setDepositoChoice] = useState<string | null>(null);
   const [crearPlanDeposito, setCrearPlanDeposito] = useState(true);
   const [cantidadCuotasDeposito, setCantidadCuotasDeposito] = useState(
     String(DEFAULT_DEPOSITO_PLAN_CUOTAS),
@@ -120,6 +126,7 @@ export function AdjustContractModal({
     setFechaAjusteMonth(defaultFechaAjusteMonth(contrato, ultimoAjusteEn));
     setMontoNuevoInput("");
     setShowDetails(false);
+    setDepositoChoice(null);
     setCrearPlanDeposito(true);
     setCantidadCuotasDeposito(String(DEFAULT_DEPOSITO_PLAN_CUOTAS));
   }, [contrato, open, ultimoAjusteEn]);
@@ -173,16 +180,21 @@ export function AdjustContractModal({
           currency,
         )
       : null;
+  const ofreceDeposito = Boolean(preview?.actualizacionDeposito.requiereCobro);
+  const actualizarDeposito = depositoChoice === DEPOSITO_SI;
+  const depositoSinElegir = ofreceDeposito && depositoChoice === null;
   const depositoPlanInvalido =
-    Boolean(preview?.actualizacionDeposito.requiereCobro) &&
-    crearPlanDeposito &&
-    !cuotasDepositoValidas;
+    ofreceDeposito && actualizarDeposito && crearPlanDeposito && !cuotasDepositoValidas;
 
   const detailsNote = requiresManualMonto
     ? `Ingresá el nuevo alquiler acordado entre las partes para el período de ${freq} meses.`
-    : overdue
-      ? `El ajuste debía aplicarse en ${formatMonthYear(contractualEnd.anio, contractualEnd.mes)}. Podés usar el último ${indiceCode} publicado (${formatMonthYear(maxPublished.anio, maxPublished.mes)}).`
-      : `Período de ${freq} meses desde ${formatMonthYear(vigenteDesde.anio, vigenteDesde.mes)}.`;
+    : contratoIndex === "IPC"
+      ? `Se multiplican los últimos ${freq} IPC mensuales. Los porcentajes no se suman: el alquiler nuevo es el actual por ese producto.`
+      : contratoIndex === "ICL"
+        ? "El coeficiente es el ICL de la fecha de actualización dividido el ICL del inicio o del último ajuste."
+        : overdue
+          ? `El ajuste debía aplicarse en ${formatMonthYear(contractualEnd.anio, contractualEnd.mes)}. Podés usar el último ${indiceCode} publicado (${formatMonthYear(maxPublished.anio, maxPublished.mes)}).`
+          : `Período de ${freq} meses desde ${formatMonthYear(vigenteDesde.anio, vigenteDesde.mes)}.`;
 
   function resetSuggested() {
     setFechaAjusteMonth(defaultFechaAjusteMonth(contrato!, ultimoAjusteEn));
@@ -209,15 +221,17 @@ export function AdjustContractModal({
               loading ||
               submitting ||
               !fechaAjuste ||
+              depositoSinElegir ||
               depositoPlanInvalido
             }
             onClick={() => {
-              if (!preview || !fechaAjuste || depositoPlanInvalido) return;
+              if (!preview || !fechaAjuste || depositoSinElegir || depositoPlanInvalido) return;
               const input: AdjustContractSubmitInput = {
                 fechaAjuste: preview.fechaAjuste,
                 montoNuevo: requiresManualMonto ? montoNuevo ?? undefined : undefined,
+                actualizarDeposito: ofreceDeposito ? actualizarDeposito : false,
               };
-              if (preview.actualizacionDeposito.requiereCobro) {
+              if (ofreceDeposito && actualizarDeposito) {
                 input.depositoPlan = {
                   crearPlan: crearPlanDeposito,
                   cantidadCuotas: cuotasDeposito,
@@ -299,7 +313,25 @@ export function AdjustContractModal({
           ) : null}
         </div>
 
-        {preview?.actualizacionDeposito.requiereCobro ? (
+        {ofreceDeposito && preview ? (
+          <div className="flex flex-col gap-3 rounded-sm border border-border bg-bg-page px-4 py-3">
+            <div className="flex flex-col gap-1">
+              <span className="text-[13px] font-semibold text-text-primary">
+                ¿Actualizar el depósito?
+              </span>
+              <p className="text-[12px] text-text-secondary">
+                Es opcional. Si no lo actualizás, queda con el monto actual.
+              </p>
+            </div>
+            <ChipToggle
+              options={[DEPOSITO_NO, DEPOSITO_SI]}
+              value={depositoChoice ?? ""}
+              onChange={setDepositoChoice}
+            />
+          </div>
+        ) : null}
+
+        {ofreceDeposito && actualizarDeposito && preview ? (
           <div className="flex flex-col gap-3 rounded-sm border border-primary/20 bg-primary-soft/50 px-4 py-3 text-[13px] text-text-primary">
             <p>
               El depósito pasa de{" "}
@@ -385,7 +417,9 @@ export function AdjustContractModal({
                   </span>
                   {preview?.valorDesde ? (
                     <span className="text-[11px] font-semibold text-primary">
-                      {indiceCode}: {formatIndexValue(preview.valorDesde)}
+                      {indiceCode}{" "}
+                      {formatIndicePunto(preview.periodoDesde, contratoIndex === "ICL")}:{" "}
+                      {formatIndexValue(preview.valorDesde)}
                     </span>
                   ) : null}
                 </div>
@@ -400,7 +434,9 @@ export function AdjustContractModal({
                   />
                   {preview?.valorHasta ? (
                     <span className="text-[11px] font-semibold text-primary">
-                      {indiceCode}: {formatIndexValue(preview.valorHasta)}
+                      {indiceCode}{" "}
+                      {formatIndicePunto(preview.periodoHasta, contratoIndex === "ICL")}:{" "}
+                      {formatIndexValue(preview.valorHasta)}
                     </span>
                   ) : null}
                 </div>

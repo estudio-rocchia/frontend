@@ -96,6 +96,7 @@ export function CitaHorarioFields({
   showAgenda,
   citas,
   dateKey,
+  onDateKeyChange,
   asignadoUsuarioId,
   assigneeName,
   programadaEn,
@@ -111,6 +112,7 @@ export function CitaHorarioFields({
   showAgenda: boolean;
   citas: CitaDetail[];
   dateKey: string;
+  onDateKeyChange?: (dateKey: string) => void;
   asignadoUsuarioId: number;
   assigneeName: string;
   programadaEn: string;
@@ -120,7 +122,18 @@ export function CitaHorarioFields({
 }) {
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className={`grid gap-4 ${onDateKeyChange ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
+        {onDateKeyChange ? (
+          <FieldLabel label="Fecha">
+            <input
+              type="date"
+              className={formInputClass}
+              value={dateKey}
+              onChange={(e) => onDateKeyChange(e.target.value)}
+              disabled={disabled}
+            />
+          </FieldLabel>
+        ) : null}
         <FieldLabel label="Hora de inicio">
           <CitaTimePicker value={time} onChange={onTimeChange} disabled={disabled} />
         </FieldLabel>

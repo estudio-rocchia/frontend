@@ -62,7 +62,6 @@ export function PublicarEnVentaModal({
 }: PublicarEnVentaModalProps) {
   const [step, setStep] = useState(0);
   const [propiedad, setPropiedad] = useState<VentaNuevaPropiedadValue>(emptyVentaNuevaPropiedad);
-  const [description, setDescription] = useState("");
   const [aceptaPermuta, setAceptaPermuta] = useState(false);
   const [aceptaFinanciacion, setAceptaFinanciacion] = useState(false);
   const [aceptaVehiculo, setAceptaVehiculo] = useState(false);
@@ -90,7 +89,6 @@ export function PublicarEnVentaModal({
     if (!open) return;
     setStep(0);
     setPropiedad(emptyVentaNuevaPropiedad());
-    setDescription("");
     setAceptaPermuta(false);
     setAceptaFinanciacion(false);
     setAceptaVehiculo(false);
@@ -223,7 +221,6 @@ export function PublicarEnVentaModal({
       const payload = buildPublishEnVentaPayload({
         propiedad,
         tipoInmuebleId,
-        description,
         aceptaPermuta,
         aceptaFinanciacion,
         aceptaVehiculo,
@@ -316,12 +313,6 @@ export function PublicarEnVentaModal({
                 <span className="font-medium text-text-primary">{codePreview.label}</span>
               </div>
             ) : null}
-            <FormField
-              label="Descripción (opcional)"
-              value={description}
-              onChange={setDescription}
-              placeholder="Detalles de la propiedad para la publicación"
-            />
             <FormSection title="Condiciones de permuta">
               <div className="flex flex-col gap-2">
                 <label className="flex items-center gap-2 text-[13px] text-text-primary">

@@ -14,6 +14,11 @@ export type ServicioFormValues = {
   numeroMedidor: string;
   numeroClienteSecheep: string;
   numeroSuministroSecheep: string;
+  numeroSocioAgua: string;
+  numeroServicioAgua: string;
+  proveedorAgua: "cooperativa" | "sameep";
+  numeroClienteSameep: string;
+  numeroSuministroSameep: string;
   modoFacturacion: ModoFacturacion;
   montoFijo: string;
   codigoMoneda: "ARS" | "USD";
@@ -26,6 +31,11 @@ const emptyForm: ServicioFormValues = {
   numeroMedidor: "",
   numeroClienteSecheep: "",
   numeroSuministroSecheep: "",
+  numeroSocioAgua: "",
+  numeroServicioAgua: "1",
+  proveedorAgua: "cooperativa",
+  numeroClienteSameep: "",
+  numeroSuministroSameep: "",
   modoFacturacion: "variable",
   montoFijo: "",
   codigoMoneda: "ARS",
@@ -152,6 +162,11 @@ export function ServicioFormModal({
         numeroMedidor: editing.numeroMedidor ?? "",
         numeroClienteSecheep: editing.numeroClienteSecheep ?? "",
         numeroSuministroSecheep: editing.numeroSuministroSecheep ?? "",
+        numeroSocioAgua: editing.numeroSocioAgua ?? "",
+        numeroServicioAgua: editing.numeroServicioAgua ? String(editing.numeroServicioAgua) : "1",
+        proveedorAgua: editing.proveedorAgua === "sameep" ? "sameep" : "cooperativa",
+        numeroClienteSameep: editing.numeroClienteSameep ?? "",
+        numeroSuministroSameep: editing.numeroSuministroSameep ?? "",
         modoFacturacion: editing.modoFacturacion,
         montoFijo: editing.montoFijo ? String(Number(editing.montoFijo)) : "",
         codigoMoneda: editing.codigoMoneda?.trim() === "USD" ? "USD" : "ARS",
@@ -194,6 +209,20 @@ export function ServicioFormModal({
     if (form.modoFacturacion === "fixed") {
       const monto = Number(form.montoFijo);
       if (!Number.isFinite(monto) || monto <= 0) {
+        return;
+      }
+    }
+    if (tipo?.code === "water" && form.modoFacturacion === "variable" && form.proveedorAgua === "sameep") {
+      const cliente = form.numeroClienteSameep.replace(/\D/g, "");
+      const suministro = form.numeroSuministroSameep.replace(/\D/g, "");
+      if ((cliente || suministro) && (!cliente || cliente.length > 6 || !suministro || suministro.length > 6)) {
+        return;
+      }
+    }
+    if (tipo?.code === "water" && form.modoFacturacion === "variable" && form.proveedorAgua !== "sameep" && form.numeroSocioAgua.trim()) {
+      const socio = form.numeroSocioAgua.replace(/\D/g, "");
+      const servicio = Number(form.numeroServicioAgua);
+      if (!socio || socio.length > 6 || !Number.isInteger(servicio) || servicio < 1 || servicio > 99) {
         return;
       }
     }
@@ -302,8 +331,63 @@ export function ServicioFormModal({
               value={form.numeroMedidor}
               onChange={(v) => setForm((prev) => ({ ...prev, numeroMedidor: v }))}
               placeholder="Opcional"
-              hint="Referencia para identificar el suministro en el contrato"
+              hint="Referencia interna. El cobro variable usa los datos del prestador."
             />
+            {!isFixed ? (
+              <>
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-[11px] font-semibold text-text-secondary">Prestador</span>
+                  <select
+                    value={form.proveedorAgua}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        proveedorAgua: e.target.value === "sameep" ? "sameep" : "cooperativa",
+                      }))
+                    }
+                    className="rounded-sm border border-border bg-bg-card px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
+                  >
+                    <option value="cooperativa">Cooperativa Las Breñas</option>
+                    <option value="sameep">SAMEEP</option>
+                  </select>
+                </label>
+                {form.proveedorAgua === "sameep" ? (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Field
+                      label="Nº de cliente"
+                      value={form.numeroClienteSameep}
+                      onChange={(v) => setForm((prev) => ({ ...prev, numeroClienteSameep: v }))}
+                      placeholder="Ej. 123456"
+                      hint="Figura en la factura de SAMEEP."
+                    />
+                    <Field
+                      label="Nº de suministro"
+                      value={form.numeroSuministroSameep}
+                      onChange={(v) => setForm((prev) => ({ ...prev, numeroSuministroSameep: v }))}
+                      placeholder="Ej. 1"
+                      hint="Hasta 6 dígitos."
+                    />
+                  </div>
+                ) : (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Field
+                      label="Nº de socio"
+                      value={form.numeroSocioAgua}
+                      onChange={(v) => setForm((prev) => ({ ...prev, numeroSocioAgua: v }))}
+                      placeholder="Ej. 419158"
+                      hint="Figura en la factura de la cooperativa de Las Breñas."
+                    />
+                    <Field
+                      label="Servicio Nº"
+                      value={form.numeroServicioAgua}
+                      onChange={(v) => setForm((prev) => ({ ...prev, numeroServicioAgua: v }))}
+                      placeholder="1"
+                      hint="Cada conexión tiene el suyo. Si hay una sola, es 1."
+                    />
+                  </div>
+                )}
+              </>
+            ) : null}
           </div>
         ) : (
           <>

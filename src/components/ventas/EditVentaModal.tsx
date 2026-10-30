@@ -26,8 +26,6 @@ export function EditVentaModal({ open, onClose, token, venta, onSaved }: EditVen
   const [monto, setMonto] = useState("");
   const [moneda, setMoneda] = useState("USD");
   const [fechaBoleto, setFechaBoleto] = useState("");
-  const [fechaEscritura, setFechaEscritura] = useState("");
-  const [escribano, setEscribano] = useState("");
   const [condiciones, setCondiciones] = useState("");
   const [formaPagoId, setFormaPagoId] = useState("");
   const [formasPago, setFormasPago] = useState<CatalogoItem[]>([]);
@@ -48,8 +46,6 @@ export function EditVentaModal({ open, onClose, token, venta, onSaved }: EditVen
     setMonto(venta.montoPrecioVenta);
     setMoneda(venta.codigoMoneda.trim() === "ARS" ? "ARS" : "USD");
     setFechaBoleto(venta.fechaBoleto ?? "");
-    setFechaEscritura(venta.fechaEscritura ?? "");
-    setEscribano(venta.nombreEscribano ?? "");
     setCondiciones(venta.condicionesPago ?? "");
     setFormaPagoId(venta.formaPagoId ? String(venta.formaPagoId) : "");
     setNotas(venta.notas ?? "");
@@ -71,8 +67,6 @@ export function EditVentaModal({ open, onClose, token, venta, onSaved }: EditVen
         montoPrecioVenta,
         codigoMoneda: moneda,
         fechaBoleto: fechaBoleto || null,
-        fechaEscritura: fechaEscritura || null,
-        nombreEscribano: escribano.trim() || null,
         condicionesPago: condiciones.trim() || null,
         formaPagoId: formaPagoId ? Number(formaPagoId) : null,
         notas: notas.trim() || null,
@@ -115,9 +109,7 @@ export function EditVentaModal({ open, onClose, token, venta, onSaved }: EditVen
               <span className="text-[11px] font-semibold text-text-secondary">Moneda</span>
               <ChipToggle options={["USD", "ARS"]} value={moneda} onChange={setMoneda} />
             </div>
-            <FormField label="Fecha de compromiso" value={fechaBoleto} onChange={setFechaBoleto} type="date" />
-            <FormField label="Fecha escritura" value={fechaEscritura} onChange={setFechaEscritura} type="date" />
-            <FormField label="Escribano" value={escribano} onChange={setEscribano} />
+            <FormField label="Fecha de boleto (opcional)" value={fechaBoleto} onChange={setFechaBoleto} type="date" />
             <div className="flex flex-col gap-1.5">
               <span className="text-[11px] font-semibold text-text-secondary">Estado</span>
               <div className="flex flex-wrap gap-2">

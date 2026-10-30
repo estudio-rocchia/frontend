@@ -44,13 +44,29 @@ export function formatVariationPct(ratio: number, decimals = 1): string {
 }
 
 export function buildValorMap(rows: { periodo: string; valor: string }[]): Map<string, number> {
+  const bestPeriodo = new Map<string, string>();
   const map = new Map<string, number>();
   for (const row of rows) {
     const key = normalizePeriodo(row.periodo);
     const v = parseValor(row.valor);
-    if (v !== null) map.set(key, v);
+    if (v === null) continue;
+    const prev = bestPeriodo.get(key);
+    if (prev !== undefined && prev > row.periodo) continue;
+    bestPeriodo.set(key, row.periodo);
+    map.set(key, v);
   }
   return map;
+}
+
+/** Last published point of each month, newest month first. */
+export function latestPointPerMonth<T extends { periodo: string }>(rows: T[]): T[] {
+  const byMonth = new Map<string, T>();
+  for (const row of rows) {
+    const key = row.periodo.slice(0, 7);
+    const prev = byMonth.get(key);
+    if (!prev || row.periodo > prev.periodo) byMonth.set(key, row);
+  }
+  return [...byMonth.values()].sort((a, b) => b.periodo.localeCompare(a.periodo));
 }
 
 export function computeIndexVariations(

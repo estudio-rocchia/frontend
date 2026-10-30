@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 
 import { ContractCobranzasSection } from "@/components/alquileres/ContractCobranzasSection";
+import { ContractGarantesSection } from "@/components/alquileres/ContractGarantesSection";
 import { ContractDepositoPlanSection } from "@/components/alquileres/ContractDepositoPlanSection";
 import { ContractServiciosSection } from "@/components/alquileres/ContractServiciosSection";
 import { useContractFicha } from "@/components/alquileres/use-contract-ficha";
@@ -14,7 +15,7 @@ import { FieldBlock } from "@/components/ui/FormLayout";
 import { PageHeaderSkeleton, Skeleton } from "@/components/ui/Skeleton";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useAuth } from "@/context/auth-context";
-import { moneyClassName } from "@/lib/format";
+import { daysUntilDate, moneyClassName } from "@/lib/format";
 import { pagePaddingClass } from "@/lib/layout";
 import { canCollectRentFromCuotas } from "@/lib/mappers/cuotas";
 
@@ -22,6 +23,14 @@ const CobrarAlquilerModal = dynamic(
   () =>
     import("@/components/alquileres/CobrarAlquilerModal").then((mod) => ({
       default: mod.CobrarAlquilerModal,
+    })),
+  { ssr: false },
+);
+
+const FinalizarContratoModal = dynamic(
+  () =>
+    import("@/components/alquileres/FinalizarContratoModal").then((mod) => ({
+      default: mod.FinalizarContratoModal,
     })),
   { ssr: false },
 );
@@ -78,6 +87,7 @@ export function ContractFichaView() {
   const [activeTab, setActiveTab] = useState<FichaTab>("resumen");
   const [cobrarModalOpen, setCobrarModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [finishModalOpen, setFinishModalOpen] = useState(false);
 
   useEffect(() => {
     const tab = tabFromQuery(searchParams.get("tab"));
@@ -104,6 +114,9 @@ export function ContractFichaView() {
     handleCreateServicio,
     handleUpdateServicio,
     handleDeactivateServicio,
+    handleConsultarAgua,
+    handleConsultarSameep,
+    handleConsultarSecheep,
     handleImportSecheep,
     handleCreatePeriodo,
     handleCreatePlanDeposito,
@@ -111,6 +124,7 @@ export function ContractFichaView() {
     handleDownloadRecibo,
     handleCobrarSuccess,
     handleUpdateContrato,
+    reloadFicha,
   } = useContractFicha({ contratoId, validId, token, logout });
 
   const contratoCode = contrato?.contratoCode ?? detail?.propertyCode ?? "—";
@@ -127,6 +141,7 @@ export function ContractFichaView() {
   }, [detail]);
 
   const canEdit = contrato?.estado === "active";
+  const canFinish = Boolean(canEdit && contrato && daysUntilDate(contrato.fechaFin) <= 30);
   const canCollect = canEdit && contrato && canCollectRentFromCuotas(cuotas, contrato);
   const cobrarSubtitle = detail ? `${detail.tenant} · ${detail.property}` : undefined;
 
@@ -217,6 +232,16 @@ export function ContractFichaView() {
                   Cobrar
                 </ButtonPrimary>
               ) : null}
+              {canFinish ? (
+                <ButtonOutline
+                  type="button"
+                  data-testid="ficha-finalizar"
+                  onClick={() => setFinishModalOpen(true)}
+                  disabled={submitting}
+                >
+                  Finalizar
+                </ButtonOutline>
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -269,7 +294,14 @@ export function ContractFichaView() {
                 <div className="grid gap-4 sm:grid-cols-2">
                   <FieldBlock label="Inquilino" value={detail.tenant} />
                   <FieldBlock label="Propietario" value={detail.owner} />
-                  <FieldBlock label="Garantes" value={detail.guarantors} />
+                  {contrato && token ? (
+                    <ContractGarantesSection
+                      contrato={contrato}
+                      editable={canEdit}
+                      token={token}
+                      onChanged={() => void reloadFicha()}
+                    />
+                  ) : null}
                 </div>
               </div>
 
@@ -333,6 +365,9 @@ export function ContractFichaView() {
               onDeactivateServicio={handleDeactivateServicio}
               onCreatePeriodo={handleCreatePeriodo}
               onImportSecheep={handleImportSecheep}
+              onConsultarSecheep={handleConsultarSecheep}
+              onConsultarAgua={handleConsultarAgua}
+              onConsultarSameep={handleConsultarSameep}
               onRegisterPago={handleRegisterPago}
               mediosPago={mediosPago}
               canRegisterPago={canEdit}
@@ -351,6 +386,19 @@ export function ContractFichaView() {
           subtitle={cobrarSubtitle}
           mediosPago={mediosPago}
           onSuccess={() => void handleCobrarSuccess()}
+        />
+      ) : null}
+      {finishModalOpen && contrato ? (
+        <FinalizarContratoModal
+          open
+          contratoId={contrato.id}
+          subtitle={`${detail.tenant} · ${detail.property}`}
+          token={token}
+          onClose={() => setFinishModalOpen(false)}
+          onFinished={() => {
+            setFinishModalOpen(false);
+            void reloadFicha("Contrato finalizado. No se creó uno nuevo.");
+          }}
         />
       ) : null}
       {editModalOpen ? (

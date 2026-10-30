@@ -10,7 +10,7 @@ test.describe("Alquileres — listado", () => {
   test("muestra la tabla y permite buscar un contrato demo", async ({ authedPage }) => {
     await searchContratos(authedPage, "ALQ-MIX-01");
     await expect(authedPage.getByRole("cell", { name: /D137/ })).toBeVisible();
-    await expect(authedPage.getByRole("button", { name: "Ver ficha" }).first()).toBeVisible();
+    await expect(authedPage.getByRole("button", { name: "Ver ficha" })).toHaveCount(0);
   });
 
   test("filtra por KPI A cobrar y muestra contratos con acción Cobrar", async ({ authedPage }) => {
@@ -26,7 +26,7 @@ test.describe("Alquileres — listado", () => {
     await expect(authedPage.getByRole("button", { name: "Cobrar" }).first()).toBeVisible();
   });
 
-  test("navega a la ficha desde Ver ficha", async ({ authedPage }) => {
+  test("navega a la ficha al elegir el contrato", async ({ authedPage }) => {
     await openContratoFicha(authedPage, "ALQ-MIX-01");
     await expect(authedPage.getByTestId("ficha-tab-cobranzas")).toBeVisible();
   });

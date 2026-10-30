@@ -40,6 +40,17 @@ export function catalogMotivo(item: CatalogSearchItem): string {
   return VENTA_EMPTY_FIELD;
 }
 
+export function catalogItemSearchText(item: CatalogSearchItem): string {
+  return [
+    item.inmueble.code,
+    item.inmueble.displayLabel,
+    item.inmueble.title,
+    item.detalle?.observacion,
+  ]
+    .filter((part) => part?.trim())
+    .join(" ");
+}
+
 export function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }

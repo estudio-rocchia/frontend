@@ -23,13 +23,12 @@ export function CalendarioDayPanel({
   citas: CitaDetail[];
   onSelectCita: (cita: CitaDetail) => void;
 }) {
-  const activeCitas = citas.filter((c) => c.estado !== "cancelada");
   const countLabel =
-    activeCitas.length === 0
+    citas.length === 0
       ? "Sin citas"
-      : activeCitas.length === 1
+      : citas.length === 1
         ? "1 cita"
-        : `${activeCitas.length} citas`;
+        : `${citas.length} citas`;
 
   return (
     <aside className="flex min-h-[420px] flex-col rounded-md border border-border bg-bg-card shadow-[var(--shadow-card)]">
@@ -42,7 +41,7 @@ export function CalendarioDayPanel({
       </header>
 
       <div className="flex flex-1 flex-col gap-4 p-4">
-        {activeCitas.length === 0 ? (
+        {citas.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-md border border-dashed border-border bg-bg-page/80 px-6 py-10 text-center">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-soft text-primary">
               <CalendarDays className="h-6 w-6" aria-hidden />
@@ -57,8 +56,9 @@ export function CalendarioDayPanel({
           </div>
         ) : (
           <ol className="relative flex flex-col gap-3 pl-1">
-            {activeCitas.map((cita) => {
+            {citas.map((cita) => {
               const styles = citaEstadoStyles(cita.estado);
+              const cancelled = cita.estado === "cancelada";
               return (
                 <li key={cita.id} className="relative pl-5">
                   <span
@@ -68,10 +68,10 @@ export function CalendarioDayPanel({
                   <button
                     type="button"
                     onClick={() => onSelectCita(cita)}
-                    className={`w-full rounded-md border border-border border-l-[3px] p-3.5 text-left transition-colors hover:bg-bg-page ${styles.chip} ${interactiveFocusClass}`}
+                    className={`w-full rounded-md border border-border border-l-[3px] p-3.5 text-left transition-colors hover:bg-bg-page ${styles.chip} ${cancelled ? "opacity-80" : ""} ${interactiveFocusClass}`}
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-1.5 text-sm font-semibold text-text-primary">
+                      <div className={`flex items-center gap-1.5 text-sm font-semibold ${cancelled ? "text-text-secondary line-through" : "text-text-primary"}`}>
                         <Clock className="h-3.5 w-3.5 shrink-0 text-text-secondary" aria-hidden />
                         {citaTimeLabel(cita.programadaEn)}
                         <span className="font-normal text-text-secondary">
@@ -84,7 +84,9 @@ export function CalendarioDayPanel({
                         {citaEstadoLabel(cita.estado)}
                       </span>
                     </div>
-                    <p className="mt-2 text-sm font-medium text-text-primary">{citaDisplayTitle(cita)}</p>
+                    <p className={`mt-2 text-sm font-medium ${cancelled ? "text-text-secondary line-through" : "text-text-primary"}`}>
+                      {citaDisplayTitle(cita)}
+                    </p>
                     <p className="mt-1 text-[11px] font-medium uppercase tracking-wide text-text-secondary">
                       {citaTipoLabel(cita.tipo)}
                     </p>

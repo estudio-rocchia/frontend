@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useSyncScope } from "@/lib/sync/use-sync-scope";
 
@@ -17,7 +17,7 @@ const PublicarEnVentaModal = dynamic(
     })),
   { ssr: false },
 );
-import { VentasCatalogFilterChips } from "@/components/ventas/VentasCatalogFilterChips";
+import { VentasCatalogFiltersPanel } from "@/components/ventas/VentasCatalogFiltersPanel";
 import { VentasCreateActions } from "@/components/ventas/VentasCreateActions";
 import {
   VENTAS_MAIN_PANEL_ID,
@@ -38,12 +38,15 @@ import {
   fetchVenta,
   searchCatalogo,
 } from "@/lib/api";
+import { buyerSearchText, fetchParteNombres } from "@/lib/ventas/partes";
 import type { CatalogSearchItem, CatalogoItem, VentaDetail } from "@/lib/api/types";
 import { pagePaddingClass } from "@/lib/layout";
 import {
-  catalogFilterSearchParams,
-  type VentasCatalogFilterId,
-} from "@/lib/ventas/catalog-filters";
+  characteristicFiltersSearchParams,
+  EMPTY_CHARACTERISTIC_FILTERS,
+  type VentasCharacteristicFilters,
+} from "@/lib/ventas/characteristic-filters";
+import { catalogItemSearchText } from "@/lib/ventas/catalog-helpers";
 import { VENTAS_TAB_COPY, ventasEmptyHint } from "@/lib/ventas/workspace-copy";
 
 function isVentasTabId(value: string | null): value is VentasTabId {
@@ -66,25 +69,38 @@ export function VentasWorkspace() {
   const searchParams = useSearchParams();
   const { token, logout } = useAuth();
   const [tab, setTab] = useState<VentasTabId>("en_operacion");
+  const [urlTabReady, setUrlTabReady] = useState(false);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [ventaRows, setVentaRows] = useState<VentaDetail[]>([]);
+  const [parteNombres, setParteNombres] = useState<Record<number, string>>({});
   const [catalogRows, setCatalogRows] = useState<CatalogSearchItem[]>([]);
   const [tabCounts, setTabCounts] = useState<Partial<Record<VentasTabId, number>>>({});
   const [estadoIds, setEstadoIds] = useState<Record<string, number>>({});
   const [tipoInmuebleIds, setTipoInmuebleIds] = useState<Record<string, number>>({});
-  const [catalogFilter, setCatalogFilter] = useState<VentasCatalogFilterId>("todos");
+  const [tiposInmueble, setTiposInmueble] = useState<CatalogoItem[]>([]);
+  const [characteristicFilters, setCharacteristicFilters] =
+    useState<VentasCharacteristicFilters>(EMPTY_CHARACTERISTIC_FILTERS);
   const [tipoVentaId, setTipoVentaId] = useState<number | undefined>();
   const [newVentaOpen, setNewVentaOpen] = useState(false);
   const [publicarOpen, setPublicarOpen] = useState(false);
   const [newVentaInmuebleId, setNewVentaInmuebleId] = useState<number | null>(null);
+  const characteristicFiltersRef = useRef(characteristicFilters);
+  characteristicFiltersRef.current = characteristicFilters;
+  const skipFilterReloadRef = useRef(true);
+  const loadGenerationRef = useRef(0);
+
+  useEffect(() => {
+    skipFilterReloadRef.current = true;
+  }, [tab]);
 
   useEffect(() => {
     const tabParam = searchParams.get("tab");
     if (isVentasTabId(tabParam)) {
       setTab(tabParam);
     }
+    setUrlTabReady(true);
   }, [searchParams]);
 
   useEffect(() => {
@@ -102,6 +118,7 @@ export function VentasWorkspace() {
         const tipoMap: Record<string, number> = {};
         for (const item of tiposInmueble.items) tipoMap[item.code] = item.id;
         setTipoInmuebleIds(tipoMap);
+        setTiposInmueble(tiposInmueble.items);
         const ventaTipoId = tipos.items.find((t) => t.code === "venta")?.id;
         setTipoVentaId(ventaTipoId);
       } catch {
@@ -157,6 +174,8 @@ export function VentasWorkspace() {
 
   const load = useCallback(async (options?: { silent?: boolean }) => {
     if (!token) return;
+    const generation = ++loadGenerationRef.current;
+    const stillCurrent = () => generation === loadGenerationRef.current;
     const silent = options?.silent ?? false;
     if (!silent) {
       setLoading(true);
@@ -167,6 +186,12 @@ export function VentasWorkspace() {
         const res = await fetchVentas(token, { limit: 100 });
         const activas = res.items.filter((v) => v.estado !== "completed" && v.estado !== "cancelled");
         const details = await Promise.all(activas.map((v) => fetchVenta(token, v.id)));
+        const buyerIds = details.flatMap((venta) =>
+          venta.partes.filter((parte) => parte.rol === "buyer").map((parte) => parte.personaId),
+        );
+        const nombres = await fetchParteNombres(token, buyerIds).catch(() => ({}));
+        if (!stillCurrent()) return;
+        setParteNombres(nombres);
         setVentaRows(details);
         setCatalogRows([]);
         setTabCounts((prev) => ({ ...prev, en_operacion: details.length }));
@@ -175,6 +200,7 @@ export function VentasWorkspace() {
           tab === "fuera_mercado" ? "off_market" : tab === "vendidos" ? "sold" : "available";
         const estadoOfertaId = estadoIds[estadoCode];
         if (!estadoOfertaId) {
+          if (!stillCurrent()) return;
           setCatalogRows([]);
           setVentaRows([]);
           setError("Catálogo de estados no disponible. Recargá la página.");
@@ -183,14 +209,15 @@ export function VentasWorkspace() {
         const res = await searchCatalogo(token, {
           estadoOfertaId,
           tipoOperacionId: tipoVentaId,
-          ...catalogFilterSearchParams(catalogFilter, tipoInmuebleIds),
+          ...characteristicFiltersSearchParams(characteristicFiltersRef.current, tipoInmuebleIds),
           limit: 200,
         });
+        if (!stillCurrent()) return;
         setCatalogRows(res.items);
         setVentaRows([]);
-        setTabCounts((prev) => ({ ...prev, [tab]: res.items.length }));
       }
     } catch (err) {
+      if (!stillCurrent()) return;
       if (err instanceof ApiError && err.status === 401) {
         logout();
         return;
@@ -199,42 +226,48 @@ export function VentasWorkspace() {
       setVentaRows([]);
       setCatalogRows([]);
     } finally {
-      if (!silent) {
+      if (stillCurrent() && !silent) {
         setLoading(false);
       }
     }
-  }, [token, tab, estadoIds, tipoInmuebleIds, catalogFilter, tipoVentaId, logout]);
+  }, [token, tab, estadoIds, tipoInmuebleIds, tipoVentaId, logout]);
 
   useSyncScope("ventas", () => void load({ silent: true }), Boolean(token));
 
   useEffect(() => {
+    if (!urlTabReady) return;
     if (tab !== "en_operacion" && Object.keys(estadoIds).length === 0) return;
     void load();
-  }, [load, tab, estadoIds]);
+  }, [load, tab, estadoIds, urlTabReady]);
+
+  useEffect(() => {
+    if (tab === "en_operacion") return;
+    if (Object.keys(estadoIds).length === 0) return;
+    if (skipFilterReloadRef.current) {
+      skipFilterReloadRef.current = false;
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void load({ silent: true });
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [characteristicFilters, load, tab, estadoIds]);
 
   const tableRows: VentasTableRow[] = useMemo(() => {
     if (tab === "en_operacion") {
       return ventaRows
         .filter((venta) => {
-          const label = `${venta.inmueble?.code ?? ""} ${venta.inmueble?.title ?? ""}`;
+          const label = `${venta.inmueble?.code ?? ""} ${venta.inmueble?.title ?? ""} ${buyerSearchText(venta, parteNombres)}`;
           return matchesSearch(label, search);
         })
         .map((venta) => ({ kind: "venta", venta }));
     }
     return catalogRows
-      .filter((item) =>
-        matchesSearch(
-          `${item.inmueble.code} ${item.inmueble.displayLabel ?? item.inmueble.title ?? ""}`,
-          search,
-        ),
-      )
+      .filter((item) => matchesSearch(catalogItemSearchText(item), search))
       .map((item) => ({ kind: "catalog", item }));
-  }, [tab, ventaRows, catalogRows, search]);
+  }, [tab, ventaRows, catalogRows, search, parteNombres]);
 
-  const emptyHint = useMemo(
-    () => ventasEmptyHint(tab, catalogFilter),
-    [tab, catalogFilter],
-  );
+  const emptyHint = useMemo(() => ventasEmptyHint(tab), [tab]);
 
   function openNewVenta(inmuebleId?: number) {
     setNewVentaInmuebleId(inmuebleId ?? null);
@@ -258,15 +291,7 @@ export function VentasWorkspace() {
     const lotes = catalogRows.filter((item) => item.tipoInmueble.code === "lot").length;
 
     if (tab === "a_la_venta") {
-      if (catalogFilter === "lotes_menos_10k_usd") {
-        return [
-          { label: "Lotes < USD 10.000", value: String(catalogRows.length), hint: "Oferta en dólares" },
-        ];
-      }
-      return [
-        { label: "A la venta", value: String(catalogRows.length), hint: "Ofertas disponibles" },
-        { label: "Lotes", value: String(lotes), hint: "Tipo lote" },
-      ];
+      return [];
     }
 
     if (tab === "fuera_mercado") {
@@ -280,7 +305,7 @@ export function VentasWorkspace() {
       { label: "Total vendidos", value: String(catalogRows.length), hint: "Archivo de ventas cerradas" },
       { label: "Lotes", value: String(lotes), hint: "Lotes vendidos" },
     ];
-  }, [tab, ventaRows, catalogRows, catalogFilter]);
+  }, [tab, ventaRows, catalogRows]);
 
   function changeTab(next: VentasTabId) {
     setTab(next);
@@ -332,17 +357,20 @@ export function VentasWorkspace() {
           tab={tab}
           onPublicar={() => setPublicarOpen(true)}
           onNuevaVenta={() => openNewVenta()}
-          disabled={loading}
         />
       </header>
 
       <VentasFilterChips active={tab} onChange={changeTab} counts={tabCounts} />
 
       {tab !== "en_operacion" ? (
-        <VentasCatalogFilterChips
-          active={catalogFilter}
+        <VentasCatalogFiltersPanel
+          filters={characteristicFilters}
+          tiposInmueble={tiposInmueble}
           onChange={(next) => {
-            setCatalogFilter(next);
+            setCharacteristicFilters(next);
+          }}
+          onClear={() => {
+            setCharacteristicFilters(EMPTY_CHARACTERISTIC_FILTERS);
             setSearch("");
           }}
         />
@@ -373,10 +401,11 @@ export function VentasWorkspace() {
           <VentasTable
             tab={tab}
             rows={tableRows}
-            loading={loading}
+            loading={loading && tableRows.length === 0}
             search={search}
             searchPlaceholder={tabCopy.searchPlaceholder}
             emptyHint={emptyHint}
+            parteNombres={parteNombres}
             onSearchChange={setSearch}
             onOpenRow={handleOpenRow}
           />

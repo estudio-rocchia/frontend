@@ -24,6 +24,7 @@ import type {
 import { invalidateDashboardAlerts } from "@/lib/dashboard-alerts-events";
 import { cuotaEstadoLabel } from "@/lib/ventas/status-labels";
 import { todayIso } from "@/lib/ventas/catalog-helpers";
+import { isVentaContado } from "@/lib/ventas/contado";
 import { downloadBlob, formatDateDisplay, formatMoney, moneyClassName } from "@/lib/format";
 
 export type CobrarVentaMode = "auto" | "sena" | "cuota";
@@ -130,7 +131,7 @@ export function CobrarVentaModal({
           setNota("Entrega inicial / seña");
         } else if (cuota) {
           setMonto(cuota.saldo);
-          setNota(`Cuota ${cuota.numero}`);
+          setNota(isVentaContado(detail.plan) ? "Pago al contado" : `Cuota ${cuota.numero}`);
         } else {
           setMonto("");
           setNota("");
@@ -151,9 +152,10 @@ export function CobrarVentaModal({
 
   const titulo = useMemo(() => {
     if (pagoTipo === "sena") return "Registrar seña / entrega inicial";
+    if (cuotaTarget && venta?.plan && isVentaContado(venta.plan)) return "Cobrar venta al contado";
     if (cuotaTarget) return `Cobrar cuota ${cuotaTarget.numero}`;
     return "Registrar cobro";
-  }, [pagoTipo, cuotaTarget]);
+  }, [pagoTipo, cuotaTarget, venta?.plan]);
 
   async function handleSubmit() {
     if (!venta || ventaId === null) return;
@@ -231,7 +233,7 @@ export function CobrarVentaModal({
       {loading ? (
         <p className="text-sm text-text-secondary">Cargando...</p>
       ) : sinPlan ? (
-        <p className="text-sm text-text-secondary">Configurá la financiación antes de cobrar.</p>
+        <p className="text-sm text-text-secondary">Configurá la forma de pago antes de cobrar.</p>
       ) : (
         <div className="flex flex-col gap-4">
           {pagoTipo === "sena" ? (
@@ -246,7 +248,9 @@ export function CobrarVentaModal({
           {pagoTipo === "cuota" && cuotaTarget ? (
             <div className="rounded-md border border-primary/20 bg-primary-soft/40 px-4 py-3">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">
-                Cuota {cuotaTarget.numero}
+                {venta?.plan && isVentaContado(venta.plan)
+                  ? "Pago al contado"
+                  : `Cuota ${cuotaTarget.numero}`}
               </p>
               <p className="mt-1 text-sm text-text-primary">
                 Vence {formatDateDisplay(cuotaTarget.fechaVencimiento)}. Saldo:{" "}

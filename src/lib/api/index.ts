@@ -23,6 +23,7 @@ import type {
   PagoListItem,
   PagoRecord,
   PersonaRecord,
+  PreviewFinalizarContrato,
   ActualizacionDepositoResult,
   ApplyAjusteInput,
   ApplyAjusteResponse,
@@ -74,6 +75,20 @@ export function login(usernameOrEmail: string, password: string) {
   return apiRequest<LoginResponse>("/auth/login", {
     method: "POST",
     body: JSON.stringify({ usernameOrEmail, password }),
+  });
+}
+
+export function requestPasswordReset(email: string) {
+  return apiRequest<{ ok: true }>("/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export function resetPasswordWithToken(token: string, password: string) {
+  return apiRequest<{ ok: true }>("/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ token, password }),
   });
 }
 
@@ -268,6 +283,34 @@ export function importSecheep(token: string, servicioId: number, body: SecheepIm
   });
 }
 
+export function consultarSecheep(token: string, servicioId: number, captchaToken: string) {
+  return apiRequest<SecheepImportResult>(`/servicios/${servicioId}/secheep/consultar`, {
+    method: "POST",
+    token,
+    body: JSON.stringify({ captchaToken }),
+  });
+}
+
+export function consultarSameep(token: string, servicioId: number, captchaToken: string) {
+  return apiRequest<import("./types").AguaConsultaResult>(`/servicios/${servicioId}/agua/sameep/consultar`, {
+    method: "POST",
+    token,
+    body: JSON.stringify({ captchaToken }),
+  });
+}
+
+export function consultarAgua(
+  token: string,
+  servicioId: number,
+  body: import("./types").AguaConsultaInput,
+) {
+  return apiRequest<import("./types").AguaConsultaResult>(`/servicios/${servicioId}/agua/consultar`, {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
 export function fetchPlanesActualizacionDeposito(token: string, contratoId: number) {
   return apiRequest<{ items: PlanActualizacionDepositoDetail[] }>(
     `/contratos/${contratoId}/planes-actualizacion-deposito`,
@@ -444,6 +487,18 @@ export function updatePersona(
 
 export function fetchInmuebleFicha(token: string, inmuebleId: number) {
   return apiRequest<InmuebleFicha>(`/inmuebles/${inmuebleId}/ficha`, { token });
+}
+
+export function upsertInmuebleDetalle(
+  token: string,
+  inmuebleId: number,
+  body: import("./types").UpsertDetalleInput,
+) {
+  return apiRequest<import("./types").DetalleInmuebleRecord>(`/inmuebles/${inmuebleId}/detalle`, {
+    method: "PUT",
+    token,
+    body: JSON.stringify(body),
+  });
 }
 
 export function fetchInmuebles(token: string, params?: { limit?: number; offset?: number }) {
@@ -641,6 +696,25 @@ export function updateContrato(
   });
 }
 
+export function addContratoGarante(
+  token: string,
+  contratoId: number,
+  body: { personaId: number },
+) {
+  return apiRequest<{ id: number; personaId: number }>(`/contratos/${contratoId}/garantes`, {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function removeContratoGarante(token: string, contratoId: number, personaId: number) {
+  return apiRequest<void>(`/contratos/${contratoId}/garantes/${personaId}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
 export function changeContratoEstado(
   token: string,
   contratoId: number,
@@ -650,6 +724,19 @@ export function changeContratoEstado(
     method: "POST",
     token,
     body: JSON.stringify({ estado }),
+  });
+}
+
+export function previewFinalizarContrato(token: string, contratoId: number) {
+  return apiRequest<PreviewFinalizarContrato>(`/contratos/${contratoId}/finalizar/preview`, {
+    token,
+  });
+}
+
+export function finalizarContrato(token: string, contratoId: number) {
+  return apiRequest<ContratoRecord>(`/contratos/${contratoId}/finalizar`, {
+    method: "POST",
+    token,
   });
 }
 
@@ -756,6 +843,16 @@ export function searchCatalogo(
     codigoMoneda?: string;
     aceptaFinanciacion?: boolean;
     aceptaPermuta?: boolean;
+    bedroomsMin?: number;
+    bathroomsMin?: number;
+    tieneCochera?: boolean;
+    tienePileta?: boolean;
+    superficieTotalMin?: number;
+    superficieTotalMax?: number;
+    frenteMin?: number;
+    fondoMin?: number;
+    tieneEscritura?: boolean;
+    tieneConstruccion?: boolean;
     limit?: number;
     offset?: number;
   },
@@ -772,6 +869,24 @@ export function searchCatalogo(
     query.set("aceptaFinanciacion", String(params.aceptaFinanciacion));
   }
   if (params?.aceptaPermuta !== undefined) query.set("aceptaPermuta", String(params.aceptaPermuta));
+  if (params?.bedroomsMin !== undefined) query.set("bedroomsMin", String(params.bedroomsMin));
+  if (params?.bathroomsMin !== undefined) query.set("bathroomsMin", String(params.bathroomsMin));
+  if (params?.tieneCochera !== undefined) query.set("tieneCochera", String(params.tieneCochera));
+  if (params?.tienePileta !== undefined) query.set("tienePileta", String(params.tienePileta));
+  if (params?.superficieTotalMin !== undefined) {
+    query.set("superficieTotalMin", String(params.superficieTotalMin));
+  }
+  if (params?.superficieTotalMax !== undefined) {
+    query.set("superficieTotalMax", String(params.superficieTotalMax));
+  }
+  if (params?.frenteMin !== undefined) query.set("frenteMin", String(params.frenteMin));
+  if (params?.fondoMin !== undefined) query.set("fondoMin", String(params.fondoMin));
+  if (params?.tieneEscritura !== undefined) {
+    query.set("tieneEscritura", String(params.tieneEscritura));
+  }
+  if (params?.tieneConstruccion !== undefined) {
+    query.set("tieneConstruccion", String(params.tieneConstruccion));
+  }
   query.set("limit", String(params?.limit ?? 100));
   if (params?.offset) query.set("offset", String(params.offset));
   return apiRequest<{ items: CatalogSearchItem[] }>(`/catalogo/buscar?${query}`, { token });
@@ -831,6 +946,18 @@ export function updateVenta(token: string, id: number, body: import("./types").U
   });
 }
 
+export function completarVenta(
+  token: string,
+  id: number,
+  body: { fechaEscritura: string; nombreEscribano?: string | null },
+) {
+  return apiRequest<import("./types").VentaRecord>(`/ventas/${id}/completar`, {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
 export function cancelVenta(token: string, id: number) {
   return apiRequest<import("./types").VentaRecord>(`/ventas/${id}/cancelar`, {
     method: "POST",
@@ -844,6 +971,13 @@ export function addVentaParte(token: string, ventaId: number, body: import("./ty
     method: "POST",
     token,
     body: JSON.stringify(body),
+  });
+}
+
+export function removeVentaParte(token: string, ventaId: number, parteId: number) {
+  return apiRequest<void>(`/ventas/${ventaId}/partes/${parteId}`, {
+    method: "DELETE",
+    token,
   });
 }
 

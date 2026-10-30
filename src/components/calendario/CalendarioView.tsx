@@ -37,7 +37,7 @@ import { computeCalendarioKpis } from "@/lib/calendar/stats";
 import { pagePaddingClass } from "@/lib/layout";
 import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 
-const ESTADO_LEGEND: CitaDetail["estado"][] = ["programada", "confirmada", "realizada"];
+const ESTADO_LEGEND: CitaDetail["estado"][] = ["programada", "confirmada", "realizada", "cancelada"];
 
 function isWeekend(date: Date): boolean {
   const day = date.getDay();
@@ -235,7 +235,6 @@ export function CalendarioView() {
             <div className="grid grid-cols-7 gap-px bg-border p-px">
               {monthCells.map((cell) => {
                 const dayCitas = citasByDay.get(cell.key) ?? [];
-                const visibleCitas = dayCitas.filter((c) => c.estado !== "cancelada");
                 const isSelected = cell.key === selectedDateKey;
                 const isToday = cell.key === todayKey;
                 const weekend = isWeekend(cell.date);
@@ -263,14 +262,14 @@ export function CalendarioView() {
                       >
                         {cell.date.getDate()}
                       </span>
-                      {visibleCitas.length > 0 ? (
+                      {dayCitas.length > 0 ? (
                         <span className="text-[10px] font-medium text-text-secondary tabular-nums">
-                          {visibleCitas.length}
+                          {dayCitas.length}
                         </span>
                       ) : null}
                     </div>
                     <div className="flex flex-col gap-1">
-                      {visibleCitas.slice(0, 2).map((cita) => {
+                      {dayCitas.slice(0, 2).map((cita) => {
                         const styles = citaEstadoStyles(cita.estado);
                         return (
                           <span
@@ -281,9 +280,9 @@ export function CalendarioView() {
                           </span>
                         );
                       })}
-                      {visibleCitas.length > 2 ? (
+                      {dayCitas.length > 2 ? (
                         <span className="text-[10px] font-medium text-text-secondary">
-                          +{visibleCitas.length - 2} más
+                          +{dayCitas.length - 2} más
                         </span>
                       ) : null}
                     </div>
