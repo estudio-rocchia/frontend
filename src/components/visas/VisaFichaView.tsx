@@ -3,30 +3,32 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, Copy } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
-import { CotizacionCard } from "@/components/visas/CotizacionCard";
+import { CotizacionCard, CotizacionCardSkeleton } from "@/components/visas/CotizacionCard";
 import { EnlacesOficiales } from "@/components/visas/EnlacesOficiales";
+import { ExpedienteCard, ExpedienteCardSkeleton } from "@/components/visas/ExpedienteCard";
+import { GrupoCard, GrupoCardSkeleton } from "@/components/visas/GrupoCard";
 import { NuevoTramiteModal } from "@/components/visas/NuevoTramiteModal";
-import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useAuth } from "@/context/auth-context";
 import {
   ApiError,
+  anularReciboVisa,
   deleteTramiteVisa,
+  downloadReciboVisaPdf,
+  emitirReciboVisa,
   fetchCotizacionVisa,
   fetchTramiteVisa,
   updateGrupoVisa,
   updateTramiteVisa,
 } from "@/lib/api";
-import type { CotizacionVisa, EstadoTramiteVisa, TramiteVisaDetail } from "@/lib/api/types";
-import { formatDateDisplay, personaDisplayName } from "@/lib/format";
+import type { CotizacionVisa, EstadoTramiteVisa, QuienAsignaTurno, TramiteVisaDetail } from "@/lib/api/types";
+import { downloadBlob, personaDisplayName } from "@/lib/format";
 import { pagePaddingClass } from "@/lib/layout";
-import { formInputClass } from "@/lib/ui/interactive-focus";
 import {
   canEditVisas,
   ESTADO_VISA_LABEL,
-  ESTADOS_TRAMITE_VISA,
   estadoVisaVariant,
 } from "@/lib/visas/labels";
 
@@ -41,9 +43,14 @@ export function VisaFichaView() {
   const [detail, setDetail] = useState<TramiteVisaDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [expedienteAviso, setExpedienteAviso] = useState<string | null>(null);
+  const [expedienteError, setExpedienteError] = useState<string | null>(null);
+  const [savingCobro, setSavingCobro] = useState(false);
+  const [cobroError, setCobroError] = useState<string | null>(null);
   const [savingGrupo, setSavingGrupo] = useState(false);
+  const [grupoAviso, setGrupoAviso] = useState<string | null>(null);
+  const [grupoError, setGrupoError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -55,8 +62,13 @@ export function VisaFichaView() {
   const [notas, setNotas] = useState("");
   const [abiertoEn, setAbiertoEn] = useState("");
   const [decisionEn, setDecisionEn] = useState("");
+  const [turnoEn, setTurnoEn] = useState("");
+  const [turnoAsignadoPor, setTurnoAsignadoPor] = useState<QuienAsignaTurno | "">("");
+  const [entrevistaEn, setEntrevistaEn] = useState("");
+  const [arancelPagadoEn, setArancelPagadoEn] = useState("");
   const [cambiosTurno, setCambiosTurno] = useState("0");
   const [notasGrupo, setNotasGrupo] = useState("");
+  const [honorarioPagadoEn, setHonorarioPagadoEn] = useState("");
 
   const applyDetail = useCallback((next: TramiteVisaDetail) => {
     setDetail(next);
@@ -66,8 +78,13 @@ export function VisaFichaView() {
     setNotas(next.notas ?? "");
     setAbiertoEn(next.abiertoEn);
     setDecisionEn(next.decisionEn ?? "");
+    setTurnoEn(next.turnoEn ?? "");
+    setTurnoAsignadoPor(next.turnoAsignadoPor ?? "");
+    setEntrevistaEn(next.entrevistaEn ?? "");
+    setArancelPagadoEn(next.arancelPagadoEn ?? "");
     setCambiosTurno(String(next.grupo.cambiosTurno));
     setNotasGrupo(next.grupo.notas ?? "");
+    setHonorarioPagadoEn(next.grupo.honorarioPagadoEn ?? "");
     setPreview(next.cotizacion);
   }, []);
 
@@ -103,7 +120,7 @@ export function VisaFichaView() {
     if (!Number.isInteger(cambios) || cambios < 0 || cambios > 20) return;
     if (cambios === detail.grupo.cambiosTurno) return;
     const handle = window.setTimeout(() => {
-      void fetchCotizacionVisa(token, detail.grupo.integrantes, cambios)
+      void fetchCotizacionVisa(token, detail.grupo.integrantes, cambios, detail.grupoId)
         .then(setPreview)
         .catch(() => setPreview(detail.cotizacion));
     }, 200);
@@ -113,8 +130,8 @@ export function VisaFichaView() {
   async function saveTramite() {
     if (!token || !detail) return;
     setSaving(true);
-    setError(null);
-    setSuccess(null);
+    setExpedienteError(null);
+    setExpedienteAviso(null);
     try {
       const next = await updateTramiteVisa(token, detail.id, {
         estado,
@@ -123,15 +140,18 @@ export function VisaFichaView() {
         notas: notas.trim() || null,
         abiertoEn,
         decisionEn: decisionEn || null,
+        turnoEn: turnoEn || null,
+        turnoAsignadoPor: turnoAsignadoPor || null,
+        entrevistaEn: entrevistaEn || null,
       });
       applyDetail(next);
-      setSuccess("Trámite actualizado");
+      setExpedienteAviso("Expediente guardado");
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         logout();
         return;
       }
-      setError(err instanceof ApiError ? err.message : "No se pudo guardar");
+      setExpedienteError(err instanceof ApiError ? err.message : "No se pudo guardar el expediente");
     } finally {
       setSaving(false);
     }
@@ -141,30 +161,91 @@ export function VisaFichaView() {
     if (!token || !detail) return;
     const cambios = Number(cambiosTurno);
     setSavingGrupo(true);
-    setError(null);
-    setSuccess(null);
+    setGrupoError(null);
+    setGrupoAviso(null);
     try {
       const next = await updateGrupoVisa(token, detail.id, {
         cambiosTurno: cambios,
         notas: notasGrupo.trim() || null,
       });
       applyDetail(next);
-      setSuccess("Cotización actualizada");
+      setGrupoAviso("Grupo guardado");
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         logout();
         return;
       }
-      setError(err instanceof ApiError ? err.message : "No se pudo guardar la cotización");
+      setGrupoError(err instanceof ApiError ? err.message : "No se pudo guardar el grupo");
     } finally {
       setSavingGrupo(false);
+    }
+  }
+
+  function aplicarCobro(next: TramiteVisaDetail) {
+    setDetail(next);
+    setHonorarioPagadoEn(next.grupo.honorarioPagadoEn ?? "");
+    setArancelPagadoEn(next.arancelPagadoEn ?? "");
+  }
+
+  async function cobrar(input: { honorario: boolean; arancel: boolean; fecha: string }) {
+    if (!token || !detail) return;
+    setSavingCobro(true);
+    setCobroError(null);
+    try {
+      const next = await emitirReciboVisa(token, detail.id, input);
+      aplicarCobro(next);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        logout();
+        return;
+      }
+      setCobroError(err instanceof ApiError ? err.message : "No se pudo registrar el cobro");
+      throw err;
+    } finally {
+      setSavingCobro(false);
+    }
+  }
+
+  async function anularRecibo(reciboId: number) {
+    if (!token) return;
+    setSavingCobro(true);
+    setCobroError(null);
+    try {
+      const next = await anularReciboVisa(token, reciboId);
+      aplicarCobro(next);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        logout();
+        return;
+      }
+      setCobroError(err instanceof ApiError ? err.message : "No se pudo anular el recibo");
+    } finally {
+      setSavingCobro(false);
+    }
+  }
+
+  async function verRecibo(reciboId: number) {
+    if (!token) return;
+    setCobroError(null);
+    try {
+      const { blob, filename } = await downloadReciboVisaPdf(token, reciboId);
+      const url = URL.createObjectURL(blob);
+      const opened = window.open(url, "_blank", "noopener,noreferrer");
+      if (!opened) downloadBlob(blob, filename ?? "recibo.pdf");
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        logout();
+        return;
+      }
+      setCobroError(err instanceof ApiError ? err.message : "No se pudo abrir el recibo");
     }
   }
 
   async function anular() {
     if (!token || !detail) return;
     setSaving(true);
-    setError(null);
+    setExpedienteError(null);
     try {
       await deleteTramiteVisa(token, detail.id);
       router.push("/visas");
@@ -173,7 +254,7 @@ export function VisaFichaView() {
         logout();
         return;
       }
-      setError(err instanceof ApiError ? err.message : "No se pudo anular el trámite");
+      setExpedienteError(err instanceof ApiError ? err.message : "No se pudo anular el trámite");
       setSaving(false);
     }
   }
@@ -190,7 +271,24 @@ export function VisaFichaView() {
   }
 
   const nombre = detail ? personaDisplayName(detail.persona) : "Trámite";
+  const expedienteDirty = Boolean(
+    detail &&
+      (estado !== detail.estado ||
+        numeroDs160 !== (detail.numeroDs160 ?? "") ||
+        emailAis !== (detail.emailAis ?? "") ||
+        notas !== (detail.notas ?? "") ||
+        abiertoEn !== detail.abiertoEn ||
+        decisionEn !== (detail.decisionEn ?? "") ||
+        turnoEn !== (detail.turnoEn ?? "") ||
+        turnoAsignadoPor !== (detail.turnoAsignadoPor ?? "") ||
+        entrevistaEn !== (detail.entrevistaEn ?? "")),
+  );
+  const grupoDirty = Boolean(
+    detail &&
+      (cambiosTurno !== String(detail.grupo.cambiosTurno) || notasGrupo !== (detail.grupo.notas ?? "")),
+  );
   const cambiosNumero = Number(cambiosTurno);
+  const cambiosValidos = Number.isInteger(cambiosNumero) && cambiosNumero >= 0 && cambiosNumero <= 20;
   const cotizacion =
     detail && cambiosNumero === detail.grupo.cambiosTurno
       ? detail.cotizacion
@@ -217,198 +315,152 @@ export function VisaFichaView() {
             ) : null}
           </div>
           {detail ? (
-            <StatusBadge label={ESTADO_VISA_LABEL[detail.estado]} variant={estadoVisaVariant(detail.estado)} />
+            <div className="flex flex-col items-start gap-2 sm:items-end">
+              <StatusBadge label={ESTADO_VISA_LABEL[estado]} variant={estadoVisaVariant(estado)} />
+              <EnlacesOficiales compact />
+            </div>
           ) : null}
         </div>
       </div>
 
-      <EnlacesOficiales />
+      {error ? (
+        <p role="alert" className="rounded-sm bg-danger-bg px-3 py-2 text-sm font-semibold text-danger">
+          {error}
+        </p>
+      ) : null}
 
-      {error ? <p className="text-sm text-danger">{error}</p> : null}
-      {success ? <p className="text-sm text-success">{success}</p> : null}
+      {loading && !detail ? (
+        <div className="grid items-start gap-4 md:gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+          <ExpedienteCardSkeleton />
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
+            <CotizacionCardSkeleton />
+            <GrupoCardSkeleton />
+          </div>
+        </div>
+      ) : null}
 
       {detail && cotizacion ? (
-        <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-          <section className="flex flex-col gap-4 rounded-md border border-border bg-bg-card p-5 shadow-[var(--shadow-card)]">
-            <div className="flex flex-col gap-1">
-              <h2 className="text-[15px] font-semibold text-text-primary">Expediente</h2>
-              <p className="text-xs text-text-secondary">
-                Abierto el {formatDateDisplay(detail.abiertoEn)}. El cuestionario del solicitante se carga en el
-                siguiente paso; desde acá se abre el DS-160 y se consulta el estado.
-              </p>
-            </div>
+        <div className="grid items-start gap-4 md:gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+          <ExpedienteCard
+            canEdit={canEdit}
+            estado={estado}
+            numeroDs160={numeroDs160}
+            emailAis={emailAis}
+            notas={notas}
+            abiertoEn={abiertoEn}
+            decisionEn={decisionEn}
+            turnoEn={turnoEn}
+            turnoAsignadoPor={turnoAsignadoPor}
+            entrevistaEn={entrevistaEn}
+            dirty={expedienteDirty}
+            saving={saving}
+            copied={copied}
+            confirmDelete={confirmDelete}
+            savedMessage={expedienteAviso}
+            errorMessage={expedienteError}
+            onEstado={(value) => {
+              setEstado(value);
+              setExpedienteError(null);
+            }}
+            onNumeroDs160={(value) => {
+              setNumeroDs160(value);
+              setExpedienteError(null);
+            }}
+            onEmailAis={(value) => {
+              setEmailAis(value);
+              setExpedienteError(null);
+            }}
+            onNotas={(value) => {
+              setNotas(value);
+              setExpedienteError(null);
+            }}
+            onAbiertoEn={(value) => {
+              setAbiertoEn(value);
+              setExpedienteError(null);
+            }}
+            onDecisionEn={(value) => {
+              setDecisionEn(value);
+              setExpedienteError(null);
+            }}
+            onTurnoEn={(value) => {
+              setTurnoEn(value);
+              if (!value) setTurnoAsignadoPor("");
+              setExpedienteError(null);
+            }}
+            onTurnoAsignadoPor={(value) => {
+              setTurnoAsignadoPor(value);
+              setExpedienteError(null);
+            }}
+            onEntrevistaEn={(value) => {
+              setEntrevistaEn(value);
+              setExpedienteError(null);
+            }}
+            onCopy={() => void copyDs160()}
+            onSave={() => void saveTramite()}
+            onDiscard={() => {
+              setEstado(detail.estado);
+              setNumeroDs160(detail.numeroDs160 ?? "");
+              setEmailAis(detail.emailAis ?? "");
+              setNotas(detail.notas ?? "");
+              setAbiertoEn(detail.abiertoEn);
+              setDecisionEn(detail.decisionEn ?? "");
+              setTurnoEn(detail.turnoEn ?? "");
+              setTurnoAsignadoPor(detail.turnoAsignadoPor ?? "");
+              setEntrevistaEn(detail.entrevistaEn ?? "");
+              setConfirmDelete(false);
+              setExpedienteError(null);
+              setExpedienteAviso(null);
+            }}
+            onAskDelete={() => setConfirmDelete(true)}
+            onCancelDelete={() => setConfirmDelete(false)}
+            onConfirmDelete={() => void anular()}
+          />
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="flex flex-col gap-1.5">
-                <span className="text-[11px] font-semibold text-text-secondary">Estado</span>
-                <select
-                  value={estado}
-                  disabled={!canEdit}
-                  onChange={(event) => setEstado(event.target.value as EstadoTramiteVisa)}
-                  className={formInputClass}
-                >
-                  {ESTADOS_TRAMITE_VISA.map((value) => (
-                    <option key={value} value={value}>
-                      {ESTADO_VISA_LABEL[value]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex flex-col gap-1.5">
-                <span className="text-[11px] font-semibold text-text-secondary">Confirmación DS-160</span>
-                <span className="flex gap-2">
-                  <input
-                    value={numeroDs160}
-                    disabled={!canEdit}
-                    onChange={(event) => setNumeroDs160(event.target.value)}
-                    placeholder="AA00…"
-                    className={`${formInputClass} min-w-0 flex-1`}
-                  />
-                  <ButtonOutline onClick={() => void copyDs160()} disabled={!numeroDs160.trim()} className="px-3">
-                    <Copy className="h-4 w-4" aria-hidden />
-                    <span className="sr-only">{copied ? "Copiado" : "Copiar"}</span>
-                  </ButtonOutline>
-                </span>
-                {copied ? <span className="text-xs text-success">Copiado</span> : null}
-              </label>
-              <label className="flex flex-col gap-1.5">
-                <span className="text-[11px] font-semibold text-text-secondary">Mail de la cuenta AIS</span>
-                <input
-                  type="email"
-                  value={emailAis}
-                  disabled={!canEdit}
-                  onChange={(event) => setEmailAis(event.target.value)}
-                  className={formInputClass}
-                />
-              </label>
-              <label className="flex flex-col gap-1.5">
-                <span className="text-[11px] font-semibold text-text-secondary">Apertura</span>
-                <input
-                  type="date"
-                  value={abiertoEn}
-                  disabled={!canEdit}
-                  onChange={(event) => setAbiertoEn(event.target.value)}
-                  className={formInputClass}
-                />
-              </label>
-              <label className="flex flex-col gap-1.5">
-                <span className="text-[11px] font-semibold text-text-secondary">Resolución</span>
-                <input
-                  type="date"
-                  value={decisionEn}
-                  disabled={!canEdit}
-                  onChange={(event) => setDecisionEn(event.target.value)}
-                  className={formInputClass}
-                />
-              </label>
-            </div>
-
-            <label className="flex flex-col gap-1.5">
-              <span className="text-[11px] font-semibold text-text-secondary">Notas</span>
-              <textarea
-                value={notas}
-                disabled={!canEdit}
-                onChange={(event) => setNotas(event.target.value)}
-                rows={4}
-                className={formInputClass}
-              />
-            </label>
-
-            {canEdit ? (
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                {confirmDelete ? (
-                  <div className="flex items-center gap-2">
-                    <ButtonOutline onClick={() => void anular()} disabled={saving}>
-                      Confirmar anulación
-                    </ButtonOutline>
-                    <button
-                      type="button"
-                      className="text-sm text-text-secondary"
-                      onClick={() => setConfirmDelete(false)}
-                    >
-                      Cancelar
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    className="text-sm text-danger"
-                    onClick={() => setConfirmDelete(true)}
-                  >
-                    Anular trámite
-                  </button>
-                )}
-                <ButtonPrimary onClick={() => void saveTramite()} disabled={saving}>
-                  {saving ? "Guardando…" : "Guardar"}
-                </ButtonPrimary>
-              </div>
-            ) : null}
-          </section>
-
-          <div className="flex flex-col gap-4">
-            <CotizacionCard cotizacion={cotizacion} />
-            <section className="flex flex-col gap-3 rounded-md border border-border bg-bg-card p-5 shadow-[var(--shadow-card)]">
-              <h2 className="text-[15px] font-semibold text-text-primary">Grupo</h2>
-              <label className="flex flex-col gap-1.5">
-                <span className="text-[11px] font-semibold text-text-secondary">Cambios o adelantos de turno</span>
-                <input
-                  type="number"
-                  min={0}
-                  max={20}
-                  value={cambiosTurno}
-                  disabled={!canEdit}
-                  onChange={(event) => setCambiosTurno(event.target.value)}
-                  className={formInputClass}
-                />
-                <span className="text-xs text-text-secondary">25 USD cada uno, aparte del honorario.</span>
-              </label>
-              <label className="flex flex-col gap-1.5">
-                <span className="text-[11px] font-semibold text-text-secondary">Nota del grupo</span>
-                <textarea
-                  value={notasGrupo}
-                  disabled={!canEdit}
-                  onChange={(event) => setNotasGrupo(event.target.value)}
-                  rows={2}
-                  className={formInputClass}
-                />
-              </label>
-              {canEdit ? (
-                <ButtonPrimary onClick={() => void saveGrupo()} disabled={savingGrupo}>
-                  {savingGrupo ? "Guardando…" : "Guardar cotización"}
-                </ButtonPrimary>
-              ) : null}
-
-              <div className="flex flex-col gap-2 border-t border-border pt-3">
-                <div className="flex items-center justify-between gap-2">
-                  <h3 className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
-                    Integrantes
-                  </h3>
-                  {canEdit ? (
-                    <button type="button" className="text-sm font-medium text-primary" onClick={() => setAddOpen(true)}>
-                      Agregar
-                    </button>
-                  ) : null}
-                </div>
-                <ul className="flex flex-col">
-                  {detail.integrantes.map((integrante) => {
-                    const current = integrante.id === detail.id;
-                    const label = personaDisplayName(integrante.persona);
-                    return (
-                      <li key={integrante.id} className="border-t border-border py-2 first:border-t-0">
-                        {current ? (
-                          <p className="text-sm font-semibold text-text-primary">{label}</p>
-                        ) : (
-                          <Link href={`/visas/${integrante.id}`} className="text-sm text-primary hover:underline">
-                            {label}
-                          </Link>
-                        )}
-                        <p className="text-xs text-text-secondary">{ESTADO_VISA_LABEL[integrante.estado]}</p>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            </section>
+          <div className="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-1">
+            <CotizacionCard
+              cotizacion={cotizacion}
+              preview={cambiosTurno !== String(detail.grupo.cambiosTurno)}
+              canEdit={canEdit}
+              abiertoEn={abiertoEn}
+              honorarioPagadoEn={honorarioPagadoEn || null}
+              arancelPagadoEn={arancelPagadoEn || null}
+              integrantes={detail.integrantes}
+              tramiteId={detail.id}
+              recibos={detail.recibos ?? []}
+              saving={savingCobro}
+              errorMessage={cobroError}
+              onCobrar={cobrar}
+              onVerRecibo={verRecibo}
+              onAnularRecibo={anularRecibo}
+            />
+            <GrupoCard
+              integrantes={detail.integrantes}
+              currentId={detail.id}
+              canEdit={canEdit}
+              cambiosTurno={cambiosTurno}
+              notas={notasGrupo}
+              cambioUnitarioUsd={cotizacion.cambioTurnoUnitarioUsd}
+              dirty={grupoDirty}
+              valid={cambiosValidos}
+              saving={savingGrupo}
+              savedMessage={grupoAviso}
+              errorMessage={grupoError}
+              onCambiosTurno={(value) => {
+                setCambiosTurno(value);
+                setGrupoError(null);
+              }}
+              onNotas={(value) => {
+                setNotasGrupo(value);
+                setGrupoError(null);
+              }}
+              onSave={() => void saveGrupo()}
+              onDiscard={() => {
+                setCambiosTurno(String(detail.grupo.cambiosTurno));
+                setNotasGrupo(detail.grupo.notas ?? "");
+                setGrupoError(null);
+              }}
+              onAdd={() => setAddOpen(true)}
+            />
           </div>
         </div>
       ) : null}

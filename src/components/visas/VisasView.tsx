@@ -1,12 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, Search } from "lucide-react";
+import { ChevronRight, CircleDollarSign, Plus, Search } from "lucide-react";
 
 import { EnlacesOficiales } from "@/components/visas/EnlacesOficiales";
 import { NuevoTramiteModal } from "@/components/visas/NuevoTramiteModal";
-import { ButtonPrimary } from "@/components/ui/Button";
+import { PreciosVisaModal } from "@/components/visas/PreciosVisaModal";
+import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useAuth } from "@/context/auth-context";
@@ -58,6 +60,7 @@ export function VisasView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [preciosOpen, setPreciosOpen] = useState(false);
   const canEdit = canEditVisas(user?.roles);
 
   useEffect(() => {
@@ -107,25 +110,47 @@ export function VisasView() {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="flex flex-col gap-1">
           <h1 className="text-[22px] font-bold text-text-primary">Visas</h1>
-          <p className="max-w-xl text-sm text-text-secondary">
-            Expediente de cada solicitante, cotización del grupo y acceso a las páginas de la embajada.
-          </p>
+          <div className="mt-2">
+            <EnlacesOficiales compact />
+          </div>
         </div>
         {canEdit ? (
-          <ButtonPrimary onClick={() => setCreateOpen(true)}>
-            <Plus className="mr-1.5 h-4 w-4" aria-hidden />
-            Nuevo trámite
-          </ButtonPrimary>
+          <div className="flex flex-wrap gap-2">
+            <ButtonOutline onClick={() => setPreciosOpen(true)}>
+              <CircleDollarSign className="mr-1.5 h-4 w-4" aria-hidden />
+              Actualizar precios
+            </ButtonOutline>
+            <ButtonPrimary onClick={() => setCreateOpen(true)}>
+              <Plus className="mr-1.5 h-4 w-4" aria-hidden />
+              Nuevo trámite
+            </ButtonPrimary>
+          </div>
         ) : null}
       </div>
 
-      <EnlacesOficiales />
-
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard label="Trámites" value={String(resumen.total)} hint={anio === "todos" ? "Todos los años" : String(anio)} />
-        <KpiCard label="En curso" value={String(resumen.enCurso)} hint="Todavía sin resolución" />
-        <KpiCard label="Aprobados" value={String(resumen.aprobados)} hint="Resolución favorable" />
-        <KpiCard label="Rechazados" value={String(resumen.rechazados)} hint="Resolución denegada" />
+        <KpiCard
+          label="Trámites"
+          value={String(resumen.total)}
+          hint={anio === "todos" ? "Todos los años" : String(anio)}
+          selected={estado === ""}
+          onClick={() => setEstado("")}
+        />
+        <KpiCard label="En curso" value={String(resumen.enCurso)} hint="Sin resolución todavía" />
+        <KpiCard
+          label="Aprobados"
+          value={String(resumen.aprobados)}
+          hint={estado === "aprobado" ? "Filtro activo" : "Ver solo aprobados"}
+          selected={estado === "aprobado"}
+          onClick={() => setEstado((current) => (current === "aprobado" ? "" : "aprobado"))}
+        />
+        <KpiCard
+          label="Rechazados"
+          value={String(resumen.rechazados)}
+          hint={estado === "rechazado" ? "Filtro activo" : "Ver solo rechazados"}
+          selected={estado === "rechazado"}
+          onClick={() => setEstado((current) => (current === "rechazado" ? "" : "rechazado"))}
+        />
       </div>
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
@@ -177,12 +202,30 @@ export function VisasView() {
 
       {error ? <p className="text-sm text-danger">{error}</p> : null}
 
+      {!loading && items.length === 0 ? (
+        <div className="flex flex-col items-start gap-3 rounded-md border border-dashed border-border bg-bg-card px-6 py-10">
+          <p className="text-sm font-semibold text-text-primary">
+            {estado || debouncedSearch.trim() ? "Ningún trámite coincide con el filtro." : "Todavía no hay trámites de visa."}
+          </p>
+          <p className="max-w-md text-sm text-text-secondary">
+            {estado || debouncedSearch.trim()
+              ? "Probá con otro nombre, otro estado o todos los años."
+              : "Abrí el primero con el solicitante titular. Si viajan juntos, después sumás al resto en el mismo grupo."}
+          </p>
+          {canEdit && !estado && !debouncedSearch.trim() ? (
+            <ButtonPrimary onClick={() => setCreateOpen(true)}>
+              <Plus className="mr-1.5 h-4 w-4" aria-hidden />
+              Nuevo trámite
+            </ButtonPrimary>
+          ) : null}
+        </div>
+      ) : (
       <div className="overflow-x-auto rounded-md border border-border bg-bg-card shadow-[var(--shadow-card)]">
         <table className="w-full min-w-[760px] border-collapse text-left">
           <thead>
             <tr className="bg-bg-cream">
-              {["Solicitante", "Estado", "DS-160", "Grupo", "Honorario", "Abierto"].map((header) => (
-                <th key={header} className="h-11 px-5 text-xs font-semibold text-text-secondary">
+              {["Solicitantes", "DS-160", "Total", "Abierto", ""].map((header) => (
+                <th key={header || "abrir"} className="h-11 px-5 text-xs font-semibold text-text-secondary">
                   {header}
                 </th>
               ))}
@@ -192,46 +235,79 @@ export function VisasView() {
             {loading ? (
               Array.from({ length: 5 }).map((_, index) => (
                 <tr key={index} className="border-t border-border">
-                  {Array.from({ length: 6 }).map((__, cell) => (
-                    <td key={cell} className="h-[52px] px-5">
+                  {Array.from({ length: 5 }).map((__, cell) => (
+                    <td key={cell} className="h-[60px] px-5">
                       <div className="h-4 animate-pulse rounded-sm bg-border/70" />
                     </td>
                   ))}
                 </tr>
               ))
-            ) : items.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-5 py-8 text-sm text-text-secondary">
-                  No hay trámites para este filtro.
-                </td>
-              </tr>
             ) : (
-              items.map((item) => (
+              items.map((item) => {
+                const miembros = item.miembros.length > 0
+                  ? item.miembros
+                  : [{ id: item.id, personaId: item.personaId, estado: item.estado, persona: item.persona }];
+                return (
                 <tr
                   key={item.id}
                   className="cursor-pointer border-t border-border transition-colors hover:bg-bg-page"
                   onClick={() => router.push(`/visas/${item.id}`)}
                 >
-                  <td className="h-[52px] px-5 text-sm font-medium text-text-primary">
-                    {personaDisplayName(item.persona)}
+                  <td className="h-16 px-5">
+                    <div className="flex items-center gap-x-3 overflow-x-auto">
+                      {miembros.map((miembro, index) => (
+                        <span key={miembro.id} className="inline-flex shrink-0 items-center gap-2">
+                          {index > 0 ? <span className="text-text-secondary" aria-hidden>·</span> : null}
+                          <Link
+                            href={`/visas/${miembro.id}`}
+                            onClick={(event) => event.stopPropagation()}
+                            className="max-w-[14rem] truncate text-sm font-semibold text-text-primary hover:underline"
+                          >
+                            {personaDisplayName(miembro.persona)}
+                          </Link>
+                          <StatusBadge
+                            label={ESTADO_VISA_LABEL[miembro.estado]}
+                            variant={estadoVisaVariant(miembro.estado)}
+                          />
+                        </span>
+                      ))}
+                    </div>
+                    <span className="mt-0.5 block truncate text-xs text-text-secondary">
+                      {miembros.length === 1
+                        ? (miembros[0]?.persona.numeroDocumento ?? "Sin documento")
+                        : `${miembros.length} personas`}
+                    </span>
                   </td>
+                  <td className="px-5 font-mono text-sm text-text-secondary">{item.numeroDs160 ?? "—"}</td>
                   <td className="px-5">
-                    <StatusBadge label={ESTADO_VISA_LABEL[item.estado]} variant={estadoVisaVariant(item.estado)} />
-                  </td>
-                  <td className="px-5 text-sm text-text-secondary">{item.numeroDs160 ?? "—"}</td>
-                  <td className="px-5 text-sm text-text-secondary">
-                    {item.integrantes === 1 ? "Individual" : `${item.integrantes} personas`}
-                  </td>
-                  <td className="px-5 text-sm tabular-nums text-text-primary">
-                    {formatUsd(item.cotizacion.honorarioUnitarioUsd)}
+                    <span className="block text-sm font-semibold tabular-nums text-text-primary">
+                      {formatUsd(item.cotizacion.totalUsd)}
+                    </span>
+                    <span className="block text-xs tabular-nums text-text-secondary">
+                      Estudio {formatUsd(item.cotizacion.totalEstudioUsd)}
+                    </span>
                   </td>
                   <td className="px-5 text-sm text-text-secondary">{formatDateDisplay(item.abiertoEn)}</td>
+                  <td className="px-5 text-text-secondary">
+                    <ChevronRight className="h-4 w-4" aria-hidden />
+                  </td>
                 </tr>
-              ))
+                );
+              })
             )}
           </tbody>
         </table>
       </div>
+      )}
+
+      {token && canEdit ? (
+        <PreciosVisaModal
+          open={preciosOpen}
+          token={token}
+          onClose={() => setPreciosOpen(false)}
+          onSaved={() => void load()}
+        />
+      ) : null}
 
       {token && canEdit ? (
         <NuevoTramiteModal

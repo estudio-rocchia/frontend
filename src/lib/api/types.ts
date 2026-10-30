@@ -1263,6 +1263,8 @@ export interface UpdateCitaInput {
   notas?: string | null;
 }
 
+export type QuienAsignaTurno = "estudio" | "solicitante";
+
 export type EstadoTramiteVisa =
   | "borrador"
   | "formulario_completo"
@@ -1283,6 +1285,14 @@ export interface PersonaVisaResumen {
   numeroDocumento: string | null;
   email: string | null;
   phone: string | null;
+}
+
+export interface TarifaVisa {
+  honorarioIndividualUsd: number;
+  honorarioGrupoChicoUsd: number;
+  honorarioGrupoGrandeUsd: number;
+  arancelConsularUsd: number;
+  cambioTurnoUsd: number;
 }
 
 export interface CotizacionVisa {
@@ -1308,6 +1318,7 @@ export interface TramiteVisaListItem {
   abiertoEn: string;
   persona: PersonaVisaResumen;
   integrantes: number;
+  miembros: IntegranteVisa[];
   cotizacion: CotizacionVisa;
 }
 
@@ -1315,6 +1326,7 @@ export interface IntegranteVisa {
   id: number;
   personaId: number;
   estado: EstadoTramiteVisa;
+  arancelPagadoEn: string | null;
   persona: PersonaVisaResumen;
 }
 
@@ -1328,6 +1340,10 @@ export interface TramiteVisaDetail {
   notas: string | null;
   abiertoEn: string;
   decisionEn: string | null;
+  turnoEn: string | null;
+  turnoAsignadoPor: QuienAsignaTurno | null;
+  entrevistaEn: string | null;
+  arancelPagadoEn: string | null;
   creadoEn: string;
   actualizadoEn: string;
   persona: PersonaVisaResumen;
@@ -1336,10 +1352,23 @@ export interface TramiteVisaDetail {
     cambiosTurno: number;
     notas: string | null;
     integrantes: number;
+    honorarioPagadoEn: string | null;
   };
   integrantes: IntegranteVisa[];
   cotizacion: CotizacionVisa;
   enlaces: { ds160: string; ais: string };
+  recibos: ReciboVisa[];
+}
+
+export interface ReciboVisa {
+  id: number;
+  reciboNumber: string;
+  tramiteId: number;
+  grupoId: number;
+  fechaPago: string;
+  montoTotal: number;
+  estado: "issued" | "cancelled";
+  conceptos: ("honorario" | "arancel")[];
 }
 
 export interface VisasResumen {
@@ -1368,4 +1397,8 @@ export interface UpdateTramiteVisaInput {
   notas?: string | null;
   abiertoEn?: string;
   decisionEn?: string | null;
+  turnoEn?: string | null;
+  turnoAsignadoPor?: QuienAsignaTurno | null;
+  entrevistaEn?: string | null;
+  arancelPagadoEn?: string | null;
 }

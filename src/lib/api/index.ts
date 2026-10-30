@@ -69,6 +69,7 @@ import type {
   CotizacionVisa,
   CreateTramiteVisaInput,
   EstadoTramiteVisa,
+  TarifaVisa,
   TramiteVisaDetail,
   TramiteVisaListItem,
   UpdateTramiteVisaInput,
@@ -1168,11 +1169,24 @@ export function fetchVisasResumen(token: string, anio?: number) {
   return apiRequest<VisasResumen>(`/visas/resumen${query}`, { token });
 }
 
-export function fetchCotizacionVisa(token: string, personas: number, cambiosTurno = 0) {
+export function fetchTarifaVisa(token: string) {
+  return apiRequest<TarifaVisa>("/visas/tarifa", { token });
+}
+
+export function updateTarifaVisa(token: string, body: TarifaVisa) {
+  return apiRequest<TarifaVisa>("/visas/tarifa", {
+    method: "PUT",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function fetchCotizacionVisa(token: string, personas: number, cambiosTurno = 0, grupoId?: number) {
   const query = new URLSearchParams({
     personas: String(personas),
     cambiosTurno: String(cambiosTurno),
   });
+  if (grupoId !== undefined) query.set("grupoId", String(grupoId));
   return apiRequest<CotizacionVisa>(`/visas/cotizacion?${query}`, { token });
 }
 
@@ -1188,6 +1202,29 @@ export function createTramiteVisa(token: string, body: CreateTramiteVisaInput) {
   });
 }
 
+export function emitirReciboVisa(
+  token: string,
+  tramiteId: number,
+  body: { honorario: boolean; arancel: boolean; fecha: string },
+) {
+  return apiRequest<TramiteVisaDetail>(`/visas/${tramiteId}/recibos`, {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function anularReciboVisa(token: string, reciboId: number) {
+  return apiRequest<TramiteVisaDetail>(`/visas/recibos/${reciboId}/anular`, {
+    method: "POST",
+    token,
+  });
+}
+
+export function downloadReciboVisaPdf(token: string, reciboId: number) {
+  return apiBlobWithFilename(`/visas/recibos/${reciboId}/pdf`, token);
+}
+
 export function updateTramiteVisa(token: string, id: number, body: UpdateTramiteVisaInput) {
   return apiRequest<TramiteVisaDetail>(`/visas/${id}`, {
     method: "PATCH",
@@ -1199,7 +1236,7 @@ export function updateTramiteVisa(token: string, id: number, body: UpdateTramite
 export function updateGrupoVisa(
   token: string,
   tramiteId: number,
-  body: { cambiosTurno?: number; notas?: string | null },
+  body: { cambiosTurno?: number; notas?: string | null; honorarioPagadoEn?: string | null },
 ) {
   return apiRequest<TramiteVisaDetail>(`/visas/${tramiteId}/grupo`, {
     method: "PATCH",
