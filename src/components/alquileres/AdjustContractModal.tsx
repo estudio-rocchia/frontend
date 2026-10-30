@@ -10,6 +10,7 @@ import { useContratoAdjustmentPreview } from "@/components/alquileres/useContrat
 import type { ContratoDetail } from "@/lib/api/types";
 import {
   formatIndexValue,
+  formatIndicePunto,
   formatMoney,
   formatMonthYear,
   moneyClassName,
@@ -187,9 +188,13 @@ export function AdjustContractModal({
 
   const detailsNote = requiresManualMonto
     ? `Ingresá el nuevo alquiler acordado entre las partes para el período de ${freq} meses.`
-    : overdue
-      ? `El ajuste debía aplicarse en ${formatMonthYear(contractualEnd.anio, contractualEnd.mes)}. Podés usar el último ${indiceCode} publicado (${formatMonthYear(maxPublished.anio, maxPublished.mes)}).`
-      : `Período de ${freq} meses desde ${formatMonthYear(vigenteDesde.anio, vigenteDesde.mes)}.`;
+    : contratoIndex === "IPC"
+      ? `Se multiplican los últimos ${freq} IPC mensuales. Los porcentajes no se suman: el alquiler nuevo es el actual por ese producto.`
+      : contratoIndex === "ICL"
+        ? "El coeficiente es el ICL de la fecha de actualización dividido el ICL del inicio o del último ajuste."
+        : overdue
+          ? `El ajuste debía aplicarse en ${formatMonthYear(contractualEnd.anio, contractualEnd.mes)}. Podés usar el último ${indiceCode} publicado (${formatMonthYear(maxPublished.anio, maxPublished.mes)}).`
+          : `Período de ${freq} meses desde ${formatMonthYear(vigenteDesde.anio, vigenteDesde.mes)}.`;
 
   function resetSuggested() {
     setFechaAjusteMonth(defaultFechaAjusteMonth(contrato!, ultimoAjusteEn));
@@ -412,7 +417,9 @@ export function AdjustContractModal({
                   </span>
                   {preview?.valorDesde ? (
                     <span className="text-[11px] font-semibold text-primary">
-                      {indiceCode}: {formatIndexValue(preview.valorDesde)}
+                      {indiceCode}{" "}
+                      {formatIndicePunto(preview.periodoDesde, contratoIndex === "ICL")}:{" "}
+                      {formatIndexValue(preview.valorDesde)}
                     </span>
                   ) : null}
                 </div>
@@ -427,7 +434,9 @@ export function AdjustContractModal({
                   />
                   {preview?.valorHasta ? (
                     <span className="text-[11px] font-semibold text-primary">
-                      {indiceCode}: {formatIndexValue(preview.valorHasta)}
+                      {indiceCode}{" "}
+                      {formatIndicePunto(preview.periodoHasta, contratoIndex === "ICL")}:{" "}
+                      {formatIndexValue(preview.valorHasta)}
                     </span>
                   ) : null}
                 </div>

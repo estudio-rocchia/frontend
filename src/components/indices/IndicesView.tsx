@@ -14,6 +14,7 @@ import {
   computeIndexVariations,
   computeLatestVariations,
   earlierIsoDate,
+  latestPointPerMonth,
   periodoInUserRange,
   subtractMonthsFromDate,
 } from "@/lib/indices/variations";
@@ -153,10 +154,10 @@ export function IndicesView() {
     }
   }, [token, syncing, load, logout]);
 
-  const rows = useMemo(
-    () => allRows.filter((row) => periodoInUserRange(row.periodo, desde, hasta)),
-    [allRows, desde, hasta],
-  );
+  const rows = useMemo(() => {
+    const inRange = allRows.filter((row) => periodoInUserRange(row.periodo, desde, hasta));
+    return indice === "ICL" ? latestPointPerMonth(inRange) : inRange;
+  }, [allRows, desde, hasta, indice]);
 
   const valorMap = useMemo(() => buildValorMap(allRows), [allRows]);
 

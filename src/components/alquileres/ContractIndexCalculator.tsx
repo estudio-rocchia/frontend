@@ -4,13 +4,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AdjustmentIndex } from "@/data/alquileres-contract-details";
 import { ApiError, previewAjusteIndice } from "@/lib/api";
 import type { ContratoDetail, IndiceCode, PreviewAjusteResponse } from "@/lib/api/types";
-import { formatMoney, formatMonthYear, rentalApiErrorMessage } from "@/lib/format";
+import { formatIndicePunto, formatMoney, rentalApiErrorMessage } from "@/lib/format";
 import {
   ADJUSTMENT_INDICES,
   type MonthYear,
   defaultFrecuenciaAjuste,
   frecuenciaOptions,
-  fromIsoMonthDate,
   indiceCodeFromContrato,
   indexYearRange,
   isPublishedAdjustmentIndex,
@@ -127,8 +126,7 @@ function ResultBox({
 
   if (!preview) return null;
 
-  const desde = fromIsoMonthDate(preview.periodoDesde);
-  const hasta = fromIsoMonthDate(preview.periodoHasta);
+  const daily = preview.tipoIndiceCode === "ICL";
   const variacion = Number.parseFloat(preview.variacionPct);
   const sign = variacion >= 0 ? "+" : "";
   const factor = Number.parseFloat(preview.factor).toLocaleString("es-AR", {
@@ -144,8 +142,8 @@ function ResultBox({
       </p>
       <p className="mt-2 text-center text-[12px] text-text-secondary">
       {preview.tipoIndiceCode}: {formatIndexValue(preview.valorDesde)} (
-      {formatMonthYear(desde.anio, desde.mes)}) → {formatIndexValue(preview.valorHasta)} (
-        {formatMonthYear(hasta.anio, hasta.mes)}) · Aumento {sign}
+      {formatIndicePunto(preview.periodoDesde, daily)}) → {formatIndexValue(preview.valorHasta)} (
+        {formatIndicePunto(preview.periodoHasta, daily)}) · Aumento {sign}
         {preview.variacionPct}%
       </p>
     </div>
@@ -369,8 +367,11 @@ export function ContractIndexCalculator({
 
       {!isAdjust ? (
         <p className="text-[12px] leading-relaxed text-text-secondary">
-          Elegí entre qué meses medir la suba del {indiceLabel} (sugerimos los últimos{" "}
-          {value.frecuenciaAjusteMeses} meses).
+          {value.tipoIndice === "IPC"
+            ? `El coeficiente es el producto de los últimos ${value.frecuenciaAjusteMeses} IPC mensuales. Los porcentajes no se suman.`
+            : value.tipoIndice === "ICL"
+              ? "El coeficiente es el ICL de la fecha final dividido el ICL de la fecha inicial."
+              : `Elegí entre qué meses medir la suba del ${indiceLabel} (sugerimos los últimos ${value.frecuenciaAjusteMeses} meses).`}
         </p>
       ) : null}
 
