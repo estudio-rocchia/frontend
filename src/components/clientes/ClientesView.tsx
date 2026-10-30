@@ -11,7 +11,7 @@ import { KpiCard } from "@/components/ui/KpiCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useAuth } from "@/context/auth-context";
 import { clienteFilters, type ClienteFilterId, type ClienteRow } from "@/data/clientes";
-import { ApiError, fetchClientesKpis, fetchPersonas } from "@/lib/api";
+import { ApiError, fetchClientesKpis, fetchPersonas, fetchVisas, fetchVisasResumen } from "@/lib/api";
 import { prefetchClientesList } from "@/lib/api/clientes-list";
 import type { ClientesKpis } from "@/lib/api/types";
 import { useCursorPagination } from "@/lib/hooks/use-cursor-pagination";
@@ -52,6 +52,7 @@ export function ClientesView() {
   } = useCursorPagination();
   const [totalPersonas, setTotalPersonas] = useState(0);
   const [kpis, setKpis] = useState<ClientesKpis | null>(null);
+  const [visaSolicitantes, setVisaSolicitantes] = useState(0);
   const [listTab, setListTab] = useState<"listado" | "nuevo">("listado");
 
   const load = useCallback(async (options?: { silent?: boolean }) => {
@@ -63,11 +64,39 @@ export function ClientesView() {
     setError(null);
 
     try {
-      if (activeFilter === "juridico" || activeFilter === "visas") {
+      const visaResumen = await fetchVisasResumen(token).catch((err: unknown) => {
+        if (err instanceof ApiError && err.status === 401) throw err;
+        return null;
+      });
+      setVisaSolicitantes(visaResumen?.solicitantes ?? 0);
+
+      if (activeFilter === "juridico") {
         const counts = await fetchClientesKpis(token);
         setKpis(counts);
         setClienteRows([]);
         setTotalPersonas(0);
+        return;
+      }
+
+      if (activeFilter === "visas") {
+        const [counts, visas] = await Promise.all([
+          fetchClientesKpis(token),
+          fetchVisas(token, { q: debouncedSearch.trim() || undefined }),
+        ]);
+        setKpis(counts);
+        const ids = [...new Set(visas.items.map((item) => item.personaId))];
+        if (ids.length === 0) {
+          setClienteRows([]);
+          setTotalPersonas(0);
+          return;
+        }
+        const personasRes = await fetchPersonas(token, {
+          ids,
+          withVinculos: true,
+          limit: 200,
+        });
+        setClienteRows(personasRes.items.map((persona) => mapPersonaToClienteRow(persona)));
+        setTotalPersonas(personasRes.items.length);
         return;
       }
 
@@ -139,9 +168,11 @@ export function ClientesView() {
 
   const filteredRows = useMemo(
     () =>
-      activeFilter === "juridico" || activeFilter === "visas"
+      activeFilter === "juridico"
         ? []
-        : filterClientes(clienteRows, activeFilter),
+        : activeFilter === "visas"
+          ? clienteRows
+          : filterClientes(clienteRows, activeFilter),
     [clienteRows, activeFilter],
   );
 
@@ -151,10 +182,10 @@ export function ClientesView() {
       inquilinos: kpis?.inquilinos ?? 0,
       propietarios: kpis?.propietarios ?? 0,
       juridico: 0,
-      visas: 0,
+      visas: visaSolicitantes,
       morosos: kpis?.morosos ?? 0,
     }),
-    [kpis, totalPersonas],
+    [kpis, totalPersonas, visaSolicitantes],
   );
 
   const hasSearch = searchQuery.trim().length > 0;
@@ -164,12 +195,11 @@ export function ClientesView() {
   const rangeEnd = Math.min((pageIndex + 1) * PAGE_SIZE, totalPersonas);
 
   const resultSummary = useMemo(() => {
-    const count = filteredRows.length;
     const countLabel = `${totalPersonas} cliente${totalPersonas === 1 ? "" : "s"}`;
     const filterLabel = clienteFilters.find((filter) => filter.id === activeFilter)?.label ?? "";
     if (hasSearch) return `${countLabel} encontrado${totalPersonas === 1 ? "" : "s"} · ${filterLabel}`;
     return `${countLabel} · ${filterLabel}`;
-  }, [filteredRows.length, hasSearch, activeFilter, totalPersonas]);
+  }, [hasSearch, activeFilter, totalPersonas]);
 
   if (error && clienteRows.length === 0 && !kpis) {
     return (
@@ -268,18 +298,14 @@ export function ClientesView() {
                 {clienteFilters.map(({ id, label }) => {
                   const selected = activeFilter === id;
                   const count = filterCounts[id];
-                  const disabled = (id === "juridico" || id === "visas") && count === 0;
+                  const disabled = id === "juridico" && count === 0;
                   return (
                     <button
                       key={id}
                       type="button"
                       disabled={disabled}
                       onClick={() => setActiveFilter(id)}
-                      title={
-                        id === "juridico" || id === "visas"
-                          ? "Módulo en desarrollo"
-                          : undefined
-                      }
+                      title={id === "juridico" ? "Módulo en desarrollo" : undefined}
                       className={`rounded-full border border-border px-3.5 py-2 text-[13px] transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                         selected
                           ? "bg-primary-soft font-semibold text-primary"
@@ -287,7 +313,7 @@ export function ClientesView() {
                       }`}
                     >
                       {label}
-                      {id !== "juridico" && id !== "visas" ? ` (${count})` : ""}
+                      {id !== "juridico" ? ` (${count})` : ""}
                     </button>
                   );
                 })}
@@ -320,9 +346,11 @@ export function ClientesView() {
                 ) : filteredRows.length === 0 ? (
                   <tr>
                     <td colSpan={tableHeaders.length} className="px-5 py-8 text-sm text-text-secondary">
-                      {activeFilter === "juridico" || activeFilter === "visas"
+                      {activeFilter === "juridico"
                         ? "Este módulo estará disponible próximamente."
-                        : hasSearch
+                        : activeFilter === "visas"
+                          ? "No hay clientes con un trámite de visa."
+                          : hasSearch
                           ? "No hay clientes que coincidan con la búsqueda."
                           : "No hay clientes para este filtro."}
                     </td>

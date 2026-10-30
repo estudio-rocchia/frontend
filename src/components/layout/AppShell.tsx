@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useState } from "react";
+import { memo, useCallback, useState } from "react";
 
 import { DashboardAlertsProvider } from "@/context/dashboard-alerts-context";
 import { DashboardReadAlertsProvider } from "@/context/dashboard-read-alerts-context";
@@ -15,6 +15,7 @@ const MainContent = memo(function MainContent({ children }: { children: React.Re
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const closeMobileNav = useCallback(() => setMobileNavOpen(false), []);
 
   return (
     <DashboardReadAlertsProvider>
@@ -23,7 +24,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen overflow-x-hidden">
       <Sidebar
         mobileOpen={mobileNavOpen}
-        onMobileClose={() => setMobileNavOpen(false)}
+        onMobileClose={closeMobileNav}
       />
       <div className="flex min-h-screen min-w-0 flex-1 flex-col">
         <Topbar onMenuClick={() => setMobileNavOpen(true)} />

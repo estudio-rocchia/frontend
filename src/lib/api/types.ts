@@ -1262,3 +1262,110 @@ export interface UpdateCitaInput {
   estado?: CitaEstado;
   notas?: string | null;
 }
+
+export type EstadoTramiteVisa =
+  | "borrador"
+  | "formulario_completo"
+  | "ds160_cargado"
+  | "arancel_pagado"
+  | "turno_asignado"
+  | "entrevista"
+  | "aprobado"
+  | "rechazado"
+  | "procesamiento_administrativo";
+
+export interface PersonaVisaResumen {
+  id: number;
+  nombre: string | null;
+  apellido: string | null;
+  razonSocial: string | null;
+  tipoDocumento: string | null;
+  numeroDocumento: string | null;
+  email: string | null;
+  phone: string | null;
+}
+
+export interface CotizacionVisa {
+  personas: number;
+  honorarioUnitarioUsd: number;
+  honorarioTotalUsd: number;
+  arancelUnitarioUsd: number;
+  arancelTotalUsd: number;
+  cambiosTurno: number;
+  cambioTurnoUnitarioUsd: number;
+  cambioTurnoTotalUsd: number;
+  totalEstudioUsd: number;
+  totalConsuladoUsd: number;
+  totalUsd: number;
+}
+
+export interface TramiteVisaListItem {
+  id: number;
+  grupoId: number;
+  personaId: number;
+  estado: EstadoTramiteVisa;
+  numeroDs160: string | null;
+  abiertoEn: string;
+  persona: PersonaVisaResumen;
+  integrantes: number;
+  cotizacion: CotizacionVisa;
+}
+
+export interface IntegranteVisa {
+  id: number;
+  personaId: number;
+  estado: EstadoTramiteVisa;
+  persona: PersonaVisaResumen;
+}
+
+export interface TramiteVisaDetail {
+  id: number;
+  grupoId: number;
+  personaId: number;
+  estado: EstadoTramiteVisa;
+  numeroDs160: string | null;
+  emailAis: string | null;
+  notas: string | null;
+  abiertoEn: string;
+  decisionEn: string | null;
+  creadoEn: string;
+  actualizadoEn: string;
+  persona: PersonaVisaResumen;
+  grupo: {
+    id: number;
+    cambiosTurno: number;
+    notas: string | null;
+    integrantes: number;
+  };
+  integrantes: IntegranteVisa[];
+  cotizacion: CotizacionVisa;
+  enlaces: { ds160: string; ais: string };
+}
+
+export interface VisasResumen {
+  anio: number | null;
+  total: number;
+  solicitantes: number;
+  enCurso: number;
+  aprobados: number;
+  rechazados: number;
+  porEstado: Record<EstadoTramiteVisa, number>;
+}
+
+export interface CreateTramiteVisaInput {
+  personaId: number;
+  grupoId?: number | null;
+  numeroDs160?: string | null;
+  emailAis?: string | null;
+  notas?: string | null;
+  abiertoEn?: string;
+}
+
+export interface UpdateTramiteVisaInput {
+  estado?: EstadoTramiteVisa;
+  numeroDs160?: string | null;
+  emailAis?: string | null;
+  notas?: string | null;
+  abiertoEn?: string;
+  decisionEn?: string | null;
+}

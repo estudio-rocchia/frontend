@@ -95,7 +95,7 @@ export function Sidebar({
             aria-label="Cerrar menú"
             onClick={onMobileClose}
           />
-          <aside className="relative flex h-full w-[min(280px,88vw)] flex-col gap-2 bg-primary px-4 py-6 shadow-xl">
+          <aside className="relative flex h-dvh max-h-dvh w-[min(280px,88vw)] flex-col gap-2 overflow-y-auto bg-primary px-4 py-6 shadow-xl">
             <button
               type="button"
               onClick={onMobileClose}

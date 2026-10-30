@@ -1,5 +1,7 @@
-import { PlaceholderPage } from "@/components/PlaceholderPage";
+import { lazyWorkspace } from "@/lib/lazy-workspace";
+
+const VisasView = lazyWorkspace(() => import("@/components/visas/VisasView"), "VisasView");
 
 export default function VisasPage() {
-  return <PlaceholderPage title="Visas" />;
+  return <VisasView />;
 }

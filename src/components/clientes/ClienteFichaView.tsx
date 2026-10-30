@@ -12,6 +12,13 @@ const ClienteInmobiliariaTab = dynamic(
     })),
   { ssr: false },
 );
+const ClienteVisasTab = dynamic(
+  () =>
+    import("@/components/visas/ClienteVisasTab").then((mod) => ({
+      default: mod.ClienteVisasTab,
+    })),
+  { ssr: false },
+);
 const EditarClienteModal = dynamic(
   () =>
     import("@/components/clientes/EditarClienteModal").then((mod) => ({
@@ -22,7 +29,6 @@ const EditarClienteModal = dynamic(
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { FieldBlock } from "@/components/ui/FormLayout";
 import { PageHeaderSkeleton, Skeleton } from "@/components/ui/Skeleton";
-import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useAuth } from "@/context/auth-context";
 import { type ClienteRow } from "@/data/clientes";
 import {
@@ -37,6 +43,7 @@ import {
 import { useClientePrefetch } from "@/lib/use-cliente-prefetch";
 import type { ContratoListItem, PersonaRecord } from "@/lib/api/types";
 import { personaDisplayName } from "@/lib/format";
+import { canEditVisas } from "@/lib/visas/labels";
 import { pagePaddingClass } from "@/lib/layout";
 import { buildClientesContext, mapPersonaToClienteRow, vinculoBadgeClass } from "@/lib/mappers/clientes";
 import {
@@ -80,7 +87,7 @@ export function ClienteFichaView() {
   const personaId = Number(params.id);
   const validId = Number.isInteger(personaId) && personaId > 0;
 
-  const { token, logout } = useAuth();
+  const { token, user, logout } = useAuth();
   const { consume: consumePrefetchedCliente } = useClientePrefetch(token);
   const [activeTab, setActiveTab] = useState<FichaTab>("resumen");
   const [persona, setPersona] = useState<PersonaRecord | null>(null);
@@ -510,20 +517,21 @@ export function ClienteFichaView() {
           </div>
         ) : null}
 
-        {!loadingDetail && activeTab === "visas" ? (
-          <div className="flex flex-col gap-3">
-            <SectionTitle>Trámites de visa</SectionTitle>
-            <p className="text-sm text-text-secondary">
-              Sin trámites vinculados. El módulo de visas estará disponible próximamente.
-            </p>
-          </div>
+        {!loadingDetail && activeTab === "visas" && token && persona ? (
+          <ClienteVisasTab
+            token={token}
+            personaId={personaId}
+            personaNombre={personaDisplayName(persona)}
+            canEdit={canEditVisas(user?.roles)}
+            onAuthError={logout}
+          />
         ) : null}
 
         {!loadingDetail && activeTab === "historial" ? (
           <div className="flex flex-col gap-3">
             <SectionTitle>Historial unificado</SectionTitle>
             <p className="text-sm text-text-secondary">
-              El historial consolidado entre áreas se habilitará cuando estén activos los módulos jurídico y visas.
+              El historial consolidado entre áreas se habilitará cuando esté activo el módulo jurídico.
             </p>
           </div>
         ) : null}

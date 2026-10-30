@@ -66,6 +66,13 @@ import type {
   CitaDetail,
   CreateCitaInput,
   UpdateCitaInput,
+  CotizacionVisa,
+  CreateTramiteVisaInput,
+  EstadoTramiteVisa,
+  TramiteVisaDetail,
+  TramiteVisaListItem,
+  UpdateTramiteVisaInput,
+  VisasResumen,
 } from "./types";
 
 export { ApiError, NetworkError, getApiBaseUrl } from "./client";
@@ -1141,4 +1148,74 @@ export function cancelCita(token: string, id: number) {
     method: "POST",
     token,
   });
+}
+
+export function fetchVisas(
+  token: string,
+  params?: { anio?: number; estado?: EstadoTramiteVisa; q?: string; personaId?: number },
+) {
+  const query = new URLSearchParams();
+  if (params?.anio !== undefined) query.set("anio", String(params.anio));
+  if (params?.estado) query.set("estado", params.estado);
+  if (params?.q) query.set("q", params.q);
+  if (params?.personaId !== undefined) query.set("personaId", String(params.personaId));
+  const suffix = query.toString();
+  return apiRequest<{ items: TramiteVisaListItem[] }>(`/visas${suffix ? `?${suffix}` : ""}`, { token });
+}
+
+export function fetchVisasResumen(token: string, anio?: number) {
+  const query = anio !== undefined ? `?anio=${anio}` : "";
+  return apiRequest<VisasResumen>(`/visas/resumen${query}`, { token });
+}
+
+export function fetchCotizacionVisa(token: string, personas: number, cambiosTurno = 0) {
+  const query = new URLSearchParams({
+    personas: String(personas),
+    cambiosTurno: String(cambiosTurno),
+  });
+  return apiRequest<CotizacionVisa>(`/visas/cotizacion?${query}`, { token });
+}
+
+export function fetchTramiteVisa(token: string, id: number) {
+  return apiRequest<TramiteVisaDetail>(`/visas/${id}`, { token });
+}
+
+export function createTramiteVisa(token: string, body: CreateTramiteVisaInput) {
+  return apiRequest<TramiteVisaDetail>("/visas", {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function updateTramiteVisa(token: string, id: number, body: UpdateTramiteVisaInput) {
+  return apiRequest<TramiteVisaDetail>(`/visas/${id}`, {
+    method: "PATCH",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function updateGrupoVisa(
+  token: string,
+  tramiteId: number,
+  body: { cambiosTurno?: number; notas?: string | null },
+) {
+  return apiRequest<TramiteVisaDetail>(`/visas/${tramiteId}/grupo`, {
+    method: "PATCH",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function addIntegranteVisa(token: string, tramiteId: number, personaId: number) {
+  return apiRequest<TramiteVisaDetail>(`/visas/${tramiteId}/integrantes`, {
+    method: "POST",
+    token,
+    body: JSON.stringify({ personaId }),
+  });
+}
+
+export function deleteTramiteVisa(token: string, id: number) {
+  return apiRequest<void>(`/visas/${id}`, { method: "DELETE", token });
 }
