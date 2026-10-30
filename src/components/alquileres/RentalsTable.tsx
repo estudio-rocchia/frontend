@@ -2,7 +2,7 @@
 
 import { Loader2, Search, X } from "lucide-react";
 import { RentalFilterChips } from "@/components/alquileres/RentalFilterChips";
-import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
+import { ButtonOutline } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import {
@@ -18,6 +18,45 @@ import type { ContratoTableStats } from "@/lib/api/types";
 import { contractEndHint, moneyClassName } from "@/lib/format";
 import { rentCollectionWindowHint } from "@/lib/rental-collection";
 import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
+
+function RowActions({
+  primary,
+  finalizar,
+}: {
+  primary: { label: string; onClick: () => void } | null;
+  finalizar: { onClick: () => void } | null;
+}) {
+  if (!primary && !finalizar) return null;
+
+  const segment =
+    "inline-flex h-8 items-center px-2.5 text-xs font-medium transition-colors " + interactiveFocusClass;
+
+  return (
+    <div className="inline-flex overflow-hidden rounded-sm border border-border bg-bg-card">
+      {primary ? (
+        <button
+          type="button"
+          onClick={primary.onClick}
+          className={`${segment} bg-primary font-semibold text-text-on-primary hover:bg-primary-dark`}
+        >
+          {primary.label}
+        </button>
+      ) : null}
+      {finalizar ? (
+        <button
+          type="button"
+          data-testid="finalizar-contrato"
+          onClick={finalizar.onClick}
+          className={`${segment} text-text-primary hover:bg-primary-soft/70 ${
+            primary ? "border-l border-border" : ""
+          }`}
+        >
+          Finalizar
+        </button>
+      ) : null}
+    </div>
+  );
+}
 
 const PAGE_SIZE = 15;
 
@@ -50,6 +89,7 @@ type RentalsTableProps = {
   onCollect: (row: RentalRow) => void;
   onAdjust: (row: RentalRow) => void;
   onRenew: (row: RentalRow) => void;
+  onFinish: (row: RentalRow) => void;
   onPrefetch?: (row: RentalRow) => void;
   serverMode?: boolean;
   loading?: boolean;
@@ -76,6 +116,7 @@ export function RentalsTable({
   onCollect,
   onAdjust,
   onRenew,
+  onFinish,
   onPrefetch,
   serverMode = false,
   loading = false,
@@ -278,8 +319,17 @@ export function RentalsTable({
                   return (
                     <tr
                       key={row.id}
-                      className="border-b border-border align-middle transition-colors hover:bg-bg-page/70 [&>td]:py-4"
+                      tabIndex={0}
+                      aria-label={`Abrir ficha de ${row.contractProperty}`}
+                      className={`cursor-pointer border-b border-border align-middle transition-colors hover:bg-bg-page/70 [&>td]:py-4 ${interactiveFocusClass}`}
                       onMouseEnter={() => onPrefetch?.(row)}
+                      onClick={() => onViewFicha(row)}
+                      onKeyDown={(event) => {
+                        if (event.target !== event.currentTarget) return;
+                        if (event.key !== "Enter" && event.key !== " ") return;
+                        event.preventDefault();
+                        onViewFicha(row);
+                      }}
                     >
                       <td className="px-3 font-medium text-text-primary sm:px-5">{row.contractProperty}</td>
                       <td className="px-3 text-text-primary sm:px-5">{row.tenant}</td>
@@ -312,31 +362,23 @@ export function RentalsTable({
                           />
                         </div>
                       </td>
-                      <td className="whitespace-nowrap px-3 text-right sm:px-5">
-                        <div className="flex flex-wrap items-center justify-end gap-1.5 sm:gap-2">
-                          {showCollect ? (
-                            <ButtonPrimary type="button" onClick={() => onCollect(row)}>
-                              Cobrar
-                            </ButtonPrimary>
-                          ) : null}
-                          <ButtonOutline
-                            type="button"
-                            onClick={() => onViewFicha(row)}
-                            className="px-2.5 py-1.5 text-xs sm:px-[18px] sm:py-2 sm:text-sm"
-                          >
-                            Ver ficha
-                          </ButtonOutline>
-                          {showAdjust ? (
-                            <ButtonPrimary type="button" onClick={() => onAdjust(row)}>
-                              Ajustar
-                            </ButtonPrimary>
-                          ) : null}
-                          {showRenew ? (
-                            <ButtonPrimary type="button" onClick={() => onRenew(row)}>
-                              Renovar
-                            </ButtonPrimary>
-                          ) : null}
-                        </div>
+                      <td
+                        className="whitespace-nowrap px-3 text-right sm:px-5"
+                        onClick={(event) => event.stopPropagation()}
+                        onKeyDown={(event) => event.stopPropagation()}
+                      >
+                        <RowActions
+                          primary={
+                            showCollect
+                              ? { label: "Cobrar", onClick: () => onCollect(row) }
+                              : showAdjust
+                                ? { label: "Ajustar", onClick: () => onAdjust(row) }
+                                : showRenew
+                                  ? { label: "Renovar", onClick: () => onRenew(row) }
+                                  : null
+                          }
+                          finalizar={showRenew ? { onClick: () => onFinish(row) } : null}
+                        />
                       </td>
                     </tr>
                   );

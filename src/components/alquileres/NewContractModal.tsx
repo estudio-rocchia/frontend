@@ -49,6 +49,7 @@ export type NewContractForm = {
   frecuenciaAjusteMeses: number;
   notasIndice: string;
   mora: MoraPunitoriaForm;
+  garantes: Array<{ key: string; field: PersonaFieldValue }>;
 };
 
 const MIN_VACANTE_SEARCH_LEN = 2;
@@ -74,6 +75,7 @@ function emptyForm(hasVacantes: boolean): NewContractForm {
     frecuenciaAjusteMeses: 12,
     notasIndice: "",
     mora: DEFAULT_MORA_PUNITORIA,
+    garantes: [],
   };
 }
 
@@ -240,7 +242,8 @@ export function NewContractModal({
     ownerValid &&
     form.amount.trim() &&
     form.depositAmount.trim() &&
-    isMoraPunitoriaValid(form.mora);
+    isMoraPunitoriaValid(form.mora) &&
+    form.garantes.every((garante) => isPersonaFieldValid(garante.field));
 
   return (
     <Modal
@@ -439,6 +442,68 @@ export function NewContractModal({
                 token={token}
               />
             )}
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[11px] font-semibold text-text-secondary">Garantes</span>
+                <button
+                  type="button"
+                  className="text-[13px] font-semibold text-primary"
+                  onClick={() =>
+                    patch({
+                      garantes: [
+                        ...form.garantes,
+                        { key: crypto.randomUUID(), field: emptyNewPersonaField() },
+                      ],
+                    })
+                  }
+                >
+                  Agregar garante
+                </button>
+              </div>
+              {form.garantes.length === 0 ? (
+                <p className="text-[12px] text-text-secondary">
+                  Opcional. Podés sumar uno o más garantes al contrato.
+                </p>
+              ) : (
+                form.garantes.map((garante, index) => (
+                  <div
+                    key={garante.key}
+                    className="flex flex-col gap-2 rounded-sm border border-border bg-bg-page p-3"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-[12px] font-semibold text-text-primary">
+                        Garante {index + 1}
+                      </span>
+                      <button
+                        type="button"
+                        className="text-[12px] font-semibold text-danger"
+                        onClick={() =>
+                          patch({
+                            garantes: form.garantes.filter((item) => item.key !== garante.key),
+                          })
+                        }
+                      >
+                        Quitar
+                      </button>
+                    </div>
+                    <PersonaSelectField
+                      label="Persona"
+                      value={garante.field}
+                      onChange={(field) =>
+                        patch({
+                          garantes: form.garantes.map((item) =>
+                            item.key === garante.key ? { ...item, field } : item,
+                          ),
+                        })
+                      }
+                      token={token}
+                      searchId={`contrato-nuevo-garante-${garante.key}`}
+                      placeholder="Nombre o apellido del garante…"
+                    />
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </FormSection>
 

@@ -40,9 +40,8 @@ export async function openContratoFicha(page: Page, contratoCode: string) {
   await page.goto("/alquileres");
   await expect(page.getByRole("heading", { name: "Listado de contratos" })).toBeVisible();
   await searchContratos(page, contratoCode);
-  await contractRow(page, contratoCode)
-    .getByRole("button", { name: "Ver ficha" })
-    .click();
+  const marker = rowMarkerForQuery(contratoCode);
+  await contractRow(page, contratoCode).getByRole("cell", { name: new RegExp(marker) }).click();
   await expect(page).toHaveURL(/\/alquileres\/\d+/);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(contratoCode);
 }

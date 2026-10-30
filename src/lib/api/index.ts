@@ -23,6 +23,7 @@ import type {
   PagoListItem,
   PagoRecord,
   PersonaRecord,
+  PreviewFinalizarContrato,
   ActualizacionDepositoResult,
   ApplyAjusteInput,
   ApplyAjusteResponse,
@@ -653,6 +654,25 @@ export function updateContrato(
   });
 }
 
+export function addContratoGarante(
+  token: string,
+  contratoId: number,
+  body: { personaId: number },
+) {
+  return apiRequest<{ id: number; personaId: number }>(`/contratos/${contratoId}/garantes`, {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function removeContratoGarante(token: string, contratoId: number, personaId: number) {
+  return apiRequest<void>(`/contratos/${contratoId}/garantes/${personaId}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
 export function changeContratoEstado(
   token: string,
   contratoId: number,
@@ -662,6 +682,19 @@ export function changeContratoEstado(
     method: "POST",
     token,
     body: JSON.stringify({ estado }),
+  });
+}
+
+export function previewFinalizarContrato(token: string, contratoId: number) {
+  return apiRequest<PreviewFinalizarContrato>(`/contratos/${contratoId}/finalizar/preview`, {
+    token,
+  });
+}
+
+export function finalizarContrato(token: string, contratoId: number) {
+  return apiRequest<ContratoRecord>(`/contratos/${contratoId}/finalizar`, {
+    method: "POST",
+    token,
   });
 }
 

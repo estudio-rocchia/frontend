@@ -360,6 +360,16 @@ export interface ContratoTableItem extends ContratoListItem {
   operativa?: ContratoOperativa;
 }
 
+export interface MotivoCierreContrato {
+  codigo: "estado" | "ventana" | "mora" | "servicios" | "deposito";
+  mensaje: string;
+}
+
+export interface PreviewFinalizarContrato {
+  puedeFinalizar: boolean;
+  motivos: MotivoCierreContrato[];
+}
+
 export type ContratoOperativaFilter =
   | "todos"
   | "a_cobrar"

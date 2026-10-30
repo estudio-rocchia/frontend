@@ -519,9 +519,16 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
     }
   }
 
+  async function reloadFicha(message?: string) {
+    setError(null);
+    await loadCore();
+    if (message) setSuccess(message);
+  }
+
   return {
     detail,
     contrato,
+    reloadFicha,
     servicios,
     periodos,
     planesDeposito,
