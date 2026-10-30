@@ -25,6 +25,14 @@ export function getLoginErrorPresentation(error: unknown): LoginErrorPresentatio
       };
     }
 
+    if (error.status === 400 && error.message.includes("reset token")) {
+      return {
+        title: "Enlace inválido o vencido",
+        description:
+          "Este enlace ya no sirve para restablecer la contraseña. Solicitá uno nuevo e intentá otra vez.",
+      };
+    }
+
     if (error.status >= 500) {
       return {
         title: "Error temporal del sistema",

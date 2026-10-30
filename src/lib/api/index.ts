@@ -78,6 +78,20 @@ export function login(usernameOrEmail: string, password: string) {
   });
 }
 
+export function requestPasswordReset(email: string) {
+  return apiRequest<{ ok: true }>("/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export function resetPasswordWithToken(token: string, password: string) {
+  return apiRequest<{ ok: true }>("/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ token, password }),
+  });
+}
+
 export function fetchMe(token: string) {
   return apiRequest<MeResponse>("/auth/me", { token });
 }

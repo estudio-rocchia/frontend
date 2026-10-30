@@ -5,6 +5,9 @@ import { FormEvent, useState } from "react";
 
 import { LoginShell } from "@/components/auth/LoginShell";
 import { LoginSpinner } from "@/components/auth/LoginSpinner";
+import { requestPasswordReset } from "@/lib/api";
+import { getLoginErrorPresentation } from "@/lib/auth/login-errors";
+import { LoginErrorAlert } from "@/components/auth/LoginErrorAlert";
 import {
   loginInputClass,
   loginLinkClass,
@@ -14,12 +17,15 @@ import {
 export default function RecuperarCuentaPage() {
   const [email, setEmail] = useState("");
   const [fieldError, setFieldError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<ReturnType<typeof getLoginErrorPresentation> | null>(
+    null,
+  );
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const canSubmit = Boolean(email.trim() && !submitting);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!email.trim()) {
       setFieldError("Ingresá tu email.");
@@ -27,11 +33,16 @@ export default function RecuperarCuentaPage() {
     }
 
     setFieldError(null);
+    setSubmitError(null);
     setSubmitting(true);
-    window.setTimeout(() => {
-      setSubmitting(false);
+    try {
+      await requestPasswordReset(email.trim());
       setSubmitted(true);
-    }, 600);
+    } catch (error) {
+      setSubmitError(getLoginErrorPresentation(error));
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -62,12 +73,13 @@ export default function RecuperarCuentaPage() {
               onChange={(e) => {
                 setEmail(e.target.value);
                 if (fieldError) setFieldError(null);
+                if (submitError) setSubmitError(null);
               }}
               autoComplete="email"
               autoFocus
               aria-invalid={Boolean(fieldError)}
               aria-describedby={fieldError ? "recuperar-email-error" : undefined}
-              placeholder="email o nombre de usuario"
+              placeholder="usuario@rocchia.com"
               className={loginInputClass(Boolean(fieldError))}
             />
             {fieldError ? (
@@ -76,6 +88,8 @@ export default function RecuperarCuentaPage() {
               </span>
             ) : null}
           </label>
+
+          {submitError ? <LoginErrorAlert id="recuperar-submit-error" error={submitError} /> : null}
 
           <button type="submit" disabled={!canSubmit} className={loginSubmitClass}>
             {submitting ? (
