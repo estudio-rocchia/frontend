@@ -410,7 +410,7 @@ export function VentaFichaView() {
               <>
                 {ventaNecesitaFinanciacion(venta) ? (
                   <ButtonOutline type="button" onClick={() => setFinanciacionOpen(true)}>
-                    Configurar financiación
+                    Configurar forma de pago
                   </ButtonOutline>
                 ) : null}
                 <ButtonOutline type="button" onClick={() => setEditOpen(true)}>Editar</ButtonOutline>

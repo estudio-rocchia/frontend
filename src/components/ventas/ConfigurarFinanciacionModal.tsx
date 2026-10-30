@@ -6,10 +6,17 @@ import { Modal } from "@/components/ui/Modal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { ChipToggle, FormField, FormSection } from "@/components/ui/FormLayout";
 import { ApiError, createVentaFinanciacion } from "@/lib/api";
-import type { TipoEntregaInicial, VentaDetail } from "@/lib/api/types";
+import type { TipoEntregaInicial, VentaDetail, VentaModalidadPago } from "@/lib/api/types";
 import { previewFinanciacionCuotas } from "@/lib/ventas/financiacion-preview";
 import { todayIso } from "@/lib/ventas/catalog-helpers";
 import { formatDateDisplay, formatMoney, moneyClassName } from "@/lib/format";
+
+type ModalidadPago = VentaModalidadPago;
+
+const MODALIDAD_OPTIONS: Array<{ value: ModalidadPago; label: string }> = [
+  { value: "financiado", label: "Financiación" },
+  { value: "contado", label: "Contado" },
+];
 
 const TIPO_ENTREGA: Array<{ value: TipoEntregaInicial; label: string }> = [
   { value: "cash", label: "Efectivo" },
@@ -34,6 +41,7 @@ export function ConfigurarFinanciacionModal({
   onSaved,
 }: ConfigurarFinanciacionModalProps) {
   const precioTotal = venta?.montoPrecioVenta ?? "0";
+  const [modalidad, setModalidad] = useState<ModalidadPago>("financiado");
   const [entrega, setEntrega] = useState("");
   const [tipoEntrega, setTipoEntrega] = useState<TipoEntregaInicial>("cash");
   const [cuotas, setCuotas] = useState("4");
@@ -45,6 +53,7 @@ export function ConfigurarFinanciacionModal({
 
   useEffect(() => {
     if (!open || !venta) return;
+    setModalidad("financiado");
     const half = Number(venta.montoPrecioVenta) / 2;
     setEntrega(Number.isFinite(half) ? String(Math.round(half)) : "");
     setTipoEntrega("cash");
@@ -56,7 +65,7 @@ export function ConfigurarFinanciacionModal({
   }, [open, venta]);
 
   const preview = useMemo(() => {
-    if (!venta) return null;
+    if (!venta || modalidad === "contado") return null;
     const montoPrecioTotal = Number.parseFloat(precioTotal);
     const montoEntregaInicial = Number.parseFloat(entrega.replace(",", "."));
     const cantidadCuotas = Number.parseInt(cuotas, 10);
@@ -68,10 +77,29 @@ export function ConfigurarFinanciacionModal({
       tasaInteresMensual,
       primerVencimiento,
     });
-  }, [venta, precioTotal, entrega, cuotas, tasa, primerVencimiento]);
+  }, [venta, modalidad, precioTotal, entrega, cuotas, tasa, primerVencimiento]);
 
   async function handleSubmit() {
     if (!venta) return;
+    if (modalidad === "contado") {
+      setSaving(true);
+      setError(null);
+      try {
+        await createVentaFinanciacion(token, venta.id, {
+          modalidadPago: "contado",
+          primerVencimiento,
+          notasEntregaInicial: notasEntrega.trim() || null,
+        });
+        onSaved();
+        onClose();
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : "No se pudo registrar la venta al contado.");
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
     const montoEntregaInicial = Number.parseFloat(entrega.replace(",", "."));
     const cantidadCuotas = Number.parseInt(cuotas, 10);
     const tasaInteresMensual = Number.parseFloat(tasa.replace(",", ".")) / 100;
@@ -111,7 +139,7 @@ export function ConfigurarFinanciacionModal({
     <Modal
       open={open}
       onClose={onClose}
-      title="Configurar financiación"
+      title="Configurar forma de pago"
       subtitle={
         venta?.inmueble
           ? `${venta.inmueble.code} · ${formatMoney(venta.montoPrecioVenta, venta.codigoMoneda)}`
@@ -122,7 +150,7 @@ export function ConfigurarFinanciacionModal({
         <>
           <ButtonOutline type="button" onClick={onClose} disabled={saving}>Cancelar</ButtonOutline>
           <ButtonPrimary type="button" onClick={handleSubmit} disabled={saving || !venta || !!venta?.plan}>
-            {saving ? "Guardando..." : "Generar cuotas"}
+            {saving ? "Guardando..." : modalidad === "contado" ? "Registrar contado" : "Generar cuotas"}
           </ButtonPrimary>
         </>
       }
@@ -142,6 +170,31 @@ export function ConfigurarFinanciacionModal({
             </p>
           </div>
 
+          <FormSection title="Modalidad">
+            <ChipToggle
+              options={MODALIDAD_OPTIONS.map((option) => option.label)}
+              value={MODALIDAD_OPTIONS.find((option) => option.value === modalidad)?.label ?? "Financiación"}
+              onChange={(label) => {
+                const match = MODALIDAD_OPTIONS.find((option) => option.label === label);
+                if (match) setModalidad(match.value);
+              }}
+            />
+          </FormSection>
+
+          {modalidad === "contado" ? (
+            <FormSection title="Pago al contado">
+              <p className="text-[13px] text-text-secondary">
+                Se registrará un único cobro por el precio total de la venta. Después podés registrar el pago y emitir el recibo.
+              </p>
+              <FormField
+                label="Fecha prevista del pago"
+                value={primerVencimiento}
+                onChange={setPrimerVencimiento}
+                type="date"
+              />
+              <FormField label="Notas (opcional)" value={notasEntrega} onChange={setNotasEntrega} />
+            </FormSection>
+          ) : (
           <FormSection title="Plan">
             <div className="grid gap-3 sm:grid-cols-2">
               <FormField label="Entrega inicial" value={entrega} onChange={setEntrega} type="number" />
@@ -164,8 +217,9 @@ export function ConfigurarFinanciacionModal({
             ) : null}
             <FormField label="Notas entrega (opcional)" value={notasEntrega} onChange={setNotasEntrega} />
           </FormSection>
+          )}
 
-          {preview && preview.length > 0 ? (
+          {modalidad === "financiado" && preview && preview.length > 0 ? (
             <FormSection title="Vista previa de cuotas">
               <div className="flex flex-col gap-2 md:hidden">
                 {preview.map((row) => (

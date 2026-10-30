@@ -8,11 +8,14 @@ import {
   RegistrarPagoServicioModal,
   type RegistrarPagoServicioFormValues,
 } from "@/components/alquileres/RegistrarPagoServicioModal";
+import { AguaConsultaModal } from "@/components/alquileres/AguaConsultaModal";
+import { SameepConsultaModal } from "@/components/alquileres/SameepConsultaModal";
 import { SecheepImportModal } from "@/components/alquileres/SecheepImportModal";
 import { ServicioFormModal, type ServicioFormValues } from "@/components/alquileres/ServicioFormModal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import type {
+  AguaConsultaResult,
   CatalogoItem,
   PeriodoServicioRecord,
   SecheepImportInput,
@@ -26,7 +29,7 @@ import {
   modoFacturacionLabel,
   periodoEstadoLabel,
   periodoEstadoVariant,
-  periodoRangeLabel,
+  periodoMonthYearLabel,
   periodosForServicio,
   servicioBillingSummary,
   servicioDisplayName,
@@ -68,7 +71,7 @@ function PeriodosServicioTable({
       <tbody className="divide-y divide-border">
         {periodos.map((periodo) => (
           <tr key={periodo.id} className="bg-bg-card">
-            <td className="px-4 py-2.5 text-text-primary">{periodoRangeLabel(periodo)}</td>
+            <td className="px-4 py-2.5 text-text-primary">{periodoMonthYearLabel(periodo)}</td>
             <td className="px-4 py-2.5 text-text-secondary">
               {periodo.fechaVencimiento ? formatDateDisplay(periodo.fechaVencimiento) : "—"}
             </td>
@@ -120,6 +123,9 @@ export function ContractServiciosSection({
   onDeactivateServicio,
   onCreatePeriodo,
   onImportSecheep,
+  onConsultarSecheep,
+  onConsultarAgua,
+  onConsultarSameep,
   onRegisterPago,
   mediosPago,
   canRegisterPago,
@@ -137,6 +143,12 @@ export function ContractServiciosSection({
   onDeactivateServicio: (servicioId: number) => Promise<void>;
   onCreatePeriodo: (servicioId: number, values: PeriodoFormValues) => Promise<void>;
   onImportSecheep: (servicioId: number, payload: SecheepImportInput) => Promise<void>;
+  onConsultarSecheep: (servicioId: number, captchaToken: string) => Promise<void>;
+  onConsultarAgua: (
+    servicioId: number,
+    body: { captchaToken?: string; captchaAnswer?: string },
+  ) => Promise<AguaConsultaResult>;
+  onConsultarSameep: (servicioId: number, captchaToken: string) => Promise<void>;
   onRegisterPago: (
     periodo: PeriodoServicioRecord,
     servicio: ServicioContratoRecord,
@@ -158,6 +170,10 @@ export function ContractServiciosSection({
   const [pagoServicio, setPagoServicio] = useState<ServicioContratoRecord | null>(null);
   const [secheepModalOpen, setSecheepModalOpen] = useState(false);
   const [secheepServicio, setSecheepServicio] = useState<ServicioContratoRecord | null>(null);
+  const [aguaModalOpen, setAguaModalOpen] = useState(false);
+  const [aguaServicio, setAguaServicio] = useState<ServicioContratoRecord | null>(null);
+  const [sameepModalOpen, setSameepModalOpen] = useState(false);
+  const [sameepServicio, setSameepServicio] = useState<ServicioContratoRecord | null>(null);
   const activeServicios = useMemo(() => servicios.filter((s) => s.activo), [servicios]);
   const inactiveServicios = useMemo(() => servicios.filter((s) => !s.activo), [servicios]);
   const saldoTotal = useMemo(() => totalSaldoPendiente(periodos, servicios), [periodos, servicios]);
@@ -301,7 +317,7 @@ export function ContractServiciosSection({
       {activePanel === "servicios" ? (
         <div className="flex flex-col gap-3">
           <p className="text-[13px] text-text-secondary">
-            Cada servicio activo del contrato. Desde acá podés registrar períodos, importar SECHEEP o editar la
+            Cada servicio activo del contrato. Desde acá podés registrar períodos, traer facturas de agua o SECHEEP, o editar la
             configuración.
           </p>
 
@@ -335,6 +351,17 @@ export function ContractServiciosSection({
                     const servicioPeriodos = periodosForServicio(periodos, servicio.id);
                     const secheepStatus = secheepStatusForServicio(servicio);
                     const showSecheepImport = isSecheepElectricity(servicio) && secheepConfigured(servicio);
+                    const sameepListo =
+                      servicio.proveedorAgua === "sameep" &&
+                      Boolean(servicio.numeroClienteSameep?.trim()) &&
+                      Boolean(servicio.numeroSuministroSameep?.trim());
+                    const showAguaConsulta =
+                      servicio.tipoServicioCode === "water" &&
+                      servicio.modoFacturacion === "variable" &&
+                      (sameepListo ||
+                        (servicio.proveedorAgua !== "sameep" &&
+                          Boolean(servicio.numeroSocioAgua?.trim()) &&
+                          servicio.numeroServicioAgua !== null));
                     const monedaSaldo = servicioPeriodos.find((p) => Number(p.saldo) > 0)?.codigoMoneda;
 
                     return (
@@ -356,6 +383,29 @@ export function ContractServiciosSection({
                                   .join(" · ")}
                               </p>
                             ) : null
+                          ) : servicio.tipoServicioCode === "water" && servicio.proveedorAgua === "sameep" ? (
+                            <p className="mt-0.5 text-[12px] text-text-secondary">
+                              {[
+                                servicio.numeroClienteSameep ? `Cliente ${servicio.numeroClienteSameep}` : null,
+                                servicio.numeroSuministroSameep
+                                  ? `Suministro ${servicio.numeroSuministroSameep}`
+                                  : null,
+                              ]
+                                .filter(Boolean)
+                                .join(" · ") || "SAMEEP"}
+                            </p>
+                          ) : servicio.tipoServicioCode === "water" &&
+                            (servicio.numeroSocioAgua || servicio.numeroServicioAgua) ? (
+                            <p className="mt-0.5 text-[12px] text-text-secondary">
+                              {[
+                                servicio.numeroSocioAgua ? `Socio ${servicio.numeroSocioAgua}` : null,
+                                servicio.numeroServicioAgua
+                                  ? `Servicio ${servicio.numeroServicioAgua}`
+                                  : null,
+                              ]
+                                .filter(Boolean)
+                                .join(" · ")}
+                            </p>
                           ) : servicio.numeroMedidor ? (
                             <p className="mt-0.5 text-[12px] text-text-secondary">Medidor {servicio.numeroMedidor}</p>
                           ) : null}
@@ -372,6 +422,11 @@ export function ContractServiciosSection({
                                 ? `${servicioPeriodos.length} período${servicioPeriodos.length === 1 ? "" : "s"} cargados · Ver listado`
                                 : "Sin períodos cargados todavía"}
                             </button>
+                          ) : null}
+                          {servicio.aguaConsultadoEn ? (
+                            <p className="mt-0.5 text-[11px] text-text-secondary">
+                              Agua: {formatDateDisplay(servicio.aguaConsultadoEn.slice(0, 10))}
+                            </p>
                           ) : null}
                           {servicio.secheepConsultadoEn ? (
                             <p className="mt-0.5 text-[11px] text-text-secondary">
@@ -415,6 +470,24 @@ export function ContractServiciosSection({
                                   Período
                                 </ButtonOutline>
                               ) : null}
+                              {showAguaConsulta ? (
+                                <ButtonOutline
+                                  type="button"
+                                  className="px-2.5 py-1 text-xs"
+                                  onClick={() => {
+                                    if (servicio.proveedorAgua === "sameep") {
+                                      setSameepServicio(servicio);
+                                      setSameepModalOpen(true);
+                                      return;
+                                    }
+                                    setAguaServicio(servicio);
+                                    setAguaModalOpen(true);
+                                  }}
+                                  disabled={submitting}
+                                >
+                                  Agua
+                                </ButtonOutline>
+                              ) : null}
                               {showSecheepImport ? (
                                 <ButtonOutline
                                   type="button"
@@ -425,7 +498,7 @@ export function ContractServiciosSection({
                                   }}
                                   disabled={submitting}
                                 >
-                                  SECHEEP
+                                  Facturas
                                 </ButtonOutline>
                               ) : null}
                               <ButtonOutline
@@ -614,6 +687,36 @@ export function ContractServiciosSection({
         servicio={periodoServicio}
       />
 
+      <SameepConsultaModal
+        open={sameepModalOpen}
+        onClose={() => {
+          setSameepModalOpen(false);
+          setSameepServicio(null);
+        }}
+        servicio={sameepServicio}
+        submitting={submitting}
+        onConsultar={async (captchaToken) => {
+          if (!sameepServicio) return;
+          await onConsultarSameep(sameepServicio.id, captchaToken);
+        }}
+      />
+
+      <AguaConsultaModal
+        open={aguaModalOpen}
+        onClose={() => {
+          setAguaModalOpen(false);
+          setAguaServicio(null);
+        }}
+        servicio={aguaServicio}
+        submitting={submitting}
+        onConsultar={async (body) => {
+          if (!aguaServicio) {
+            throw new Error("Elegí un servicio de agua.");
+          }
+          return onConsultarAgua(aguaServicio.id, body);
+        }}
+      />
+
       <SecheepImportModal
         open={secheepModalOpen}
         onClose={() => {
@@ -623,6 +726,10 @@ export function ContractServiciosSection({
         onSubmit={async (payload) => {
           if (!secheepServicio) return;
           await onImportSecheep(secheepServicio.id, payload);
+        }}
+        onConsultar={async (captchaToken) => {
+          if (!secheepServicio) return;
+          await onConsultarSecheep(secheepServicio.id, captchaToken);
         }}
         submitting={submitting}
         servicio={secheepServicio}

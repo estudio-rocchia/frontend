@@ -4,6 +4,7 @@ import { FichaSummaryCard } from "@/components/alquileres/FichaSummaryCard";
 import { ButtonOutline } from "@/components/ui/Button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import type { CuotaFinanciacionRecord, VentaDetail } from "@/lib/api/types";
+import { isVentaContado } from "@/lib/ventas/contado";
 import { proximaCuotaPendiente } from "@/lib/ventas/cobranza";
 import {
   cuotasPagadasHint,
@@ -33,17 +34,57 @@ export function VentaFinanciacionSection({
 }) {
   const resumen = venta.financiacionResumen;
   const moneda = venta.codigoMoneda;
+  const contado = isVentaContado(venta.plan);
 
   if (!venta.plan) {
     return (
       <div className="flex flex-col gap-4">
         <p className="text-[13px] text-text-secondary">
-          Esta venta no tiene plan de financiación. Configurá entrega inicial y cuotas para registrar cobros.
+          Definí si la venta es al contado o financiada para registrar cobros y recibos.
         </p>
         {editable ? (
           <ButtonOutline type="button" onClick={onConfigureFinanciacion}>
-            Configurar financiación
+            Configurar forma de pago
           </ButtonOutline>
+        ) : null}
+      </div>
+    );
+  }
+
+  if (contado) {
+    const cuota = cuotas[0];
+    return (
+      <div className="flex flex-col gap-5">
+        <div className="rounded-md border border-primary/20 bg-primary-soft/30 px-4 py-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">Venta al contado</p>
+          <p className="mt-1 text-sm text-text-primary">
+            Un solo pago por{" "}
+            <span className={`font-semibold ${moneyClassName}`}>
+              {formatMoney(venta.plan.montoPrecioTotal, moneda)}
+            </span>
+            {cuota ? (
+              <>
+                {" "}
+                · previsto para {formatDateDisplay(cuota.fechaVencimiento)}
+              </>
+            ) : null}
+          </p>
+        </div>
+        {loading ? (
+          <p className="text-[13px] text-text-secondary">Cargando…</p>
+        ) : cuota ? (
+          <div className="rounded-md border border-border px-4 py-3 text-[13px]">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="font-medium text-text-primary">Pago total</p>
+                <p className="text-text-secondary">Saldo: {formatMoney(cuota.saldo, moneda)}</p>
+              </div>
+              <StatusBadge
+                label={cuotaEstadoLabel(cuota.estadoCode)}
+                variant={cuotaEstadoVariant(cuota.estadoCode)}
+              />
+            </div>
+          </div>
         ) : null}
       </div>
     );

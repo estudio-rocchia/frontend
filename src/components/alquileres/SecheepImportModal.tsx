@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Modal } from "@/components/ui/Modal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
@@ -16,6 +16,25 @@ import {
 } from "@/lib/mappers/secheep";
 import { formatMoney } from "@/lib/format";
 
+const SECHEEP_SITE_KEY = "6Lffpb4UAAAAAEbWyPCimLJe__edYU23bNFKJ1OA";
+
+type Grecaptcha = {
+  ready: (callback: () => void) => void;
+  render: (
+    element: HTMLElement,
+    options: {
+      sitekey: string;
+      callback: (token: string) => void;
+      "expired-callback"?: () => void;
+    },
+  ) => number;
+  reset: (widgetId?: number) => void;
+};
+
+function getGrecaptcha(): Grecaptcha | undefined {
+  return (window as Window & { grecaptcha?: Grecaptcha }).grecaptcha;
+}
+
 const emptyRow = (): SecheepManualFacturaRow => ({
   id: crypto.randomUUID(),
   periodo: "",
@@ -29,16 +48,21 @@ export function SecheepImportModal({
   open,
   onClose,
   onSubmit,
+  onConsultar,
   submitting = false,
   servicio,
 }: {
   open: boolean;
   onClose: () => void;
   onSubmit: (payload: SecheepImportInput) => Promise<void>;
+  onConsultar: (captchaToken: string) => Promise<void>;
   submitting?: boolean;
   servicio: ServicioContratoRecord | null;
 }) {
   const [rows, setRows] = useState<SecheepManualFacturaRow[]>([]);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const captchaHost = useRef<HTMLDivElement>(null);
+  const widgetId = useRef<number | null>(null);
   const [pasteFallback, setPasteFallback] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pasteHint, setPasteHint] = useState<string | null>(null);
@@ -57,12 +81,54 @@ export function SecheepImportModal({
     }
   }, [rows, servicio]);
 
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+
+    function renderWidget() {
+      const captcha = getGrecaptcha();
+      const host = captchaHost.current;
+      if (cancelled || !captcha || !host || widgetId.current !== null) return;
+      captcha.ready(() => {
+        if (cancelled || !captchaHost.current || widgetId.current !== null) return;
+        widgetId.current = captcha.render(captchaHost.current, {
+          sitekey: SECHEEP_SITE_KEY,
+          callback: (token) => setCaptchaToken(token),
+          "expired-callback": () => setCaptchaToken(null),
+        });
+      });
+    }
+
+    if (getGrecaptcha()) {
+      renderWidget();
+    } else {
+      const script = document.createElement("script");
+      script.src = "https://www.google.com/recaptcha/api.js?render=explicit";
+      script.async = true;
+      script.onload = renderWidget;
+      document.body.appendChild(script);
+    }
+
+    return () => {
+      cancelled = true;
+      widgetId.current = null;
+      setCaptchaToken(null);
+    };
+  }, [open]);
+
+  function resetCaptcha() {
+    const id = widgetId.current;
+    if (id !== null) getGrecaptcha()?.reset(id);
+    setCaptchaToken(null);
+  }
+
   function handleClose() {
     setRows([]);
     setPasteFallback("");
     setError(null);
     setPasteHint(null);
     setShowManual(false);
+    resetCaptcha();
     onClose();
   }
 
@@ -110,6 +176,21 @@ export function SecheepImportModal({
     setRows((prev) => prev.filter((r) => r.id !== id));
   }
 
+  async function handleConsultar() {
+    if (!captchaToken) {
+      setError("Marcá la casilla de verificación de SECHEEP.");
+      return;
+    }
+    setError(null);
+    try {
+      await onConsultar(captchaToken);
+      handleClose();
+    } catch (err) {
+      resetCaptcha();
+      setError(err instanceof Error ? err.message : "No se pudo traer las boletas.");
+    }
+  }
+
   async function handleSubmit() {
     if (!preview || "error" in preview) {
       setError(
@@ -132,8 +213,8 @@ export function SecheepImportModal({
     <Modal
       open={open}
       onClose={handleClose}
-      title="Actualizar luz desde SECHEEP"
-      subtitle="Consultá en el recuadro, copiá la tabla y el sistema carga las boletas"
+      title="Traer facturas de luz"
+      subtitle="SECHEEP"
       footer={
         <>
           <ButtonOutline type="button" onClick={handleClose} disabled={submitting}>
@@ -141,21 +222,18 @@ export function SecheepImportModal({
           </ButtonOutline>
           <ButtonPrimary
             type="button"
-            onClick={() => void handleSubmit()}
-            disabled={submitting || !preview || ("error" in preview)}
+            onClick={() => void handleConsultar()}
+            disabled={submitting || !captchaToken}
           >
-            {submitting ? "Guardando…" : "Guardar en el contrato"}
+            {submitting ? "Consultando…" : "Traer facturas"}
           </ButtonPrimary>
         </>
       }
     >
       <div className="flex flex-col gap-4">
-        <div className="rounded-sm bg-bg-page px-3 py-2.5 text-[11px] leading-relaxed text-text-secondary">
-          Por seguridad del navegador, Rocchia <span className="font-semibold text-text-primary">no puede leer</span>{" "}
-          SECHEEP automáticamente después del captcha. Lo más rápido: consultás acá abajo,{" "}
-          <span className="font-semibold text-text-primary">copiás la tabla</span> (Ctrl+C) y tocás{" "}
-          <span className="font-semibold text-text-primary">Pegar boletas copiadas</span>.
-        </div>
+        <p className="text-[12px] leading-relaxed text-text-secondary">
+          Marcá la verificación y traé las boletas. Se cargan las vencidas y las pendientes. Las pagadas no se importan.
+        </p>
 
         <div className="grid gap-2 sm:grid-cols-2">
           <div className="rounded-sm border border-border bg-bg-card px-3 py-2">
@@ -168,50 +246,26 @@ export function SecheepImportModal({
           </div>
         </div>
 
-        <div className="flex flex-col gap-2">
-          <p className="text-[12px] font-semibold text-text-primary">
-            Paso 1 — Consultar (captcha + Buscar)
-          </p>
-          <iframe
-            title="Consulta SECHEEP"
-            src={SECHEEP_CONSULTA_URL}
-            className="h-[min(420px,55vh)] w-full rounded-sm border border-border bg-white"
-            sandbox="allow-forms allow-scripts allow-same-origin allow-popups"
-          />
-          <p className="text-[11px] text-text-secondary">
-            Si el recuadro no carga,{" "}
-            <a
-              href={SECHEEP_CONSULTA_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-semibold text-primary underline"
-            >
-              abrí SECHEEP en otra pestaña
-            </a>
-            .
-          </p>
-        </div>
-
-        <div className="flex flex-col gap-2 rounded-sm border border-border bg-bg-page px-3.5 py-3">
-          <p className="text-[12px] font-semibold text-text-primary">
-            Paso 2 — Copiar y pegar boletas
-          </p>
-          <p className="text-[11px] leading-snug text-text-secondary">
-            En la tabla de resultados: seleccioná las filas (clic y arrastrar, o Ctrl+A), copiá con{" "}
-            <span className="font-semibold">Ctrl+C</span> y volvé acá.
-          </p>
-          <ButtonPrimary type="button" onClick={() => void handlePasteFromClipboard()}>
-            Pegar boletas copiadas
-          </ButtonPrimary>
-          {pasteHint ? (
-            <p className="text-[11px] font-medium text-success">{pasteHint}</p>
-          ) : null}
-        </div>
+        <div ref={captchaHost} className="min-h-[78px]" />
+        <a
+          href={SECHEEP_CONSULTA_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[12px] font-semibold text-primary underline"
+        >
+          Abrir la consulta en SECHEEP
+        </a>
 
         <details className="rounded-sm border border-dashed border-border px-3 py-2">
           <summary className="cursor-pointer text-[11px] font-semibold text-text-secondary">
-            ¿No funcionó el botón? Pegá manualmente
+            Si la verificación no pasa, pegá la tabla de SECHEEP
           </summary>
+          <div className="mt-2">
+            <ButtonOutline type="button" onClick={() => void handlePasteFromClipboard()}>
+              Pegar boletas copiadas
+            </ButtonOutline>
+            {pasteHint ? <p className="mt-2 text-[11px] font-medium text-success">{pasteHint}</p> : null}
+          </div>
           <div className="mt-2 flex flex-col gap-2">
             <textarea
               value={pasteFallback}
@@ -331,6 +385,9 @@ export function SecheepImportModal({
 
         {preview && !("error" in preview) ? (
           <div className="flex flex-col gap-2 rounded-sm border border-border bg-bg-page px-3 py-2.5">
+            <ButtonPrimary type="button" onClick={() => void handleSubmit()} disabled={submitting}>
+              {submitting ? "Guardando…" : "Guardar lo pegado"}
+            </ButtonPrimary>
             <div className="flex flex-wrap items-center gap-2">
               <StatusBadge label={preview.badge.label} variant={preview.badge.variant} />
               <span className="text-[11px] text-text-secondary">{preview.badge.detail}</span>

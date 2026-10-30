@@ -24,10 +24,13 @@ import {
   ApiError,
   addVentaParte,
   createVenta,
+  createVentaFinanciacion,
   fetchCatalog,
   fetchInmuebles,
   searchCatalogo,
 } from "@/lib/api";
+import type { VentaModalidadPago } from "@/lib/api/types";
+import { todayIso } from "@/lib/ventas/catalog-helpers";
 import type { CatalogSearchItem, CatalogoItem, InmuebleRecord } from "@/lib/api/types";
 import { altaInmuebleCatalogo } from "@/lib/inmuebles/alta-inmueble";
 import { saleOferta } from "@/lib/ventas/catalog-helpers";
@@ -36,6 +39,10 @@ import { nextInmuebleCode, prefixForTipoInmueble } from "@/lib/codes";
 
 const emptyPersona: PersonaFieldValue = emptyNewPersonaField();
 const MIN_SEARCH_LEN = 2;
+const MODALIDAD_OPTIONS: Array<{ value: VentaModalidadPago; label: string }> = [
+  { value: "financiado", label: "Financiación" },
+  { value: "contado", label: "Contado" },
+];
 
 type InmuebleSource = "catalogo" | "nuevo";
 
@@ -81,6 +88,9 @@ export function NewVentaModal({
   const [escribano, setEscribano] = useState("");
   const [condiciones, setCondiciones] = useState("");
   const [notas, setNotas] = useState("");
+  const [modalidad, setModalidad] = useState<VentaModalidadPago>("financiado");
+  const [fechaPagoContado, setFechaPagoContado] = useState(todayIso());
+  const [createdVentaId, setCreatedVentaId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -104,6 +114,9 @@ export function NewVentaModal({
     setEscribano("");
     setCondiciones("");
     setNotas("");
+    setModalidad("financiado");
+    setFechaPagoContado(todayIso());
+    setCreatedVentaId(null);
     setError(null);
 
     const item = preselectedItem ?? null;
@@ -297,6 +310,20 @@ export function NewVentaModal({
     setSaving(true);
     setError(null);
     try {
+      if (createdVentaId !== null && modalidad === "contado") {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaPagoContado)) {
+          setError("Ingresá la fecha del pago al contado.");
+          return;
+        }
+        await createVentaFinanciacion(token, createdVentaId, {
+          modalidadPago: "contado",
+          primerVencimiento: fechaPagoContado,
+        });
+        onCreated(createdVentaId);
+        onClose();
+        return;
+      }
+
       const inmuebleId = await resolveInmuebleId();
       const [buyerPersona, sellerPersona, ...garantePersonas] = await Promise.all([
         resolvePartePersona(token, buyer),
@@ -315,10 +342,15 @@ export function NewVentaModal({
         codigoMoneda,
         fechaBoleto: fechaBoleto || null,
         nombreEscribano: escribano.trim() || null,
-        condicionesPago: condiciones.trim() || null,
+        condicionesPago:
+          condiciones.trim() || (modalidad === "contado" ? "Contado" : null),
         notas: notas.trim() || null,
         estado: "boleto",
       });
+      if (!Number.isInteger(venta.id) || venta.id <= 0) {
+        setError("La venta se creó pero no se recibió un identificador válido.");
+        return;
+      }
       await Promise.all([
         addVentaParte(token, venta.id, { personaId: buyerPersona.id, rol: "buyer" }),
         addVentaParte(token, venta.id, { personaId: sellerPersona.id, rol: "seller" }),
@@ -326,9 +358,16 @@ export function NewVentaModal({
           addVentaParte(token, venta.id, { personaId: persona.id, rol: "guarantor" }),
         ),
       ]);
-      if (!Number.isInteger(venta.id) || venta.id <= 0) {
-        setError("La venta se creó pero no se recibió un identificador válido.");
-        return;
+      setCreatedVentaId(venta.id);
+      if (modalidad === "contado") {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaPagoContado)) {
+          setError("Ingresá la fecha del pago al contado.");
+          return;
+        }
+        await createVentaFinanciacion(token, venta.id, {
+          modalidadPago: "contado",
+          primerVencimiento: fechaPagoContado,
+        });
       }
       onCreated(venta.id);
       onClose();
@@ -597,6 +636,30 @@ export function NewVentaModal({
                 <FormField label="Fecha de boleto (opcional)" value={fechaBoleto} onChange={setFechaBoleto} type="date" />
                 <FormField label="Escribano (opcional)" value={escribano} onChange={setEscribano} />
               </div>
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[11px] font-semibold text-text-secondary">Forma de pago</span>
+                <ChipToggle
+                  options={MODALIDAD_OPTIONS.map((option) => option.label)}
+                  value={MODALIDAD_OPTIONS.find((option) => option.value === modalidad)?.label ?? "Financiación"}
+                  onChange={(label) => {
+                    const match = MODALIDAD_OPTIONS.find((option) => option.label === label);
+                    if (match) setModalidad(match.value);
+                  }}
+                />
+                <p className="text-[12px] text-text-secondary">
+                  {modalidad === "contado"
+                    ? "Se registra un único cobro por el precio total. Después podés cobrarlo y emitir el recibo."
+                    : "La financiación (entrega y cuotas) se configura después, desde la ficha de la venta."}
+                </p>
+              </div>
+              {modalidad === "contado" ? (
+                <FormField
+                  label="Fecha prevista del pago"
+                  value={fechaPagoContado}
+                  onChange={setFechaPagoContado}
+                  type="date"
+                />
+              ) : null}
               <FormField label="Condiciones de pago" value={condiciones} onChange={setCondiciones} />
               <FormField label="Notas" value={notas} onChange={setNotas} />
             </FormSection>

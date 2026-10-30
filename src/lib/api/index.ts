@@ -283,6 +283,34 @@ export function importSecheep(token: string, servicioId: number, body: SecheepIm
   });
 }
 
+export function consultarSecheep(token: string, servicioId: number, captchaToken: string) {
+  return apiRequest<SecheepImportResult>(`/servicios/${servicioId}/secheep/consultar`, {
+    method: "POST",
+    token,
+    body: JSON.stringify({ captchaToken }),
+  });
+}
+
+export function consultarSameep(token: string, servicioId: number, captchaToken: string) {
+  return apiRequest<import("./types").AguaConsultaResult>(`/servicios/${servicioId}/agua/sameep/consultar`, {
+    method: "POST",
+    token,
+    body: JSON.stringify({ captchaToken }),
+  });
+}
+
+export function consultarAgua(
+  token: string,
+  servicioId: number,
+  body: import("./types").AguaConsultaInput,
+) {
+  return apiRequest<import("./types").AguaConsultaResult>(`/servicios/${servicioId}/agua/consultar`, {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
 export function fetchPlanesActualizacionDeposito(token: string, contratoId: number) {
   return apiRequest<{ items: PlanActualizacionDepositoDetail[] }>(
     `/contratos/${contratoId}/planes-actualizacion-deposito`,

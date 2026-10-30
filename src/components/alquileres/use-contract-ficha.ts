@@ -24,6 +24,9 @@ import {
   fetchPlanesActualizacionDeposito,
   fetchServicios,
   fetchServiciosPeriodos,
+  consultarAgua,
+  consultarSameep,
+  consultarSecheep,
   importSecheep,
   issueRecibo,
   registerPago,
@@ -158,6 +161,39 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
       .finally(() => setLoading(false));
   }, [validId, token, logout, loadCore]);
 
+  function aguaSuministroPayload(values: ServicioFormValues) {
+    if (values.proveedorAgua === "sameep") {
+      const cliente = values.numeroClienteSameep.replace(/\D/g, "");
+      const suministro = values.numeroSuministroSameep.replace(/\D/g, "");
+      return {
+        proveedorAgua: cliente && suministro ? ("sameep" as const) : null,
+        numeroSocioAgua: null,
+        numeroServicioAgua: null,
+        numeroClienteSameep: cliente || null,
+        numeroSuministroSameep: suministro || null,
+      };
+    }
+    const socio = values.numeroSocioAgua.replace(/\D/g, "");
+    const servicio = Number(values.numeroServicioAgua);
+    if (!socio) {
+      return {
+        proveedorAgua: null,
+        numeroSocioAgua: null,
+        numeroServicioAgua: null,
+        numeroClienteSameep: null,
+        numeroSuministroSameep: null,
+      };
+    }
+    return {
+      proveedorAgua: "cooperativa" as const,
+      numeroSocioAgua: socio,
+      numeroServicioAgua:
+        Number.isInteger(servicio) && servicio >= 1 && servicio <= 99 ? servicio : 1,
+      numeroClienteSameep: null,
+      numeroSuministroSameep: null,
+    };
+  }
+
   async function handleCreateServicio(values: ServicioFormValues) {
     if (!token || !contrato) return;
     setSubmitting(true);
@@ -173,6 +209,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
               numeroMedidor: values.numeroMedidor.trim() || null,
               numeroClienteSecheep: values.numeroClienteSecheep.trim() || null,
               numeroSuministroSecheep: values.numeroSuministroSecheep.trim() || null,
+              ...aguaSuministroPayload(values),
               modoFacturacion: values.modoFacturacion,
               montoFijo: Number(values.montoFijo),
               codigoMoneda: values.codigoMoneda,
@@ -184,6 +221,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
               numeroMedidor: values.numeroMedidor.trim() || null,
               numeroClienteSecheep: values.numeroClienteSecheep.trim() || null,
               numeroSuministroSecheep: values.numeroSuministroSecheep.trim() || null,
+              ...aguaSuministroPayload(values),
               modoFacturacion: values.modoFacturacion,
             };
       await createServicio(token, contrato.id, body);
@@ -215,6 +253,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
               numeroMedidor: values.numeroMedidor.trim() || null,
               numeroClienteSecheep: values.numeroClienteSecheep.trim() || null,
               numeroSuministroSecheep: values.numeroSuministroSecheep.trim() || null,
+              ...aguaSuministroPayload(values),
               modoFacturacion: values.modoFacturacion,
               montoFijo: Number(values.montoFijo),
               codigoMoneda: values.codigoMoneda,
@@ -225,6 +264,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
               numeroMedidor: values.numeroMedidor.trim() || null,
               numeroClienteSecheep: values.numeroClienteSecheep.trim() || null,
               numeroSuministroSecheep: values.numeroSuministroSecheep.trim() || null,
+              ...aguaSuministroPayload(values),
               modoFacturacion: values.modoFacturacion,
               montoFijo: null,
               codigoMoneda: null,
@@ -255,6 +295,81 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
       await loadServicios(contrato.id);
     } catch (err) {
       setError(rentalApiErrorMessage(err, "No se pudo desactivar el servicio"));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleConsultarSameep(servicioId: number, captchaToken: string) {
+    if (!token || !contrato) {
+      throw new Error("No hay sesión para consultar SAMEEP.");
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      const result = await consultarSameep(token, servicioId, captchaToken);
+      if (result.captchaRequired) {
+        throw new Error(result.message);
+      }
+      const compartidos = result.compartidos > 0
+        ? ` Este suministro también está en ${result.compartidos} contrato${result.compartidos === 1 ? "" : "s"} más: la boleta es la del medidor completo.`
+        : "";
+      setSuccess(
+        `SAMEEP actualizado: ${result.creados} nuevo(s), ${result.actualizados} actualizado(s).${compartidos}`,
+      );
+      await loadServicios(contrato.id);
+    } catch (err) {
+      setError(rentalApiErrorMessage(err, "No se pudo consultar SAMEEP"));
+      throw err;
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleConsultarAgua(
+    servicioId: number,
+    body: { captchaToken?: string; captchaAnswer?: string },
+  ) {
+    if (!token || !contrato) {
+      throw new Error("No hay sesión para consultar el agua.");
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      const result = await consultarAgua(token, servicioId, body);
+      if (!result.captchaRequired) {
+        const compartidos = result.compartidos > 0
+          ? ` Este suministro también está en ${result.compartidos} contrato${result.compartidos === 1 ? "" : "s"} más: la boleta es la del medidor completo.`
+          : "";
+        setSuccess(
+          `Agua actualizada: ${result.creados} nuevo(s), ${result.actualizados} actualizado(s).${compartidos}`,
+        );
+        await loadServicios(contrato.id);
+      }
+      return result;
+    } catch (err) {
+      setError(rentalApiErrorMessage(err, "No se pudo consultar el agua"));
+      throw err;
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleConsultarSecheep(servicioId: number, captchaToken: string) {
+    if (!token || !contrato) {
+      throw new Error("No hay sesión para consultar SECHEEP.");
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      const result = await consultarSecheep(token, servicioId, captchaToken);
+      setSuccess(
+        `SECHEEP actualizado: ${result.creados} nuevo(s), ${result.actualizados} actualizado(s).`,
+      );
+      await loadServicios(contrato.id);
+    } catch (err) {
+      setError(rentalApiErrorMessage(err, "No se pudo consultar SECHEEP"));
+      throw err;
     } finally {
       setSubmitting(false);
     }
@@ -549,6 +664,9 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
     handleCreateServicio,
     handleUpdateServicio,
     handleDeactivateServicio,
+    handleConsultarAgua,
+    handleConsultarSameep,
+    handleConsultarSecheep,
     handleImportSecheep,
     handleCreatePeriodo,
     handleCreatePlanDeposito,

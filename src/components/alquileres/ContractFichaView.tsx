@@ -114,6 +114,9 @@ export function ContractFichaView() {
     handleCreateServicio,
     handleUpdateServicio,
     handleDeactivateServicio,
+    handleConsultarAgua,
+    handleConsultarSameep,
+    handleConsultarSecheep,
     handleImportSecheep,
     handleCreatePeriodo,
     handleCreatePlanDeposito,
@@ -362,6 +365,9 @@ export function ContractFichaView() {
               onDeactivateServicio={handleDeactivateServicio}
               onCreatePeriodo={handleCreatePeriodo}
               onImportSecheep={handleImportSecheep}
+              onConsultarSecheep={handleConsultarSecheep}
+              onConsultarAgua={handleConsultarAgua}
+              onConsultarSameep={handleConsultarSameep}
               onRegisterPago={handleRegisterPago}
               mediosPago={mediosPago}
               canRegisterPago={canEdit}
