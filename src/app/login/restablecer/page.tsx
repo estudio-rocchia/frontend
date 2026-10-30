@@ -2,11 +2,11 @@
 
 import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
-import { FormEvent, useId, useState } from "react";
+import { FormEvent, Suspense, useId, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { LoginErrorAlert } from "@/components/auth/LoginErrorAlert";
-import { LoginShell } from "@/components/auth/LoginShell";
+import { LoginLoadingScreen, LoginShell } from "@/components/auth/LoginShell";
 import { LoginSpinner } from "@/components/auth/LoginSpinner";
 import { resetPasswordWithToken } from "@/lib/api";
 import { getLoginErrorPresentation } from "@/lib/auth/login-errors";
@@ -22,7 +22,7 @@ type FieldErrors = {
   confirmPassword?: string;
 };
 
-export default function RestablecerContrasenaPage() {
+function RestablecerContrasenaForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const errorId = useId();
@@ -193,5 +193,13 @@ export default function RestablecerContrasenaPage() {
         </Link>
       </p>
     </LoginShell>
+  );
+}
+
+export default function RestablecerContrasenaPage() {
+  return (
+    <Suspense fallback={<LoginLoadingScreen message="Cargando…" />}>
+      <RestablecerContrasenaForm />
+    </Suspense>
   );
 }
