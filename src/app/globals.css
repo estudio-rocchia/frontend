@@ -105,14 +105,101 @@ body {
   animation: dashboard-count-pop 0.35s ease-out both;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .dashboard-animate-in,
-  .dashboard-count-pop,
-  .login-alert-enter {
-    animation: none;
+.login-alert-enter {
+  animation: dashboard-rise-in 0.25s ease-out both;
+}
+
+@keyframes login-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
   }
 }
 
-.login-alert-enter {
-  animation: dashboard-rise-in 0.25s ease-out both;
+@keyframes login-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes login-logo-in {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes login-window-on {
+  0% {
+    opacity: 0;
+  }
+  60% {
+    opacity: 0.95;
+  }
+  100% {
+    opacity: 0.7;
+  }
+}
+
+.login-skyline-path {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: login-draw 1.6s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+}
+
+.login-skyline-path--back {
+  animation-duration: 1.9s;
+  animation-delay: 0.15s;
+}
+
+.login-window {
+  opacity: 0;
+  animation: login-window-on 0.6s ease-out forwards;
+}
+
+.login-logo-enter {
+  animation: login-logo-in 0.5s ease-out both;
+}
+
+.login-logo-ring {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: login-draw 0.9s ease-out 0.2s forwards;
+}
+
+.login-card-enter {
+  animation: login-rise-in 0.5s ease-out 0.35s both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-animate-in,
+  .dashboard-count-pop,
+  .login-alert-enter,
+  .login-skyline-path,
+  .login-window,
+  .login-logo-enter,
+  .login-logo-ring,
+  .login-card-enter {
+    animation: none;
+  }
+
+  .login-skyline-path,
+  .login-logo-ring {
+    stroke-dashoffset: 0;
+  }
+
+  .login-window {
+    opacity: 0.7;
+  }
 }

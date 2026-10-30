@@ -1,15 +1,17 @@
 "use client";
 
+import { Mail } from "lucide-react";
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 
-import { LoginShell } from "@/components/auth/LoginShell";
+import { LoginHeading, LoginShell } from "@/components/auth/LoginShell";
 import { LoginSpinner } from "@/components/auth/LoginSpinner";
 import { requestPasswordReset } from "@/lib/api";
 import { getLoginErrorPresentation } from "@/lib/auth/login-errors";
 import { LoginErrorAlert } from "@/components/auth/LoginErrorAlert";
 import {
   loginInputClass,
+  loginInputIconClass,
   loginLinkClass,
   loginSubmitClass,
 } from "@/lib/ui/login-styles";
@@ -17,9 +19,9 @@ import {
 export default function RecuperarCuentaPage() {
   const [email, setEmail] = useState("");
   const [fieldError, setFieldError] = useState<string | null>(null);
-  const [submitError, setSubmitError] = useState<ReturnType<typeof getLoginErrorPresentation> | null>(
-    null,
-  );
+  const [submitError, setSubmitError] = useState<ReturnType<
+    typeof getLoginErrorPresentation
+  > | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -47,41 +49,44 @@ export default function RecuperarCuentaPage() {
 
   return (
     <LoginShell asForm onSubmit={handleSubmit}>
-      <div className="text-center">
-        <h1 className="text-[26px] font-bold text-text-primary">Recuperar cuenta</h1>
-        <p className="mt-1.5 text-[15px] text-text-secondary">
-          Ingresá tu email y te enviaremos instrucciones para restablecer tu contraseña.
-        </p>
-      </div>
+      <LoginHeading
+        title="Recuperar cuenta"
+        subtitle="Ingresá tu email y te enviaremos instrucciones para restablecer tu contraseña."
+      />
 
       {submitted ? (
         <div
           role="status"
-          className="login-alert-enter mt-8 rounded-lg border border-success bg-success-bg px-4 py-3 text-sm text-success"
+          className="login-alert-enter mt-7 rounded-lg border border-success bg-success-bg px-4 py-3 text-sm text-success"
         >
-          Si existe una cuenta asociada a{" "}
-          <span className="font-semibold">{email.trim()}</span>, recibirás un correo con los pasos
-          para restablecer tu contraseña.
+          Si existe una cuenta asociada a <span className="font-semibold">{email.trim()}</span>,
+          recibirás un correo con los pasos para restablecer tu contraseña.
         </div>
       ) : (
-        <div className="mt-8 flex flex-col gap-5">
+        <div className="mt-7 flex flex-col gap-5">
           <label className="flex flex-col gap-2">
             <span className="text-sm font-semibold text-text-primary">Email</span>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => {
-                setEmail(e.target.value);
-                if (fieldError) setFieldError(null);
-                if (submitError) setSubmitError(null);
-              }}
-              autoComplete="email"
-              autoFocus
-              aria-invalid={Boolean(fieldError)}
-              aria-describedby={fieldError ? "recuperar-email-error" : undefined}
-              placeholder="usuario@rocchia.com"
-              className={loginInputClass(Boolean(fieldError))}
-            />
+            <div className="relative">
+              <Mail className={loginInputIconClass} aria-hidden />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (fieldError) setFieldError(null);
+                  if (submitError) setSubmitError(null);
+                }}
+                disabled={submitting}
+                autoComplete="email"
+                autoFocus
+                aria-invalid={Boolean(fieldError)}
+                aria-describedby={fieldError ? "recuperar-email-error" : undefined}
+                placeholder="usuario@rocchia.com"
+                className={loginInputClass(Boolean(fieldError), {
+                  leadingIcon: true,
+                })}
+              />
+            </div>
             {fieldError ? (
               <span id="recuperar-email-error" className="login-alert-enter text-xs text-danger">
                 {fieldError}
