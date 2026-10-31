@@ -1,3 +1,9 @@
+import Image from "next/image";
+import type { ReactNode } from "react";
+
+import logo2 from "@/assets/logo2-cut.png";
+import rocchiaLogo from "@/assets/rocchia-logo-cut.png";
+
 const FRONT_SKYLINE =
   "M0 320 V250 H60 V210 H110 V250 H150 V170 H175 V150 H200 V170 H225 V250 H270 V200 H330 V250 " +
   "H360 V120 H380 V100 H400 V120 H420 V250 H470 V190 H540 V250 H580 V150 H640 V250 H680 V220 " +
@@ -31,8 +37,89 @@ const WINDOWS: ReadonlyArray<readonly [x: number, y: number]> = [
   [1040, 125],
 ];
 
-const WINDOWS_START_S = 1.3;
-const WINDOWS_STEP_S = 0.09;
+const WINDOW_DURATIONS = [2.6, 3.4, 4.1, 3.1, 4.8];
+
+export function LoginSky() {
+  return (
+    <div
+      aria-hidden
+      className="pointer-events-none absolute inset-x-0 top-0 h-[68%] overflow-hidden"
+    >
+      <div className="login-sky-haze login-sky-haze--near" />
+      <div className="login-sky-haze login-sky-haze--far" />
+    </div>
+  );
+}
+
+function DriftMark({ children, className }: { children: ReactNode; className: string }) {
+  return (
+    <svg viewBox="0 0 64 64" className={className} fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      {children}
+    </svg>
+  );
+}
+
+export function LoginDrift() {
+  return (
+    <div aria-hidden className="pointer-events-none absolute inset-0 text-login-accent">
+      <div className="login-drift-lane login-drift-lane--left">
+        <div className="login-drift-slot">
+          <DriftMark className="login-drift-piece login-drift-piece--key">
+            <circle cx="22" cy="22" r="8" />
+            <path d="M28 28 50 50" />
+            <path d="M42 42v8" />
+            <path d="M48 48v6" />
+          </DriftMark>
+        </div>
+        <div className="login-drift-slot">
+          <Image
+            src={rocchiaLogo}
+            alt=""
+            width={56}
+            height={56}
+            className="login-drift-piece login-drift-piece--logo"
+          />
+        </div>
+        <div className="login-drift-slot">
+          <DriftMark className="login-drift-piece login-drift-piece--scales">
+            <path d="M32 10v8" />
+            <path d="M14 20h36" />
+            <path d="M18 20c0 8 4 12 8 12s8-4 8-12" />
+            <path d="M30 20c0 8 4 12 8 12s8-4 8-12" />
+            <path d="M32 18v30" />
+            <path d="M22 52h20" />
+          </DriftMark>
+        </div>
+      </div>
+      <div className="login-drift-lane login-drift-lane--right">
+        <div className="login-drift-slot">
+          <DriftMark className="login-drift-piece login-drift-piece--house">
+            <path d="M10 30 32 12l22 18" />
+            <path d="M16 28v22h32V28" />
+            <path d="M28 50V36h8v14" />
+          </DriftMark>
+        </div>
+        <div className="login-drift-slot">
+          <DriftMark className="login-drift-piece login-drift-piece--deed">
+            <path d="M16 12h24l10 10v30H16V12z" />
+            <path d="M40 12v10h10" />
+            <path d="M24 30h16" />
+            <path d="M24 38h12" />
+          </DriftMark>
+        </div>
+        <div className="login-drift-slot">
+          <Image
+            src={logo2}
+            alt=""
+            width={128}
+            height={128}
+            className="login-drift-piece login-drift-piece--logo2"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function LoginSkyline() {
   return (
@@ -74,7 +161,10 @@ export function LoginSkyline() {
             rx={1}
             fill="var(--login-accent)"
             className="login-window"
-            style={{ animationDelay: `${WINDOWS_START_S + index * WINDOWS_STEP_S}s` }}
+            style={{
+              animationDuration: `${WINDOW_DURATIONS[index % WINDOW_DURATIONS.length]}s`,
+              animationDelay: `${1.7 + ((index * 0.47) % 3.2)}s`,
+            }}
           />
         ))}
       </svg>

@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 
 import { CapsLockHint, useCapsLock } from "@/components/auth/CapsLockHint";
 import { LoginErrorAlert } from "@/components/auth/LoginErrorAlert";
-import { LoginHeading, LoginLoadingScreen, LoginShell } from "@/components/auth/LoginShell";
+import { LoginHeading, LoginLoadingScreen, LoginShell, useLoginOption } from "@/components/auth/LoginShell";
 import { LoginSpinner } from "@/components/auth/LoginSpinner";
 import { useAuth } from "@/context/auth-context";
 import {
@@ -41,6 +41,12 @@ function validateFields(usernameOrEmail: string, password: string): FieldErrors 
 function describedBy(...ids: Array<string | false | null | undefined>) {
   const value = ids.filter(Boolean).join(" ");
   return value || undefined;
+}
+
+function LoginTitle() {
+  const { option } = useLoginOption();
+  if (option === 2) return null;
+  return <LoginHeading title="Acceso" subtitle="Estudio Jurídico e Inmobiliario" />;
 }
 
 export default function LoginPage() {
@@ -103,8 +109,7 @@ export default function LoginPage() {
 
   return (
     <LoginShell asForm onSubmit={handleSubmit} shakeSignal={shakeSignal}>
-      <LoginHeading title="Acceso" subtitle="Estudio Jurídico e Inmobiliario" />
-
+      <LoginTitle />
       <div className="mt-7 flex flex-col gap-5">
         <label className="flex flex-col gap-2">
           <span className="text-sm font-semibold text-text-primary">Email o usuario</span>

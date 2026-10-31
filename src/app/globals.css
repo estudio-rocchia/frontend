@@ -141,14 +141,15 @@ body {
 }
 
 @keyframes login-window-on {
-  0% {
+  0%,
+  100% {
     opacity: 0;
   }
-  60% {
+  38% {
     opacity: 0.95;
   }
-  100% {
-    opacity: 0.7;
+  62% {
+    opacity: 0.28;
   }
 }
 
@@ -165,7 +166,7 @@ body {
 
 .login-window {
   opacity: 0;
-  animation: login-window-on 0.6s ease-out forwards;
+  animation: login-window-on ease-in-out infinite backwards;
 }
 
 .login-logo-enter {
@@ -182,6 +183,297 @@ body {
   animation: login-rise-in 0.5s ease-out 0.35s both;
 }
 
+.login-sky-haze {
+  position: absolute;
+  left: -15%;
+  width: 130%;
+  height: 70%;
+  background:
+    radial-gradient(ellipse 22% 48% at 18% 42%, color-mix(in srgb, var(--login-accent) 70%, transparent), transparent 72%),
+    radial-gradient(ellipse 16% 36% at 52% 28%, color-mix(in srgb, var(--login-accent) 45%, transparent), transparent 70%),
+    radial-gradient(ellipse 24% 50% at 82% 55%, color-mix(in srgb, var(--login-accent) 55%, transparent), transparent 74%);
+  filter: blur(12px);
+  animation: login-sky-drift 22s ease-in-out infinite alternate;
+}
+
+.login-sky-haze--near {
+  top: 6%;
+  opacity: 0.85;
+}
+
+.login-sky-haze--far {
+  top: 18%;
+  opacity: 0.5;
+  animation-duration: 34s;
+  animation-direction: alternate-reverse;
+}
+
+@keyframes login-sky-drift {
+  from {
+    transform: translate3d(-6%, 0, 0);
+  }
+  to {
+    transform: translate3d(6%, 5%, 0);
+  }
+}
+
+.login-wordmark-shine {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(
+    105deg,
+    transparent 0%,
+    transparent 30%,
+    var(--login-accent) 44%,
+    white 50%,
+    var(--login-accent) 56%,
+    transparent 70%,
+    transparent 100%
+  );
+  background-repeat: no-repeat;
+  background-size: 240% 100%;
+  mask-image: var(--wordmark);
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: 100% 100%;
+  animation: login-wordmark-shine 6.5s linear infinite;
+}
+
+.login-drift-lane {
+  position: absolute;
+  top: 0;
+  bottom: 30vh;
+  display: flex;
+  flex-direction: column;
+  width: calc(50% - 15.5rem);
+  overflow: hidden;
+}
+
+.login-drift-slot {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.login-drift-lane--left {
+  left: 0;
+}
+
+.login-drift-lane--right {
+  right: 0;
+}
+
+.login-drift-piece {
+  position: absolute;
+  width: 4.25rem;
+  height: 4.25rem;
+  opacity: 0;
+}
+
+.login-drift-piece--scales {
+  animation:
+    login-drift-scales 16s ease-in-out infinite,
+    login-drift-in 0.7s ease-out 3.4s both;
+}
+
+.login-drift-piece--house {
+  animation:
+    login-drift-house 19s ease-in-out infinite,
+    login-drift-in 0.7s ease-out 1s both;
+}
+
+.login-drift-piece--key {
+  width: 3.25rem;
+  height: 3.25rem;
+  animation:
+    login-drift-key 21s ease-in-out infinite,
+    login-drift-in 0.7s ease-out 0.35s both;
+}
+
+.login-drift-piece--deed {
+  width: 3.25rem;
+  height: 3.25rem;
+  animation:
+    login-drift-deed 17s ease-in-out infinite,
+    login-drift-in 0.7s ease-out 2.6s both;
+}
+
+.login-drift-piece--logo {
+  width: 4.5rem;
+  height: 4.5rem;
+  object-fit: contain;
+  animation:
+    login-drift-logo 23s ease-in-out infinite,
+    login-drift-in 0.7s ease-out 1.8s both;
+}
+
+.login-drift-piece--logo2 {
+  width: 5.25rem;
+  height: 5.25rem;
+  object-fit: contain;
+  animation:
+    login-drift-logo2 25s ease-in-out infinite,
+    login-drift-in 0.7s ease-out 4.2s both;
+}
+
+@keyframes login-drift-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 0.8;
+  }
+}
+
+@keyframes login-drift-scales {
+  0% {
+    top: 42%;
+    left: 12%;
+    transform: rotate(-8deg);
+  }
+  40% {
+    top: 16%;
+    left: 58%;
+    transform: rotate(6deg);
+  }
+  72% {
+    top: 48%;
+    left: 6%;
+    transform: rotate(-3deg);
+  }
+  100% {
+    top: 42%;
+    left: 12%;
+    transform: rotate(-8deg);
+  }
+}
+
+@keyframes login-drift-key {
+  0% {
+    top: 28%;
+    left: 46%;
+    transform: rotate(8deg);
+  }
+  38% {
+    top: 6%;
+    left: 8%;
+    transform: rotate(-10deg);
+  }
+  74% {
+    top: 36%;
+    left: 54%;
+    transform: rotate(4deg);
+  }
+  100% {
+    top: 28%;
+    left: 46%;
+    transform: rotate(8deg);
+  }
+}
+
+@keyframes login-drift-house {
+  0% {
+    top: 10%;
+    left: 52%;
+    transform: rotate(5deg);
+  }
+  45% {
+    top: 32%;
+    left: 8%;
+    transform: rotate(-7deg);
+  }
+  78% {
+    top: 6%;
+    left: 34%;
+    transform: rotate(3deg);
+  }
+  100% {
+    top: 10%;
+    left: 52%;
+    transform: rotate(5deg);
+  }
+}
+
+@keyframes login-drift-logo {
+  0% {
+    top: 22%;
+    left: 8%;
+    transform: rotate(-6deg);
+  }
+  34% {
+    top: 4%;
+    left: 50%;
+    transform: rotate(5deg);
+  }
+  68% {
+    top: 30%;
+    left: 18%;
+    transform: rotate(-3deg);
+  }
+  100% {
+    top: 22%;
+    left: 8%;
+    transform: rotate(-6deg);
+  }
+}
+
+@keyframes login-drift-logo2 {
+  0% {
+    top: 28%;
+    left: 46%;
+    transform: rotate(4deg);
+  }
+  36% {
+    top: 6%;
+    left: 6%;
+    transform: rotate(-5deg);
+  }
+  70% {
+    top: 34%;
+    left: 28%;
+    transform: rotate(3deg);
+  }
+  100% {
+    top: 28%;
+    left: 46%;
+    transform: rotate(4deg);
+  }
+}
+
+@keyframes login-drift-deed {
+  0% {
+    top: 30%;
+    left: 36%;
+    transform: rotate(-6deg);
+  }
+  42% {
+    top: 6%;
+    left: 8%;
+    transform: rotate(8deg);
+  }
+  76% {
+    top: 34%;
+    left: 52%;
+    transform: rotate(-2deg);
+  }
+  100% {
+    top: 30%;
+    left: 36%;
+    transform: rotate(-6deg);
+  }
+}
+
+@keyframes login-wordmark-shine {
+  from {
+    background-position: 120% 0;
+  }
+  to {
+    background-position: -20% 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .dashboard-animate-in,
   .dashboard-count-pop,
@@ -190,8 +482,16 @@ body {
   .login-window,
   .login-logo-enter,
   .login-logo-ring,
-  .login-card-enter {
+  .login-card-enter,
+  .login-sky-haze,
+  .login-wordmark-shine,
+  .login-drift-piece {
     animation: none;
+    opacity: 0.8;
+  }
+
+  .login-wordmark-shine {
+    opacity: 0;
   }
 
   .login-skyline-path,
