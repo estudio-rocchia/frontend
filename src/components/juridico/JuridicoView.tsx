@@ -231,7 +231,13 @@ export function JuridicoView() {
         </div>
       ) : null}
 
-      <div className="flex justify-end">
+      <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+        <Link
+          href="/juridico/formularios"
+          className={`inline-flex min-h-11 w-full items-center justify-center rounded-md border border-border bg-bg-card px-4 text-sm font-semibold text-text-primary sm:w-auto ${interactiveFocusClass}`}
+        >
+          Formularios
+        </Link>
         <ButtonPrimary className="w-full sm:w-auto" onClick={openCreate}>
           Nuevo expediente
         </ButtonPrimary>

@@ -473,7 +473,7 @@ function Resumen({
               ? causante
                 ? `Causante: ${causante}`
                 : "La entrevista de sucesión todavía no tiene causante."
-              : "Ficha de esta causa. Se arma con puntos y preguntas."}
+              : "Ficha de esta causa. Se arma con categorías y preguntas."}
           </p>
         </TaskCard>
       </div>

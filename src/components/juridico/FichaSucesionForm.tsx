@@ -66,7 +66,7 @@ const EJEMPLO: Partial<Record<FichaField["key"], string>> = {
   otraNecesidad: "Detalle, si hay",
   comoLlego: "Recomendación, aviso, ya es cliente…",
   proximoPaso: "Pedir partidas, volver con escrituras…",
-  observaciones: "Lo que no entró en los puntos anteriores",
+  observaciones: "Lo que no entró en las categorías anteriores",
 };
 
 const campoClass = `${formInputClass} min-h-11 w-full bg-bg-card shadow-[var(--shadow-card)]`;
@@ -168,13 +168,13 @@ export function FichaSucesionForm({
       <div className="flex flex-col gap-2">
         {total === 0 ? (
           <p className="text-sm text-text-secondary">
-            Esta causa no trae puntos fijos. Agregá los puntos y las preguntas que hagan falta.
+            Esta causa no trae categorías fijas. Agregá las categorías y las preguntas que hagan falta.
           </p>
         ) : (
           <>
             <div className="flex items-baseline justify-between gap-3">
               <p className="text-sm font-semibold text-text-primary">
-                Punto {active + 1} de {total}
+                Categoría {active + 1} de {total}
               </p>
               <p className="text-xs text-text-secondary">{conDatos} con datos</p>
             </div>
@@ -184,7 +184,7 @@ export function FichaSucesionForm({
               aria-valuenow={conDatos}
               aria-valuemin={0}
               aria-valuemax={total}
-              aria-label="Puntos de la ficha con algún dato"
+              aria-label="Categorías de la ficha con algún dato"
             >
               <div className="h-full rounded-full bg-primary" style={{ width: `${progreso}%` }} />
             </div>
@@ -194,7 +194,7 @@ export function FichaSucesionForm({
       </div>
 
       <div className="flex min-w-0 flex-col gap-6 xl:grid xl:grid-cols-[220px_minmax(0,1fr)] xl:items-start xl:gap-8">
-      <nav className="flex min-w-0 gap-2 overflow-x-auto pb-1 xl:flex-col xl:overflow-visible xl:pb-0" aria-label="Puntos de la ficha">
+      <nav className="flex min-w-0 gap-2 overflow-x-auto pb-1 xl:flex-col xl:overflow-visible xl:pb-0" aria-label="Categorías de la ficha">
         {secciones.map((item, index) => (
           <StepChip
             key={item.id}
@@ -209,7 +209,7 @@ export function FichaSucesionForm({
           <StepChip
             key={punto.id}
             index={secciones.length + index}
-            label={punto.titulo.trim() || "Nuevo"}
+            label={punto.titulo.trim() || "Nueva"}
             selected={active === secciones.length + index}
             filled={puntoLibreConDatos(punto)}
             onClick={() => setStep(secciones.length + index)}
@@ -219,7 +219,7 @@ export function FichaSucesionForm({
           className="justify-start px-3 xl:w-full"
           onClick={() => setPuntos([...extras.puntos, { id: crypto.randomUUID(), titulo: "", preguntas: [] }], total)}
         >
-          Agregar punto
+          Agregar categoría
         </AddAction>
       </nav>
 
@@ -346,7 +346,7 @@ export function FichaSucesionForm({
           }}
         />
       ) : (
-        <p className="text-sm text-text-secondary">Agregá un punto para empezar la ficha.</p>
+        <p className="text-sm text-text-secondary">Agregá una categoría para empezar la ficha.</p>
       )}
 
       <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
@@ -488,7 +488,7 @@ function FichaVista({ ficha, secciones }: { ficha: FichaSucesion; secciones: typ
     })),
     ...extras.puntos.map((punto, index) => ({
       id: punto.id,
-      titulo: punto.titulo.trim() || "Punto nuevo",
+      titulo: punto.titulo.trim() || "Categoría nueva",
       filas: respuestasDelPunto(ficha, secciones.length + index, secciones),
     })),
   ];
@@ -502,7 +502,7 @@ function FichaVista({ ficha, secciones }: { ficha: FichaSucesion; secciones: typ
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-text-secondary">
-        {conDatos.length} {conDatos.length === 1 ? "punto con datos." : "puntos con datos."}
+        {conDatos.length} {conDatos.length === 1 ? "categoría con datos." : "categorías con datos."}
       </p>
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         {conDatos.map((bloque) => (
@@ -730,34 +730,40 @@ function PuntoLibre({
   onQuitar: () => void;
 }) {
   return (
-    <section className="flex flex-col gap-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <input
-          value={punto.titulo}
-          placeholder="Nombre del punto"
-          aria-label="Nombre del punto"
-          onChange={(event) => onTitulo(event.target.value)}
-          className={`min-w-0 flex-1 bg-transparent text-lg font-semibold text-text-primary outline-none placeholder:text-text-secondary ${interactiveFocusClass}`}
-        />
-        <button
-          type="button"
-          onClick={onQuitar}
-          className={`inline-flex min-h-11 items-center text-sm font-semibold text-danger ${interactiveFocusClass}`}
-        >
-          Quitar punto
-        </button>
-      </div>
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {punto.preguntas.map((pregunta) => (
-          <PreguntaLibre
-            key={pregunta.id}
-            pregunta={pregunta}
-            onChange={(next) => onPregunta(pregunta.id, next)}
-            onRemove={() => onQuitarPregunta(pregunta.id)}
+    <section className="flex flex-col gap-5">
+      <div className="flex flex-col gap-1">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Categoría</p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <input
+            value={punto.titulo}
+            placeholder="Nombre de la categoría"
+            aria-label="Nombre de la categoría"
+            onChange={(event) => onTitulo(event.target.value)}
+            className={`min-w-0 flex-1 bg-transparent text-xl font-semibold text-text-primary outline-none placeholder:font-normal placeholder:text-text-secondary ${interactiveFocusClass}`}
           />
-        ))}
+          <button
+            type="button"
+            onClick={onQuitar}
+            className={`inline-flex min-h-11 items-center text-sm font-medium text-text-secondary hover:text-danger ${interactiveFocusClass}`}
+          >
+            Quitar categoría
+          </button>
+        </div>
       </div>
-      <AgregarPregunta onAdd={onAgregarPregunta} />
+      <div className="flex flex-col gap-4 border-l-2 border-border pl-4">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Preguntas</p>
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          {punto.preguntas.map((pregunta) => (
+            <PreguntaLibre
+              key={pregunta.id}
+              pregunta={pregunta}
+              onChange={(next) => onPregunta(pregunta.id, next)}
+              onRemove={() => onQuitarPregunta(pregunta.id)}
+            />
+          ))}
+        </div>
+        <AgregarPregunta onAdd={onAgregarPregunta} />
+      </div>
     </section>
   );
 }

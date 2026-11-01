@@ -3,6 +3,7 @@ import type {
   EstadoTramiteRpi,
   ExpedienteDetail,
   ExpedienteListItem,
+  FichaPuntoLibre,
   FichaSucesion,
   JuridicoResumen,
   RamaExpediente,
@@ -1155,6 +1156,29 @@ export function cancelCita(token: string, id: number) {
 
 export function fetchJuridicoResumen(token: string) {
   return apiRequest<JuridicoResumen>("/expedientes/resumen", { token });
+}
+
+export function fetchPlantillas(token: string) {
+  return apiRequest<{ items: Array<{ rama: RamaExpediente; nombre: string | null; puntos: FichaPuntoLibre[] }> }>(
+    "/expedientes/plantillas",
+    { token },
+  );
+}
+
+export function savePlantilla(
+  token: string,
+  rama: RamaExpediente,
+  puntos: FichaPuntoLibre[],
+  nombre?: string | null,
+) {
+  return apiRequest<{ rama: RamaExpediente; nombre: string | null; puntos: FichaPuntoLibre[] }>(
+    `/expedientes/plantillas/${rama}`,
+    {
+      method: "PUT",
+      token,
+      body: JSON.stringify({ puntos, nombre: nombre ?? null }),
+    },
+  );
 }
 
 export function fetchExpedientes(
