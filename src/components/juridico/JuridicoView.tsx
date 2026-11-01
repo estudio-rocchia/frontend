@@ -1,16 +1,15 @@
 "use client";
 
-import { Search } from "lucide-react";
+import { FilePlus, FolderPlus, Search } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { EmptyState, EstadoBadge, Notice, OfficialLink, plazoRelativo, ramaLabel } from "@/components/juridico/juridico-ui";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
-import { KpiCard } from "@/components/ui/KpiCard";
 import { Modal } from "@/components/ui/Modal";
 import { useAuth } from "@/context/auth-context";
-import { ApiError, createExpediente, fetchExpedientes, fetchJuridicoResumen, fetchPersonas } from "@/lib/api";
+import { ApiError, createExpediente, fetchExpedientes, fetchJuridicoResumen, fetchPersonas, fetchPlantillas } from "@/lib/api";
 import type { PersonaRecord } from "@/lib/api/types";
 import { daysUntilDate, formatDateDisplay, personaDisplayName } from "@/lib/format";
 import {
@@ -26,8 +25,12 @@ import { pagePaddingClass } from "@/lib/layout";
 import { useSyncScope } from "@/lib/sync/use-sync-scope";
 import { formInputClass, interactiveFocusClass } from "@/lib/ui/interactive-focus";
 
-const ramas: RamaExpediente[] = ["sucesion", "familia", "otra"];
 const tableHeaders = ["Expediente", "Rama", "Estado", "Inicio", "Próximo plazo"];
+const ramasFijas: Array<"sucesion" | "familia"> = ["sucesion", "familia"];
+
+function claveRama(nombre: string) {
+  return nombre.trim().toLocaleLowerCase();
+}
 
 function plazoVencido(item: ExpedienteListItem): boolean {
   return Boolean(item.proximoPlazo && item.plazosPendientes > 0 && daysUntilDate(item.proximoPlazo) < 0);
@@ -51,6 +54,8 @@ export function JuridicoView() {
   const [selectedPersona, setSelectedPersona] = useState<PersonaRecord | null>(null);
   const [rama, setRama] = useState<RamaExpediente>("sucesion");
   const [ramaDetalle, setRamaDetalle] = useState("");
+  const [ramaLibre, setRamaLibre] = useState(false);
+  const [ramasCreadas, setRamasCreadas] = useState<string[]>([]);
   const [caratula, setCaratula] = useState("");
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -119,13 +124,53 @@ export function JuridicoView() {
     [items, soloVencidos],
   );
 
-  function toggleRama(next: RamaExpediente) {
-    setRamaFilter((current) => (current === next ? "todas" : next));
+  function elegirFiltro(next: RamaExpediente | "todas") {
+    setRamaFilter(next);
+  }
+
+  const cargarRamas = useCallback(async () => {
+    if (!token) return;
+    try {
+      const page = await fetchPlantillas(token);
+      const nombres = page.items
+        .filter((item) => item.rama === "otra" && item.nombre?.trim())
+        .map((item) => item.nombre!.trim())
+        .sort((a, b) => a.localeCompare(b, "es"));
+      setRamasCreadas(nombres);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) logout();
+    }
+  }, [token, logout]);
+
+  useEffect(() => {
+    void cargarRamas();
+  }, [cargarRamas]);
+
+  const valorRama =
+    rama === "sucesion" || rama === "familia" ? rama : ramaLibre ? "otra" : `creada:${ramaDetalle}`;
+
+  function elegirRama(value: string) {
+    if (value === "sucesion" || value === "familia") {
+      setRama(value);
+      setRamaLibre(false);
+      setRamaDetalle("");
+      return;
+    }
+    if (value === "otra") {
+      setRama("otra");
+      setRamaLibre(true);
+      setRamaDetalle("");
+      return;
+    }
+    setRama("otra");
+    setRamaLibre(false);
+    setRamaDetalle(value.slice("creada:".length));
   }
 
   function openCreate() {
     setFormError(null);
     setCreating(true);
+    void cargarRamas();
   }
 
   function closeCreate() {
@@ -171,56 +216,73 @@ export function JuridicoView() {
   const filtersActive = ramaFilter !== "todas" || soloVencidos;
 
   return (
-    <div className={`flex flex-col gap-4 md:gap-5 ${pagePaddingClass}`}>
-      <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-bold text-text-primary xl:text-[22px]">Área jurídica</h1>
-        <p className="text-sm text-text-secondary">Causas, plazos y sucesiones.</p>
-        <div className="flex flex-wrap gap-x-4">
-          <OfficialLink href={resumen?.enlaces.justiciaChaco ?? ENLACE_JUSTICIA_CHACO}>
-            Justicia Chaco
-          </OfficialLink>
+    <div className={`flex flex-col gap-6 ${pagePaddingClass}`}>
+      <header className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-xl font-bold text-text-primary xl:text-[22px]">Área jurídica</h1>
+          <p className="text-sm leading-snug text-text-secondary">Causas en trámite y sus plazos.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-x-4">
+          <OfficialLink href={resumen?.enlaces.justiciaChaco ?? ENLACE_JUSTICIA_CHACO}>Justicia Chaco</OfficialLink>
           <OfficialLink href={resumen?.enlaces.rpi ?? ENLACE_RPI}>Registro de la Propiedad</OfficialLink>
         </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4 xl:gap-4">
-        {loading && !resumen
-          ? Array.from({ length: 4 }).map((_, index) => (
-              <div key={index} className="h-[112px] animate-pulse rounded-md border border-border bg-bg-card" />
-            ))
-          : (
-            <>
-              <KpiCard
-                label="Sucesiones"
-                value={String(resumen?.sucesiones ?? 0)}
-                hint="Filtrar"
-                selected={ramaFilter === "sucesion"}
-                onClick={() => toggleRama("sucesion")}
-              />
-              <KpiCard
-                label="Familia"
-                value={String(resumen?.familia ?? 0)}
-                hint="Filtrar"
-                selected={ramaFilter === "familia"}
-                onClick={() => toggleRama("familia")}
-              />
-              <KpiCard
-                label="Otras ramas"
-                value={String(resumen?.otras ?? 0)}
-                hint="Filtrar"
-                selected={ramaFilter === "otra"}
-                onClick={() => toggleRama("otra")}
-              />
-              <KpiCard
-                label="Plazos vencidos"
-                value={String(resumen?.plazosVencidos ?? 0)}
-                hint="Sin cumplir"
-                selected={soloVencidos}
-                onClick={() => setSoloVencidos((current) => !current)}
-              />
-            </>
-          )}
-      </div>
+        <div className="overflow-x-auto" role="tablist" aria-label="Filtrar expedientes">
+          <div className="inline-flex min-h-11 items-stretch overflow-hidden rounded-md border border-border bg-bg-card">
+            {(
+              [
+                { id: "todas" as const, label: "Todas", count: resumen?.total ?? 0 },
+                { id: "sucesion" as const, label: "Sucesión", count: resumen?.sucesiones ?? 0 },
+                { id: "familia" as const, label: "Familia", count: resumen?.familia ?? 0 },
+                { id: "otra" as const, label: "Otras", count: resumen?.otras ?? 0 },
+              ]
+            ).map((item) => {
+              const activo = ramaFilter === item.id && !soloVencidos;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={activo}
+                  onClick={() => {
+                    elegirFiltro(item.id);
+                    setSoloVencidos(false);
+                  }}
+                  className={`inline-flex h-11 shrink-0 items-center gap-2 border-r border-border px-4 text-sm font-semibold ${interactiveFocusClass} ${
+                    activo ? "bg-primary text-text-on-primary" : "text-text-primary hover:bg-bg-page"
+                  }`}
+                >
+                  {item.label}
+                  <span className={`text-xs tabular-nums ${activo ? "opacity-80" : "font-medium text-text-secondary"}`}>
+                    {loading && !resumen ? "–" : item.count}
+                  </span>
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              role="tab"
+              aria-selected={soloVencidos}
+              onClick={() => setSoloVencidos((current) => !current)}
+              className={`inline-flex h-11 shrink-0 items-center gap-2 px-4 text-sm font-semibold ${interactiveFocusClass} ${
+                soloVencidos ? "bg-primary text-text-on-primary" : "text-text-primary hover:bg-bg-page"
+              }`}
+            >
+              Vencidos
+              <span
+                className={`text-xs tabular-nums ${
+                  soloVencidos
+                    ? "opacity-80"
+                    : (resumen?.plazosVencidos ?? 0) > 0
+                      ? "font-semibold text-danger"
+                      : "font-medium text-text-secondary"
+                }`}
+              >
+                {loading && !resumen ? "–" : (resumen?.plazosVencidos ?? 0)}
+              </span>
+            </button>
+          </div>
+        </div>
+      </header>
 
       {error ? (
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -231,27 +293,23 @@ export function JuridicoView() {
         </div>
       ) : null}
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-        <Link
-          href="/juridico/formularios"
-          className={`inline-flex min-h-11 w-full items-center justify-center rounded-md border border-border bg-bg-card px-4 text-sm font-semibold text-text-primary sm:w-auto ${interactiveFocusClass}`}
-        >
-          Formularios
-        </Link>
-        <ButtonPrimary className="w-full sm:w-auto" onClick={openCreate}>
-          Nuevo expediente
-        </ButtonPrimary>
-      </div>
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+          <Link
+            href="/juridico/formularios"
+            className={`inline-flex w-full items-center justify-center gap-2 rounded-sm border border-border bg-bg-card px-[18px] py-2.5 text-sm font-medium text-text-primary sm:w-auto ${interactiveFocusClass}`}
+          >
+            <FilePlus className="h-4 w-4" aria-hidden />
+            Crear formulario
+          </Link>
+          <ButtonPrimary className="w-full gap-2 sm:w-auto" onClick={openCreate}>
+            <FolderPlus className="h-4 w-4" aria-hidden />
+            Nuevo expediente
+          </ButtonPrimary>
+        </div>
 
       <section className="overflow-hidden rounded-md border border-border bg-bg-card shadow-[var(--shadow-card)]" aria-busy={loading}>
-        <div className="flex flex-col gap-3 border-b border-border px-4 py-4 md:px-5 md:py-5">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-base font-semibold text-text-primary">Expedientes</h2>
-            <p className="text-xs text-text-secondary" role="status">
-              {loading ? "Cargando…" : `${visibleItems.length}`}
-            </p>
-          </div>
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-3 border-b border-border px-4 py-4 md:flex-row md:items-center md:justify-between md:px-5">
             <label className="flex min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-sm border border-border bg-bg-page px-3 focus-within:border-primary md:max-w-md">
               <Search className="h-4 w-4 shrink-0 text-text-secondary" aria-hidden />
               <input
@@ -275,7 +333,6 @@ export function JuridicoView() {
                 Limpiar filtros
               </button>
             ) : null}
-          </div>
         </div>
 
         {loading ? (
@@ -286,7 +343,8 @@ export function JuridicoView() {
             description={filtersActive || hasSearch ? "Probá con otro dato o limpiá el filtro." : undefined}
             action={
               !hasSearch && !filtersActive ? (
-                <ButtonPrimary className="w-full sm:w-auto" onClick={openCreate}>
+                <ButtonPrimary className="w-full gap-2 sm:w-auto" onClick={openCreate}>
+                  <FolderPlus className="h-4 w-4" aria-hidden />
                   Nuevo expediente
                 </ButtonPrimary>
               ) : filtersActive ? (
@@ -358,6 +416,7 @@ export function JuridicoView() {
           </>
         )}
       </section>
+      </div>
 
       <Modal
         open={creating}
@@ -439,17 +498,27 @@ export function JuridicoView() {
             </p>
           ) : null}
 
-          <div className="flex flex-col gap-1.5">
+          <label className="flex flex-col gap-1.5">
             <span className="text-[11px] font-semibold text-text-secondary">Rama</span>
-            <div className="flex flex-wrap gap-2">
-              {ramas.map((option) => (
-                <FilterChip key={option} selected={rama === option} onClick={() => setRama(option)}>
+            <select
+              value={valorRama}
+              onChange={(event) => elegirRama(event.target.value)}
+              className={`${formInputClass} w-full`}
+            >
+              {ramasFijas.map((option) => (
+                <option key={option} value={option}>
                   {RAMA_LABEL[option]}
-                </FilterChip>
+                </option>
               ))}
-            </div>
-          </div>
-          {rama === "otra" ? (
+              {ramasCreadas.map((nombre) => (
+                <option key={claveRama(nombre)} value={`creada:${nombre}`}>
+                  {nombre}
+                </option>
+              ))}
+              <option value="otra">Otra</option>
+            </select>
+          </label>
+          {rama === "otra" && ramaLibre ? (
             <label className="flex flex-col gap-1.5">
               <span className="text-[11px] font-semibold text-text-secondary">¿De qué rama se trata?</span>
               <input
@@ -546,30 +615,5 @@ function ExpedienteListSkeleton() {
         ))}
       </div>
     </div>
-  );
-}
-
-function FilterChip({
-  selected,
-  onClick,
-  children,
-}: {
-  selected: boolean;
-  onClick: () => void;
-  children: string;
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={selected}
-      onClick={onClick}
-      className={`min-h-11 rounded-full border border-border px-3.5 text-[13px] transition-colors ${interactiveFocusClass} ${
-        selected
-          ? "bg-primary-soft font-semibold text-primary"
-          : "bg-bg-card font-normal text-text-secondary hover:text-text-primary"
-      }`}
-    >
-      {children}
-    </button>
   );
 }

@@ -6,8 +6,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Notice } from "@/components/juridico/juridico-ui";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
+import { Modal } from "@/components/ui/Modal";
 import { useAuth } from "@/context/auth-context";
-import { ApiError, fetchPlantillas, savePlantilla } from "@/lib/api";
+import { ApiError, deletePlantilla, fetchPlantillas, savePlantilla } from "@/lib/api";
 import {
   RAMA_LABEL,
   type FichaPreguntaLibre,
@@ -53,6 +54,7 @@ export function FormulariosView() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [confirmarBaja, setConfirmarBaja] = useState(false);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -115,6 +117,7 @@ export function FormulariosView() {
   function elegirFija(item: "sucesion" | "familia") {
     setRama(item);
     setAgregando(false);
+    setConfirmarBaja(false);
     setError(null);
     setNotice(null);
   }
@@ -123,6 +126,7 @@ export function FormulariosView() {
     setRama("otra");
     setNombreOtra(item.nombre);
     setAgregando(false);
+    setConfirmarBaja(false);
     setError(null);
     setNotice(null);
   }
@@ -173,6 +177,30 @@ export function FormulariosView() {
         return;
       }
       setError(err instanceof ApiError ? err.message : "No se pudo crear la rama");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function eliminarRama() {
+    if (!token || rama !== "otra" || !nombreOtra.trim()) return;
+    const clave = claveNombre(nombreOtra);
+    setSaving(true);
+    setError(null);
+    setNotice(null);
+    try {
+      await deletePlantilla(token, "otra", nombreOtra.trim());
+      setOtras((current) => current.filter((item) => item.clave !== clave));
+      setRama("familia");
+      setNombreOtra("");
+      setConfirmarBaja(false);
+      setNotice("Rama eliminada. Los expedientes que ya la copiaron conservan su ficha.");
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        logout();
+        return;
+      }
+      setError(err instanceof ApiError ? err.message : "No se pudo eliminar la rama");
     } finally {
       setSaving(false);
     }
@@ -327,14 +355,60 @@ export function FormulariosView() {
         <div className="h-56 animate-pulse rounded-md border border-border bg-bg-card" aria-busy="true" />
       ) : (
         <section className="flex flex-col gap-5 rounded-md border border-border bg-bg-card p-4 shadow-[var(--shadow-card)] md:p-6">
-          <div className="flex flex-col gap-1">
-            <h2 className="text-lg font-semibold text-text-primary">{titulo}</h2>
-            <p className="max-w-2xl text-sm leading-relaxed text-text-secondary">
-              {rama === "sucesion"
-                ? "La primera consulta fija sigue en cada sucesión. Las categorías de abajo se suman en los expedientes nuevos."
-                : `Se copia en los expedientes nuevos de ${titulo}. Cada categoría agrupa sus preguntas.`}
-            </p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex flex-col gap-1">
+              <h2 className="text-lg font-semibold text-text-primary">{titulo}</h2>
+              <p className="max-w-2xl text-sm leading-relaxed text-text-secondary">
+                {rama === "sucesion"
+                  ? "La primera consulta fija sigue en cada sucesión. Las categorías de abajo se suman en los expedientes nuevos."
+                  : `Se copia en los expedientes nuevos de ${titulo}. Cada categoría agrupa sus preguntas.`}
+              </p>
+            </div>
+            {rama === "otra" && nombreOtra.trim() ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setError(null);
+                  setConfirmarBaja(true);
+                }}
+                className={`inline-flex w-fit items-center justify-center rounded-sm bg-danger px-[18px] py-2.5 text-sm font-semibold text-text-on-primary hover:opacity-90 ${interactiveFocusClass}`}
+              >
+                Eliminar rama
+              </button>
+            ) : null}
           </div>
+
+          <Modal
+            open={confirmarBaja}
+            onClose={() => {
+              if (!saving) setConfirmarBaja(false);
+            }}
+            title="Eliminar rama"
+            subtitle={nombreOtra.trim()}
+            maxWidthClass="max-w-md"
+            footer={
+              <>
+                <ButtonOutline className="w-full sm:w-auto" disabled={saving} onClick={() => setConfirmarBaja(false)}>
+                  Cancelar
+                </ButtonOutline>
+                <button
+                  type="button"
+                  className={`inline-flex w-full items-center justify-center rounded-sm bg-danger px-[18px] py-2.5 text-sm font-semibold text-text-on-primary hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto ${interactiveFocusClass}`}
+                  disabled={saving}
+                  onClick={() => void eliminarRama()}
+                >
+                  {saving ? "Eliminando…" : "Eliminar rama"}
+                </button>
+              </>
+            }
+          >
+            <div className="flex flex-col gap-3">
+              {error ? <Notice tone="danger">{error}</Notice> : null}
+              <p className="text-sm leading-relaxed text-text-secondary">
+                No se copia en expedientes nuevos. Los que ya la tienen conservan su ficha.
+              </p>
+            </div>
+          </Modal>
 
           {puntos.length === 0 ? (
             <div className="flex flex-col items-start gap-3 rounded-md border border-dashed border-border bg-bg-page px-4 py-8">

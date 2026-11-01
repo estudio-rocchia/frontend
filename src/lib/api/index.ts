@@ -1165,6 +1165,11 @@ export function fetchPlantillas(token: string) {
   );
 }
 
+export function deletePlantilla(token: string, rama: RamaExpediente, nombre?: string | null) {
+  const query = nombre?.trim() ? `?nombre=${encodeURIComponent(nombre.trim())}` : "";
+  return apiRequest<void>(`/expedientes/plantillas/${rama}${query}`, { method: "DELETE", token });
+}
+
 export function savePlantilla(
   token: string,
   rama: RamaExpediente,
@@ -1254,6 +1259,10 @@ export function linkExpedienteInmueble(token: string, id: number, inmuebleId: nu
     token,
     body: JSON.stringify({ inmuebleId }),
   });
+}
+
+export function deleteExpediente(token: string, id: number) {
+  return apiRequest<void>(`/expedientes/${id}`, { method: "DELETE", token });
 }
 
 export function unlinkExpedienteInmueble(token: string, id: number, inmuebleId: number) {

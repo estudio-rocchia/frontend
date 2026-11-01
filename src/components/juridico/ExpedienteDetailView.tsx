@@ -8,11 +8,13 @@ import { ArrowLeft } from "lucide-react";
 import { FichaSucesionForm } from "@/components/juridico/FichaSucesionForm";
 import { EstadoBadge, Field, Notice, OfficialLink, RpiBadge, plazoRelativo, ramaLabel } from "@/components/juridico/juridico-ui";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
+import { Modal } from "@/components/ui/Modal";
 import { useAuth } from "@/context/auth-context";
 import {
   ApiError,
   createPlazoExpediente,
   createTramiteRpi,
+  deleteExpediente,
   deletePlazoExpediente,
   fetchExpediente,
   linkExpedienteInmueble,
@@ -58,6 +60,7 @@ export function ExpedienteDetailView() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [confirmarBaja, setConfirmarBaja] = useState(false);
   const [plazoDescripcion, setPlazoDescripcion] = useState("");
   const [plazoFecha, setPlazoFecha] = useState("");
   const [inmuebleQuery, setInmuebleQuery] = useState("");
@@ -108,6 +111,23 @@ export function ExpedienteDetailView() {
   function openTab(next: ExpedienteTab) {
     setTab(next);
     setNotice(null);
+  }
+
+  async function quitarExpediente() {
+    if (!token || !expediente) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await deleteExpediente(token, expediente.id);
+      router.push("/juridico");
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        logout();
+        return;
+      }
+      setError(err instanceof ApiError ? err.message : "No se pudo eliminar el expediente");
+      setSaving(false);
+    }
   }
 
   async function run(action: () => Promise<ExpedienteDetail | void>, message?: string) {
@@ -187,30 +207,72 @@ export function ExpedienteDetailView() {
         Expedientes
       </button>
 
-      <header className="flex flex-col gap-2 rounded-md border border-border bg-bg-card p-4 shadow-[var(--shadow-card)] md:p-5">
-        <div className="flex flex-wrap items-center gap-2">
-          <EstadoBadge estado={expediente.estado} />
-          <span className="rounded-full bg-bg-page px-2.5 py-1 text-xs font-semibold text-text-secondary">
-            {ramaLabel(expediente.rama, expediente.ramaDetalle)}
-          </span>
-        </div>
-        <h1 className="text-xl font-bold text-text-primary xl:text-[22px]">{titulo}</h1>
-        <p className="text-sm text-text-secondary">
-          {tituloEsCliente ? (
-            <Link href={`/clientes/${expediente.personaId}`} className="font-medium text-primary hover:underline">
-              {dni ? `DNI ${dni}` : "Ficha del cliente"}
-            </Link>
-          ) : (
-            <>
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-col gap-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <EstadoBadge estado={expediente.estado} />
+            <span className="text-xs font-semibold text-text-secondary">{ramaLabel(expediente.rama, expediente.ramaDetalle)}</span>
+          </div>
+          <h1 className="text-xl font-bold text-text-primary xl:text-[22px]">{titulo}</h1>
+          <p className="text-sm leading-snug text-text-secondary">
+            {tituloEsCliente ? (
               <Link href={`/clientes/${expediente.personaId}`} className="font-medium text-primary hover:underline">
-                {nombreCliente}
+                {dni ? `DNI ${dni}` : "Ficha del cliente"}
               </Link>
-              {dni ? ` · DNI ${dni}` : ""}
-            </>
-          )}
-          {` · inicio ${formatDateDisplay(expediente.abiertoEn)}`}
-        </p>
+            ) : (
+              <>
+                <Link href={`/clientes/${expediente.personaId}`} className="font-medium text-primary hover:underline">
+                  {nombreCliente}
+                </Link>
+                {dni ? ` · DNI ${dni}` : ""}
+              </>
+            )}
+            {` · inicio ${formatDateDisplay(expediente.abiertoEn)}`}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setError(null);
+            setConfirmarBaja(true);
+          }}
+          className={`inline-flex w-fit items-center justify-center rounded-sm bg-danger px-[18px] py-2.5 text-sm font-semibold text-text-on-primary hover:opacity-90 ${interactiveFocusClass}`}
+        >
+          Eliminar expediente
+        </button>
       </header>
+
+      <Modal
+        open={confirmarBaja}
+        onClose={() => {
+          if (!saving) setConfirmarBaja(false);
+        }}
+        title="Eliminar expediente"
+        subtitle={titulo}
+        maxWidthClass="max-w-md"
+        footer={
+          <>
+            <ButtonOutline className="w-full sm:w-auto" disabled={saving} onClick={() => setConfirmarBaja(false)}>
+              Cancelar
+            </ButtonOutline>
+            <button
+              type="button"
+              className={`inline-flex w-full items-center justify-center rounded-sm bg-danger px-[18px] py-2.5 text-sm font-semibold text-text-on-primary hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto ${interactiveFocusClass}`}
+              disabled={saving}
+              onClick={() => void quitarExpediente()}
+            >
+              {saving ? "Eliminando…" : "Eliminar expediente"}
+            </button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-3">
+          {error ? <Notice tone="danger">{error}</Notice> : null}
+          <p className="text-sm leading-relaxed text-text-secondary">
+            Deja de aparecer en la lista. Las demás causas de {ramaLabel(expediente.rama, expediente.ramaDetalle)} siguen igual.
+          </p>
+        </div>
+      </Modal>
 
       <section className="overflow-hidden rounded-md border border-border bg-bg-card shadow-[var(--shadow-card)]">
         <div
@@ -411,106 +473,74 @@ function Resumen({
   const relativo = proximo ? plazoRelativo(proximo.venceEn) : null;
   const causante = expediente.ficha?.causanteNombre?.trim();
 
+  const fichaLinea = esSucesion
+    ? causante
+      ? `Causante: ${causante}`
+      : "Todavía sin causante"
+    : "Categorías y preguntas de esta causa";
+  const inmueblesLinea =
+    expediente.inmuebles.length === 0
+      ? "Ninguno vinculado"
+      : expediente.inmuebles.map((inmueble) => inmueble.code).join(", ");
+  const registroLinea =
+    expediente.tramitesRpi.length === 0
+      ? "Sin trámites"
+      : expediente.tramitesRpi.map((tramite) => `${tramite.inmueble.code} · ${RPI_LABEL[tramite.estado]}`).join(" · ");
+
   return (
-    <div className="flex flex-col gap-3">
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        <TaskCard title="Carátula" action="Editar carátula" onOpen={() => onOpen("caratula")}>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <Fact label="Número" value={expediente.numero?.trim() || "Sin número"} />
-            <Fact label="Juzgado" value={expediente.juzgado?.trim() || "Sin juzgado"} />
-            <Fact label="Carátula" value={caratula || "Todavía sin carátula judicial"} />
-            <Fact label="Estado del estudio" value={ESTADO_LABEL[expediente.estado]} />
-          </div>
-        </TaskCard>
+    <div className="flex flex-col gap-4">
+      <button
+        type="button"
+        onClick={() => onOpen("plazos")}
+        className={`flex flex-col items-start gap-1 rounded-md border border-border bg-bg-page px-4 py-4 text-left md:px-5 ${interactiveFocusClass}`}
+      >
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Próximo plazo</span>
+        {proximo && relativo ? (
+          <>
+            <span className="text-lg font-semibold text-text-primary">{proximo.descripcion}</span>
+            <span className={`text-sm ${relativo.tone === "overdue" ? "font-semibold text-danger" : "text-text-secondary"}`}>
+              {formatDateDisplay(proximo.venceEn)} · {relativo.text}
+              {vencidos > 1 ? ` · ${vencidos} vencidos` : ""}
+            </span>
+          </>
+        ) : (
+          <span className="text-lg font-semibold text-text-primary">No hay plazos pendientes</span>
+        )}
+      </button>
 
-        <TaskCard title="Plazos" action="Ver plazos" onOpen={() => onOpen("plazos")}>
-          {proximo && relativo ? (
-            <p className="text-sm text-text-primary">
-              <span className="font-semibold">{proximo.descripcion}</span>
-              <span className={relativo.tone === "overdue" ? "font-semibold text-danger" : "text-text-secondary"}>
-                {` · ${formatDateDisplay(proximo.venceEn)} · ${relativo.text}`}
-              </span>
-              {vencidos > 1 ? (
-                <span className="mt-1 block text-xs font-semibold text-danger">{vencidos} plazos vencidos</span>
-              ) : null}
-            </p>
-          ) : (
-            <p className="text-sm text-text-secondary">No hay plazos pendientes.</p>
-          )}
-        </TaskCard>
-
-        <TaskCard title="Inmuebles de la causa" action="Elegir inmuebles" onOpen={() => onOpen("inmuebles")}>
-          <p className="text-sm text-text-secondary">Propiedades del catálogo que entran en este expediente.</p>
-          {expediente.inmuebles.length === 0 ? null : (
-            <ul className="flex flex-col gap-1">
-              {expediente.inmuebles.map((inmueble) => (
-                <li key={inmueble.id} className="text-sm text-text-primary">
-                  <span className="font-semibold">{inmueble.code}</span>
-                  <span className="text-text-secondary"> · {inmueble.displayLabel}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </TaskCard>
-
-        <TaskCard title="Inscripción" action="Ver inscripciones" onOpen={() => onOpen("registro")}>
-          <p className="text-sm text-text-secondary">Trámite de esas propiedades en el Registro de la Propiedad.</p>
-          {expediente.tramitesRpi.length === 0 ? null : (
-            <ul className="flex flex-col gap-2">
-              {expediente.tramitesRpi.map((tramite) => (
-                <li key={tramite.id} className="flex flex-wrap items-center gap-2 text-sm text-text-primary">
-                  <span className="font-semibold">{tramite.inmueble.code}</span>
-                  <RpiBadge estado={tramite.estado} />
-                </li>
-              ))}
-            </ul>
-          )}
-        </TaskCard>
-
-        <TaskCard title={esSucesion ? "Primera consulta" : "Ficha"} action="Abrir la ficha" onOpen={() => onOpen("consulta")}>
-          <p className="text-sm text-text-secondary">
-            {esSucesion
-              ? causante
-                ? `Causante: ${causante}`
-                : "La entrevista de sucesión todavía no tiene causante."
-              : "Ficha de esta causa. Se arma con categorías y preguntas."}
-          </p>
-        </TaskCard>
-      </div>
+      <ul className="overflow-hidden rounded-md border border-border bg-bg-page">
+        <ResumenFila titulo="Carátula" detalle={caratula || "Todavía sin carátula judicial"} accion="Editar" onOpen={() => onOpen("caratula")} />
+        <ResumenFila titulo={esSucesion ? "Primera consulta" : "Ficha"} detalle={fichaLinea} accion="Abrir" onOpen={() => onOpen("consulta")} />
+        <ResumenFila titulo="Inmuebles" detalle={inmueblesLinea} accion="Elegir" onOpen={() => onOpen("inmuebles")} />
+        <ResumenFila titulo="Inscripción" detalle={registroLinea} accion="Ver" onOpen={() => onOpen("registro")} />
+      </ul>
     </div>
   );
 }
 
-function TaskCard({
-  title,
-  action,
+function ResumenFila({
+  titulo,
+  detalle,
+  accion,
   onOpen,
-  children,
 }: {
-  title: string;
-  action: string;
+  titulo: string;
+  detalle: string;
+  accion: string;
   onOpen: () => void;
-  children: ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className={`flex min-h-11 flex-col gap-3 rounded-md border border-border bg-bg-page p-4 text-left transition-colors hover:border-primary/40 ${interactiveFocusClass}`}
-    >
-      <h2 className="text-[15px] font-semibold text-text-primary">{title}</h2>
-      <div className="min-h-10">{children}</div>
-      <span className="text-sm font-semibold text-primary">{action}</span>
-    </button>
-  );
-}
-
-function Fact({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <span className="text-[11px] font-semibold text-text-secondary">{label}</span>
-      <span className="text-sm text-text-primary">{value}</span>
-    </div>
+    <li className="border-b border-border last:border-b-0">
+      <button
+        type="button"
+        onClick={onOpen}
+        className={`flex min-h-11 w-full flex-col items-start gap-0.5 px-4 py-3 text-left hover:bg-bg-card sm:flex-row sm:items-center sm:gap-4 md:px-5 ${interactiveFocusClass}`}
+      >
+        <span className="w-36 shrink-0 text-sm font-semibold text-text-primary">{titulo}</span>
+        <span className="min-w-0 flex-1 text-sm text-text-secondary sm:truncate">{detalle}</span>
+        <span className="shrink-0 text-sm font-semibold text-primary">{accion}</span>
+      </button>
+    </li>
   );
 }
 
