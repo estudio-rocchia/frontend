@@ -158,6 +158,9 @@ export function ExpedienteDetailView() {
   }
 
   const titulo = expedienteTitulo(expediente);
+  const nombreCliente = personaDisplayName(expediente.persona);
+  const tituloEsCliente = titulo.trim().toLowerCase() === nombreCliente.trim().toLowerCase();
+  const dni = expediente.persona.numeroDocumento?.trim();
   const esSucesion = expediente.rama === "sucesion";
   const tituloFicha = esSucesion ? "Primera consulta" : "Ficha";
   const pendientes = expediente.plazos
@@ -193,10 +196,18 @@ export function ExpedienteDetailView() {
         </div>
         <h1 className="text-xl font-bold text-text-primary xl:text-[22px]">{titulo}</h1>
         <p className="text-sm text-text-secondary">
-          <Link href={`/clientes/${expediente.personaId}`} className="font-medium text-primary hover:underline">
-            {personaDisplayName(expediente.persona)}
-          </Link>
-          {expediente.persona.numeroDocumento ? ` · DNI ${expediente.persona.numeroDocumento}` : ""}
+          {tituloEsCliente ? (
+            <Link href={`/clientes/${expediente.personaId}`} className="font-medium text-primary hover:underline">
+              {dni ? `DNI ${dni}` : "Ficha del cliente"}
+            </Link>
+          ) : (
+            <>
+              <Link href={`/clientes/${expediente.personaId}`} className="font-medium text-primary hover:underline">
+                {nombreCliente}
+              </Link>
+              {dni ? ` · DNI ${dni}` : ""}
+            </>
+          )}
           {` · inicio ${formatDateDisplay(expediente.abiertoEn)}`}
         </p>
       </header>

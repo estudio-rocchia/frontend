@@ -172,20 +172,15 @@ export function JuridicoView() {
 
   return (
     <div className={`flex flex-col gap-4 md:gap-5 ${pagePaddingClass}`}>
-      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-xl font-bold text-text-primary xl:text-[22px]">Área jurídica</h1>
-          <p className="text-sm text-text-secondary">Causas, plazos y sucesiones.</p>
-          <div className="flex flex-wrap gap-x-4">
-            <OfficialLink href={resumen?.enlaces.justiciaChaco ?? ENLACE_JUSTICIA_CHACO}>
-              Justicia Chaco
-            </OfficialLink>
-            <OfficialLink href={resumen?.enlaces.rpi ?? ENLACE_RPI}>Registro de la Propiedad</OfficialLink>
-          </div>
+      <div className="flex flex-col gap-1">
+        <h1 className="text-xl font-bold text-text-primary xl:text-[22px]">Área jurídica</h1>
+        <p className="text-sm text-text-secondary">Causas, plazos y sucesiones.</p>
+        <div className="flex flex-wrap gap-x-4">
+          <OfficialLink href={resumen?.enlaces.justiciaChaco ?? ENLACE_JUSTICIA_CHACO}>
+            Justicia Chaco
+          </OfficialLink>
+          <OfficialLink href={resumen?.enlaces.rpi ?? ENLACE_RPI}>Registro de la Propiedad</OfficialLink>
         </div>
-        <ButtonPrimary className="w-full md:w-auto" onClick={openCreate}>
-          Nuevo expediente
-        </ButtonPrimary>
       </div>
 
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4 xl:gap-4">
@@ -235,6 +230,12 @@ export function JuridicoView() {
           </ButtonOutline>
         </div>
       ) : null}
+
+      <div className="flex justify-end">
+        <ButtonPrimary className="w-full sm:w-auto" onClick={openCreate}>
+          Nuevo expediente
+        </ButtonPrimary>
+      </div>
 
       <section className="overflow-hidden rounded-md border border-border bg-bg-card shadow-[var(--shadow-card)]" aria-busy={loading}>
         <div className="flex flex-col gap-3 border-b border-border px-4 py-4 md:px-5 md:py-5">
