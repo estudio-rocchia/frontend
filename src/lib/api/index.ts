@@ -1,3 +1,13 @@
+import type {
+  EstadoExpediente,
+  EstadoTramiteRpi,
+  ExpedienteDetail,
+  ExpedienteListItem,
+  FichaSucesion,
+  JuridicoResumen,
+  RamaExpediente,
+  TramiteRpi,
+} from "../juridico/model";
 import { withCache } from "./cache";
 import { apiBlob, apiBlobWithFilename, apiRequest } from "./client";
 import type {
@@ -1140,5 +1150,161 @@ export function cancelCita(token: string, id: number) {
   return apiRequest<CitaDetail>(`/citas/${id}/cancelar`, {
     method: "POST",
     token,
+  });
+}
+
+export function fetchJuridicoResumen(token: string) {
+  return apiRequest<JuridicoResumen>("/expedientes/resumen", { token });
+}
+
+export function fetchExpedientes(
+  token: string,
+  params?: { rama?: RamaExpediente; estado?: EstadoExpediente; q?: string; personaId?: number },
+) {
+  const query = new URLSearchParams();
+  if (params?.rama) query.set("rama", params.rama);
+  if (params?.estado) query.set("estado", params.estado);
+  if (params?.q) query.set("q", params.q);
+  if (params?.personaId) query.set("personaId", String(params.personaId));
+  const suffix = query.toString();
+  return apiRequest<{ items: ExpedienteListItem[] }>(`/expedientes${suffix ? `?${suffix}` : ""}`, { token });
+}
+
+export function fetchExpediente(token: string, id: number) {
+  return apiRequest<ExpedienteDetail>(`/expedientes/${id}`, { token });
+}
+
+export function createExpediente(
+  token: string,
+  body: {
+    personaId: number;
+    rama: RamaExpediente;
+    ramaDetalle?: string | null;
+    numero?: string | null;
+    juzgado?: string | null;
+    caratula?: string | null;
+    estado?: EstadoExpediente;
+    abiertoEn?: string;
+    notas?: string | null;
+  },
+) {
+  return apiRequest<ExpedienteDetail>("/expedientes", {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function updateExpediente(
+  token: string,
+  id: number,
+  body: {
+    rama?: RamaExpediente;
+    ramaDetalle?: string | null;
+    numero?: string | null;
+    juzgado?: string | null;
+    caratula?: string | null;
+    estado?: EstadoExpediente;
+    abiertoEn?: string;
+    notas?: string | null;
+  },
+) {
+  return apiRequest<ExpedienteDetail>(`/expedientes/${id}`, {
+    method: "PATCH",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function saveFichaSucesion(token: string, id: number, ficha: FichaSucesion) {
+  return apiRequest<ExpedienteDetail>(`/expedientes/${id}/ficha-sucesion`, {
+    method: "PUT",
+    token,
+    body: JSON.stringify(ficha),
+  });
+}
+
+export function linkExpedienteInmueble(token: string, id: number, inmuebleId: number) {
+  return apiRequest<ExpedienteDetail>(`/expedientes/${id}/inmuebles`, {
+    method: "POST",
+    token,
+    body: JSON.stringify({ inmuebleId }),
+  });
+}
+
+export function unlinkExpedienteInmueble(token: string, id: number, inmuebleId: number) {
+  return apiRequest<ExpedienteDetail>(`/expedientes/${id}/inmuebles/${inmuebleId}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
+export function createPlazoExpediente(
+  token: string,
+  id: number,
+  body: { descripcion: string; venceEn: string },
+) {
+  return apiRequest<ExpedienteDetail>(`/expedientes/${id}/plazos`, {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function updatePlazoExpediente(
+  token: string,
+  id: number,
+  plazoId: number,
+  body: { descripcion?: string; venceEn?: string; cumplido?: boolean },
+) {
+  return apiRequest<ExpedienteDetail>(`/expedientes/${id}/plazos/${plazoId}`, {
+    method: "PATCH",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function deletePlazoExpediente(token: string, id: number, plazoId: number) {
+  return apiRequest<ExpedienteDetail>(`/expedientes/${id}/plazos/${plazoId}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
+export function createTramiteRpi(
+  token: string,
+  body: {
+    inmuebleId: number;
+    expedienteId?: number | null;
+    numeroTramite?: string | null;
+    escribano?: string | null;
+    estado?: EstadoTramiteRpi;
+    pedidoEn?: string;
+    notas?: string | null;
+  },
+) {
+  return apiRequest<TramiteRpi>("/tramites-rpi", {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function updateTramiteRpi(
+  token: string,
+  id: number,
+  body: {
+    numeroTramite?: string | null;
+    escribano?: string | null;
+    estado?: EstadoTramiteRpi;
+    pedidoEn?: string;
+    notas?: string | null;
+    expedienteId?: number | null;
+  },
+) {
+  return apiRequest<TramiteRpi>(`/tramites-rpi/${id}`, {
+    method: "PATCH",
+    token,
+    body: JSON.stringify(body),
   });
 }

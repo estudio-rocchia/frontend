@@ -181,6 +181,7 @@ export function filterClientes(rows: ClienteRow[], filter: ClienteFilterId): Cli
     case "morosos":
       return rows.filter((row) => row.enMora);
     case "juridico":
+      return rows;
     case "visas":
       return [];
     default:

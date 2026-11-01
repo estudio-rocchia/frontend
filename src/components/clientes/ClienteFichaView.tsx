@@ -12,6 +12,13 @@ const ClienteInmobiliariaTab = dynamic(
     })),
   { ssr: false },
 );
+const ClienteJuridicoTab = dynamic(
+  () =>
+    import("@/components/clientes/ClienteJuridicoTab").then((mod) => ({
+      default: mod.ClienteJuridicoTab,
+    })),
+  { ssr: false },
+);
 const EditarClienteModal = dynamic(
   () =>
     import("@/components/clientes/EditarClienteModal").then((mod) => ({
@@ -501,12 +508,10 @@ export function ClienteFichaView() {
           )
         ) : null}
 
-        {!loadingDetail && activeTab === "juridico" ? (
+        {!loadingDetail && activeTab === "juridico" && token ? (
           <div className="flex flex-col gap-3">
             <SectionTitle>Expedientes jurídicos</SectionTitle>
-            <p className="text-sm text-text-secondary">
-              Sin expedientes vinculados. El módulo jurídico estará disponible próximamente.
-            </p>
+            <ClienteJuridicoTab token={token} personaId={persona.id} />
           </div>
         ) : null}
 

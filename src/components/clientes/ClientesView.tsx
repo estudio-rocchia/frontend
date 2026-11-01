@@ -11,7 +11,7 @@ import { KpiCard } from "@/components/ui/KpiCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useAuth } from "@/context/auth-context";
 import { clienteFilters, type ClienteFilterId, type ClienteRow } from "@/data/clientes";
-import { ApiError, fetchClientesKpis, fetchPersonas } from "@/lib/api";
+import { ApiError, fetchClientesKpis, fetchExpedientes, fetchJuridicoResumen, fetchPersonas } from "@/lib/api";
 import { prefetchClientesList } from "@/lib/api/clientes-list";
 import type { ClientesKpis } from "@/lib/api/types";
 import { useCursorPagination } from "@/lib/hooks/use-cursor-pagination";
@@ -52,6 +52,7 @@ export function ClientesView() {
   } = useCursorPagination();
   const [totalPersonas, setTotalPersonas] = useState(0);
   const [kpis, setKpis] = useState<ClientesKpis | null>(null);
+  const [juridicoCount, setJuridicoCount] = useState(0);
   const [listTab, setListTab] = useState<"listado" | "nuevo">("listado");
 
   const load = useCallback(async (options?: { silent?: boolean }) => {
@@ -63,11 +64,36 @@ export function ClientesView() {
     setError(null);
 
     try {
-      if (activeFilter === "juridico" || activeFilter === "visas") {
+      const juridicoClientes = await fetchJuridicoResumen(token)
+        .then((resumen) => resumen.clientes)
+        .catch(() => 0);
+      setJuridicoCount(juridicoClientes);
+
+      if (activeFilter === "visas") {
         const counts = await fetchClientesKpis(token);
         setKpis(counts);
         setClienteRows([]);
         setTotalPersonas(0);
+        return;
+      }
+
+      if (activeFilter === "juridico") {
+        const [counts, expedientes] = await Promise.all([
+          fetchClientesKpis(token),
+          fetchExpedientes(token, { q: debouncedSearch.trim() || undefined }),
+        ]);
+        const ids = [...new Set(expedientes.items.map((item) => item.personaId))];
+        setKpis(counts);
+        if (ids.length === 0) {
+          setClienteRows([]);
+          setTotalPersonas(0);
+          applyResponse(null);
+          return;
+        }
+        const personasRes = await fetchPersonas(token, { ids, withVinculos: true, limit: 200 });
+        setClienteRows(personasRes.items.map((persona) => mapPersonaToClienteRow(persona)));
+        setTotalPersonas(personasRes.items.length);
+        applyResponse(null);
         return;
       }
 
@@ -139,9 +165,7 @@ export function ClientesView() {
 
   const filteredRows = useMemo(
     () =>
-      activeFilter === "juridico" || activeFilter === "visas"
-        ? []
-        : filterClientes(clienteRows, activeFilter),
+      activeFilter === "visas" ? [] : filterClientes(clienteRows, activeFilter),
     [clienteRows, activeFilter],
   );
 
@@ -150,11 +174,11 @@ export function ClientesView() {
       todos: kpis?.total ?? totalPersonas,
       inquilinos: kpis?.inquilinos ?? 0,
       propietarios: kpis?.propietarios ?? 0,
-      juridico: 0,
+      juridico: juridicoCount,
       visas: 0,
       morosos: kpis?.morosos ?? 0,
     }),
-    [kpis, totalPersonas],
+    [kpis, totalPersonas, juridicoCount],
   );
 
   const hasSearch = searchQuery.trim().length > 0;
@@ -268,18 +292,14 @@ export function ClientesView() {
                 {clienteFilters.map(({ id, label }) => {
                   const selected = activeFilter === id;
                   const count = filterCounts[id];
-                  const disabled = (id === "juridico" || id === "visas") && count === 0;
+                  const disabled = id === "visas" && count === 0;
                   return (
                     <button
                       key={id}
                       type="button"
                       disabled={disabled}
                       onClick={() => setActiveFilter(id)}
-                      title={
-                        id === "juridico" || id === "visas"
-                          ? "Módulo en desarrollo"
-                          : undefined
-                      }
+                      title={id === "visas" ? "Módulo en desarrollo" : undefined}
                       className={`rounded-full border border-border px-3.5 py-2 text-[13px] transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                         selected
                           ? "bg-primary-soft font-semibold text-primary"
@@ -287,7 +307,7 @@ export function ClientesView() {
                       }`}
                     >
                       {label}
-                      {id !== "juridico" && id !== "visas" ? ` (${count})` : ""}
+                      {id !== "visas" ? ` (${count})` : ""}
                     </button>
                   );
                 })}
@@ -320,9 +340,11 @@ export function ClientesView() {
                 ) : filteredRows.length === 0 ? (
                   <tr>
                     <td colSpan={tableHeaders.length} className="px-5 py-8 text-sm text-text-secondary">
-                      {activeFilter === "juridico" || activeFilter === "visas"
+                      {activeFilter === "visas"
                         ? "Este módulo estará disponible próximamente."
-                        : hasSearch
+                        : activeFilter === "juridico"
+                          ? "No hay clientes con expedientes."
+                          : hasSearch
                           ? "No hay clientes que coincidan con la búsqueda."
                           : "No hay clientes para este filtro."}
                     </td>
