@@ -41,7 +41,7 @@ export function Modal({
         aria-modal="true"
         aria-labelledby="modal-title"
       >
-        <header className="flex shrink-0 items-start justify-between border-b border-border px-6 py-5">
+        <header className="flex shrink-0 items-start justify-between gap-3 border-b border-border px-4 py-4 sm:px-6 sm:py-5">
           <div className="flex flex-col gap-1">
             <h2 id="modal-title" className="text-lg font-bold text-text-primary">
               {title}
@@ -59,9 +59,9 @@ export function Modal({
             <X className="h-5 w-5" />
           </button>
         </header>
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5">{children}</div>
         {footer ? (
-          <footer className="flex shrink-0 justify-end gap-3 border-t border-border px-6 py-5">
+          <footer className="flex shrink-0 flex-col-reverse gap-2 border-t border-border px-4 py-4 sm:flex-row sm:justify-end sm:gap-3 sm:px-6 sm:py-5">
             {footer}
           </footer>
         ) : null}

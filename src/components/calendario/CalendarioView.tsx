@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { CalendarDays, ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { Bell, CalendarDays, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -17,8 +17,9 @@ const CitaModal = dynamic(
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useAuth } from "@/context/auth-context";
-import { fetchCitas } from "@/lib/api/index";
+import { fetchCitas, fetchRecordatorios } from "@/lib/api/index";
 import type { CitaDetail } from "@/lib/api/types";
+import type { RecordatorioPlazo } from "@/lib/juridico/model";
 import {
   citaChipLabel,
   citaEstadoLabel,
@@ -53,6 +54,7 @@ export function CalendarioView() {
   const [month, setMonth] = useState(today.getMonth());
   const [selectedDateKey, setSelectedDateKey] = useState(todayKey);
   const [citas, setCitas] = useState<CitaDetail[]>([]);
+  const [recordatorios, setRecordatorios] = useState<RecordatorioPlazo[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCita, setEditingCita] = useState<CitaDetail | null>(null);
@@ -62,8 +64,15 @@ export function CalendarioView() {
     if (!options?.silent) setLoading(true);
     try {
       const range = monthRangeIso(year, month);
-      const response = await fetchCitas(token, range);
+      const grid = buildMonthGrid(year, month);
+      const desde = grid[0]?.key ?? range.desde.slice(0, 10);
+      const hasta = grid[grid.length - 1]?.key ?? range.hasta.slice(0, 10);
+      const [response, reminders] = await Promise.all([
+        fetchCitas(token, range),
+        fetchRecordatorios(token, { desde, hasta }).catch(() => ({ items: [] as RecordatorioPlazo[] })),
+      ]);
       setCitas(response.items);
+      setRecordatorios(reminders.items);
     } finally {
       if (!options?.silent) setLoading(false);
     }
@@ -122,7 +131,18 @@ export function CalendarioView() {
   }, [citas]);
 
   const kpis = useMemo(() => computeCalendarioKpis(citas, todayKey), [citas, todayKey]);
+  const recordatoriosByDay = useMemo(() => {
+    const map = new Map<string, RecordatorioPlazo[]>();
+    for (const item of recordatorios) {
+      const list = map.get(item.venceEn) ?? [];
+      list.push(item);
+      map.set(item.venceEn, list);
+    }
+    return map;
+  }, [recordatorios]);
+
   const selectedCitas = citasByDay.get(selectedDateKey) ?? [];
+  const selectedRecordatorios = recordatoriosByDay.get(selectedDateKey) ?? [];
   const monthCells = buildMonthGrid(year, month);
   const viewingCurrentMonth = year === today.getFullYear() && month === today.getMonth();
 
@@ -235,6 +255,7 @@ export function CalendarioView() {
             <div className="grid grid-cols-7 gap-px bg-border p-px">
               {monthCells.map((cell) => {
                 const dayCitas = citasByDay.get(cell.key) ?? [];
+                const dayRecordatorios = (recordatoriosByDay.get(cell.key) ?? []).filter((item) => !item.cumplidoEn);
                 const isSelected = cell.key === selectedDateKey;
                 const isToday = cell.key === todayKey;
                 const weekend = isWeekend(cell.date);
@@ -269,7 +290,7 @@ export function CalendarioView() {
                       ) : null}
                     </div>
                     <div className="flex flex-col gap-1">
-                      {dayCitas.slice(0, 2).map((cita) => {
+                      {dayCitas.slice(0, dayRecordatorios.length > 0 ? 1 : 2).map((cita) => {
                         const styles = citaEstadoStyles(cita.estado);
                         return (
                           <span
@@ -280,9 +301,17 @@ export function CalendarioView() {
                           </span>
                         );
                       })}
-                      {dayCitas.length > 2 ? (
+                      {dayCitas.length > (dayRecordatorios.length > 0 ? 1 : 2) ? (
                         <span className="text-[10px] font-medium text-text-secondary">
-                          +{dayCitas.length - 2} más
+                          +{dayCitas.length - (dayRecordatorios.length > 0 ? 1 : 2)} más
+                        </span>
+                      ) : null}
+                      {dayRecordatorios.length > 0 ? (
+                        <span className="flex items-center gap-1 truncate text-[10px] font-semibold text-primary">
+                          <Bell className="h-3 w-3 shrink-0" aria-hidden />
+                          {dayRecordatorios.length === 1
+                            ? dayRecordatorios[0]?.descripcion
+                            : `${dayRecordatorios.length} recordatorios`}
                         </span>
                       ) : null}
                     </div>
@@ -309,6 +338,7 @@ export function CalendarioView() {
         <CalendarioDayPanel
           dateKey={selectedDateKey}
           citas={selectedCitas}
+          recordatorios={selectedRecordatorios}
           onSelectCita={openEdit}
         />
       </div>
