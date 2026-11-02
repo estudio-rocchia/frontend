@@ -655,11 +655,11 @@ export function AlquileresWorkspace() {
 
   return (
     <>
-      <div className={`flex flex-col gap-6 sm:gap-8 ${pagePaddingClass}`}>
+      <div className={`relative z-10 flex flex-col gap-6 sm:gap-8 ${pagePaddingClass}`}>
         <header className="flex flex-col gap-4">
           <div className="flex max-w-2xl flex-col gap-1">
-            <h1 className="text-[22px] font-bold text-text-primary">Gestión de alquileres</h1>
-            <p className="text-sm text-text-secondary">
+            <h1 className="text-[22px] font-semibold tracking-tight text-text-on-primary">Gestión de alquileres</h1>
+            <p className="text-sm text-white/75">
               Operá contratos activos, ajustes por índice y renovaciones.
             </p>
           </div>
@@ -682,37 +682,37 @@ export function AlquileresWorkspace() {
         {error ? (
           <div>
             <p className="rounded-sm border border-danger bg-danger-bg px-3 py-2 text-sm text-danger">{error}</p>
-            <button type="button" onClick={() => void loadRows()} className="mt-3 text-sm font-semibold text-primary">
+            <button type="button" onClick={() => void loadRows()} className="mt-3 text-sm font-semibold text-white">
               Reintentar
             </button>
           </div>
         ) : (
           <RentalsTable
-            rows={rows}
-            loading={loading}
-            isSearchPending={isSearchPending}
-            serverMode
-            total={tableTotal}
-            page={pageIndex + 1}
-            pageSize={ALQUILERES_PAGE_SIZE}
-            canGoPrev={canGoPrev}
-            canGoNext={canGoNext}
-            onGoPrev={goPrev}
-            onGoNext={goNext}
-            stats={stats}
-            searchQuery={searchQuery}
-            activeChip={activeChip}
-            onSearchChange={setSearchQuery}
-            onChipChange={setActiveChip}
-            onClearFilters={clearFilters}
-            onPrefetch={(row) => prefetchContrato(Number(row.id))}
-            onViewFicha={(row) => openFicha(row.id)}
-            onCollect={(row) => void openCollectFromRow(row)}
-            onAdjust={(row) => void openAdjustFromRow(row)}
-            onRenew={(row) => void openRenewFromRow(row)}
-            onFinish={openFinishFromRow}
-          />
-        )}
+              rows={rows}
+              loading={loading}
+              isSearchPending={isSearchPending}
+              serverMode
+              total={tableTotal}
+              page={pageIndex + 1}
+              pageSize={ALQUILERES_PAGE_SIZE}
+              canGoPrev={canGoPrev}
+              canGoNext={canGoNext}
+              onGoPrev={goPrev}
+              onGoNext={goNext}
+              stats={stats}
+              searchQuery={searchQuery}
+              activeChip={activeChip}
+              onSearchChange={setSearchQuery}
+              onChipChange={setActiveChip}
+              onClearFilters={clearFilters}
+              onPrefetch={(row) => prefetchContrato(Number(row.id))}
+              onViewFicha={(row) => openFicha(row.id)}
+              onCollect={(row) => void openCollectFromRow(row)}
+              onAdjust={(row) => void openAdjustFromRow(row)}
+              onRenew={(row) => void openRenewFromRow(row)}
+              onFinish={openFinishFromRow}
+            />
+          )}
       </div>
 
       {liquidacionModalOpen ? (
@@ -795,7 +795,7 @@ export function AlquileresWorkspace() {
 
       {toast ? (
         <div
-          className="fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 rounded-sm border border-border bg-bg-card px-4 py-3 text-sm font-medium text-text-primary shadow-[var(--shadow-card)]"
+          className="fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 rounded-full border border-border bg-bg-card px-4 py-3 text-sm font-medium text-text-primary shadow-[var(--shadow-card)]"
           role="status"
         >
           {toast}

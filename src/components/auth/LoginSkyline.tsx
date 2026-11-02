@@ -39,6 +39,17 @@ const WINDOWS: ReadonlyArray<readonly [x: number, y: number]> = [
 
 const WINDOW_DURATIONS = [2.6, 3.4, 4.1, 3.1, 4.8];
 
+export function LoginScene({ className = "" }: { className?: string }) {
+  return (
+    <div aria-hidden className={`pointer-events-none overflow-hidden bg-primary ${className}`}>
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(255,255,255,0.09),transparent_60%)]" />
+      <LoginSky />
+      <LoginDrift />
+      <LoginSkyline />
+    </div>
+  );
+}
+
 export function LoginSky() {
   return (
     <div

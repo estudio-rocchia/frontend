@@ -42,10 +42,10 @@ function FilterChip({
       type="button"
       onClick={() => onSelect(id)}
       aria-pressed={selected}
-      className={`rounded-full border border-border px-3.5 py-2 text-[13px] transition-colors ${
+      className={`rounded-full px-3.5 py-1.5 text-[13px] transition-colors ${
         selected
-          ? "bg-primary-soft font-semibold text-primary"
-          : "bg-bg-card font-normal text-text-secondary hover:text-text-primary"
+          ? "bg-primary font-semibold text-text-on-primary"
+          : "bg-bg-page font-medium text-text-secondary hover:text-text-primary"
       }`}
     >
       {label}

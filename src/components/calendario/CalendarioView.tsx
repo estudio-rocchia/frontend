@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { Bell, CalendarDays, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useSyncScope } from "@/lib/sync/use-sync-scope";
 
@@ -58,10 +58,14 @@ export function CalendarioView() {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCita, setEditingCita] = useState<CitaDetail | null>(null);
+  const hasLoadedOnce = useRef(false);
+  const requestSeq = useRef(0);
 
   const loadCitas = useCallback(async (options?: { silent?: boolean }) => {
     if (!token) return;
-    if (!options?.silent) setLoading(true);
+    const seq = ++requestSeq.current;
+    const block = !options?.silent && !hasLoadedOnce.current;
+    if (block) setLoading(true);
     try {
       const range = monthRangeIso(year, month);
       const grid = buildMonthGrid(year, month);
@@ -71,10 +75,12 @@ export function CalendarioView() {
         fetchCitas(token, range),
         fetchRecordatorios(token, { desde, hasta }).catch(() => ({ items: [] as RecordatorioPlazo[] })),
       ]);
+      if (seq !== requestSeq.current) return;
       setCitas(response.items);
       setRecordatorios(reminders.items);
+      hasLoadedOnce.current = true;
     } finally {
-      if (!options?.silent) setLoading(false);
+      if (block && seq === requestSeq.current) setLoading(false);
     }
   }, [token, year, month]);
 

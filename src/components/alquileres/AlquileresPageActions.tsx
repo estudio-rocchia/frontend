@@ -23,15 +23,15 @@ function PageAction({
   disabled?: boolean;
 }) {
   const primary = emphasis === "primary";
-  const className = `flex h-full items-center gap-3 rounded-md border px-3 py-2.5 text-left shadow-[var(--shadow-card)] transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${interactiveFocusClass} ${
+  const className = `flex h-full items-center gap-3 rounded-xl border px-3.5 py-3 text-left shadow-[var(--shadow-card)] transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${interactiveFocusClass} ${
     primary
       ? "border-primary bg-primary text-text-on-primary hover:bg-primary-dark"
-      : "border-border bg-bg-card text-text-primary hover:border-primary/40 hover:bg-primary-soft/60"
+      : "border-border bg-bg-card text-text-primary hover:bg-primary-soft/50"
   }`;
   const content = (
     <>
       <span
-        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-sm ${
+        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
           primary ? "bg-white/15 text-text-on-primary" : "bg-primary-soft text-primary"
         }`}
         aria-hidden

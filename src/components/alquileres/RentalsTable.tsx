@@ -32,7 +32,7 @@ function RowActions({
     "inline-flex h-8 items-center px-2.5 text-xs font-medium transition-colors " + interactiveFocusClass;
 
   return (
-    <div className="inline-flex overflow-hidden rounded-sm border border-border bg-bg-card">
+    <div className="inline-flex overflow-hidden rounded-full border border-border bg-bg-card">
       {primary ? (
         <button
           type="button"
@@ -58,7 +58,84 @@ function RowActions({
   );
 }
 
-const PAGE_SIZE = 15;
+const cellPad = "px-4";
+const headCell = `h-12 border-b border-border ${cellPad} text-[11px] font-semibold uppercase tracking-wide text-text-secondary`;
+const bodyCell = `min-h-[52px] border-b border-border py-3 ${cellPad}`;
+
+function RentalMobileCard({
+  row,
+  onOpen,
+  onPrefetch,
+  onCollect,
+  onAdjust,
+  onRenew,
+  onFinish,
+}: {
+  row: RentalRow;
+  onOpen: () => void;
+  onPrefetch?: () => void;
+  onCollect: () => void;
+  onAdjust: () => void;
+  onRenew: () => void;
+  onFinish: () => void;
+}) {
+  const showRenew = row.needsRenewal;
+  const showCollect = canCollectRent(row);
+  const showAdjust = row.needsAdjustment && row.canAdjust && !showRenew && !showCollect;
+
+  return (
+    <article
+      className="flex flex-col gap-3 border-t border-border px-4 py-4"
+      onMouseEnter={onPrefetch}
+    >
+      <button
+        type="button"
+        onClick={onOpen}
+        className={`flex items-start justify-between gap-3 text-left ${interactiveFocusClass}`}
+      >
+        <PropertyCell label={row.contractProperty} />
+        <StatusBadge label={row.status.label} variant={row.status.variant} />
+      </button>
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-[13px]">
+        <div>
+          <dt className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Inquilino</dt>
+          <dd className="mt-0.5 text-text-primary">{row.tenant}</dd>
+        </div>
+        <div className="text-right">
+          <dt className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Alquiler</dt>
+          <dd className={`mt-0.5 font-semibold text-primary ${moneyClassName}`}>{row.amount}</dd>
+        </div>
+        <div>
+          <dt className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Período</dt>
+          <dd className="mt-0.5 text-text-secondary">{row.month}</dd>
+        </div>
+        <div className="text-right">
+          <dt className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Fin</dt>
+          <dd className="mt-0.5"><ContractEndCell row={row} /></dd>
+        </div>
+        {row.daysOverdue > 0 ? (
+          <div className="col-span-2 text-right text-sm font-semibold tabular-nums text-danger">
+            {row.daysOverdue} días de mora
+          </div>
+        ) : null}
+      </dl>
+      <div className="flex justify-end">
+        <RowActions
+          primary={
+            showCollect
+              ? { label: "Cobrar", onClick: onCollect }
+              : showAdjust
+                ? { label: "Ajustar", onClick: onAdjust }
+                : showRenew
+                  ? { label: "Renovar", onClick: onRenew }
+                  : null
+          }
+          finalizar={showRenew ? { onClick: onFinish } : null}
+        />
+      </div>
+    </article>
+  );
+}
 
 function ContractEndCell({ row }: { row: RentalRow }) {
   const hint = contractEndHint(row.daysUntilContractEnd);
@@ -70,10 +147,24 @@ function ContractEndCell({ row }: { row: RentalRow }) {
         : "text-text-secondary";
 
   return (
-    <div className="flex flex-col gap-0.5">
-      <span className="text-text-primary">{row.contractEnd}</span>
+    <div className="flex flex-col items-end gap-0.5 text-right">
+      <span className="tabular-nums text-text-primary">{row.contractEnd}</span>
       {hint ? <span className={`text-[11px] font-semibold ${hintClass}`}>{hint}</span> : null}
     </div>
+  );
+}
+
+function PropertyCell({ label }: { label: string }) {
+  const [code, ...rest] = label.split(" · ");
+  const title = rest.join(" · ");
+  if (!title) {
+    return <span className="font-semibold text-text-primary">{label}</span>;
+  }
+  return (
+    <span className="flex min-w-0 flex-col gap-0.5">
+      <span className="text-[11px] font-semibold uppercase tracking-wide text-primary">{code}</span>
+      <span className="font-medium text-text-primary">{title}</span>
+    </span>
   );
 }
 
@@ -82,6 +173,8 @@ function defaultActiveChip(counts: ReturnType<typeof rentalOperationalCounts>): 
   if (counts.ajustePendiente > 0) return "ajuste_pendiente";
   return "todos";
 }
+
+const PAGE_SIZE = 15;
 
 type RentalsTableProps = {
   rows: RentalRow[];
@@ -167,59 +260,58 @@ export function RentalsTable({
   const useCursorPagination = serverMode && onGoNext !== undefined && onGoPrev !== undefined;
 
   return (
-    <div className="flex flex-col gap-5">
-      <section className="flex flex-col gap-4 rounded-md border border-border bg-bg-card p-4 shadow-[var(--shadow-card)] sm:p-5">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex min-w-0 flex-1 items-center gap-3">
-            <div className="relative min-w-0 flex-1 lg:max-w-md">
-              <Search
-                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary"
+    <section className="flex min-h-[400px] flex-1 flex-col overflow-hidden rounded-xl border border-border bg-bg-card shadow-[var(--shadow-card)]">
+      <div className="flex flex-col gap-4 px-4 py-4 sm:px-5">
+        <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <h2 className="text-[15px] font-semibold tracking-tight text-text-primary">Listado de contratos</h2>
+          <div className="relative min-w-0 w-full lg:max-w-md">
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary"
+              aria-hidden
+            />
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(event) => onSearchChange?.(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape" && searchQuery) {
+                  event.preventDefault();
+                  onSearchChange?.("");
+                }
+              }}
+              placeholder="Código, dirección, propiedad o inquilino…"
+              aria-label="Buscar contratos"
+              className={`w-full rounded-full border border-border bg-bg-page py-2.5 pl-9 pr-9 text-[13px] text-text-primary placeholder:text-text-secondary focus:border-primary ${interactiveFocusClass}`}
+            />
+            {isSearchPending ? (
+              <Loader2
+                className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-text-secondary"
                 aria-hidden
               />
-              <input
-                type="search"
-                value={searchQuery}
-                onChange={(event) => onSearchChange?.(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Escape" && searchQuery) {
-                    event.preventDefault();
-                    onSearchChange?.("");
-                  }
-                }}
-                placeholder="Código, dirección, propiedad o inquilino…"
-                aria-label="Buscar contratos"
-                className={`w-full rounded-sm border border-border bg-bg-page py-2.5 pl-9 pr-9 text-[13px] text-text-primary placeholder:text-text-secondary focus:border-primary ${interactiveFocusClass}`}
-              />
-              {isSearchPending ? (
-                <Loader2
-                  className="absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-text-secondary"
-                  aria-hidden
-                />
-              ) : hasActiveSearch ? (
-                <button
-                  type="button"
-                  onClick={() => onSearchChange?.("")}
-                  className={`absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-sm text-text-secondary hover:bg-bg-cream hover:text-text-primary ${interactiveFocusClass}`}
-                  aria-label="Limpiar búsqueda"
-                >
-                  <X className="h-4 w-4" aria-hidden />
-                </button>
-              ) : null}
-            </div>
-
-            <RentalFilterChips
-              active={activeChip}
-              stats={stats}
-              onChange={(chip) => {
-                onChipChange?.(chip);
-                onPageChange?.(1);
-              }}
-            />
+            ) : hasActiveSearch ? (
+              <button
+                type="button"
+                onClick={() => onSearchChange?.("")}
+                className={`absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-text-secondary hover:bg-bg-card hover:text-text-primary ${interactiveFocusClass}`}
+                aria-label="Limpiar búsqueda"
+              >
+                <X className="h-4 w-4" aria-hidden />
+              </button>
+            ) : null}
           </div>
         </div>
 
+        <RentalFilterChips
+          active={activeChip}
+          stats={stats}
+          onChange={(chip) => {
+            onChipChange?.(chip);
+            onPageChange?.(1);
+          }}
+        />
+
         {hasActiveFilters ? (
-          <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-[12px] text-text-secondary">Filtros activos:</span>
             {hasActiveSearch ? (
               <span className="rounded-full bg-bg-page px-2.5 py-1 text-[12px] text-text-primary">
@@ -246,40 +338,65 @@ export function RentalsTable({
         {activeChip === "a_cobrar" ? (
           <p className="text-[12px] text-text-secondary">{rentCollectionWindowHint()}</p>
         ) : null}
-      </section>
+      </div>
 
-      <section className="flex min-h-[400px] flex-1 flex-col overflow-hidden rounded-md border border-border bg-bg-card shadow-[var(--shadow-card)]">
-        <div className="border-b border-border px-4 py-4 sm:px-5">
-          <h2 className="text-[15px] font-semibold text-text-primary">Listado de contratos</h2>
-        </div>
+      <div className="border-t border-border md:hidden">
+        {loading ? (
+          Array.from({ length: 4 }).map((_, index) => (
+            <div key={index} className="flex flex-col gap-2 border-t border-border px-4 py-4 first:border-t-0">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-4 w-48" />
+              <Skeleton className="h-4 w-32" />
+            </div>
+          ))
+        ) : paginated.length === 0 ? (
+          <div className="px-4 py-10 text-center">
+            <p className="text-sm font-medium text-text-primary">
+              {hasActiveFilters ? "No hay contratos con estos criterios" : "No hay contratos para mostrar"}
+            </p>
+          </div>
+        ) : (
+          paginated.map((row) => (
+            <RentalMobileCard
+              key={row.id}
+              row={row}
+              onOpen={() => onViewFicha(row)}
+              onPrefetch={() => onPrefetch?.(row)}
+              onCollect={() => onCollect(row)}
+              onAdjust={() => onAdjust(row)}
+              onRenew={() => onRenew(row)}
+              onFinish={() => onFinish(row)}
+            />
+          ))
+        )}
+      </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[880px] text-left text-[13px]">
+      <div className="hidden overflow-x-auto border-t border-border md:block">
+          <table className="w-full min-w-[960px] border-separate border-spacing-0 text-left text-[13px]">
             <thead>
-              <tr className="h-11 bg-bg-cream text-xs font-semibold text-text-secondary">
-                <th className="px-3 sm:px-5">Contrato / Propiedad</th>
-                <th className="px-3 sm:px-5">Inquilino</th>
-                <th
-                  className="hidden px-3 sm:px-5 2xl:table-cell"
-                  title="Mes de la cuota pendiente o en mora"
-                >
+              <tr>
+                <th className={`sticky left-0 z-20 bg-bg-card text-left shadow-[4px_0_8px_-6px_rgba(26,43,50,0.2)] ${headCell}`}>
+                  Contrato / Propiedad
+                </th>
+                <th className={`text-left ${headCell}`}>Inquilino</th>
+                <th className={`hidden text-left 2xl:table-cell ${headCell}`} title="Mes de la cuota pendiente o en mora">
                   Período a cobrar
                 </th>
-                <th className="px-3 text-right sm:px-5">Alquiler actual</th>
-                <th className="hidden px-3 text-right sm:px-5 lg:table-cell">Días mora</th>
-                <th className="px-3 text-center sm:px-5">Estado</th>
-                <th className="hidden whitespace-nowrap px-3 sm:px-5 xl:table-cell">Inicio</th>
-                <th className="whitespace-nowrap px-3 sm:px-5">Fin</th>
-                <th className="hidden px-3 text-center sm:px-5 lg:table-cell">Servicios</th>
-                <th className="whitespace-nowrap px-3 text-right sm:px-5">Acciones</th>
+                <th className={`text-right ${headCell}`}>Alquiler actual</th>
+                <th className={`hidden text-right lg:table-cell ${headCell}`}>Días mora</th>
+                <th className={`text-center ${headCell}`}>Estado</th>
+                <th className={`hidden text-right xl:table-cell ${headCell}`}>Inicio</th>
+                <th className={`text-right ${headCell}`}>Fin</th>
+                <th className={`hidden text-left lg:table-cell ${headCell}`}>Servicios</th>
+                <th className={`text-right ${headCell}`}>Acciones</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 Array.from({ length: 6 }).map((_, index) => (
-                  <tr key={index} className="border-b border-border [&>td]:py-4">
+                  <tr key={index} className="border-t border-border">
                     {Array.from({ length: 10 }).map((__, cellIndex) => (
-                      <td key={cellIndex} className="px-3 sm:px-5">
+                      <td key={cellIndex} className={bodyCell}>
                         <Skeleton className="h-4 w-full max-w-[120px]" />
                       </td>
                     ))}
@@ -287,7 +404,7 @@ export function RentalsTable({
                 ))
               ) : paginated.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-5 py-14">
+                  <td colSpan={10} className="px-4 py-14">
                     <div className="mx-auto flex max-w-sm flex-col items-center gap-3 text-center">
                       <p className="text-sm font-medium text-text-primary">
                         {hasActiveFilters
@@ -310,18 +427,19 @@ export function RentalsTable({
                   </td>
                 </tr>
               ) : (
-                paginated.map((row) => {
+                paginated.map((row, index) => {
                   const showRenew = row.needsRenewal;
                   const showCollect = canCollectRent(row);
                   const showAdjust =
                     row.needsAdjustment && row.canAdjust && !showRenew && !showCollect;
+                  const zebra = index % 2 === 1 ? "bg-bg-page" : "bg-bg-card";
 
                   return (
                     <tr
                       key={row.id}
                       tabIndex={0}
                       aria-label={`Abrir ficha de ${row.contractProperty}`}
-                      className={`cursor-pointer border-b border-border align-middle transition-colors hover:bg-bg-page/70 [&>td]:py-4 ${interactiveFocusClass}`}
+                      className={`group cursor-pointer border-t border-border align-middle transition-colors hover:bg-primary-soft/50 ${zebra} ${interactiveFocusClass}`}
                       onMouseEnter={() => onPrefetch?.(row)}
                       onClick={() => onViewFicha(row)}
                       onKeyDown={(event) => {
@@ -331,30 +449,32 @@ export function RentalsTable({
                         onViewFicha(row);
                       }}
                     >
-                      <td className="px-3 font-medium text-text-primary sm:px-5">{row.contractProperty}</td>
-                      <td className="px-3 text-text-primary sm:px-5">{row.tenant}</td>
-                      <td className="hidden px-3 text-text-secondary sm:px-5 2xl:table-cell">{row.month}</td>
-                      <td className={`px-3 text-right text-[15px] font-bold text-primary sm:px-5 ${moneyClassName}`}>
+                      <td className={`sticky left-0 z-10 text-left shadow-[4px_0_8px_-6px_rgba(26,43,50,0.2)] group-hover:bg-primary-soft/50 ${bodyCell} ${zebra}`}>
+                        <PropertyCell label={row.contractProperty} />
+                      </td>
+                      <td className={`text-left text-text-primary ${bodyCell}`}>{row.tenant}</td>
+                      <td className={`hidden text-left text-text-secondary 2xl:table-cell ${bodyCell}`}>{row.month}</td>
+                      <td className={`text-right text-[15px] font-semibold text-primary ${bodyCell} ${moneyClassName}`}>
                         {row.amount}
                       </td>
                       <td
-                        className={`hidden px-3 text-right font-semibold sm:px-5 lg:table-cell ${
+                        className={`hidden text-right font-semibold tabular-nums lg:table-cell ${bodyCell} ${
                           row.daysOverdue > 0 ? "text-danger" : "text-text-primary"
                         }`}
                       >
                         {row.daysOverdue}
                       </td>
-                      <td className="px-3 text-center sm:px-5">
+                      <td className={`text-center ${bodyCell}`}>
                         <StatusBadge label={row.status.label} variant={row.status.variant} />
                       </td>
-                      <td className="hidden whitespace-nowrap px-3 text-text-secondary sm:px-5 xl:table-cell">
+                      <td className={`hidden whitespace-nowrap text-right tabular-nums text-text-secondary xl:table-cell ${bodyCell}`}>
                         {row.contractStart}
                       </td>
-                      <td className="whitespace-nowrap px-3 sm:px-5">
+                      <td className={`whitespace-nowrap text-right ${bodyCell}`}>
                         <ContractEndCell row={row} />
                       </td>
-                      <td className="hidden px-3 text-center sm:px-5 lg:table-cell">
-                        <div className="flex flex-col items-center gap-1">
+                      <td className={`hidden text-left lg:table-cell ${bodyCell}`}>
+                        <div className="flex flex-col items-start gap-1">
                           <span className="font-medium text-text-primary">{row.servicios.summary}</span>
                           <StatusBadge
                             label={row.servicios.status.label}
@@ -363,7 +483,7 @@ export function RentalsTable({
                         </div>
                       </td>
                       <td
-                        className="whitespace-nowrap px-3 text-right sm:px-5"
+                        className={`whitespace-nowrap text-right ${bodyCell}`}
                         onClick={(event) => event.stopPropagation()}
                         onKeyDown={(event) => event.stopPropagation()}
                       >
@@ -414,7 +534,6 @@ export function RentalsTable({
             </ButtonOutline>
           </div>
         </footer>
-      </section>
-    </div>
+    </section>
   );
 }
