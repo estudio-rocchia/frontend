@@ -1,4 +1,4 @@
-import type { CitaDetail, CitaEstado } from "@/lib/api/types";
+import type { CitaDetail, CitaEstado, CitaTipo } from "@/lib/api/types";
 import { parseDateKey } from "@/lib/calendar/month";
 import { citaTipoLabel } from "@/lib/calendar/tipos";
 
@@ -65,6 +65,22 @@ export function citaEstadoStyles(estado: CitaEstado): {
         chip: "border-l-warning bg-warning-bg/70 text-text-primary",
         dot: "bg-warning",
       };
+  }
+}
+
+export function citaTipoChipClass(tipo: CitaTipo, estado: CitaEstado): string {
+  if (estado === "cancelada") return "bg-bg-page text-text-secondary line-through";
+  switch (tipo) {
+    case "reunion":
+      return "bg-primary-soft text-primary";
+    case "visita_inmueble":
+      return "bg-accent-sky-bg text-primary-dark";
+    case "visa":
+      return "bg-warning-bg text-warning";
+    case "juridico":
+      return "bg-accent-lilac-bg text-text-primary";
+    default:
+      return "bg-bg-cream text-text-secondary";
   }
 }
 

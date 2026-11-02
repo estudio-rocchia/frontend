@@ -8,59 +8,75 @@ import { X } from "lucide-react";
 
 import rocchiaLogo from "@/assets/rocchia-logo.png";
 import { useAuth } from "@/context/auth-context";
-import { mainNav } from "@/config/navigation";
+import { isNavActive, navGroups, type NavItem } from "@/config/navigation";
 import { prefetchClientesList } from "@/lib/api/clientes-list";
 import { canManageUsers } from "@/lib/auth/roles";
 
-function isActive(pathname: string, href: string) {
-  if (href === "/") return pathname === "/";
-  return pathname === href || pathname.startsWith(`${href}/`);
+const navLinkFocus =
+  "outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--login-accent)]";
+
+function visibleItems(items: NavItem[], canAdmin: boolean) {
+  return items.filter((item) => !item.adminOnly || canAdmin);
 }
 
 const SidebarNav = memo(function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const { user, token } = useAuth();
-  const navItems = mainNav.filter((item) => !item.adminOnly || canManageUsers(user));
+  const canAdmin = canManageUsers(user);
 
   return (
     <>
-      <div className="flex items-center gap-2.5 pb-5">
-        <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full bg-white ring-2 ring-white/25">
+      <div className="mb-6 flex items-center gap-3 px-1">
+        <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full bg-white ring-2 ring-[var(--login-accent)]">
           <Image
             src={rocchiaLogo}
             alt=""
-            width={88}
-            height={88}
-            sizes="44px"
+            width={80}
+            height={80}
+            sizes="40px"
             priority
             className="h-full w-full object-cover"
           />
         </div>
-        <span className="text-lg font-bold text-text-on-primary">Rocchia</span>
+        <div className="min-w-0">
+          <p className="text-[17px] font-semibold tracking-tight text-text-on-primary">Rocchia</p>
+          <p className="text-[11px] tracking-wide text-[var(--login-accent)]">Jurídico · Inmobiliario</p>
+        </div>
       </div>
-      <p className="mb-2 text-[11px] text-[var(--nav-subtitle)]">Jurídico · Inmobiliario</p>
-      <nav className="flex flex-1 flex-col gap-1">
-        {navItems.map(({ label, href, icon: Icon }) => {
-          const active = isActive(pathname, href);
+      <nav className="flex flex-1 flex-col gap-5">
+        {navGroups.map((group) => {
+          const items = visibleItems(group.items, canAdmin);
+          if (items.length === 0) return null;
           return (
-            <Link
-              key={href}
-              href={href}
-              onClick={onNavigate}
-              onMouseEnter={() => {
-                if (href === "/clientes" && token) {
-                  void prefetchClientesList(token);
-                }
-              }}
-              className={`flex items-center gap-3 rounded-sm px-3.5 py-2.5 text-sm font-medium transition-colors ${
-                active
-                  ? "text-text-on-primary"
-                  : "text-[var(--nav-muted)] hover:text-text-on-primary/90"
-              }`}
-            >
-              <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />
-              {label}
-            </Link>
+            <div key={group.label} className="flex flex-col gap-1">
+              <p className="px-3.5 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--nav-subtitle)]">
+                {group.label}
+              </p>
+              {items.map(({ label, href, icon: Icon }) => {
+                const active = isNavActive(pathname, href);
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    onClick={onNavigate}
+                    aria-current={active ? "page" : undefined}
+                    onMouseEnter={() => {
+                      if (href === "/clientes" && token) {
+                        void prefetchClientesList(token);
+                      }
+                    }}
+                    className={`flex items-center gap-3 rounded-md px-3.5 py-2.5 text-sm font-medium transition-colors ${navLinkFocus} ${
+                      active
+                        ? "bg-white/15 text-text-on-primary shadow-[inset_3px_0_0_var(--login-accent)]"
+                        : "text-[var(--nav-muted)] hover:bg-white/10 hover:text-text-on-primary"
+                    }`}
+                  >
+                    <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />
+                    {label}
+                  </Link>
+                );
+              })}
+            </div>
           );
         })}
       </nav>
@@ -83,7 +99,7 @@ export function Sidebar({
 
   return (
     <>
-      <aside className="hidden w-[240px] shrink-0 flex-col gap-2 bg-primary px-4 py-6 xl:flex">
+      <aside className="hidden w-[248px] shrink-0 flex-col bg-primary px-3 py-6 xl:flex">
         <SidebarNav />
       </aside>
 
@@ -95,7 +111,7 @@ export function Sidebar({
             aria-label="Cerrar menú"
             onClick={onMobileClose}
           />
-          <aside className="relative flex h-dvh max-h-dvh w-[min(280px,88vw)] flex-col gap-2 overflow-y-auto bg-primary px-4 py-6 shadow-xl">
+          <aside className="relative flex h-dvh max-h-dvh w-[min(280px,88vw)] flex-col overflow-y-auto bg-primary px-3 py-6 shadow-xl">
             <button
               type="button"
               onClick={onMobileClose}
