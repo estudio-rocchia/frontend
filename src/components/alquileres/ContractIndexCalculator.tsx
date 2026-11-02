@@ -367,8 +367,8 @@ export function ContractIndexCalculator({
 
       {!isAdjust ? (
         <p className="text-[12px] leading-relaxed text-text-secondary">
-          {value.tipoIndice === "IPC"
-            ? `El coeficiente es el producto de los últimos ${value.frecuenciaAjusteMeses} IPC mensuales. Los porcentajes no se suman.`
+          {value.tipoIndice === "IPC" || value.tipoIndice === "CAC"
+            ? `El coeficiente es el producto de los últimos ${value.frecuenciaAjusteMeses} ${value.tipoIndice} mensuales. Los porcentajes no se suman.`
             : value.tipoIndice === "ICL"
               ? "El coeficiente es el ICL de la fecha final dividido el ICL de la fecha inicial."
               : `Elegí entre qué meses medir la suba del ${indiceLabel} (sugerimos los últimos ${value.frecuenciaAjusteMeses} meses).`}

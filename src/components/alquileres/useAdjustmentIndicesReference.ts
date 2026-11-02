@@ -3,7 +3,12 @@
 import { useEffect, useState } from "react";
 import { fetchIndiceValores } from "@/lib/api";
 import type { IndiceCode, ValorIndiceRecord } from "@/lib/api/types";
-import { computeLatestVariations, type IndexVariations } from "@/lib/indices/variations";
+import {
+  buildValorMap,
+  computeIndexVariations,
+  computeLatestVariations,
+  type IndexVariations,
+} from "@/lib/indices/variations";
 import { ADJUSTMENT_INDICES, lastIndexMonthAsOf } from "@/lib/rental-adjustment";
 
 export type IndexReferenceSnapshot = {
@@ -11,7 +16,12 @@ export type IndexReferenceSnapshot = {
   valor: string;
   periodo: string;
   variations: IndexVariations;
+  rows: ValorIndiceRecord[];
 };
+
+export function monthlyVariation(rows: ValorIndiceRecord[], periodo: string): string | null {
+  return computeIndexVariations(buildValorMap(rows), periodo).mensual;
+}
 
 function addMonthsToIsoMonth(isoMonth: string, months: number): string {
   const d = new Date(`${isoMonth}T12:00:00`);
@@ -36,13 +46,20 @@ async function loadIndexSnapshot(
     valor: latest.valor,
     periodo: latest.periodo,
     variations: computeLatestVariations(sorted),
+    rows: sorted,
   };
 }
 
-export function useAdjustmentIndicesReference(open: boolean, token: string | null) {
+export function useAdjustmentIndicesReference(
+  open: boolean,
+  token: string | null,
+  codes: readonly IndiceCode[],
+) {
   const [items, setItems] = useState<IndexReferenceSnapshot[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
+
+  const codesKey = codes.join(",");
 
   useEffect(() => {
     if (!open || !token) {
@@ -52,14 +69,19 @@ export function useAdjustmentIndicesReference(open: boolean, token: string | nul
     }
 
     const hasta = lastIndexMonthAsOf(new Date().toISOString().slice(0, 10));
-    const desde = addMonthsToIsoMonth(hasta, -14);
+    const desde = addMonthsToIsoMonth(hasta, -36);
+    const requested = codesKey
+      .split(",")
+      .filter((code): code is IndiceCode =>
+        (ADJUSTMENT_INDICES as readonly string[]).includes(code),
+      );
     let cancelled = false;
 
     setLoading(true);
     setError(false);
 
     void Promise.all(
-      ADJUSTMENT_INDICES.map((code) => loadIndexSnapshot(token, code, desde, hasta)),
+      requested.map((code) => loadIndexSnapshot(token, code, desde, hasta)),
     )
       .then((results) => {
         if (cancelled) return;
@@ -78,7 +100,7 @@ export function useAdjustmentIndicesReference(open: boolean, token: string | nul
     return () => {
       cancelled = true;
     };
-  }, [open, token]);
+  }, [open, token, codesKey]);
 
   return { items, loading, error };
 }
