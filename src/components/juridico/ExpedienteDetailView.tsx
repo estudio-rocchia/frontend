@@ -3,16 +3,23 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, CircleCheck, Eye, Plus, RotateCcw, Trash2 } from "lucide-react";
 
 import { FichaSucesionForm } from "@/components/juridico/FichaSucesionForm";
-import { EstadoBadge, Field, Notice, OfficialLink, RpiBadge, plazoRelativo, ramaLabel } from "@/components/juridico/juridico-ui";
-import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
+import {
+  emptyInmuebleAlta,
+  InmuebleAltaFields,
+  isInmuebleAltaValid,
+  type InmuebleAltaValue,
+} from "@/components/inmuebles/InmuebleAltaFields";
+import { EstadoBadge, Field, Notice, OfficialLink, RpiBadge, editSurfaceClass, plazoRelativo, ramaLabel } from "@/components/juridico/juridico-ui";
+import { ButtonDanger, ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { useAuth } from "@/context/auth-context";
 import {
   ApiError,
   createPlazoExpediente,
+  fetchCatalog,
   createTramiteRpi,
   deleteExpediente,
   deletePlazoExpediente,
@@ -25,7 +32,9 @@ import {
   updatePlazoExpediente,
   updateTramiteRpi,
 } from "@/lib/api";
-import type { CatalogSearchItem } from "@/lib/api/types";
+import type { CatalogoItem, CatalogSearchItem } from "@/lib/api/types";
+import { altaInmuebleCatalogo } from "@/lib/inmuebles/alta-inmueble";
+import { fetchAllInmuebleCodes } from "@/lib/inmuebles/inmueble-codes";
 import { formatDateDisplay, personaDisplayName } from "@/lib/format";
 import {
   ENLACE_JUSTICIA_CHACO,
@@ -170,7 +179,7 @@ export function ExpedienteDetailView() {
           Expedientes
         </button>
         <Notice tone="danger">{error ?? "Expediente no encontrado"}</Notice>
-        <ButtonOutline className="w-full sm:w-auto" onClick={() => void load()}>
+        <ButtonOutline className="w-full md:w-auto" onClick={() => void load()}>
           Reintentar
         </ButtonOutline>
       </div>
@@ -192,7 +201,7 @@ export function ExpedienteDetailView() {
     { id: "caratula", label: "Carátula" },
     { id: "plazos", label: "Plazos", count: pendientes.length, alert: vencidos > 0 },
     { id: "inmuebles", label: "Inmuebles", count: expediente.inmuebles.length },
-    { id: "registro", label: "Inscripción", count: expediente.tramitesRpi.length },
+    { id: "registro", label: "Registro", count: expediente.tramitesRpi.length },
     { id: "consulta", label: tituloFicha },
   ];
 
@@ -207,7 +216,7 @@ export function ExpedienteDetailView() {
         Expedientes
       </button>
 
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div className="flex flex-col gap-1">
           <div className="flex flex-wrap items-center gap-2">
             <EstadoBadge estado={expediente.estado} />
@@ -230,16 +239,15 @@ export function ExpedienteDetailView() {
             {` · inicio ${formatDateDisplay(expediente.abiertoEn)}`}
           </p>
         </div>
-        <button
-          type="button"
+        <ButtonDanger
+          className="w-full md:w-auto"
           onClick={() => {
             setError(null);
             setConfirmarBaja(true);
           }}
-          className={`inline-flex w-fit items-center justify-center rounded-sm bg-danger px-[18px] py-2.5 text-sm font-semibold text-text-on-primary hover:opacity-90 ${interactiveFocusClass}`}
         >
           Eliminar expediente
-        </button>
+        </ButtonDanger>
       </header>
 
       <Modal
@@ -252,17 +260,12 @@ export function ExpedienteDetailView() {
         maxWidthClass="max-w-md"
         footer={
           <>
-            <ButtonOutline className="w-full sm:w-auto" disabled={saving} onClick={() => setConfirmarBaja(false)}>
+            <ButtonOutline className="w-full md:w-auto" disabled={saving} onClick={() => setConfirmarBaja(false)}>
               Cancelar
             </ButtonOutline>
-            <button
-              type="button"
-              className={`inline-flex w-full items-center justify-center rounded-sm bg-danger px-[18px] py-2.5 text-sm font-semibold text-text-on-primary hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto ${interactiveFocusClass}`}
-              disabled={saving}
-              onClick={() => void quitarExpediente()}
-            >
+            <ButtonDanger className="w-full md:w-auto" disabled={saving} onClick={() => void quitarExpediente()}>
               {saving ? "Eliminando…" : "Eliminar expediente"}
-            </button>
+            </ButtonDanger>
           </>
         }
       >
@@ -276,7 +279,7 @@ export function ExpedienteDetailView() {
 
       <section className="overflow-hidden rounded-md border border-border bg-bg-card shadow-[var(--shadow-card)]">
         <div
-          className="flex gap-1 overflow-x-auto border-b border-border px-2 pt-2"
+          className="grid grid-cols-3 border-b border-border md:flex md:gap-1 md:overflow-x-auto md:px-2 md:pt-2"
           role="tablist"
           aria-label="Secciones del expediente"
         >
@@ -289,7 +292,7 @@ export function ExpedienteDetailView() {
               aria-selected={tab === item.id}
               aria-controls={`expediente-panel-${item.id}`}
               onClick={() => openTab(item.id)}
-              className={`inline-flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-t-sm px-3 text-sm font-medium transition-colors ${interactiveFocusClass} ${
+              className={`inline-flex min-h-11 items-center justify-center gap-1.5 border-b border-border px-2 text-center text-sm font-medium transition-colors md:shrink-0 md:justify-start md:border-b-0 md:px-3 md:text-left ${interactiveFocusClass} ${
                 tab === item.id
                   ? "border-b-2 border-primary text-primary"
                   : "text-text-secondary hover:text-text-primary"
@@ -333,17 +336,16 @@ export function ExpedienteDetailView() {
             <CaratulaForm
               expediente={expediente}
               saving={saving}
-              onChange={setExpediente}
-              onSave={() =>
-                void run(
+              onSave={(draft) =>
+                run(
                   () =>
                     updateExpediente(token!, expediente.id, {
-                      numero: expediente.numero,
-                      juzgado: expediente.juzgado,
-                      caratula: expediente.caratula,
-                      estado: expediente.estado,
-                      abiertoEn: expediente.abiertoEn,
-                      notas: expediente.notas,
+                      numero: draft.numero,
+                      juzgado: draft.juzgado,
+                      caratula: draft.caratula,
+                      estado: draft.estado,
+                      abiertoEn: draft.abiertoEn,
+                      notas: draft.notas,
                     }),
                   "Carátula guardada",
                 )
@@ -360,17 +362,13 @@ export function ExpedienteDetailView() {
               onDescripcion={setPlazoDescripcion}
               onFecha={setPlazoFecha}
               onToggle={(plazo) =>
-                void run(
-                  () =>
-                    updatePlazoExpediente(token!, expediente.id, plazo.id, {
-                      cumplido: !plazo.cumplidoEn,
-                    }),
-                  plazo.cumplidoEn ? "Plazo reabierto" : "Plazo marcado como cumplido",
+                void run(() =>
+                  updatePlazoExpediente(token!, expediente.id, plazo.id, {
+                    cumplido: !plazo.cumplidoEn,
+                  }),
                 )
               }
-              onDelete={(plazo) =>
-                void run(() => deletePlazoExpediente(token!, expediente.id, plazo.id), "Plazo quitado")
-              }
+              onDelete={(plazo) => void run(() => deletePlazoExpediente(token!, expediente.id, plazo.id))}
               onCreate={() =>
                 void run(async () => {
                   const next = await createPlazoExpediente(token!, expediente.id, {
@@ -380,20 +378,22 @@ export function ExpedienteDetailView() {
                   setPlazoDescripcion("");
                   setPlazoFecha("");
                   return next;
-                }, "Plazo agregado. Quedó en el calendario.")
+                })
               }
             />
           ) : null}
 
           {tab === "inmuebles" ? (
             <InmueblesPanel
+              token={token ?? ""}
               vinculados={expediente.inmuebles}
+              tramites={expediente.tramitesRpi}
               query={inmuebleQuery}
               resultados={inmuebles}
               saving={saving}
               onQuery={setInmuebleQuery}
               onLink={(inmuebleId) =>
-                void run(async () => {
+                run(async () => {
                   const next = await linkExpedienteInmueble(token!, expediente.id, inmuebleId);
                   setInmuebleQuery("");
                   setInmuebles([]);
@@ -512,7 +512,7 @@ function Resumen({
         <ResumenFila titulo="Carátula" detalle={caratula || "Todavía sin carátula judicial"} accion="Editar" onOpen={() => onOpen("caratula")} />
         <ResumenFila titulo={esSucesion ? "Primera consulta" : "Ficha"} detalle={fichaLinea} accion="Abrir" onOpen={() => onOpen("consulta")} />
         <ResumenFila titulo="Inmuebles" detalle={inmueblesLinea} accion="Elegir" onOpen={() => onOpen("inmuebles")} />
-        <ResumenFila titulo="Inscripción" detalle={registroLinea} accion="Ver" onOpen={() => onOpen("registro")} />
+        <ResumenFila titulo="Registro" detalle={registroLinea} accion="Ver" onOpen={() => onOpen("registro")} />
       </ul>
     </div>
   );
@@ -547,80 +547,127 @@ function ResumenFila({
 function CaratulaForm({
   expediente,
   saving,
-  onChange,
   onSave,
 }: {
   expediente: ExpedienteDetail;
   saving: boolean;
-  onChange: (next: ExpedienteDetail) => void;
-  onSave: () => void;
+  onSave: (draft: ExpedienteDetail) => Promise<boolean>;
 }) {
+  const [editando, setEditando] = useState(false);
+  const [draft, setDraft] = useState(expediente);
+  const visible = editando ? draft : expediente;
+
+  function empezar() {
+    setDraft(expediente);
+    setEditando(true);
+  }
+
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-text-secondary">Completala cuando la causa ya está en el juzgado.</p>
+      <div className="flex items-center justify-end">
         <OfficialLink href={expediente.enlaces.justiciaChaco || ENLACE_JUSTICIA_CHACO}>Justicia Chaco</OfficialLink>
       </div>
-      <div className="grid gap-3 md:grid-cols-2">
-        <Field label="Número" hint="Cuando el juzgado lo asigne.">
-          <input
-            value={expediente.numero ?? ""}
-            placeholder="Vacío si todavía no hay expediente"
-            onChange={(event) => onChange({ ...expediente, numero: event.target.value })}
-            className={formInputClass}
-          />
-        </Field>
-        <Field label="Juzgado">
-          <input
-            value={expediente.juzgado ?? ""}
-            placeholder="Juzgado y secretaría"
-            onChange={(event) => onChange({ ...expediente, juzgado: event.target.value })}
-            className={formInputClass}
-          />
-        </Field>
-        <Field label="Carátula" hint="El título que pone el juzgado. Si no está judicializado, dejala vacía.">
-          <input
-            value={expediente.caratula ?? ""}
-            placeholder="Vacío hasta que el juzgado titule la causa"
-            onChange={(event) => onChange({ ...expediente, caratula: event.target.value })}
-            className={formInputClass}
-          />
-        </Field>
-        <Field label="Estado interno" hint="Cómo lo lleva el estudio. No se importa del portal.">
-          <select
-            value={expediente.estado}
-            onChange={(event) => onChange({ ...expediente, estado: event.target.value as EstadoExpediente })}
-            className={formInputClass}
-          >
-            {estados.map((estado) => (
-              <option key={estado} value={estado}>
-                {ESTADO_LABEL[estado]}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Inicio">
-          <input
-            type="date"
-            value={expediente.abiertoEn}
-            onChange={(event) => onChange({ ...expediente, abiertoEn: event.target.value })}
-            className={formInputClass}
-          />
-        </Field>
-        <Field label="Notas">
-          <textarea
-            value={expediente.notas ?? ""}
-            rows={3}
-            onChange={(event) => onChange({ ...expediente, notas: event.target.value })}
-            className={formInputClass}
-          />
-        </Field>
-      </div>
-      <div className="flex justify-end">
-        <ButtonPrimary className="w-full md:w-auto" disabled={saving} onClick={onSave}>
-          Guardar carátula
-        </ButtonPrimary>
-      </div>
+      {editando ? (
+        <div className={`flex flex-col gap-4 ${editSurfaceClass}`}>
+          <div className="grid gap-3 md:grid-cols-2">
+            <Field label="Número" hint="Cuando el juzgado lo asigne.">
+              <input
+                value={draft.numero ?? ""}
+                placeholder="Vacío si todavía no hay expediente"
+                onChange={(event) => setDraft({ ...draft, numero: event.target.value })}
+                className={formInputClass}
+              />
+            </Field>
+            <Field label="Juzgado">
+              <input
+                value={draft.juzgado ?? ""}
+                placeholder="Juzgado y secretaría"
+                onChange={(event) => setDraft({ ...draft, juzgado: event.target.value })}
+                className={formInputClass}
+              />
+            </Field>
+            <Field label="Carátula" hint="El título que pone el juzgado. Si no está judicializado, dejala vacía.">
+              <input
+                value={draft.caratula ?? ""}
+                placeholder="Vacío hasta que el juzgado titule la causa"
+                onChange={(event) => setDraft({ ...draft, caratula: event.target.value })}
+                className={formInputClass}
+              />
+            </Field>
+            <Field label="Estado interno" hint="Cómo lo lleva el estudio. No se importa del portal.">
+              <select
+                value={draft.estado}
+                onChange={(event) => setDraft({ ...draft, estado: event.target.value as EstadoExpediente })}
+                className={formInputClass}
+              >
+                {estados.map((estado) => (
+                  <option key={estado} value={estado}>
+                    {ESTADO_LABEL[estado]}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Inicio">
+              <input
+                type="date"
+                value={draft.abiertoEn}
+                onChange={(event) => setDraft({ ...draft, abiertoEn: event.target.value })}
+                className={formInputClass}
+              />
+            </Field>
+            <Field label="Notas">
+              <textarea
+                value={draft.notas ?? ""}
+                rows={3}
+                onChange={(event) => setDraft({ ...draft, notas: event.target.value })}
+                className={formInputClass}
+              />
+            </Field>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+            <ButtonOutline className="w-full sm:w-auto" disabled={saving} onClick={() => setEditando(false)}>
+              Cancelar
+            </ButtonOutline>
+            <ButtonPrimary
+              className="w-full sm:w-auto"
+              disabled={saving}
+              onClick={() =>
+                void onSave(draft).then((ok) => {
+                  if (ok) setEditando(false);
+                })
+              }
+            >
+              {saving ? "Guardando…" : "Guardar carátula"}
+            </ButtonPrimary>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-4">
+          <dl className="grid gap-4 md:grid-cols-2">
+            <DatoLectura label="Número" value={visible.numero} vacio="Sin número" />
+            <DatoLectura label="Juzgado" value={visible.juzgado} vacio="Sin juzgado" />
+            <DatoLectura label="Carátula" value={visible.caratula} vacio="Sin carátula" />
+            <DatoLectura label="Estado interno" value={ESTADO_LABEL[visible.estado]} />
+            <DatoLectura label="Inicio" value={formatDateDisplay(visible.abiertoEn)} />
+            <DatoLectura label="Notas" value={visible.notas} vacio="Sin notas" />
+          </dl>
+          <div className="flex justify-end">
+            <ButtonOutline className="w-full sm:w-auto" onClick={empezar}>
+              Editar
+            </ButtonOutline>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DatoLectura({ label, value, vacio = "Sin dato" }: { label: string; value?: string | null; vacio?: string }) {
+  const texto = value?.trim();
+  return (
+    <div className="flex flex-col gap-0.5">
+      <dt className="text-xs font-semibold text-text-secondary">{label}</dt>
+      <dd className={`text-sm ${texto ? "text-text-primary" : "text-text-secondary"}`}>{texto || vacio}</dd>
     </div>
   );
 }
@@ -646,74 +693,142 @@ function PlazosPanel({
   onDelete: (plazo: PlazoExpediente) => void;
   onCreate: () => void;
 }) {
+  const [modo, setModo] = useState<"ver" | "cargar">(plazos.length === 0 ? "cargar" : "ver");
+
   return (
     <div className="flex flex-col gap-5">
-      <p className="text-sm text-text-secondary">Cada plazo entra al calendario a las 15 h.</p>
-      <div className="flex flex-col gap-3 rounded-md border border-dashed border-border bg-bg-page p-4">
-        <h2 className="text-sm font-semibold text-text-primary">Nuevo plazo</h2>
-        <div className="grid gap-3 md:grid-cols-[1fr_180px_auto] md:items-end">
-          <Field label="Descripción">
-            <input
-              value={descripcion}
-              placeholder="Presentar escrito, pedir informe…"
-              onChange={(event) => onDescripcion(event.target.value)}
-              className={formInputClass}
-            />
-          </Field>
-          <Field label="Vencimiento">
-            <input type="date" value={fecha} onChange={(event) => onFecha(event.target.value)} className={formInputClass} />
-          </Field>
-          <ButtonPrimary className="w-full md:w-auto" disabled={saving || !descripcion.trim() || !fecha} onClick={onCreate}>
-            Agregar plazo
-          </ButtonPrimary>
-        </div>
-      </div>
-      {plazos.length === 0 ? (
-        <p className="text-sm text-text-secondary">Todavía no hay plazos. El primero suele ser el seguimiento de la consulta.</p>
-      ) : (
-        <ul className="flex flex-col gap-2">
-          {plazos.map((plazo) => {
-            const relativo = plazoRelativo(plazo.venceEn);
-            const pendingOverdue = !plazo.cumplidoEn && relativo.tone === "overdue";
-            return (
-              <li
-                key={plazo.id}
-                className={`flex flex-col gap-3 rounded-sm border px-3 py-3 sm:flex-row sm:items-center sm:justify-between ${
-                  pendingOverdue ? "border-danger bg-danger-bg/40" : "border-border bg-bg-page"
+      <div className="grid grid-cols-2 gap-2" role="tablist" aria-label="Plazos">
+        {(
+          [
+            { id: "ver" as const, label: "Ver plazos", Icon: Eye },
+            { id: "cargar" as const, label: "Cargar plazo", Icon: Plus },
+          ]
+        ).map((opcion) => {
+          const activo = modo === opcion.id;
+          return (
+            <button
+              key={opcion.id}
+              type="button"
+              role="tab"
+              aria-selected={activo}
+              onClick={() => setModo(opcion.id)}
+              className={`inline-flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-md border px-3 text-sm font-semibold transition-colors ${interactiveFocusClass} ${
+                activo && opcion.id === "cargar"
+                  ? "border-primary bg-primary text-text-on-primary shadow-[var(--shadow-card)]"
+                  : activo
+                    ? "border-border bg-bg-page text-text-primary"
+                    : "border-border bg-bg-card text-text-secondary hover:text-text-primary"
+              }`}
+            >
+              <span
+                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
+                  activo && opcion.id === "cargar" ? "bg-white/15" : "bg-primary-soft text-primary"
                 }`}
               >
-                <div className="min-w-0">
-                  <p
-                    className={`text-sm ${
-                      plazo.cumplidoEn ? "text-text-secondary line-through" : "font-medium text-text-primary"
-                    }`}
-                  >
-                    {plazo.descripcion}
-                  </p>
-                  <p className={`text-xs ${pendingOverdue ? "font-semibold text-danger" : "text-text-secondary"}`}>
-                    {formatDateDisplay(plazo.venceEn)}
-                    {plazo.cumplidoEn ? " · cumplido" : ` · ${relativo.text}`}
-                  </p>
-                </div>
-                <div className="grid grid-cols-2 gap-2 sm:flex">
-                  <ButtonOutline className="w-full sm:w-auto" disabled={saving} onClick={() => onToggle(plazo)}>
-                    {plazo.cumplidoEn ? "Reabrir" : "Cumplido"}
-                  </ButtonOutline>
-                  <ButtonOutline className="w-full sm:w-auto" disabled={saving} onClick={() => onDelete(plazo)}>
-                    Quitar
-                  </ButtonOutline>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+                <opcion.Icon className="h-3.5 w-3.5" aria-hidden />
+              </span>
+              <span className="truncate">{opcion.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {modo === "ver" ? (
+        plazos.length === 0 ? (
+          <p className="text-sm text-text-secondary">Todavía no hay plazos.</p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {plazos.map((plazo) => (
+              <PlazoFila key={plazo.id} plazo={plazo} saving={saving} onToggle={onToggle} onDelete={onDelete} />
+            ))}
+          </ul>
+        )
+      ) : (
+        <div className="flex flex-col gap-5">
+          <div className={`flex flex-col gap-3 ${editSurfaceClass}`}>
+            <h2 className="text-sm font-semibold text-text-primary">Nuevo plazo</h2>
+            <div className="grid gap-3 md:grid-cols-[1fr_180px_auto] md:items-end">
+              <Field label="Descripción">
+                <input
+                  value={descripcion}
+                  placeholder="Presentar escrito, pedir informe…"
+                  onChange={(event) => onDescripcion(event.target.value)}
+                  className={`${formInputClass} w-full`}
+                />
+              </Field>
+              <Field label="Vencimiento">
+                <input type="date" value={fecha} onChange={(event) => onFecha(event.target.value)} className={`${formInputClass} w-full`} />
+              </Field>
+              <ButtonPrimary className="w-full md:w-auto" disabled={saving || !descripcion.trim() || !fecha} onClick={onCreate}>
+                Agregar plazo
+              </ButtonPrimary>
+            </div>
+            <p className="text-xs text-text-secondary">Queda como recordatorio en el calendario, el día del vencimiento.</p>
+          </div>
+        </div>
       )}
     </div>
   );
 }
 
+function PlazoFila({
+  plazo,
+  saving,
+  onToggle,
+  onDelete,
+}: {
+  plazo: PlazoExpediente;
+  saving: boolean;
+  onToggle: (plazo: PlazoExpediente) => void;
+  onDelete: (plazo: PlazoExpediente) => void;
+}) {
+  const relativo = plazoRelativo(plazo.venceEn);
+  const pendingOverdue = !plazo.cumplidoEn && relativo.tone === "overdue";
+  return (
+    <li
+      className={`flex flex-col gap-3 rounded-sm border px-3 py-3 sm:flex-row sm:items-center sm:justify-between ${
+        pendingOverdue ? "border-danger bg-danger-bg/40" : "border-border bg-bg-page"
+      }`}
+    >
+      <div className="min-w-0">
+        <p className={`text-sm ${plazo.cumplidoEn ? "text-text-secondary line-through" : "font-medium text-text-primary"}`}>
+          {plazo.descripcion}
+        </p>
+        <p className={`text-xs ${pendingOverdue ? "font-semibold text-danger" : "text-text-secondary"}`}>
+          {formatDateDisplay(plazo.venceEn)}
+          {plazo.cumplidoEn ? " · Cumplido" : ` · ${relativo.text}`}
+        </p>
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          disabled={saving}
+          onClick={() => onDelete(plazo)}
+          className={`inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-sm px-3 text-sm font-semibold text-danger hover:bg-danger-bg disabled:cursor-not-allowed disabled:opacity-50 ${interactiveFocusClass}`}
+        >
+          <Trash2 className="h-4 w-4" aria-hidden />
+          Quitar
+        </button>
+        {plazo.cumplidoEn ? (
+          <ButtonOutline className="min-w-0 flex-1 gap-2 sm:flex-none" disabled={saving} onClick={() => onToggle(plazo)}>
+            <RotateCcw className="h-4 w-4" aria-hidden />
+            Reabrir
+          </ButtonOutline>
+        ) : (
+          <ButtonPrimary className="min-w-0 flex-1 gap-2 sm:flex-none" disabled={saving} onClick={() => onToggle(plazo)}>
+            <CircleCheck className="h-4 w-4" aria-hidden />
+            Cumplir
+          </ButtonPrimary>
+        )}
+      </div>
+    </li>
+  );
+}
+
 function InmueblesPanel({
+  token,
   vinculados,
+  tramites,
   query,
   resultados,
   saving,
@@ -721,73 +836,193 @@ function InmueblesPanel({
   onLink,
   onUnlink,
 }: {
+  token: string;
   vinculados: ExpedienteDetail["inmuebles"];
+  tramites: ExpedienteDetail["tramitesRpi"];
   query: string;
   resultados: CatalogSearchItem[];
   saving: boolean;
   onQuery: (value: string) => void;
-  onLink: (inmuebleId: number) => void;
+  onLink: (inmuebleId: number) => Promise<boolean>;
   onUnlink: (inmuebleId: number) => void;
 }) {
+  const [editando, setEditando] = useState(false);
+  const [creando, setCreando] = useState(false);
+  const [alta, setAlta] = useState<InmuebleAltaValue>(emptyInmuebleAlta());
+  const [tipos, setTipos] = useState<CatalogoItem[]>([]);
+  const [codes, setCodes] = useState<string[]>([]);
+  const [loadingTipos, setLoadingTipos] = useState(false);
+  const [creandoAlta, setCreandoAlta] = useState(false);
+  const [altaError, setAltaError] = useState<string | null>(null);
+  const sinResultados = query.trim().length >= 2 && resultados.length === 0;
+
+  useEffect(() => {
+    if (!creando || !token) return;
+    let active = true;
+    setLoadingTipos(true);
+    void Promise.all([
+      fetchCatalog<CatalogoItem>(token, "/catalogos/tipos-inmueble"),
+      fetchAllInmuebleCodes(token),
+    ])
+      .then(([catalogo, existentes]) => {
+        if (!active) return;
+        setTipos(catalogo.items);
+        setCodes(existentes);
+      })
+      .catch(() => {
+        if (active) setAltaError("No se pudo preparar el alta de la propiedad");
+      })
+      .finally(() => {
+        if (active) setLoadingTipos(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [creando, token]);
+
+  async function crearYVincular() {
+    if (!token) return;
+    if (!isInmuebleAltaValid(alta)) {
+      setAltaError("Completá la dirección de la propiedad");
+      return;
+    }
+    setCreandoAlta(true);
+    setAltaError(null);
+    try {
+      const creado = await altaInmuebleCatalogo(token, {
+        localidadId: Number(alta.direccion.localidadId),
+        calle: alta.direccion.calle,
+        numero: alta.direccion.numero,
+        referencia: alta.direccion.referencia,
+        alias: alta.alias,
+        tipoInmuebleCode: alta.tipoInmuebleCode,
+        reservedCodes: codes,
+        tiposInmueble: tipos,
+      });
+      const ok = await onLink(creado.id);
+      if (!ok) return;
+      setCreando(false);
+      setAlta(emptyInmuebleAlta());
+      onQuery("");
+    } catch (err) {
+      setAltaError(err instanceof ApiError ? err.message : err instanceof Error ? err.message : "No se pudo crear la propiedad");
+    } finally {
+      setCreandoAlta(false);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-base font-semibold text-text-primary">Inmuebles de esta causa</h2>
-        <p className="text-sm text-text-secondary">Propiedades del catálogo del estudio que forman parte del expediente.</p>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-text-secondary">Propiedades de esta causa.</p>
+        <ButtonOutline className="shrink-0" aria-pressed={editando} onClick={() => setEditando((current) => !current)}>
+          {editando ? "Listo" : "Editar"}
+        </ButtonOutline>
       </div>
-      <div className="flex flex-col gap-3">
-        <h2 className="text-sm font-semibold text-text-primary">En el expediente</h2>
-        {vinculados.length === 0 ? (
-          <p className="text-sm text-text-secondary">Todavía no hay inmuebles en este expediente.</p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {vinculados.map((inmueble) => (
+      {vinculados.length === 0 ? (
+        <p className="text-sm text-text-secondary">Ninguna en esta causa.</p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {vinculados.map((inmueble) => {
+            const estados = tramites.filter((tramite) => tramite.inmueble.id === inmueble.id);
+            return (
               <li
                 key={inmueble.id}
-                className="flex flex-col gap-3 rounded-sm border border-border bg-bg-page px-3 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+                className="flex flex-col gap-3 rounded-md border border-border bg-bg-page px-4 py-3 text-sm md:flex-row md:items-center md:justify-between"
               >
-                <span>
-                  <span className="font-semibold text-text-primary">{inmueble.code}</span>
-                  <span className="text-text-secondary"> · {inmueble.displayLabel}</span>
-                </span>
-                <ButtonOutline className="w-full sm:w-auto" disabled={saving} onClick={() => onUnlink(inmueble.id)}>
-                  Desvincular
-                </ButtonOutline>
+                <div className="flex min-w-0 flex-col gap-1">
+                  <p className="font-semibold text-text-primary">
+                    {inmueble.code}
+                    <span className="font-normal text-text-secondary"> · {inmueble.displayLabel}</span>
+                  </p>
+                  {estados.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {estados.map((tramite) => (
+                        <RpiBadge key={tramite.id} estado={tramite.estado} />
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-text-secondary">Sin trámite en el registro</p>
+                  )}
+                </div>
+                {editando ? (
+                  <ButtonOutline className="w-full md:w-auto" disabled={saving} onClick={() => onUnlink(inmueble.id)}>
+                    Quitar
+                  </ButtonOutline>
+                ) : null}
               </li>
-            ))}
-          </ul>
-        )}
-      </div>
-      <div className="flex flex-col gap-3 border-t border-border pt-4">
-        <h2 className="text-sm font-semibold text-text-primary">Sumar del catálogo</h2>
-        <Field label="Buscar en el catálogo">
-          <input
-            value={query}
-            onChange={(event) => onQuery(event.target.value)}
-            placeholder="Código o dirección"
-            className={formInputClass}
-          />
-        </Field>
-        {query.trim().length >= 2 && resultados.length === 0 ? (
-          <p className="text-xs text-text-secondary">No hay inmuebles con ese dato.</p>
-        ) : null}
-        {resultados.length > 0 ? (
-          <ul className="overflow-hidden rounded-sm border border-border">
-            {resultados.map((item) => (
-              <li key={item.inmueble.id} className="border-b border-border last:border-0">
-                <button
-                  type="button"
-                  className={`w-full px-3 py-2.5 text-left text-sm text-text-primary hover:bg-bg-page ${interactiveFocusClass}`}
-                  onClick={() => onLink(item.inmueble.id)}
+            );
+          })}
+        </ul>
+      )}
+      {editando ? (
+        <div className={`flex flex-col gap-3 ${editSurfaceClass}`}>
+          <Field label="Sumar del catálogo">
+            <input
+              value={query}
+              onChange={(event) => onQuery(event.target.value)}
+              placeholder="Código o dirección"
+              aria-label="Buscar inmueble en el catálogo"
+              className={`${formInputClass} w-full`}
+            />
+          </Field>
+          {sinResultados ? <p className="text-sm text-text-secondary">No está en el catálogo.</p> : null}
+          {resultados.length > 0 ? (
+            <ul className="overflow-hidden rounded-sm border border-border bg-bg-card">
+              {resultados.map((item) => (
+                <li key={item.inmueble.id} className="border-b border-border last:border-0">
+                  <button
+                    type="button"
+                    className={`min-h-11 w-full px-3 py-2.5 text-left text-sm text-text-primary hover:bg-bg-page ${interactiveFocusClass}`}
+                    onClick={() => void onLink(item.inmueble.id)}
+                  >
+                    <span className="font-semibold">{item.inmueble.code}</span>
+                    <span className="text-text-secondary"> · {item.inmueble.displayLabel}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {creando ? (
+            <div className="flex flex-col gap-3">
+              {altaError ? <Notice tone="danger">{altaError}</Notice> : null}
+              <InmuebleAltaFields
+                token={token}
+                value={alta}
+                onChange={setAlta}
+                tiposInmueble={tipos}
+                existingCodes={codes}
+                loadingTipos={loadingTipos}
+              />
+              <div className="flex flex-col gap-2 md:flex-row md:justify-end">
+                <ButtonOutline
+                  className="w-full md:w-auto"
+                  disabled={creandoAlta}
+                  onClick={() => {
+                    setCreando(false);
+                    setAltaError(null);
+                  }}
                 >
-                  <span className="font-semibold">{item.inmueble.code}</span>
-                  <span className="text-text-secondary"> · {item.inmueble.displayLabel}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </div>
+                  Cancelar
+                </ButtonOutline>
+                <ButtonPrimary className="w-full md:w-auto" disabled={saving || creandoAlta} onClick={() => void crearYVincular()}>
+                  {creandoAlta ? "Creando…" : "Crear y vincular"}
+                </ButtonPrimary>
+              </div>
+            </div>
+          ) : (
+            sinResultados ? (
+              <ButtonPrimary className="w-full md:w-auto" onClick={() => setCreando(true)}>
+                Crear propiedad
+              </ButtonPrimary>
+            ) : (
+              <ButtonOutline className="w-full md:w-auto" onClick={() => setCreando(true)}>
+                Crear propiedad
+              </ButtonOutline>
+            )
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -817,20 +1052,22 @@ function RegistroPanel({
   onCreate: () => void;
   onEstado: (tramiteId: number, estado: EstadoTramiteRpi) => void;
 }) {
+  const [editando, setEditando] = useState(false);
+
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-base font-semibold text-text-primary">Inscripción en el Registro de la Propiedad</h2>
-          <p className="text-sm text-text-secondary">
-            Cómo va el trámite de cada inmueble de esta causa: pedido, observado o inscripto.
-          </p>
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <p className="text-sm text-text-secondary">Trámite de inscripción de cada inmueble.</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <OfficialLink href={expediente.enlaces.rpi || ENLACE_RPI}>Abrir el Registro</OfficialLink>
+          <ButtonOutline aria-pressed={editando} onClick={() => setEditando((current) => !current)}>
+            {editando ? "Listo" : "Editar"}
+          </ButtonOutline>
         </div>
-        <OfficialLink href={expediente.enlaces.rpi || ENLACE_RPI}>Abrir el Registro</OfficialLink>
       </div>
 
       {expediente.tramitesRpi.length === 0 ? (
-        <p className="text-sm text-text-secondary">Todavía no hay una inscripción anotada.</p>
+        <p className="text-sm text-text-secondary">Ninguna inscripción anotada.</p>
       ) : (
         <ul className="flex flex-col gap-2">
           {expediente.tramitesRpi.map((tramite) => (
@@ -850,6 +1087,7 @@ function RegistroPanel({
                   {` · pedido ${formatDateDisplay(tramite.pedidoEn)}`}
                 </p>
               </div>
+              {editando ? (
               <select
                 value={tramite.estado}
                 aria-label={`Estado del trámite de ${tramite.inmueble.code}`}
@@ -862,29 +1100,29 @@ function RegistroPanel({
                   </option>
                 ))}
               </select>
+              ) : null}
             </li>
           ))}
         </ul>
       )}
 
-      {expediente.inmuebles.length === 0 ? (
+      {editando && expediente.inmuebles.length === 0 ? (
         <div className="flex flex-col items-start gap-3 rounded-md border border-dashed border-border bg-bg-page p-4">
-          <p className="text-sm text-text-secondary">
-            Primero elegí el inmueble en Inmuebles de la causa. Después se anota acá su inscripción.
-          </p>
-          <ButtonPrimary className="w-full sm:w-auto" onClick={onOpenInmuebles}>
-            Elegir inmuebles
+          <p className="text-sm text-text-secondary">Esta causa todavía no tiene inmuebles.</p>
+          <ButtonPrimary className="w-full md:w-auto" onClick={onOpenInmuebles}>
+            Ir a inmuebles
           </ButtonPrimary>
         </div>
-      ) : (
-        <div className="flex flex-col gap-3 border-t border-border pt-4">
-          <h2 className="text-sm font-semibold text-text-primary">Anotar una inscripción</h2>
+      ) : null}
+      {editando && expediente.inmuebles.length > 0 ? (
+        <div className={`flex flex-col gap-3 ${editSurfaceClass}`}>
+          <h2 className="text-sm font-semibold text-text-primary">Nueva inscripción</h2>
           <div className="grid gap-3 md:grid-cols-2">
             <Field label="Inmueble">
               <select
                 value={inmuebleId}
                 onChange={(event) => onInmueble(event.target.value ? Number(event.target.value) : "")}
-                className={formInputClass}
+                className={`${formInputClass} w-full`}
               >
                 <option value="">Elegir</option>
                 {expediente.inmuebles.map((inmueble) => (
@@ -895,10 +1133,10 @@ function RegistroPanel({
               </select>
             </Field>
             <Field label="Número de trámite">
-              <input value={numeroTramite} onChange={(event) => onNumero(event.target.value)} className={formInputClass} />
+              <input value={numeroTramite} onChange={(event) => onNumero(event.target.value)} className={`${formInputClass} w-full`} />
             </Field>
             <Field label="Escribano">
-              <input value={escribano} onChange={(event) => onEscribano(event.target.value)} className={formInputClass} />
+              <input value={escribano} onChange={(event) => onEscribano(event.target.value)} className={`${formInputClass} w-full`} />
             </Field>
           </div>
           <div className="flex justify-end">
@@ -907,7 +1145,7 @@ function RegistroPanel({
             </ButtonPrimary>
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

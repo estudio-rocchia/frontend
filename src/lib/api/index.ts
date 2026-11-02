@@ -3,6 +3,7 @@ import type {
   EstadoTramiteRpi,
   ExpedienteDetail,
   ExpedienteListItem,
+  RecordatorioPlazo,
   FichaPuntoLibre,
   FichaSucesion,
   JuridicoResumen,
@@ -1113,6 +1114,11 @@ export function fetchMediosPago(token: string) {
   return fetchCatalog<CatalogoItem>(token, "/catalogos/medios-pago");
 }
 
+export function fetchRecordatorios(token: string, params: { desde: string; hasta: string }) {
+  const query = new URLSearchParams({ desde: params.desde, hasta: params.hasta });
+  return apiRequest<{ items: RecordatorioPlazo[] }>(`/expedientes/recordatorios?${query}`, { token });
+}
+
 export function fetchCitas(
   token: string,
   params: { desde: string; hasta: string; incluirCanceladas?: boolean },
@@ -1188,10 +1194,11 @@ export function savePlantilla(
 
 export function fetchExpedientes(
   token: string,
-  params?: { rama?: RamaExpediente; estado?: EstadoExpediente; q?: string; personaId?: number },
+  params?: { rama?: RamaExpediente; ramaDetalle?: string; estado?: EstadoExpediente; q?: string; personaId?: number },
 ) {
   const query = new URLSearchParams();
   if (params?.rama) query.set("rama", params.rama);
+  if (params?.ramaDetalle) query.set("ramaDetalle", params.ramaDetalle);
   if (params?.estado) query.set("estado", params.estado);
   if (params?.q) query.set("q", params.q);
   if (params?.personaId) query.set("personaId", String(params.personaId));

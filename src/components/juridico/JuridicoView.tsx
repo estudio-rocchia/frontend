@@ -3,15 +3,15 @@
 import { FilePlus, FolderPlus, Search } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { EmptyState, EstadoBadge, Notice, OfficialLink, plazoRelativo, ramaLabel } from "@/components/juridico/juridico-ui";
-import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
+import { ButtonOutline, ButtonPrimary, buttonOutlineClass } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { useAuth } from "@/context/auth-context";
 import { ApiError, createExpediente, fetchExpedientes, fetchJuridicoResumen, fetchPersonas, fetchPlantillas } from "@/lib/api";
 import type { PersonaRecord } from "@/lib/api/types";
-import { daysUntilDate, formatDateDisplay, personaDisplayName } from "@/lib/format";
+import { formatDateDisplay, personaDisplayName } from "@/lib/format";
 import {
   ENLACE_JUSTICIA_CHACO,
   ENLACE_RPI,
@@ -32,10 +32,6 @@ function claveRama(nombre: string) {
   return nombre.trim().toLocaleLowerCase();
 }
 
-function plazoVencido(item: ExpedienteListItem): boolean {
-  return Boolean(item.proximoPlazo && item.plazosPendientes > 0 && daysUntilDate(item.proximoPlazo) < 0);
-}
-
 export function JuridicoView() {
   const router = useRouter();
   const { token, logout } = useAuth();
@@ -47,7 +43,7 @@ export function JuridicoView() {
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [ramaFilter, setRamaFilter] = useState<RamaExpediente | "todas">("todas");
-  const [soloVencidos, setSoloVencidos] = useState(false);
+  const [ramaDetalleFilter, setRamaDetalleFilter] = useState<string | null>(null);
   const [personaQuery, setPersonaQuery] = useState("");
   const [debouncedPersonaQuery, setDebouncedPersonaQuery] = useState("");
   const [personas, setPersonas] = useState<PersonaRecord[]>([]);
@@ -69,6 +65,7 @@ export function JuridicoView() {
         fetchExpedientes(token, {
           q: debouncedQuery.trim() || undefined,
           rama: ramaFilter === "todas" ? undefined : ramaFilter,
+          ramaDetalle: ramaDetalleFilter ?? undefined,
         }),
         fetchJuridicoResumen(token),
       ]);
@@ -83,7 +80,7 @@ export function JuridicoView() {
     } finally {
       setLoading(false);
     }
-  }, [token, logout, debouncedQuery, ramaFilter]);
+  }, [token, logout, debouncedQuery, ramaFilter, ramaDetalleFilter]);
 
   useSyncScope("clientes", () => void load(), Boolean(token));
 
@@ -119,13 +116,14 @@ export function JuridicoView() {
     };
   }, [token, debouncedPersonaQuery, selectedPersona]);
 
-  const visibleItems = useMemo(
-    () => (soloVencidos ? items.filter(plazoVencido) : items),
-    [items, soloVencidos],
-  );
-
-  function elegirFiltro(next: RamaExpediente | "todas") {
+  function elegirFiltro(next: RamaExpediente | "todas", detalle: string | null = null) {
     setRamaFilter(next);
+    setRamaDetalleFilter(detalle);
+  }
+
+  function cantidadRama(nombre: string) {
+    const clave = claveRama(nombre);
+    return resumen?.ramas?.find((item) => claveRama(item.nombre) === clave)?.cantidad ?? 0;
   }
 
   const cargarRamas = useCallback(async () => {
@@ -205,15 +203,26 @@ export function JuridicoView() {
   }
 
   const hasSearch = query.trim().length > 0;
-  const emptyCopy = soloVencidos
-    ? "No hay expedientes con un plazo vencido."
-    : hasSearch
-      ? "No hay expedientes para esta búsqueda."
-      : ramaFilter !== "todas"
-        ? "No hay expedientes de esta rama."
-        : "Todavía no hay expedientes.";
+  const emptyCopy = hasSearch
+    ? "No hay expedientes para esta búsqueda."
+    : ramaFilter !== "todas"
+      ? "No hay expedientes de esta rama."
+      : "Todavía no hay expedientes.";
 
-  const filtersActive = ramaFilter !== "todas" || soloVencidos;
+  const filtersActive = ramaFilter !== "todas" || ramaDetalleFilter !== null;
+
+  const filtros: Array<{ id: string; label: string; count: number; rama: RamaExpediente | "todas"; detalle: string | null }> = [
+    { id: "todas", label: "Todas", count: resumen?.total ?? 0, rama: "todas", detalle: null },
+    { id: "sucesion", label: "Sucesión", count: resumen?.sucesiones ?? 0, rama: "sucesion", detalle: null },
+    { id: "familia", label: "Familia", count: resumen?.familia ?? 0, rama: "familia", detalle: null },
+    ...ramasCreadas.map((nombre) => ({
+      id: `creada:${claveRama(nombre)}`,
+      label: nombre,
+      count: cantidadRama(nombre),
+      rama: "otra" as const,
+      detalle: nombre,
+    })),
+  ];
 
   return (
     <div className={`flex flex-col gap-6 ${pagePaddingClass}`}>
@@ -226,83 +235,54 @@ export function JuridicoView() {
           <OfficialLink href={resumen?.enlaces.justiciaChaco ?? ENLACE_JUSTICIA_CHACO}>Justicia Chaco</OfficialLink>
           <OfficialLink href={resumen?.enlaces.rpi ?? ENLACE_RPI}>Registro de la Propiedad</OfficialLink>
         </div>
-        <div className="overflow-x-auto" role="tablist" aria-label="Filtrar expedientes">
-          <div className="inline-flex min-h-11 items-stretch overflow-hidden rounded-md border border-border bg-bg-card">
-            {(
-              [
-                { id: "todas" as const, label: "Todas", count: resumen?.total ?? 0 },
-                { id: "sucesion" as const, label: "Sucesión", count: resumen?.sucesiones ?? 0 },
-                { id: "familia" as const, label: "Familia", count: resumen?.familia ?? 0 },
-                { id: "otra" as const, label: "Otras", count: resumen?.otras ?? 0 },
-              ]
-            ).map((item) => {
-              const activo = ramaFilter === item.id && !soloVencidos;
+        <div role="tablist" aria-label="Filtrar expedientes">
+          <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:gap-0 md:overflow-hidden md:rounded-md md:border md:border-border md:bg-bg-card">
+            {filtros.map((item) => {
+              const activo =
+                ramaFilter === item.rama &&
+                claveRama(ramaDetalleFilter ?? "") === claveRama(item.detalle ?? "");
               return (
                 <button
                   key={item.id}
                   type="button"
                   role="tab"
                   aria-selected={activo}
-                  onClick={() => {
-                    elegirFiltro(item.id);
-                    setSoloVencidos(false);
-                  }}
-                  className={`inline-flex h-11 shrink-0 items-center gap-2 border-r border-border px-4 text-sm font-semibold ${interactiveFocusClass} ${
-                    activo ? "bg-primary text-text-on-primary" : "text-text-primary hover:bg-bg-page"
+                  title={item.label}
+                  onClick={() => elegirFiltro(item.rama, item.detalle)}
+                  className={`inline-flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-md border border-border px-3 text-sm font-semibold md:justify-start md:rounded-none md:border-0 md:border-r md:px-4 md:last:border-r-0 ${interactiveFocusClass} ${
+                    activo ? "bg-primary text-text-on-primary" : "bg-bg-card text-text-primary hover:bg-bg-page"
                   }`}
                 >
-                  {item.label}
-                  <span className={`text-xs tabular-nums ${activo ? "opacity-80" : "font-medium text-text-secondary"}`}>
+                  <span className="truncate">{item.label}</span>
+                  <span className={`shrink-0 text-xs tabular-nums ${activo ? "opacity-80" : "font-medium text-text-secondary"}`}>
                     {loading && !resumen ? "–" : item.count}
                   </span>
                 </button>
               );
             })}
-            <button
-              type="button"
-              role="tab"
-              aria-selected={soloVencidos}
-              onClick={() => setSoloVencidos((current) => !current)}
-              className={`inline-flex h-11 shrink-0 items-center gap-2 px-4 text-sm font-semibold ${interactiveFocusClass} ${
-                soloVencidos ? "bg-primary text-text-on-primary" : "text-text-primary hover:bg-bg-page"
-              }`}
-            >
-              Vencidos
-              <span
-                className={`text-xs tabular-nums ${
-                  soloVencidos
-                    ? "opacity-80"
-                    : (resumen?.plazosVencidos ?? 0) > 0
-                      ? "font-semibold text-danger"
-                      : "font-medium text-text-secondary"
-                }`}
-              >
-                {loading && !resumen ? "–" : (resumen?.plazosVencidos ?? 0)}
-              </span>
-            </button>
           </div>
         </div>
       </header>
 
       {error ? (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <Notice tone="danger">{error}</Notice>
-          <ButtonOutline className="w-full sm:w-auto" onClick={() => void load()}>
+          <ButtonOutline className="w-full md:w-auto" onClick={() => void load()}>
             Reintentar
           </ButtonOutline>
         </div>
       ) : null}
 
       <div className="flex flex-col gap-3">
-        <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+        <div className="flex flex-col gap-2 md:flex-row md:justify-end">
           <Link
             href="/juridico/formularios"
-            className={`inline-flex w-full items-center justify-center gap-2 rounded-sm border border-border bg-bg-card px-[18px] py-2.5 text-sm font-medium text-text-primary sm:w-auto ${interactiveFocusClass}`}
+            className={`${buttonOutlineClass} w-full gap-2 md:w-auto`}
           >
             <FilePlus className="h-4 w-4" aria-hidden />
             Crear formulario
           </Link>
-          <ButtonPrimary className="w-full gap-2 sm:w-auto" onClick={openCreate}>
+          <ButtonPrimary className="w-full gap-2 md:w-auto" onClick={openCreate}>
             <FolderPlus className="h-4 w-4" aria-hidden />
             Nuevo expediente
           </ButtonPrimary>
@@ -310,7 +290,7 @@ export function JuridicoView() {
 
       <section className="overflow-hidden rounded-md border border-border bg-bg-card shadow-[var(--shadow-card)]" aria-busy={loading}>
         <div className="flex flex-col gap-3 border-b border-border px-4 py-4 md:flex-row md:items-center md:justify-between md:px-5">
-            <label className="flex min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-sm border border-border bg-bg-page px-3 focus-within:border-primary md:max-w-md">
+            <label className="flex min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-sm border border-border bg-bg-page px-3 focus-within:border-primary focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-primary md:max-w-md">
               <Search className="h-4 w-4 shrink-0 text-text-secondary" aria-hidden />
               <input
                 type="search"
@@ -326,7 +306,7 @@ export function JuridicoView() {
                 type="button"
                 onClick={() => {
                   setRamaFilter("todas");
-                  setSoloVencidos(false);
+                  setRamaDetalleFilter(null);
                 }}
                 className={`min-h-11 shrink-0 text-sm font-semibold text-primary ${interactiveFocusClass}`}
               >
@@ -337,22 +317,22 @@ export function JuridicoView() {
 
         {loading ? (
           <ExpedienteListSkeleton />
-        ) : visibleItems.length === 0 ? (
+        ) : items.length === 0 ? (
           <EmptyState
             title={emptyCopy}
             description={filtersActive || hasSearch ? "Probá con otro dato o limpiá el filtro." : undefined}
             action={
               !hasSearch && !filtersActive ? (
-                <ButtonPrimary className="w-full gap-2 sm:w-auto" onClick={openCreate}>
+                <ButtonPrimary className="w-full gap-2 md:w-auto" onClick={openCreate}>
                   <FolderPlus className="h-4 w-4" aria-hidden />
                   Nuevo expediente
                 </ButtonPrimary>
               ) : filtersActive ? (
-                <ButtonOutline
-                  className="w-full sm:w-auto"
+                  <ButtonOutline
+                  className="w-full md:w-auto"
                   onClick={() => {
                     setRamaFilter("todas");
-                    setSoloVencidos(false);
+                    setRamaDetalleFilter(null);
                   }}
                 >
                   Limpiar filtros
@@ -363,7 +343,7 @@ export function JuridicoView() {
         ) : (
           <>
             <ul className="grid gap-3 p-4 md:grid-cols-2 md:p-5 xl:hidden">
-              {visibleItems.map((item) => (
+              {items.map((item) => (
                 <li key={item.id}>
                   <ExpedienteCard item={item} />
                 </li>
@@ -381,7 +361,7 @@ export function JuridicoView() {
               </tr>
             </thead>
             <tbody>
-              {visibleItems.map((item) => {
+              {items.map((item) => {
                 const relativo = item.proximoPlazo ? plazoRelativo(item.proximoPlazo) : null;
                 return (
                   <tr
@@ -425,10 +405,10 @@ export function JuridicoView() {
         subtitle="Dejá la carátula vacía si el juzgado todavía no tituló la causa."
         footer={
           <>
-            <ButtonOutline className="w-full sm:w-auto" onClick={closeCreate} disabled={saving}>
+            <ButtonOutline className="w-full md:w-auto" onClick={closeCreate} disabled={saving}>
               Cancelar
             </ButtonOutline>
-            <ButtonPrimary className="w-full sm:w-auto" onClick={() => void handleCreate()} disabled={saving || !selectedPersona}>
+            <ButtonPrimary className="w-full md:w-auto" onClick={() => void handleCreate()} disabled={saving || !selectedPersona}>
               {saving ? "Abriendo…" : "Abrir expediente"}
             </ButtonPrimary>
           </>
@@ -536,7 +516,6 @@ export function JuridicoView() {
               placeholder="Solo si ya está judicializado"
               className={`${formInputClass} w-full`}
             />
-            <span className="text-xs text-text-secondary">Opcional hasta que exista carátula judicial.</span>
           </label>
         </div>
       </Modal>
@@ -559,7 +538,7 @@ function ExpedienteCard({ item }: { item: ExpedienteListItem }) {
       className={`flex h-full flex-col gap-3 rounded-md border border-border bg-bg-page p-4 ${interactiveFocusClass}`}
     >
       <div className="flex items-start justify-between gap-3">
-        <p className="text-sm font-semibold text-text-primary">{expedienteTitulo(item)}</p>
+        <p className="min-w-0 break-words text-sm font-semibold text-text-primary">{expedienteTitulo(item)}</p>
         <EstadoBadge estado={item.estado} />
       </div>
       <ExpedienteSubtitulo item={item} className="text-xs text-text-secondary" />

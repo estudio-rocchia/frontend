@@ -1,11 +1,11 @@
 "use client";
 
-import { ArrowLeft, Plus, X } from "lucide-react";
+import { ArrowLeft, Plus } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Notice } from "@/components/juridico/juridico-ui";
-import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
+import { ButtonDanger, ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { useAuth } from "@/context/auth-context";
 import { ApiError, deletePlantilla, fetchPlantillas, savePlantilla } from "@/lib/api";
@@ -256,12 +256,13 @@ export function FormulariosView() {
 
       <header className="flex flex-col gap-2">
         <h1 className="text-xl font-bold text-text-primary xl:text-[22px]">Formularios</h1>
-        <p className="max-w-2xl text-sm leading-relaxed text-text-secondary">
-          Cada rama tiene su formulario. Se copia al abrir un expediente nuevo. Los expedientes ya abiertos no cambian.
+        <p className="max-w-2xl text-sm leading-snug text-text-secondary">
+          Se copia al abrir un expediente nuevo. Los ya abiertos no cambian.
         </p>
       </header>
 
-      <div ref={filaRef} className="overflow-x-auto">
+      <div className="flex items-stretch gap-2">
+      <div ref={filaRef} className="min-w-0 flex-1 overflow-x-auto">
         <div
           className="inline-flex min-h-11 items-stretch overflow-hidden rounded-md border border-border bg-bg-card shadow-[var(--shadow-card)]"
           role="tablist"
@@ -296,9 +297,25 @@ export function FormulariosView() {
             );
           })}
 
-          {agregando ? (
+        </div>
+      </div>
+      {agregando ? null : (
+            <button
+              type="button"
+              aria-label="Agregar rama"
+              onClick={() => {
+                setAgregando(true);
+                setError(null);
+              }}
+              className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-border bg-bg-card text-primary shadow-[var(--shadow-card)] ${interactiveFocusClass}`}
+            >
+              <Plus className="h-4 w-4" aria-hidden />
+            </button>
+      )}
+      </div>
+      {agregando ? (
             <form
-              className="flex items-center gap-2 px-2"
+              className="flex flex-col gap-2 md:flex-row md:items-center"
               onSubmit={(event) => {
                 event.preventDefault();
                 void crearRama();
@@ -314,48 +331,29 @@ export function FormulariosView() {
                 onKeyDown={(event) => {
                   if (event.key === "Escape") cerrarAlta();
                 }}
-                className={`${formInputClass} h-9 w-52 bg-bg-page`}
+                className={`${formInputClass} min-h-11 w-full bg-bg-page md:max-w-xs`}
               />
-              <button
-                type="submit"
-                disabled={saving}
-                className={`inline-flex h-9 items-center rounded-sm bg-primary px-3 text-sm font-semibold text-text-on-primary hover:bg-primary-dark disabled:opacity-50 ${interactiveFocusClass}`}
-              >
+              <div className="flex gap-2">
+              <ButtonPrimary disabled={saving} onClick={() => void crearRama()}>
                 {saving ? "Guardando…" : "Crear"}
-              </button>
-              <button
-                type="button"
-                aria-label="Cancelar"
-                onClick={cerrarAlta}
-                className={`inline-flex h-9 w-9 items-center justify-center text-text-secondary hover:text-text-primary ${interactiveFocusClass}`}
-              >
-                <X className="h-4 w-4" aria-hidden />
-              </button>
+              </ButtonPrimary>
+              <ButtonOutline aria-label="Cancelar" onClick={cerrarAlta}>
+                Cancelar
+              </ButtonOutline>
+              </div>
             </form>
-          ) : (
-            <button
-              type="button"
-              aria-label="Agregar rama"
-              onClick={() => {
-                setAgregando(true);
-                setError(null);
-              }}
-              className={`inline-flex h-11 w-11 shrink-0 items-center justify-center text-primary ${interactiveFocusClass}`}
-            >
-              <Plus className="h-4 w-4" aria-hidden />
-            </button>
-          )}
-        </div>
-      </div>
+      ) : null}
 
       {error ? <Notice tone="danger">{error}</Notice> : null}
       {notice ? <Notice tone="success">{notice}</Notice> : null}
 
       {loading || !fijas ? (
-        <div className="h-56 animate-pulse rounded-md border border-border bg-bg-card" aria-busy="true" />
+        <div className="h-56 animate-pulse rounded-md border border-border bg-bg-card" aria-busy="true">
+          <p className="sr-only">Cargando formularios</p>
+        </div>
       ) : (
         <section className="flex flex-col gap-5 rounded-md border border-border bg-bg-card p-4 shadow-[var(--shadow-card)] md:p-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div className="flex flex-col gap-1">
               <h2 className="text-lg font-semibold text-text-primary">{titulo}</h2>
               <p className="max-w-2xl text-sm leading-relaxed text-text-secondary">
@@ -365,16 +363,15 @@ export function FormulariosView() {
               </p>
             </div>
             {rama === "otra" && nombreOtra.trim() ? (
-              <button
-                type="button"
+              <ButtonDanger
+                className="w-full md:w-auto"
                 onClick={() => {
                   setError(null);
                   setConfirmarBaja(true);
                 }}
-                className={`inline-flex w-fit items-center justify-center rounded-sm bg-danger px-[18px] py-2.5 text-sm font-semibold text-text-on-primary hover:opacity-90 ${interactiveFocusClass}`}
               >
                 Eliminar rama
-              </button>
+              </ButtonDanger>
             ) : null}
           </div>
 
@@ -388,17 +385,12 @@ export function FormulariosView() {
             maxWidthClass="max-w-md"
             footer={
               <>
-                <ButtonOutline className="w-full sm:w-auto" disabled={saving} onClick={() => setConfirmarBaja(false)}>
+                <ButtonOutline className="w-full md:w-auto" disabled={saving} onClick={() => setConfirmarBaja(false)}>
                   Cancelar
                 </ButtonOutline>
-                <button
-                  type="button"
-                  className={`inline-flex w-full items-center justify-center rounded-sm bg-danger px-[18px] py-2.5 text-sm font-semibold text-text-on-primary hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto ${interactiveFocusClass}`}
-                  disabled={saving}
-                  onClick={() => void eliminarRama()}
-                >
+                <ButtonDanger className="w-full md:w-auto" disabled={saving} onClick={() => void eliminarRama()}>
                   {saving ? "Eliminando…" : "Eliminar rama"}
-                </button>
+                </ButtonDanger>
               </>
             }
           >

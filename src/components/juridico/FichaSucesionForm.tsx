@@ -3,6 +3,7 @@
 import { AlignLeft, Calendar, ChevronLeft, ChevronRight, Eye, PenLine, Plus, SquareCheck, Type } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
+import { editSurfaceClass } from "@/components/juridico/juridico-ui";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import {
   FICHA_SECTIONS,
@@ -164,7 +165,7 @@ export function FichaSucesionForm({
       {modo === "ver" ? (
         <FichaVista ficha={ficha} secciones={secciones} />
       ) : (
-    <form className="flex flex-col gap-5" autoComplete="off" onSubmit={(event) => event.preventDefault()}>
+    <form className={`flex flex-col gap-5 ${editSurfaceClass}`} autoComplete="off" onSubmit={(event) => event.preventDefault()}>
       <div className="flex flex-col gap-2">
         {total === 0 ? (
           <p className="text-sm text-text-secondary">
@@ -194,7 +195,7 @@ export function FichaSucesionForm({
       </div>
 
       <div className="flex min-w-0 flex-col gap-6 xl:grid xl:grid-cols-[220px_minmax(0,1fr)] xl:items-start xl:gap-8">
-      <nav className="flex min-w-0 gap-2 overflow-x-auto pb-1 xl:flex-col xl:overflow-visible xl:pb-0" aria-label="Categorías de la ficha">
+      <nav className="flex min-w-0 snap-x gap-2 overflow-x-auto pb-1 md:flex-wrap md:overflow-visible xl:flex-col xl:flex-nowrap xl:pb-0" aria-label="Categorías de la ficha">
         {secciones.map((item, index) => (
           <StepChip
             key={item.id}
@@ -360,22 +361,22 @@ export function FichaSucesionForm({
           Anterior
         </button>
         {active < total - 1 ? (
-          <ButtonPrimary className="w-full sm:w-auto" onClick={() => setStep(active + 1)}>
+          <ButtonOutline className="w-full sm:w-auto" onClick={() => setStep(active + 1)}>
             Siguiente
             <ChevronRight className="ml-1 h-4 w-4" aria-hidden />
-          </ButtonPrimary>
+          </ButtonOutline>
         ) : null}
       </div>
 
       <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-end">
         <p className="text-sm text-text-secondary sm:mr-auto">Podés guardar con datos incompletos.</p>
-        <ButtonOutline
-          className="w-full font-semibold disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+        <ButtonPrimary
+          className="w-full disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
           onClick={() => void guardar()}
           disabled={saving}
         >
           {saving ? "Guardando…" : `Guardar ${titulo.toLowerCase()}`}
-        </ButtonOutline>
+        </ButtonPrimary>
       </div>
       </div>
       </div>
@@ -458,14 +459,16 @@ function ModoFicha({
             aria-selected={activo}
             onClick={() => onModo(opcion.id)}
             className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-md border px-3 text-sm font-semibold transition-colors ${interactiveFocusClass} ${
-              activo
+              activo && opcion.id === "cargar"
                 ? "border-primary bg-primary text-text-on-primary shadow-[var(--shadow-card)]"
-                : "border-border bg-bg-card text-text-secondary hover:border-primary hover:text-primary"
+                : activo
+                  ? "border-border bg-bg-page text-text-primary"
+                  : "border-border bg-bg-card text-text-secondary hover:text-text-primary"
             }`}
           >
             <span
               className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
-                activo ? "bg-white/15" : "bg-primary-soft text-primary"
+                activo && opcion.id === "cargar" ? "bg-white/15" : "bg-primary-soft text-primary"
               }`}
             >
               <opcion.Icon className="h-3.5 w-3.5" aria-hidden />
@@ -545,7 +548,7 @@ function StepChip({
       onClick={onClick}
       aria-current={selected ? "step" : undefined}
       aria-label={filled ? `${index + 1} ${label}, con datos` : undefined}
-      className={`inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-3 text-sm xl:w-full xl:justify-start xl:rounded-md ${interactiveFocusClass} ${
+      className={`inline-flex min-h-11 shrink-0 snap-start items-center gap-1.5 rounded-full border px-3 text-sm md:shrink xl:w-full xl:shrink-0 xl:justify-start xl:rounded-md ${interactiveFocusClass} ${
         selected
           ? "border-primary bg-primary font-semibold text-text-on-primary"
           : filled

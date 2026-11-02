@@ -1,8 +1,10 @@
 "use client";
 
-import { CalendarDays, Clock, MapPin, User } from "lucide-react";
+import { Bell, CalendarDays, Clock, MapPin, User } from "lucide-react";
+import Link from "next/link";
 
 import type { CitaDetail } from "@/lib/api/types";
+import type { RecordatorioPlazo } from "@/lib/juridico/model";
 import {
   citaDisplayTitle,
   citaDurationLabel,
@@ -14,21 +16,31 @@ import {
 import { citaTipoLabel } from "@/lib/calendar/tipos";
 import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 
+function contextoRecordatorio(item: RecordatorioPlazo): string {
+  const nombre = [item.personaNombre, item.personaApellido].filter(Boolean).join(" ");
+  return item.caratula?.trim() || nombre || "Expediente";
+}
+
 export function CalendarioDayPanel({
   dateKey,
   citas,
+  recordatorios,
   onSelectCita,
 }: {
   dateKey: string;
   citas: CitaDetail[];
+  recordatorios: RecordatorioPlazo[];
   onSelectCita: (cita: CitaDetail) => void;
 }) {
-  const countLabel =
-    citas.length === 0
-      ? "Sin citas"
-      : citas.length === 1
-        ? "1 cita"
-        : `${citas.length} citas`;
+  const citaLabel =
+    citas.length === 0 ? null : citas.length === 1 ? "1 cita" : `${citas.length} citas`;
+  const recordatorioLabel =
+    recordatorios.length === 0
+      ? null
+      : recordatorios.length === 1
+        ? "1 recordatorio"
+        : `${recordatorios.length} recordatorios`;
+  const countLabel = [citaLabel, recordatorioLabel].filter(Boolean).join(" · ") || "Sin citas ni recordatorios";
 
   return (
     <aside className="flex min-h-[420px] flex-col rounded-md border border-border bg-bg-card shadow-[var(--shadow-card)]">
@@ -41,7 +53,35 @@ export function CalendarioDayPanel({
       </header>
 
       <div className="flex flex-1 flex-col gap-4 p-4">
-        {citas.length === 0 ? (
+        {recordatorios.length > 0 ? (
+          <section className="flex flex-col gap-2">
+            <h3 className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Recordatorios</h3>
+            <ul className="flex flex-col gap-2">
+              {recordatorios.map((item) => (
+                <li key={item.id}>
+                  <Link
+                    href={`/juridico/${item.expedienteId}`}
+                    className={`flex items-start gap-2 rounded-md border border-primary/30 bg-primary-soft px-3 py-3 text-left ${interactiveFocusClass} ${
+                      item.cumplidoEn ? "opacity-70" : ""
+                    }`}
+                  >
+                    <Bell className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
+                    <span className="min-w-0">
+                      <span className={`block text-sm font-semibold ${item.cumplidoEn ? "text-text-secondary line-through" : "text-text-primary"}`}>
+                        {item.descripcion}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-text-secondary">
+                        {contextoRecordatorio(item)}
+                        {item.cumplidoEn ? " · Cumplido" : ""}
+                      </span>
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+        {citas.length === 0 && recordatorios.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-md border border-dashed border-border bg-bg-page/80 px-6 py-10 text-center">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-soft text-primary">
               <CalendarDays className="h-6 w-6" aria-hidden />
@@ -54,7 +94,7 @@ export function CalendarioDayPanel({
               </p>
             </div>
           </div>
-        ) : (
+        ) : citas.length > 0 ? (
           <ol className="relative flex flex-col gap-3 pl-1">
             {citas.map((cita) => {
               const styles = citaEstadoStyles(cita.estado);
@@ -108,7 +148,7 @@ export function CalendarioDayPanel({
               );
             })}
           </ol>
-        )}
+        ) : null}
       </div>
     </aside>
   );

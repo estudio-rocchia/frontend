@@ -162,6 +162,17 @@ export interface ExpedienteListItem {
   proximoPlazo: string | null;
 }
 
+export interface RecordatorioPlazo {
+  id: number;
+  expedienteId: number;
+  descripcion: string;
+  venceEn: string;
+  cumplidoEn: string | null;
+  caratula: string | null;
+  personaNombre: string | null;
+  personaApellido: string | null;
+}
+
 export interface ExpedienteDetail {
   id: number;
   personaId: number;
@@ -187,6 +198,7 @@ export interface JuridicoResumen {
   sucesiones: number;
   familia: number;
   otras: number;
+  ramas: Array<{ nombre: string; cantidad: number }>;
   plazosVencidos: number;
   plazosProximos: number;
   enlaces: { justiciaChaco: string; rpi: string };

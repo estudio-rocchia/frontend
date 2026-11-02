@@ -15,6 +15,8 @@ import {
 } from "@/lib/juridico/model";
 import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 
+export const editSurfaceClass = "rounded-md border border-primary bg-primary-soft p-4 shadow-[var(--shadow-card)]";
+
 export function Field({
   label,
   hint,
