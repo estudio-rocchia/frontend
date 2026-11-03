@@ -47,6 +47,7 @@ export function VisaFichaView() {
   const [expedienteAviso, setExpedienteAviso] = useState<string | null>(null);
   const [expedienteError, setExpedienteError] = useState<string | null>(null);
   const [savingCobro, setSavingCobro] = useState(false);
+  const [savingOpcional, setSavingOpcional] = useState(false);
   const [cobroError, setCobroError] = useState<string | null>(null);
   const [savingGrupo, setSavingGrupo] = useState(false);
   const [grupoAviso, setGrupoAviso] = useState<string | null>(null);
@@ -154,6 +155,24 @@ export function VisaFichaView() {
       setExpedienteError(err instanceof ApiError ? err.message : "No se pudo guardar el expediente");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function aplicarHonorarios(ids: string[]) {
+    if (!token || !detail) return;
+    setSavingOpcional(true);
+    setCobroError(null);
+    try {
+      const next = await updateGrupoVisa(token, detail.id, { conceptosAplicados: ids });
+      applyDetail(next);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        logout();
+        return;
+      }
+      setCobroError(err instanceof ApiError ? err.message : "No se pudo aplicar el honorario");
+    } finally {
+      setSavingOpcional(false);
     }
   }
 
@@ -427,11 +446,12 @@ export function VisaFichaView() {
               integrantes={detail.integrantes}
               tramiteId={detail.id}
               recibos={detail.recibos ?? []}
-              saving={savingCobro}
+              saving={savingCobro || savingOpcional}
               errorMessage={cobroError}
               onCobrar={cobrar}
               onVerRecibo={verRecibo}
               onAnularRecibo={anularRecibo}
+              onAplicarHonorarios={(ids) => void aplicarHonorarios(ids)}
             />
             <GrupoCard
               integrantes={detail.integrantes}

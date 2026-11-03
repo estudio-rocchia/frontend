@@ -1255,7 +1255,12 @@ export function updateTramiteVisa(token: string, id: number, body: UpdateTramite
 export function updateGrupoVisa(
   token: string,
   tramiteId: number,
-  body: { cambiosTurno?: number; notas?: string | null; honorarioPagadoEn?: string | null },
+  body: {
+    cambiosTurno?: number;
+    notas?: string | null;
+    honorarioPagadoEn?: string | null;
+    conceptosAplicados?: string[];
+  },
 ) {
   return apiRequest<TramiteVisaDetail>(`/visas/${tramiteId}/grupo`, {
     method: "PATCH",

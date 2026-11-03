@@ -5,7 +5,7 @@ import { useState } from "react";
 
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import type { CotizacionVisa, IntegranteVisa, ReciboVisa } from "@/lib/api/types";
+import type { ConceptoCotizadoVisa, CotizacionVisa, IntegranteVisa, ReciboVisa } from "@/lib/api/types";
 import { formatDateDisplay, personaDisplayName } from "@/lib/format";
 import { formInputClass, interactiveFocusClass } from "@/lib/ui/interactive-focus";
 import { formatUsd } from "@/lib/visas/labels";
@@ -19,6 +19,17 @@ type CobroLinea = {
   pagadoEn: string | null;
   href: string | null;
 };
+
+function conceptosDe(cotizacion: CotizacionVisa): ConceptoCotizadoVisa[] {
+  return cotizacion.conceptos ?? [];
+}
+
+function arancelDeEstaPersonaUsd(cotizacion: CotizacionVisa): number {
+  const extras = conceptosDe(cotizacion)
+    .filter((item) => item.destino === "consulado" && item.aplicado)
+    .reduce((sum, item) => sum + item.montoUsd, 0);
+  return cotizacion.arancelUnitarioUsd + extras;
+}
 
 function cobroBadge(cobradas: number, pendientes: number): {
   label: string;
@@ -72,13 +83,26 @@ function buildCobroLineas({
     });
   }
 
+  for (const concepto of conceptosDe(cotizacion)) {
+    if (concepto.destino !== "estudio" || concepto.totalUsd <= 0) continue;
+    lineas.push({
+      key: `extra-${concepto.id}`,
+      concepto: concepto.nombre,
+      quien: quienEstudio,
+      nota: concepto.alcance === "persona" && concepto.cantidad > 1 ? `${formatUsd(concepto.montoUsd)} × ${concepto.cantidad}` : null,
+      amount: concepto.totalUsd,
+      pagadoEn: honorarioPagadoEn,
+      href: null,
+    });
+  }
+
   const aranceles = [...integrantes].sort((a, b) => {
     if (a.id === tramiteId) return -1;
     if (b.id === tramiteId) return 1;
     return a.id - b.id;
   });
 
-  if (aranceles.length > 0) {
+  if (aranceles.length > 0 && cotizacion.arancelUnitarioUsd > 0) {
     for (const integrante of aranceles) {
       const esActual = integrante.id === tramiteId;
       lineas.push({
@@ -101,6 +125,34 @@ function buildCobroLineas({
       pagadoEn: arancelPagadoEn,
       href: null,
     });
+  }
+
+  for (const concepto of conceptosDe(cotizacion)) {
+    if (concepto.destino !== "consulado" || !concepto.aplicado || concepto.montoUsd <= 0) continue;
+    if (aranceles.length > 0) {
+      for (const integrante of aranceles) {
+        const esActual = integrante.id === tramiteId;
+        lineas.push({
+          key: `extra-${concepto.id}-${integrante.id}`,
+          concepto: concepto.nombre,
+          quien: personaDisplayName(integrante.persona),
+          nota: esActual ? "Esta ficha" : null,
+          amount: concepto.montoUsd,
+          pagadoEn: integrante.arancelPagadoEn,
+          href: esActual ? null : `/visas/${integrante.id}`,
+        });
+      }
+    } else {
+      lineas.push({
+        key: `extra-${concepto.id}`,
+        concepto: concepto.nombre,
+        quien: nombreActual ?? "Esta persona",
+        nota: null,
+        amount: concepto.montoUsd,
+        pagadoEn: arancelPagadoEn,
+        href: null,
+      });
+    }
   }
 
   return lineas;
@@ -156,6 +208,7 @@ export function CotizacionCard({
   onCobrar,
   onVerRecibo,
   onAnularRecibo,
+  onAplicarHonorarios,
 }: {
   cotizacion: CotizacionVisa;
   preview?: boolean;
@@ -171,6 +224,7 @@ export function CotizacionCard({
   onCobrar: (input: { honorario: boolean; arancel: boolean; fecha: string }) => Promise<void>;
   onVerRecibo: (reciboId: number) => Promise<void>;
   onAnularRecibo: (reciboId: number) => Promise<void>;
+  onAplicarHonorarios?: (ids: string[]) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [honorario, setHonorario] = useState(false);
@@ -183,8 +237,12 @@ export function CotizacionCard({
   const personasLabel = cotizacion.personas === 1 ? "1 persona" : `${cotizacion.personas} personas`;
   const honorarioListo = Boolean(honorarioPagadoEn);
   const arancelListo = Boolean(arancelPagadoEn);
-  const faltaHonorario = !honorarioListo;
-  const faltaArancel = !arancelListo;
+  const arancelCobroUsd = arancelDeEstaPersonaUsd(cotizacion);
+  const extrasEstudio = conceptosDe(cotizacion).some((item) => item.destino === "estudio" && item.totalUsd > 0);
+  const extrasConsulado = conceptosDe(cotizacion).some((item) => item.destino === "consulado" && item.aplicado && item.montoUsd > 0);
+  const arancelPagado = Boolean(arancelPagadoEn) || integrantes.some((item) => item.arancelPagadoEn);
+  const faltaHonorario = !honorarioListo && cotizacion.totalEstudioUsd > 0;
+  const faltaArancel = !arancelListo && arancelCobroUsd > 0;
   const faltaAlguno = faltaHonorario || faltaArancel;
   const faltaLosDos = faltaHonorario && faltaArancel;
   const esGrupo = cotizacion.personas > 1;
@@ -202,7 +260,14 @@ export function CotizacionCard({
   const badge = cobroBadge(cobradas.length, pendientes.length);
   const nombreActual = integrantes.find((item) => item.id === tramiteId);
   const quienActual = nombreActual ? personaDisplayName(nombreActual.persona) : null;
-  const honorarioLabel = cotizacion.cambiosTurno > 0
+  function alternarOpcional(id: string, checked: boolean) {
+    const ids = conceptosDe(cotizacion)
+      .filter((concepto) => concepto.aplicado && concepto.id !== id)
+      .map((concepto) => concepto.id);
+    onAplicarHonorarios?.(checked ? [...ids, id] : ids);
+  }
+
+  const honorarioBase = cotizacion.cambiosTurno > 0
     ? esGrupo
       ? "Honorario y cambios de turno del grupo"
       : quienActual
@@ -213,7 +278,24 @@ export function CotizacionCard({
       : quienActual
         ? `Honorario de ${quienActual}`
         : "Honorario";
-  const arancelLabel = quienActual ? `Arancel de ${quienActual}` : "Arancel";
+  const honorarioLabel = extrasEstudio
+    ? esGrupo
+      ? "Importes del estudio"
+      : quienActual
+        ? `Importes del estudio de ${quienActual}`
+        : "Importes del estudio"
+    : honorarioBase;
+  const arancelLabel = extrasConsulado
+    ? cotizacion.arancelUnitarioUsd > 0
+      ? quienActual
+        ? `Arancel y otros de ${quienActual}`
+        : "Arancel y otros importes"
+      : quienActual
+        ? `Otros importes de ${quienActual}`
+        : "Otros importes del consulado"
+    : quienActual
+      ? `Arancel de ${quienActual}`
+      : "Arancel";
 
   function abrir() {
     setHonorario(faltaHonorario);
@@ -306,6 +388,15 @@ export function CotizacionCard({
               amount={formatUsd(cotizacion.honorarioTotalUsd)}
             />
           ) : null}
+          <ConceptosOpcionales
+            items={conceptosDe(cotizacion).filter((item) => item.categoria === "honorario")}
+            personas={cotizacion.personas}
+            canEdit={canEdit && Boolean(onAplicarHonorarios)}
+            saving={saving || preview}
+            honorarioPagado={Boolean(honorarioPagadoEn)}
+            arancelPagado={arancelPagado}
+            onToggle={alternarOpcional}
+          />
           {cotizacion.cambiosTurno > 0 && cotizacion.cambioTurnoTotalUsd > 0 ? (
             <QuoteLine
               title="Cambios de turno"
@@ -324,6 +415,15 @@ export function CotizacionCard({
               amount={formatUsd(cotizacion.arancelTotalUsd)}
             />
           ) : null}
+          <ConceptosOpcionales
+            items={conceptosDe(cotizacion).filter((item) => item.categoria === "otro")}
+            personas={cotizacion.personas}
+            canEdit={canEdit && Boolean(onAplicarHonorarios)}
+            saving={saving || preview}
+            honorarioPagado={Boolean(honorarioPagadoEn)}
+            arancelPagado={arancelPagado}
+            onToggle={alternarOpcional}
+          />
         </dl>
       </div>
 
@@ -388,7 +488,7 @@ export function CotizacionCard({
                   />
                   <ConceptoCheck
                     label={arancelLabel}
-                    amount={formatUsd(cotizacion.arancelUnitarioUsd)}
+                    amount={formatUsd(arancelCobroUsd)}
                     checked={arancel}
                     onChange={setArancel}
                   />
@@ -397,7 +497,7 @@ export function CotizacionCard({
                 <p className="flex items-baseline justify-between gap-3 text-sm text-text-primary">
                   <span className="font-semibold">{faltaHonorario ? honorarioLabel : arancelLabel}</span>
                   <span className="shrink-0 tabular-nums">
-                    {formatUsd(faltaHonorario ? cotizacion.totalEstudioUsd : cotizacion.arancelUnitarioUsd)}
+                    {formatUsd(faltaHonorario ? cotizacion.totalEstudioUsd : arancelCobroUsd)}
                   </span>
                 </p>
               )}
@@ -536,6 +636,67 @@ export function CotizacionCard({
         )}
       </section>
     </section>
+  );
+}
+
+function ConceptosOpcionales({
+  items,
+  personas,
+  canEdit,
+  saving,
+  honorarioPagado,
+  arancelPagado,
+  onToggle,
+}: {
+  items: ConceptoCotizadoVisa[];
+  personas: number;
+  canEdit: boolean;
+  saving: boolean;
+  honorarioPagado: boolean;
+  arancelPagado: boolean;
+  onToggle: (id: string, checked: boolean) => void;
+}) {
+  const visibles = items.filter((item) => canEdit || item.aplicado);
+  if (visibles.length === 0) return null;
+
+  return (
+    <>
+      {visibles.map((item) => {
+        const total = item.aplicado
+          ? item.totalUsd
+          : personas > 0 && item.alcance === "persona"
+            ? item.montoUsd * personas
+            : item.montoUsd;
+        const detalle = item.alcance === "persona" && personas > 1 ? `${formatUsd(item.montoUsd)} × ${personas}` : undefined;
+        const bloqueado = item.destino === "consulado" ? arancelPagado : honorarioPagado;
+
+        return (
+          <div key={item.id} className="flex items-baseline justify-between gap-3 text-sm">
+            <span className="flex min-w-0 items-center gap-2">
+              {canEdit ? (
+                <input
+                  type="checkbox"
+                  checked={item.aplicado === true}
+                  disabled={saving || bloqueado}
+                  aria-label={item.nombre}
+                  onChange={(event) => onToggle(item.id, event.target.checked)}
+                  className="h-4 w-4 shrink-0 accent-primary disabled:opacity-60"
+                />
+              ) : null}
+              <span className="min-w-0">
+                <span className={`block font-medium ${item.aplicado ? "text-text-primary" : "text-text-secondary"}`}>
+                  {item.nombre}
+                </span>
+                {detalle ? <span className="block text-xs text-text-secondary">{detalle}</span> : null}
+              </span>
+            </span>
+            <span className={`shrink-0 tabular-nums ${item.aplicado ? "text-text-primary" : "text-text-secondary"}`}>
+              {formatUsd(total)}
+            </span>
+          </div>
+        );
+      })}
+    </>
   );
 }
 

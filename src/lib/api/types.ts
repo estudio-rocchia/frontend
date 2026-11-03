@@ -1287,12 +1287,34 @@ export interface PersonaVisaResumen {
   phone: string | null;
 }
 
+export type CategoriaConceptoTarifa = "honorario" | "otro";
+
+export type AlcanceConceptoTarifa = "persona" | "grupo";
+
+export type DestinoConceptoTarifa = "estudio" | "consulado";
+
+export interface ConceptoTarifaVisa {
+  id: string;
+  nombre: string;
+  categoria: CategoriaConceptoTarifa;
+  montoUsd: number;
+  alcance: AlcanceConceptoTarifa;
+  destino: DestinoConceptoTarifa;
+}
+
+export interface ConceptoCotizadoVisa extends ConceptoTarifaVisa {
+  cantidad: number;
+  totalUsd: number;
+  aplicado: boolean;
+}
+
 export interface TarifaVisa {
   honorarioIndividualUsd: number;
   honorarioGrupoChicoUsd: number;
   honorarioGrupoGrandeUsd: number;
   arancelConsularUsd: number;
   cambioTurnoUsd: number;
+  conceptos: ConceptoTarifaVisa[];
 }
 
 export interface CotizacionVisa {
@@ -1307,6 +1329,7 @@ export interface CotizacionVisa {
   totalEstudioUsd: number;
   totalConsuladoUsd: number;
   totalUsd: number;
+  conceptos: ConceptoCotizadoVisa[];
 }
 
 export interface TramiteVisaListItem {
