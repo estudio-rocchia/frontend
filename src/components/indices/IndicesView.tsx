@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { RefreshCw } from "lucide-react";
 
 import { KpiCard } from "@/components/ui/KpiCard";
-import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
+import { ButtonPrimary } from "@/components/ui/Button";
+import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 import { useAuth } from "@/context/auth-context";
 import { ApiError, fetchIndiceValores, NetworkError, syncIndices } from "@/lib/api";
 import type { IndiceCode, SyncIndicesResponse, ValorIndiceRecord } from "@/lib/api/types";
@@ -59,10 +60,10 @@ function IndexSelector({
             type="button"
             onClick={() => onChange(code)}
             disabled={disabled}
-            className={`rounded-full border border-border px-3.5 py-2 text-[13px] transition-colors disabled:opacity-60 ${
+            className={`rounded-full px-3.5 py-2 text-[13px] transition-colors disabled:opacity-60 ${
               selected
                 ? "bg-primary-soft font-semibold text-primary"
-                : "bg-bg-card font-normal text-text-secondary hover:text-text-primary"
+                : "font-medium text-text-secondary hover:bg-bg-cream hover:text-text-primary"
             }`}
           >
             {code}
@@ -170,38 +171,35 @@ export function IndicesView() {
 
   return (
     <div className={`flex flex-col gap-6 sm:gap-8 ${pagePaddingClass}`}>
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-[22px] font-bold text-text-primary">Índices de ajuste</h1>
-        </div>
-        <div className="flex shrink-0 flex-col items-start gap-1 self-start">
-          <ButtonOutline
-            type="button"
-            onClick={() => void handleSync()}
-            disabled={syncing || loading}
-            className="gap-2"
-          >
-            <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
-            {syncing ? `Actualizando ${indice}…` : `Actualizar ${indice}`}
-          </ButtonOutline>
-          {indice === "CAC" ? (
-            <p className="text-xs text-text-secondary">CAMARCO puede tardar unos minutos.</p>
-          ) : null}
-        </div>
+      <header>
+        <h1 className="text-[22px] font-bold text-text-primary">Índices de ajuste</h1>
       </header>
-
-      {syncMessage ? (
-        <p className="rounded-sm border border-primary/30 bg-primary-soft px-3 py-2 text-sm text-primary">
-          {syncMessage}
-        </p>
-      ) : null}
 
       <section className="flex flex-col gap-3">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
           Seleccionar índice
         </p>
-        <IndexSelector value={indice} onChange={setIndice} disabled={syncing} />
-        <p className="text-sm text-text-secondary">{INDEX_LABELS[indice]}</p>
+        <div className="flex w-fit max-w-full flex-wrap items-center gap-2 rounded-full border border-border bg-bg-card p-1.5 shadow-[var(--shadow-card)]">
+          <IndexSelector value={indice} onChange={setIndice} disabled={syncing} />
+          <button
+            type="button"
+            onClick={() => void handleSync()}
+            disabled={syncing || loading}
+            className={`inline-flex min-h-10 items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-text-on-primary transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50 ${interactiveFocusClass}`}
+          >
+            <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
+            {syncing ? `Actualizando ${indice}…` : `Actualizar ${indice}`}
+          </button>
+        </div>
+        <p className="text-sm text-text-secondary">
+          {INDEX_LABELS[indice]}
+          {indice === "CAC" ? " CAMARCO puede tardar unos minutos." : ""}
+        </p>
+        {syncMessage ? (
+          <p className="rounded-sm border border-primary/30 bg-primary-soft px-3 py-2 text-sm text-primary">
+            {syncMessage}
+          </p>
+        ) : null}
       </section>
 
       {!loading && !error && rows.length > 0 ? (
