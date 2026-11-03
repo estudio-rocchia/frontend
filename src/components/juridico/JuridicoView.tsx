@@ -24,6 +24,7 @@ import {
 import { pagePaddingClass } from "@/lib/layout";
 import { useSyncScope } from "@/lib/sync/use-sync-scope";
 import { formInputClass, interactiveFocusClass } from "@/lib/ui/interactive-focus";
+import { kpiTone } from "@/lib/ui/kpi-tones";
 
 const tableHeaders = ["Expediente", "Rama", "Estado", "Inicio", "Próximo plazo"];
 const ramasFijas: Array<"sucesion" | "familia"> = ["sucesion", "familia"];
@@ -228,19 +229,20 @@ export function JuridicoView() {
     <div className={`flex flex-col gap-6 ${pagePaddingClass}`}>
       <header className="flex flex-col gap-4">
         <div className="flex flex-col gap-1">
-          <h1 className="text-xl font-bold text-text-primary xl:text-[22px]">Área jurídica</h1>
-          <p className="text-sm leading-snug text-text-secondary">Causas en trámite y sus plazos.</p>
+          <h1 className="text-[26px] font-normal tracking-tight text-text-primary">Área jurídica</h1>
+          <p className="text-[13px] text-text-secondary">Causas en trámite y sus plazos.</p>
         </div>
         <div className="flex flex-wrap items-center gap-x-4">
           <OfficialLink href={resumen?.enlaces.justiciaChaco ?? ENLACE_JUSTICIA_CHACO}>Justicia Chaco</OfficialLink>
           <OfficialLink href={resumen?.enlaces.rpi ?? ENLACE_RPI}>Registro de la Propiedad</OfficialLink>
         </div>
-        <div role="tablist" aria-label="Filtrar expedientes">
-          <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:gap-0 md:overflow-hidden md:rounded-md md:border md:border-border md:bg-bg-card">
-            {filtros.map((item) => {
+        <div className="rocchia-scroll -mx-1 overflow-x-auto px-1">
+          <div role="tablist" aria-label="Filtrar expedientes" className="flex w-max min-w-full flex-nowrap items-center gap-2">
+            {filtros.map((item, index) => {
               const activo =
                 ramaFilter === item.rama &&
                 claveRama(ramaDetalleFilter ?? "") === claveRama(item.detalle ?? "");
+              const palette = kpiTone(index);
               return (
                 <button
                   key={item.id}
@@ -249,13 +251,14 @@ export function JuridicoView() {
                   aria-selected={activo}
                   title={item.label}
                   onClick={() => elegirFiltro(item.rama, item.detalle)}
-                  className={`inline-flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-md border border-border px-3 text-sm font-semibold md:justify-start md:rounded-none md:border-0 md:border-r md:px-4 md:last:border-r-0 ${interactiveFocusClass} ${
-                    activo ? "bg-primary text-text-on-primary" : "bg-bg-card text-text-primary hover:bg-bg-page"
+                  className={`rocchia-action inline-flex h-9 shrink-0 items-center gap-2 rounded-full border px-3 text-[13px] whitespace-nowrap ${interactiveFocusClass} ${
+                    activo ? `${palette.wash} ${palette.edge} text-text-primary` : "border-border bg-bg-card text-text-secondary hover:text-text-primary"
                   }`}
                 >
-                  <span className="truncate">{item.label}</span>
-                  <span className={`shrink-0 text-xs tabular-nums ${activo ? "opacity-80" : "font-medium text-text-secondary"}`}>
-                    {loading && !resumen ? "–" : item.count}
+                  <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${palette.dot}`} aria-hidden />
+                  {item.label}
+                  <span className="tabular-nums text-text-primary">
+                    {loading && !resumen ? "–" : new Intl.NumberFormat("es-AR").format(item.count)}
                   </span>
                 </button>
               );
@@ -274,18 +277,18 @@ export function JuridicoView() {
       ) : null}
 
       <div className="flex flex-col gap-3">
-        <div className="flex flex-col gap-2 md:flex-row md:justify-end">
+        <div className="flex flex-wrap items-center gap-2">
+          <ButtonPrimary className="gap-2" onClick={openCreate}>
+            <FolderPlus className="h-4 w-4" aria-hidden />
+            Nuevo expediente
+          </ButtonPrimary>
           <Link
             href="/juridico/formularios"
-            className={`${buttonOutlineClass} w-full gap-2 md:w-auto`}
+            className={`${buttonOutlineClass} gap-2`}
           >
             <FilePlus className="h-4 w-4" aria-hidden />
             Crear formulario
           </Link>
-          <ButtonPrimary className="w-full gap-2 md:w-auto" onClick={openCreate}>
-            <FolderPlus className="h-4 w-4" aria-hidden />
-            Nuevo expediente
-          </ButtonPrimary>
         </div>
 
       <section className="overflow-hidden rounded-md border border-border bg-bg-card shadow-[var(--shadow-card)]" aria-busy={loading}>
@@ -344,7 +347,7 @@ export function JuridicoView() {
           <>
             <ul className="grid gap-3 p-4 md:grid-cols-2 md:p-5 xl:hidden">
               {items.map((item) => (
-                <li key={item.id}>
+                <li key={item.id} className="min-w-0">
                   <ExpedienteCard item={item} />
                 </li>
               ))}
@@ -369,17 +372,22 @@ export function JuridicoView() {
                     className="cursor-pointer border-t border-border transition-colors hover:bg-bg-page"
                     onClick={() => router.push(`/juridico/${item.id}`)}
                   >
-                    <td className="h-[52px] px-5 py-3">
+                    <td className="h-[52px] max-w-xs px-5 py-3">
                       <Link
                         href={`/juridico/${item.id}`}
                         onClick={(event) => event.stopPropagation()}
-                        className={`text-[13px] font-semibold text-text-primary hover:text-primary ${interactiveFocusClass}`}
+                        title={expedienteTitulo(item)}
+                        className={`block truncate text-[13px] font-semibold text-text-primary hover:text-primary ${interactiveFocusClass}`}
                       >
                         {expedienteTitulo(item)}
                       </Link>
                       <ExpedienteSubtitulo item={item} className="text-[11px] text-text-secondary" />
                     </td>
-                    <td className="px-5 py-3 text-[13px] text-text-primary">{ramaLabel(item.rama, item.ramaDetalle)}</td>
+                    <td className="max-w-[10rem] px-5 py-3 text-[13px] text-text-primary">
+                      <span className="block truncate" title={ramaLabel(item.rama, item.ramaDetalle)}>
+                        {ramaLabel(item.rama, item.ramaDetalle)}
+                      </span>
+                    </td>
                     <td className="px-5 py-3">
                       <EstadoBadge estado={item.estado} />
                     </td>
@@ -527,32 +535,41 @@ function ExpedienteSubtitulo({ item, className }: { item: ExpedienteListItem; cl
   const dni = item.persona.numeroDocumento?.trim();
   const partes = [dni ? `DNI ${dni}` : null, item.numero ? `Exp. ${item.numero}` : null].filter(Boolean);
   if (partes.length === 0) return null;
-  return <p className={className}>{partes.join(" · ")}</p>;
+  const text = partes.join(" · ");
+  return (
+    <p className={`min-w-0 truncate ${className}`} title={text}>
+      {text}
+    </p>
+  );
 }
 
 function ExpedienteCard({ item }: { item: ExpedienteListItem }) {
   const relativo = item.proximoPlazo ? plazoRelativo(item.proximoPlazo) : null;
+  const titulo = expedienteTitulo(item);
+  const rama = ramaLabel(item.rama, item.ramaDetalle);
   return (
     <Link
       href={`/juridico/${item.id}`}
-      className={`flex h-full flex-col gap-3 rounded-md border border-border bg-bg-page p-4 ${interactiveFocusClass}`}
+      className={`flex h-full min-w-0 flex-col gap-3 rounded-md border border-border bg-bg-page p-4 ${interactiveFocusClass}`}
     >
-      <div className="flex items-start justify-between gap-3">
-        <p className="min-w-0 break-words text-sm font-semibold text-text-primary">{expedienteTitulo(item)}</p>
+      <div className="flex items-start gap-3">
+        <p className="line-clamp-2 min-w-0 flex-1 text-sm font-semibold leading-snug text-text-primary" title={titulo}>
+          {titulo}
+        </p>
         <EstadoBadge estado={item.estado} />
       </div>
       <ExpedienteSubtitulo item={item} className="text-xs text-text-secondary" />
-      <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-secondary">
-        <span>{ramaLabel(item.rama, item.ramaDetalle)}</span>
-        <span>{formatDateDisplay(item.abiertoEn)}</span>
-        {relativo ? (
-          <span className={relativo.tone === "overdue" ? "font-semibold text-danger" : "text-text-secondary"}>
-            {relativo.text}
-          </span>
-        ) : (
-          <span>Sin plazos</span>
-        )}
+      <div className="mt-auto flex min-w-0 items-center gap-3 text-xs text-text-secondary">
+        <span className="min-w-0 truncate" title={rama}>
+          {rama}
+        </span>
+        <span className="shrink-0 tabular-nums">{formatDateDisplay(item.abiertoEn)}</span>
       </div>
+      <span
+        className={`text-xs ${relativo?.tone === "overdue" ? "font-semibold text-danger" : "text-text-secondary"}`}
+      >
+        {relativo ? relativo.text : "Sin plazos"}
+      </span>
     </Link>
   );
 }

@@ -203,15 +203,15 @@ export function LiquidacionesHistorialView() {
 
       <div className="overflow-x-auto rounded-md border border-border bg-bg-card">
         <table className="w-full min-w-[720px] text-left text-sm">
-          <thead className="border-b border-border bg-bg-subtle text-xs uppercase tracking-wide text-text-secondary">
+          <thead className="border-b border-border text-[12px] text-text-primary">
             <tr>
-              <th className="px-4 py-3 font-semibold">Período</th>
-              <th className="px-4 py-3 font-semibold">Propietario</th>
-              <th className="px-4 py-3 font-semibold">Inmuebles</th>
-              <th className="px-4 py-3 font-semibold">Entrega</th>
-              <th className="px-4 py-3 font-semibold">Estado</th>
-              <th className="px-4 py-3 font-semibold">Nº / emisión</th>
-              <th className="px-4 py-3 text-right font-semibold">Acciones</th>
+              <th className="bg-bg-cream px-4 py-3 font-medium">Período</th>
+              <th className="bg-bg-cream px-4 py-3 font-medium">Propietario</th>
+              <th className="bg-bg-cream px-4 py-3 font-medium">Inmuebles</th>
+              <th className="bg-bg-cream px-4 py-3 font-medium">Entrega</th>
+              <th className="bg-bg-cream px-4 py-3 font-medium">Estado</th>
+              <th className="bg-bg-cream px-4 py-3 font-medium">Nº / emisión</th>
+              <th className="bg-bg-cream px-4 py-3 text-right font-medium">Acciones</th>
             </tr>
           </thead>
           <tbody>

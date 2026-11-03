@@ -658,9 +658,19 @@ export function AlquileresWorkspace() {
       <div className={`relative z-10 flex flex-col gap-6 sm:gap-8 ${pagePaddingClass}`}>
         <header className="flex flex-col gap-4">
           <div className="flex max-w-2xl flex-col gap-1">
-            <h1 className="text-[22px] font-semibold tracking-tight text-text-on-primary">Gestión de alquileres</h1>
-            <p className="text-sm text-white/75">
-              Operá contratos activos, ajustes por índice y renovaciones.
+            <h1 className="text-[26px] font-normal tracking-tight text-text-primary">Alquileres</h1>
+            <p className="text-[13px] text-text-secondary">
+              {tableStats === null
+                ? "Contratos, cobranzas y ajustes."
+                : stats.enMora > 0
+                  ? stats.enMora === 1
+                    ? "Hay un contrato en mora."
+                    : `Hay ${stats.enMora} contratos en mora.`
+                  : stats.aCobrar > 0
+                    ? stats.aCobrar === 1
+                      ? "Hay una cuota para cobrar este mes."
+                      : `Hay ${stats.aCobrar} cuotas para cobrar este mes.`
+                    : "Los contratos activos están al día."}
             </p>
           </div>
           <AlquileresPageActions
@@ -682,7 +692,7 @@ export function AlquileresWorkspace() {
         {error ? (
           <div>
             <p className="rounded-sm border border-danger bg-danger-bg px-3 py-2 text-sm text-danger">{error}</p>
-            <button type="button" onClick={() => void loadRows()} className="mt-3 text-sm font-semibold text-white">
+            <button type="button" onClick={() => void loadRows()} className="dashboard-press mt-3 h-[34px] border border-border px-3 text-[13px] text-text-primary">
               Reintentar
             </button>
           </div>

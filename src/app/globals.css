@@ -1,17 +1,18 @@
 @import "tailwindcss";
 
-/* Design tokens from untitled.pen — do not alter hex values */
+/* Rocchia 2026 — mineral canvas, stormy teal, black ink */
 :root {
-  --bg-page: #faf8f5;
-  --bg-cream: #f3ede4;
+  --bg-page: #f5f3ef;
+  --bg-cream: #e3ddd3;
   --bg-card: #ffffff;
-  --primary: #0f4c5c;
-  --primary-dark: #0a3a47;
-  --primary-soft: #e6f2f4;
-  --text-primary: #1a2b32;
-  --text-secondary: #5c6b73;
-  --text-on-primary: #ffffff;
-  --border: #e2ddd4;
+  --primary: #107077;
+  --primary-dark: #0b555a;
+  --rocchia-teal-hover: #0b555a;
+  --primary-soft: #e6f3f2;
+  --text-primary: #010400;
+  --text-secondary: #3f4a46;
+  --text-on-primary: #f5f3ef;
+  --border: #e3ddd3;
   --accent-lilac: #c4b5d8;
   --accent-lilac-bg: #f0ebf7;
   --accent-sky: #8ecae6;
@@ -22,10 +23,13 @@
   --warning-bg: #fbf3e0;
   --danger: #9b3d3d;
   --danger-bg: #fbeaea;
-  --nav-muted: #a8bfc6;
-  --nav-subtitle: #a8c5ce;
+  --nav-muted: #e7f3f2;
+  --nav-subtitle: #d5e7e5;
+  --mint: #45b3a6;
+  --index: #00c2cb;
+  --orchid: #fbc7fb;
   --logo-mark: #ffffff22;
-  --shadow-card: 0 1px 2px rgba(26, 43, 50, 0.04), 0 10px 28px rgba(26, 43, 50, 0.07);
+  --shadow-card: 0 1px 2px rgba(1, 4, 0, 0.04);
   --radius-sm: 8px;
   --radius-md: 12px;
   --login-accent: #c4a574;
@@ -41,6 +45,7 @@
   --color-bg-card: var(--bg-card);
   --color-primary: var(--primary);
   --color-primary-dark: var(--primary-dark);
+  --color-rocchia-teal-hover: var(--rocchia-teal-hover);
   --color-primary-soft: var(--primary-soft);
   --color-text-primary: var(--text-primary);
   --color-text-secondary: var(--text-secondary);
@@ -97,12 +102,66 @@ body {
   }
 }
 
+/* Next modals and drawers: spring stiffness 400, damping 30, no overshoot. */
 .dashboard-animate-in {
-  animation: dashboard-rise-in 0.35s ease-out both;
+  animation: dashboard-rise-in 160ms cubic-bezier(0.23, 1, 0.32, 1) both;
 }
 
-.dashboard-count-pop {
-  animation: dashboard-count-pop 0.35s ease-out both;
+.dashboard-press {
+  transition: transform 100ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.dashboard-row {
+  transition: background-color 100ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+@keyframes ui-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ui-draw-in {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.ui-pop-in {
+  animation: ui-pop-in 180ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+.ui-draw-in {
+  animation: ui-draw-in 180ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+.rocchia-action {
+  transition:
+    transform 100ms cubic-bezier(0.16, 1, 0.3, 1),
+    background-color 100ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 100ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.rocchia-action:hover {
+  transform: translateY(-1px);
+}
+
+.rocchia-action:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.dashboard-press:active {
+  transform: scale(0.98);
 }
 
 .login-alert-enter {
@@ -474,9 +533,47 @@ body {
   }
 }
 
+.rocchia-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #d4d4d8 transparent;
+}
+
+.rocchia-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.rocchia-scroll::-webkit-scrollbar-thumb {
+  background: #d4d4d8;
+  border-radius: 999px;
+}
+
+.rocchia-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .dashboard-animate-in,
-  .dashboard-count-pop,
+  .dashboard-count-pop {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  .dashboard-press,
+  .dashboard-press:active,
+  .dashboard-row,
+  .ui-pop-in,
+  .ui-draw-in,
+  .rocchia-action,
+  .rocchia-action:hover,
+  .rocchia-action:active {
+    animation: none;
+    transition: none;
+    transform: none;
+    opacity: 1;
+  }
+
   .login-alert-enter,
   .login-skyline-path,
   .login-window,

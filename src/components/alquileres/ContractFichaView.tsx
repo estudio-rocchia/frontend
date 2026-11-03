@@ -53,14 +53,7 @@ const tabs: { id: FichaTab; label: string }[] = [
 ];
 
 function SectionTitle({ children }: { children: string }) {
-  return (
-    <h3 className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">{children}</h3>
-  );
-}
-
-function contractInitials(code: string): string {
-  const cleaned = code.replace(/^ALQ-/i, "").trim();
-  return cleaned.slice(0, 2).toUpperCase() || "?";
+  return <h3 className="text-[13px] font-medium text-text-secondary">{children}</h3>;
 }
 
 function estadoVariant(estado: string): "success" | "warning" | "danger" {
@@ -186,16 +179,10 @@ export function ContractFichaView() {
         Volver al listado
       </button>
 
-      <header className="flex flex-col gap-4 rounded-md border border-border bg-bg-card p-5 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex gap-4">
-          <div
-            className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary-soft text-lg font-bold text-primary"
-            aria-hidden
-          >
-            {contractInitials(contratoCode)}
-          </div>
+      <header className="flex flex-col gap-4 border border-border bg-bg-card p-5 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 flex-col gap-2">
           <div className="flex flex-col gap-2">
-            <h1 className="text-[26px] font-bold text-primary">{contratoCode}</h1>
+            <h1 className="text-[26px] font-normal tracking-tight text-text-primary">{contratoCode}</h1>
             {metaLine ? <p className="text-sm text-text-secondary">{metaLine}</p> : null}
             <div className="flex flex-wrap items-center gap-2">
               <StatusBadge label={detail.estado} variant={estadoVariant(detail.estado)} />
@@ -207,10 +194,8 @@ export function ContractFichaView() {
         </div>
         <div className="flex flex-col items-start gap-3 sm:items-end">
           <div className="flex flex-col gap-1 sm:text-right">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
-              Alquiler mensual
-            </span>
-            <span className={`text-[26px] font-bold leading-none text-primary ${moneyClassName}`}>
+            <span className="text-[13px] text-text-secondary">Alquiler mensual</span>
+            <span className={`text-[30px] font-medium leading-none text-text-primary ${moneyClassName}`}>
               {detail.previousAmount}
             </span>
           </div>
@@ -255,10 +240,10 @@ export function ContractFichaView() {
               type="button"
               data-testid={`ficha-tab-${tab.id}`}
               onClick={() => setActiveTab(tab.id)}
-              className={`rounded-t-sm px-3 py-2 text-sm font-medium transition-colors ${
+              className={`dashboard-press px-3 py-2 text-[13px] ${
                 activeTab === tab.id
-                  ? "border-b-2 border-primary text-primary"
-                  : "text-text-secondary hover:text-text-primary"
+                  ? "border-b border-primary text-text-primary"
+                  : "border-b border-transparent text-text-secondary hover:text-text-primary"
               }`}
             >
               {tab.label}

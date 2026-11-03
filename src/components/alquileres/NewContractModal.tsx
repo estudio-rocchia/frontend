@@ -249,7 +249,7 @@ export function NewContractModal({
     <Modal
       open={open}
       onClose={handleClose}
-      title="Nuevo contrato"
+      title="Crear contrato"
       subtitle="Elegí un inmueble sin alquiler o cargá una propiedad nueva, vinculá al propietario y creá el contrato."
       maxWidthClass="max-w-xl"
       footer={

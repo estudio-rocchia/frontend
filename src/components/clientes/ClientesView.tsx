@@ -240,26 +240,26 @@ export function ClientesView() {
           </p>
         ) : null}
 
-        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-col gap-1">
-            <h1 className="text-[26px] font-bold text-primary">Clientes</h1>
-            <p className="text-sm text-text-secondary">
+        <header className="flex flex-col gap-4">
+          <div className="flex max-w-2xl flex-col gap-1">
+            <h1 className="text-[26px] font-normal tracking-tight text-text-primary">Clientes</h1>
+            <p className="text-[13px] text-text-secondary">
               Base centralizada con vínculos a inmobiliaria, causas jurídicas y trámites de visas
             </p>
           </div>
-          <ButtonPrimary className="shrink-0" onClick={() => router.push("/clientes/nuevo")}>
+          <ButtonPrimary className="w-fit" onClick={() => router.push("/clientes/nuevo")}>
             Nuevo cliente
           </ButtonPrimary>
         </header>
 
-        <div className="flex flex-wrap gap-2 border-b border-border pb-1">
+        <div className="inline-flex w-fit items-center gap-1 rounded-xl border border-border bg-bg-page p-1">
           <button
             type="button"
             onClick={() => setListTab("listado")}
-            className={`rounded-t-sm px-4 py-2.5 text-sm font-medium transition-colors ${
+            className={`rocchia-action rounded-lg border px-3 py-1.5 text-[13px] ${
               listTab === "listado"
-                ? "border-b-2 border-primary text-primary"
-                : "text-text-secondary hover:text-text-primary"
+                ? "border-primary bg-bg-card text-text-primary"
+                : "border-transparent text-text-secondary hover:text-text-primary"
             }`}
           >
             Listado
@@ -267,10 +267,10 @@ export function ClientesView() {
           <button
             type="button"
             onClick={() => router.push("/clientes/nuevo")}
-            className={`rounded-t-sm px-4 py-2.5 text-sm font-medium transition-colors ${
+            className={`rocchia-action rounded-lg border px-3 py-1.5 text-[13px] ${
               listTab === "nuevo"
-                ? "border-b-2 border-primary text-primary"
-                : "text-text-secondary hover:text-text-primary"
+                ? "border-primary bg-bg-card text-text-primary"
+                : "border-transparent text-text-secondary hover:text-text-primary"
             }`}
           >
             Nuevo cliente
@@ -282,14 +282,14 @@ export function ClientesView() {
             ? Array.from({ length: 4 }).map((_, index) => (
                 <div key={index} className="h-[88px] animate-pulse rounded-md border border-border bg-bg-card" />
               ))
-            : kpiCards.map((kpi) => <KpiCard key={kpi.label} {...kpi} />)}
+            : kpiCards.map((kpi, index) => <KpiCard key={kpi.label} {...kpi} tone={index} />)}
         </div>
 
-        <section className="overflow-hidden rounded-md border border-border bg-bg-card">
+        <section className="overflow-hidden rounded-xl border border-border bg-bg-card shadow-[var(--shadow-card)]">
           <div className="flex flex-col gap-5 border-b border-border px-5 py-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-col gap-1">
-                <h2 className="text-base font-semibold text-text-primary">Listado de clientes</h2>
+                <h2 className="text-[15px] font-semibold tracking-tight text-text-primary">Listado de clientes</h2>
                 <p className="text-xs text-text-secondary">{resultSummary}</p>
               </div>
               <button
@@ -301,7 +301,7 @@ export function ClientesView() {
             </div>
 
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <label className="flex min-w-0 flex-1 items-center gap-2.5 rounded-sm border border-border bg-bg-page px-3 py-2.5 focus-within:border-primary lg:max-w-md">
+              <label className="flex min-w-0 flex-1 items-center gap-2.5 rounded-xl border border-border bg-bg-page px-3 py-2 focus-within:border-primary lg:max-w-md">
                 <Search className="h-4 w-4 shrink-0 text-text-secondary" aria-hidden />
                 <input
                   type="search"
@@ -313,7 +313,7 @@ export function ClientesView() {
                 />
               </label>
 
-              <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex flex-wrap items-center gap-1 rounded-xl border border-border bg-bg-page p-1">
                 {clienteFilters.map(({ id, label }) => {
                   const selected = activeFilter === id;
                   const count = filterCounts[id];
@@ -324,10 +324,10 @@ export function ClientesView() {
                       type="button"
                       disabled={disabled}
                       onClick={() => setActiveFilter(id)}
-                      className={`rounded-full border border-border px-3.5 py-2 text-[13px] transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                      className={`rocchia-action rounded-lg border px-3 py-1.5 text-[13px] disabled:cursor-not-allowed disabled:opacity-50 ${
                         selected
-                          ? "bg-primary-soft font-semibold text-primary"
-                          : "bg-bg-card font-normal text-text-secondary hover:text-text-primary"
+                          ? "border-primary bg-bg-card font-medium text-text-primary"
+                          : "border-transparent font-normal text-text-secondary hover:text-text-primary"
                       }`}
                     >
                       {label} ({count})
@@ -341,9 +341,9 @@ export function ClientesView() {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[920px] border-collapse text-left">
               <thead>
-                <tr className="bg-bg-cream">
+                <tr>
                   {tableHeaders.map((header) => (
-                    <th key={header} className="h-11 px-5 text-xs font-semibold text-text-secondary">
+                    <th key={header} className="h-11 border-b border-border bg-bg-cream px-5 text-[12px] font-medium text-text-primary">
                       {header}
                     </th>
                   ))}

@@ -157,14 +157,14 @@ export function UsuariosView() {
           </p>
         ) : null}
 
-        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-col gap-1">
-            <h1 className="text-[26px] font-bold text-primary">Usuarios y roles</h1>
-            <p className="text-sm text-text-secondary">
+        <header className="flex flex-col gap-4">
+          <div className="flex max-w-2xl flex-col gap-1">
+            <h1 className="text-[26px] font-normal tracking-tight text-text-primary">Usuarios y roles</h1>
+            <p className="text-[13px] text-text-secondary">
               Control de accesos, permisos y protección de datos sensibles
             </p>
           </div>
-          <ButtonPrimary className="shrink-0" onClick={() => router.push("/usuarios/nuevo")}>
+          <ButtonPrimary className="w-fit" onClick={() => router.push("/usuarios/nuevo")}>
             Crear usuario
           </ButtonPrimary>
         </header>
@@ -181,24 +181,21 @@ export function UsuariosView() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          {kpis.map((kpi) => (
-            <KpiCard key={kpi.label} {...kpi} />
+          {kpis.map((kpi, index) => (
+            <KpiCard key={kpi.label} {...kpi} tone={index} />
           ))}
         </div>
 
-        <section className="overflow-hidden rounded-md border border-border bg-bg-card">
+        <section className="overflow-hidden rounded-xl border border-border bg-bg-card shadow-[var(--shadow-card)]">
           <div className="flex flex-col gap-5 border-b border-border px-5 py-5">
             <div className="flex flex-col gap-1">
-              <h2 className="text-base font-semibold text-text-primary">Matriz de permisos por rol</h2>
+              <h2 className="text-[15px] font-semibold tracking-tight text-text-primary">Matriz de permisos por rol</h2>
               <p className="text-xs text-text-secondary">{resultSummary}</p>
             </div>
 
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div className="flex min-w-0 flex-1 flex-col gap-2 lg:max-w-md">
-                <span className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
-                  Buscar
-                </span>
-                <label className="flex items-center gap-2.5 rounded-sm border border-border bg-bg-page px-3 py-2.5 focus-within:border-primary">
+                <label className="flex items-center gap-2.5 rounded-xl border border-border bg-bg-page px-3 py-2 focus-within:border-primary">
                   <Search className="h-4 w-4 shrink-0 text-text-secondary" aria-hidden />
                   <input
                     type="search"
@@ -212,10 +209,7 @@ export function UsuariosView() {
               </div>
 
               <div className="flex flex-col gap-2">
-                <span className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
-                  Estado
-                </span>
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex flex-wrap items-center gap-1 rounded-xl border border-border bg-bg-page p-1">
                   {activityFilters.map(({ id, label }) => {
                     const selected = activityFilter === id;
                     return (
@@ -223,10 +217,10 @@ export function UsuariosView() {
                         key={id}
                         type="button"
                         onClick={() => setActivityFilter(id)}
-                        className={`rounded-full border border-border px-3.5 py-2 text-[13px] transition-colors ${
+                        className={`rocchia-action rounded-lg border px-3 py-1.5 text-[13px] ${
                           selected
-                            ? "bg-primary-soft font-semibold text-primary"
-                            : "bg-bg-card font-normal text-text-secondary hover:text-text-primary"
+                            ? "border-primary bg-bg-card font-medium text-text-primary"
+                            : "border-transparent font-normal text-text-secondary hover:text-text-primary"
                         }`}
                       >
                         {label} ({activityCounts[id]})

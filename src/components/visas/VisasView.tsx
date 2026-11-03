@@ -109,29 +109,29 @@ export function VisasView() {
 
   return (
     <div className={`flex flex-col gap-6 ${pagePaddingClass}`}>
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-[22px] font-bold text-text-primary">Visas</h1>
+      <div className="flex flex-col gap-4">
+        <div className="flex max-w-2xl flex-col gap-1">
+          <h1 className="text-[26px] font-normal tracking-tight text-text-primary">Visas</h1>
           <div className="mt-2">
             <EnlacesOficiales compact />
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
+          {canEdit ? (
+            <ButtonPrimary onClick={() => setCreateOpen(true)}>
+              <Plus className="mr-1.5 h-4 w-4" aria-hidden />
+              Nuevo trámite
+            </ButtonPrimary>
+          ) : null}
           <ButtonOutline onClick={() => setPlantillaOpen(true)}>
             <FileText className="mr-1.5 h-4 w-4" aria-hidden />
             Subir formulario
           </ButtonOutline>
           {canEdit ? (
-            <>
-              <ButtonOutline onClick={() => setPreciosOpen(true)}>
-                <CircleDollarSign className="mr-1.5 h-4 w-4" aria-hidden />
-                Actualizar precios
-              </ButtonOutline>
-              <ButtonPrimary onClick={() => setCreateOpen(true)}>
-                <Plus className="mr-1.5 h-4 w-4" aria-hidden />
-                Nuevo trámite
-              </ButtonPrimary>
-            </>
+            <ButtonOutline onClick={() => setPreciosOpen(true)}>
+              <CircleDollarSign className="mr-1.5 h-4 w-4" aria-hidden />
+              Actualizar precios
+            </ButtonOutline>
           ) : null}
         </div>
       </div>
@@ -141,14 +141,16 @@ export function VisasView() {
           label="Trámites"
           value={String(resumen.total)}
           hint={anio === "todos" ? "Todos los años" : String(anio)}
+          tone={0}
           selected={estado === ""}
           onClick={() => setEstado("")}
         />
-        <KpiCard label="En curso" value={String(resumen.enCurso)} hint="Sin resolución todavía" />
+        <KpiCard label="En curso" value={String(resumen.enCurso)} hint="Sin resolución todavía" tone={3} />
         <KpiCard
           label="Aprobados"
           value={String(resumen.aprobados)}
           hint={estado === "aprobado" ? "Filtro activo" : "Ver solo aprobados"}
+          tone={1}
           selected={estado === "aprobado"}
           onClick={() => setEstado((current) => (current === "aprobado" ? "" : "aprobado"))}
         />
@@ -156,6 +158,7 @@ export function VisasView() {
           label="Rechazados"
           value={String(resumen.rechazados)}
           hint={estado === "rechazado" ? "Filtro activo" : "Ver solo rechazados"}
+          tone={2}
           selected={estado === "rechazado"}
           onClick={() => setEstado((current) => (current === "rechazado" ? "" : "rechazado"))}
         />

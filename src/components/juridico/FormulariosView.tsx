@@ -240,8 +240,10 @@ export function FormulariosView() {
   }
 
   const tabClass = (activo: boolean) =>
-    `inline-flex h-11 shrink-0 items-center whitespace-nowrap px-4 text-sm font-semibold ${interactiveFocusClass} ${
-      activo ? "bg-primary text-text-on-primary" : "text-text-primary hover:bg-bg-page"
+    `rocchia-action inline-flex h-8 shrink-0 items-center whitespace-nowrap rounded-lg border px-3 text-[13px] ${interactiveFocusClass} ${
+      activo
+        ? "border-primary bg-bg-card font-medium text-text-primary"
+        : "border-transparent text-text-secondary hover:text-text-primary"
     }`;
 
   return (
@@ -255,8 +257,8 @@ export function FormulariosView() {
       </Link>
 
       <header className="flex flex-col gap-2">
-        <h1 className="text-xl font-bold text-text-primary xl:text-[22px]">Formularios</h1>
-        <p className="max-w-2xl text-sm leading-snug text-text-secondary">
+        <h1 className="text-[26px] font-normal tracking-tight text-text-primary">Formularios</h1>
+        <p className="max-w-2xl text-[13px] text-text-secondary">
           Se copia al abrir un expediente nuevo. Los ya abiertos no cambian.
         </p>
       </header>
@@ -264,7 +266,7 @@ export function FormulariosView() {
       <div className="flex items-stretch gap-2">
       <div ref={filaRef} className="min-w-0 flex-1 overflow-x-auto">
         <div
-          className="inline-flex min-h-11 items-stretch overflow-hidden rounded-md border border-border bg-bg-card shadow-[var(--shadow-card)]"
+          className="inline-flex items-center gap-1 rounded-xl border border-border bg-bg-page p-1"
           role="tablist"
           aria-label="Ramas"
         >
@@ -275,7 +277,7 @@ export function FormulariosView() {
               role="tab"
               aria-selected={rama === item}
               onClick={() => elegirFija(item)}
-              className={`${tabClass(rama === item)} border-r border-border`}
+              className={tabClass(rama === item)}
             >
               {RAMA_LABEL[item]}
             </button>
@@ -290,7 +292,7 @@ export function FormulariosView() {
                 role="tab"
                 aria-selected={activo}
                 onClick={() => elegirOtra(item)}
-                className={`${tabClass(activo)} border-r border-border`}
+                className={tabClass(activo)}
               >
                 {item.nombre}
               </button>

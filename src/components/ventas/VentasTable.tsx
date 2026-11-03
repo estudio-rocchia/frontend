@@ -70,7 +70,7 @@ function VentaMobileCard({
       <button
         type="button"
         onClick={() => onOpenRow(row)}
-        className={`flex w-full items-start gap-3 rounded-md border border-border bg-bg-card p-4 text-left shadow-[var(--shadow-card)] ${rowFocusClass}`}
+        className={`flex w-full items-start gap-3 rounded-xl border border-border bg-bg-card p-4 text-left shadow-[var(--shadow-card)] ${rowFocusClass}`}
         aria-label={`Abrir venta ${code}`}
       >
         <div className="min-w-0 flex-1">
@@ -109,7 +109,7 @@ function VentaMobileCard({
     <button
       type="button"
       onClick={() => onOpenRow(row)}
-      className={`flex w-full items-start gap-3 rounded-md border border-border bg-bg-card p-4 text-left shadow-[var(--shadow-card)] ${rowFocusClass}`}
+      className={`flex w-full items-start gap-3 rounded-xl border border-border bg-bg-card p-4 text-left shadow-[var(--shadow-card)] ${rowFocusClass}`}
       aria-label={`Abrir ficha ${item.inmueble.code}`}
     >
       <div className="min-w-0 flex-1">
@@ -191,14 +191,14 @@ export function VentasTable({
         <>
           <div className="flex flex-col gap-2 md:hidden">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="rounded-md border border-border bg-bg-card p-4">
+              <div key={i} className="rounded-xl border border-border bg-bg-card p-4">
                 <Skeleton className="mb-2 h-4 w-3/4" />
                 <Skeleton className="mb-3 h-3 w-1/3" />
                 <Skeleton className="h-5 w-1/2" />
               </div>
             ))}
           </div>
-          <div className="hidden overflow-x-auto rounded-md border border-border bg-bg-card md:block">
+          <div className="hidden overflow-x-auto rounded-xl border border-border bg-bg-card md:block">
             <table className="w-full min-w-[720px] text-left text-[13px]">
               <tbody>
                 {Array.from({ length: 6 }).map((_, i) => (
@@ -213,7 +213,7 @@ export function VentasTable({
           </div>
         </>
       ) : rows.length === 0 ? (
-        <div className="overflow-hidden rounded-md border border-border bg-bg-card">
+        <div className="overflow-hidden rounded-xl border border-border bg-bg-card">
           <VentasEmptyState
             variant={emptyVariant(tab)}
             description={emptyHint ?? "No hay registros en esta vista."}
@@ -240,7 +240,7 @@ export function VentasTable({
             })}
           </div>
 
-          <div className="hidden overflow-x-auto rounded-md border border-border bg-bg-card md:block">
+          <div className="hidden overflow-x-auto rounded-xl border border-border bg-bg-card md:block">
             <table className="w-full min-w-[720px] text-left text-[13px]">
               <thead className="border-b border-border bg-bg-page text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
                 <tr>

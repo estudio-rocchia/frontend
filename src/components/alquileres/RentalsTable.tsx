@@ -1,10 +1,11 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { Loader2, Search, X } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
 import { RentalFilterChips } from "@/components/alquileres/RentalFilterChips";
 import { ButtonOutline } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { StatusBadge } from "@/components/ui/StatusBadge";
 import {
   canCollectRent,
   filterRentals,
@@ -19,6 +20,46 @@ import { contractEndHint, moneyClassName } from "@/lib/format";
 import { rentCollectionWindowHint } from "@/lib/rental-collection";
 import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 
+const riseEase = [0.16, 1, 0.3, 1] as const;
+
+function contractTone(row: RentalRow): string {
+  if (row.filterStatus === "en_mora" || row.daysOverdue > 0) return "bg-[var(--orchid)] text-text-primary";
+  if (row.filterStatus === "ajuste_pendiente" || row.needsAdjustment) return "bg-[#e5fafb] text-text-primary";
+  if (row.filterStatus === "al_dia" || row.status.variant === "success") return "bg-[#dff5f1] text-text-primary";
+  return "bg-bg-cream text-text-primary";
+}
+
+function serviceTone(variant: RentalRow["servicios"]["status"]["variant"]): string {
+  if (variant === "danger") return "bg-[var(--orchid)] text-text-primary";
+  if (variant === "success") return "bg-[#dff5f1] text-text-primary";
+  return "bg-bg-cream text-text-primary";
+}
+
+function ServiceMarks({ servicios }: { servicios: RentalRow["servicios"] }) {
+  const names = servicios.summary
+    .split(" · ")
+    .map((name) => name.trim())
+    .filter((name) => name && name !== "Sin servicios");
+  const visible = names.slice(0, 2);
+  const extra = names.length - visible.length;
+
+  return (
+    <div className="flex max-w-[220px] flex-wrap gap-1">
+      {visible.map((name) => (
+        <span key={name} className="rounded-md bg-bg-page px-1.5 py-0.5 text-[11px] text-text-primary">
+          {name}
+        </span>
+      ))}
+      {extra > 0 ? (
+        <span className="rounded-md bg-bg-page px-1.5 py-0.5 text-[11px] text-text-secondary">+{extra}</span>
+      ) : null}
+      <span className={`rounded-md px-1.5 py-0.5 text-[11px] ${serviceTone(servicios.status.variant)}`} title={servicios.status.label}>
+        {servicios.status.label}
+      </span>
+    </div>
+  );
+}
+
 function RowActions({
   primary,
   finalizar,
@@ -29,10 +70,10 @@ function RowActions({
   if (!primary && !finalizar) return null;
 
   const segment =
-    "inline-flex h-8 items-center px-2.5 text-xs font-medium transition-colors " + interactiveFocusClass;
+    "rocchia-action inline-flex h-8 items-center rounded-lg px-2.5 text-xs font-medium " + interactiveFocusClass;
 
   return (
-    <div className="inline-flex overflow-hidden rounded-full border border-border bg-bg-card">
+    <div className="inline-flex items-center gap-1">
       {primary ? (
         <button
           type="button"
@@ -59,7 +100,7 @@ function RowActions({
 }
 
 const cellPad = "px-4";
-const headCell = `h-12 border-b border-border ${cellPad} text-[11px] font-semibold uppercase tracking-wide text-text-secondary`;
+const headCell = `h-10 border-b border-border bg-bg-cream ${cellPad} text-[12px] font-medium text-text-primary`;
 const bodyCell = `min-h-[52px] border-b border-border py-3 ${cellPad}`;
 
 function RentalMobileCard({
@@ -94,23 +135,23 @@ function RentalMobileCard({
         className={`flex items-start justify-between gap-3 text-left ${interactiveFocusClass}`}
       >
         <PropertyCell label={row.contractProperty} />
-        <StatusBadge label={row.status.label} variant={row.status.variant} />
+        <span className={`rounded-md px-2 py-0.5 text-[12px] ${contractTone(row)}`}>{row.status.label}</span>
       </button>
       <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-[13px]">
         <div>
-          <dt className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Inquilino</dt>
+          <dt className="text-[12px] text-text-secondary">Inquilino</dt>
           <dd className="mt-0.5 text-text-primary">{row.tenant}</dd>
         </div>
         <div className="text-right">
-          <dt className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Alquiler</dt>
-          <dd className={`mt-0.5 font-semibold text-primary ${moneyClassName}`}>{row.amount}</dd>
+          <dt className="text-[12px] text-text-secondary">Alquiler</dt>
+          <dd className={`mt-0.5 font-medium tabular-nums text-text-primary ${moneyClassName}`}>{row.amount}</dd>
         </div>
         <div>
-          <dt className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Período</dt>
+          <dt className="text-[12px] text-text-secondary">Período</dt>
           <dd className="mt-0.5 text-text-secondary">{row.month}</dd>
         </div>
         <div className="text-right">
-          <dt className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Fin</dt>
+          <dt className="text-[12px] text-text-secondary">Fin</dt>
           <dd className="mt-0.5"><ContractEndCell row={row} /></dd>
         </div>
         {row.daysOverdue > 0 ? (
@@ -162,7 +203,7 @@ function PropertyCell({ label }: { label: string }) {
   }
   return (
     <span className="flex min-w-0 flex-col gap-0.5">
-      <span className="text-[11px] font-semibold uppercase tracking-wide text-primary">{code}</span>
+      <span className="text-[12px] font-medium text-text-secondary">{code}</span>
       <span className="font-medium text-text-primary">{title}</span>
     </span>
   );
@@ -258,13 +299,27 @@ export function RentalsTable({
   const rangeStart = filteredTotal === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const rangeEnd = Math.min(currentPage * pageSize, filteredTotal);
   const useCursorPagination = serverMode && onGoNext !== undefined && onGoPrev !== undefined;
+  const reduceMotion = useReducedMotion();
+  const listEntered = useRef(false);
+  useEffect(() => {
+    listEntered.current = true;
+  }, []);
 
   return (
     <section className="flex min-h-[400px] flex-1 flex-col overflow-hidden rounded-xl border border-border bg-bg-card shadow-[var(--shadow-card)]">
       <div className="flex flex-col gap-4 px-4 py-4 sm:px-5">
         <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <h2 className="text-[15px] font-semibold tracking-tight text-text-primary">Listado de contratos</h2>
-          <div className="relative min-w-0 w-full lg:max-w-md">
+          <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+          <RentalFilterChips
+            active={activeChip}
+            stats={stats}
+            onChange={(chip) => {
+              onChipChange?.(chip);
+              onPageChange?.(1);
+            }}
+          />
+          <div className="relative min-w-0 w-full sm:max-w-sm">
             <Search
               className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary"
               aria-hidden
@@ -281,7 +336,7 @@ export function RentalsTable({
               }}
               placeholder="Código, dirección, propiedad o inquilino…"
               aria-label="Buscar contratos"
-              className={`w-full rounded-full border border-border bg-bg-page py-2.5 pl-9 pr-9 text-[13px] text-text-primary placeholder:text-text-secondary focus:border-primary ${interactiveFocusClass}`}
+              className={`w-full rounded-md border border-border bg-bg-page py-2 pl-9 pr-9 text-[13px] text-text-primary placeholder:text-text-secondary focus:border-primary ${interactiveFocusClass}`}
             />
             {isSearchPending ? (
               <Loader2
@@ -299,16 +354,8 @@ export function RentalsTable({
               </button>
             ) : null}
           </div>
+          </div>
         </div>
-
-        <RentalFilterChips
-          active={activeChip}
-          stats={stats}
-          onChange={(chip) => {
-            onChipChange?.(chip);
-            onPageChange?.(1);
-          }}
-        />
 
         {hasActiveFilters ? (
           <div className="flex flex-wrap items-center gap-2">
@@ -375,7 +422,7 @@ export function RentalsTable({
           <table className="w-full min-w-[960px] border-separate border-spacing-0 text-left text-[13px]">
             <thead>
               <tr>
-                <th className={`sticky left-0 z-20 bg-bg-card text-left shadow-[4px_0_8px_-6px_rgba(26,43,50,0.2)] ${headCell}`}>
+                <th className={`sticky left-0 z-20 bg-bg-cream text-left ${headCell}`}>
                   Contrato / Propiedad
                 </th>
                 <th className={`text-left ${headCell}`}>Inquilino</th>
@@ -391,7 +438,12 @@ export function RentalsTable({
                 <th className={`text-right ${headCell}`}>Acciones</th>
               </tr>
             </thead>
-            <tbody>
+            <motion.tbody
+              key={`${activeChip}-${searchQuery}-${currentPage}`}
+              initial={!listEntered.current || reduceMotion ? false : { opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.15, ease: riseEase }}
+            >
               {loading ? (
                 Array.from({ length: 6 }).map((_, index) => (
                   <tr key={index} className="border-t border-border">
@@ -432,14 +484,16 @@ export function RentalsTable({
                   const showCollect = canCollectRent(row);
                   const showAdjust =
                     row.needsAdjustment && row.canAdjust && !showRenew && !showCollect;
-                  const zebra = index % 2 === 1 ? "bg-bg-page" : "bg-bg-card";
-
+                  const stagger = !listEntered.current && !reduceMotion;
                   return (
-                    <tr
+                    <motion.tr
                       key={row.id}
                       tabIndex={0}
                       aria-label={`Abrir ficha de ${row.contractProperty}`}
-                      className={`group cursor-pointer border-t border-border align-middle transition-colors hover:bg-primary-soft/50 ${zebra} ${interactiveFocusClass}`}
+                      initial={stagger ? { opacity: 0, y: 8 } : false}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.15, delay: stagger ? Math.min(index, 8) * 0.03 : 0, ease: riseEase }}
+                      className={`group dashboard-row cursor-pointer border-b border-border align-middle hover:bg-bg-cream ${interactiveFocusClass}`}
                       onMouseEnter={() => onPrefetch?.(row)}
                       onClick={() => onViewFicha(row)}
                       onKeyDown={(event) => {
@@ -449,23 +503,29 @@ export function RentalsTable({
                         onViewFicha(row);
                       }}
                     >
-                      <td className={`sticky left-0 z-10 text-left shadow-[4px_0_8px_-6px_rgba(26,43,50,0.2)] group-hover:bg-primary-soft/50 ${bodyCell} ${zebra}`}>
+                      <td className={`sticky left-0 z-10 bg-bg-card text-left group-hover:bg-bg-cream ${bodyCell}`}>
                         <PropertyCell label={row.contractProperty} />
                       </td>
                       <td className={`text-left text-text-primary ${bodyCell}`}>{row.tenant}</td>
                       <td className={`hidden text-left text-text-secondary 2xl:table-cell ${bodyCell}`}>{row.month}</td>
-                      <td className={`text-right text-[15px] font-semibold text-primary ${bodyCell} ${moneyClassName}`}>
+                      <td className={`text-right text-[14px] font-medium tabular-nums text-text-primary ${bodyCell} ${moneyClassName}`}>
                         {row.amount}
                       </td>
-                      <td
-                        className={`hidden text-right font-semibold tabular-nums lg:table-cell ${bodyCell} ${
-                          row.daysOverdue > 0 ? "text-danger" : "text-text-primary"
-                        }`}
-                      >
-                        {row.daysOverdue}
+                      <td className={`hidden text-right lg:table-cell ${bodyCell}`}>
+                        <span
+                          className={`tabular-nums ${
+                            row.daysOverdue > 0
+                              ? "rounded-md bg-[var(--orchid)] px-1.5 py-0.5 font-medium text-text-primary"
+                              : "text-text-secondary"
+                          }`}
+                        >
+                          {row.daysOverdue}
+                        </span>
                       </td>
                       <td className={`text-center ${bodyCell}`}>
-                        <StatusBadge label={row.status.label} variant={row.status.variant} />
+                        <span className={`inline-flex rounded-md px-2 py-0.5 text-[12px] ${contractTone(row)}`}>
+                          {row.status.label}
+                        </span>
                       </td>
                       <td className={`hidden whitespace-nowrap text-right tabular-nums text-text-secondary xl:table-cell ${bodyCell}`}>
                         {row.contractStart}
@@ -474,13 +534,7 @@ export function RentalsTable({
                         <ContractEndCell row={row} />
                       </td>
                       <td className={`hidden text-left lg:table-cell ${bodyCell}`}>
-                        <div className="flex flex-col items-start gap-1">
-                          <span className="font-medium text-text-primary">{row.servicios.summary}</span>
-                          <StatusBadge
-                            label={row.servicios.status.label}
-                            variant={row.servicios.status.variant}
-                          />
-                        </div>
+                        <ServiceMarks servicios={row.servicios} />
                       </td>
                       <td
                         className={`whitespace-nowrap text-right ${bodyCell}`}
@@ -500,11 +554,11 @@ export function RentalsTable({
                           finalizar={showRenew ? { onClick: () => onFinish(row) } : null}
                         />
                       </td>
-                    </tr>
+                    </motion.tr>
                   );
                 })
               )}
-            </tbody>
+            </motion.tbody>
           </table>
         </div>
 

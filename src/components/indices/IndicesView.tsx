@@ -60,10 +60,10 @@ function IndexSelector({
             type="button"
             onClick={() => onChange(code)}
             disabled={disabled}
-            className={`rounded-full px-3.5 py-2 text-[13px] transition-colors disabled:opacity-60 ${
+            className={`rocchia-action rounded-lg border px-3 py-1.5 text-[13px] disabled:opacity-60 ${
               selected
-                ? "bg-primary-soft font-semibold text-primary"
-                : "font-medium text-text-secondary hover:bg-bg-cream hover:text-text-primary"
+                ? "border-primary bg-bg-card font-medium text-text-primary"
+                : "border-transparent font-medium text-text-secondary hover:text-text-primary"
             }`}
           >
             {code}
@@ -171,30 +171,31 @@ export function IndicesView() {
 
   return (
     <div className={`flex flex-col gap-6 sm:gap-8 ${pagePaddingClass}`}>
-      <header>
-        <h1 className="text-[22px] font-bold text-text-primary">Índices de ajuste</h1>
+      <header className="flex flex-col gap-4">
+        <div className="flex max-w-2xl flex-col gap-1">
+          <h1 className="text-[26px] font-normal tracking-tight text-text-primary">Índices de ajuste</h1>
+          <p className="text-[13px] text-text-secondary">
+            {INDEX_LABELS[indice]}
+            {indice === "CAC" ? " CAMARCO puede tardar unos minutos." : ""}
+          </p>
+        </div>
       </header>
 
       <section className="flex flex-col gap-3">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
-          Seleccionar índice
-        </p>
-        <div className="flex w-fit max-w-full flex-wrap items-center gap-2 rounded-full border border-border bg-bg-card p-1.5 shadow-[var(--shadow-card)]">
-          <IndexSelector value={indice} onChange={setIndice} disabled={syncing} />
+        <div className="flex w-fit max-w-full flex-wrap items-center gap-2">
+          <div className="inline-flex rounded-xl border border-border bg-bg-page p-1">
+            <IndexSelector value={indice} onChange={setIndice} disabled={syncing} />
+          </div>
           <button
             type="button"
             onClick={() => void handleSync()}
             disabled={syncing || loading}
-            className={`inline-flex min-h-10 items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-text-on-primary transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50 ${interactiveFocusClass}`}
+            className={`rocchia-action inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-3.5 text-[13px] font-semibold text-text-on-primary hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50 ${interactiveFocusClass}`}
           >
             <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
             {syncing ? `Actualizando ${indice}…` : `Actualizar ${indice}`}
           </button>
         </div>
-        <p className="text-sm text-text-secondary">
-          {INDEX_LABELS[indice]}
-          {indice === "CAC" ? " CAMARCO puede tardar unos minutos." : ""}
-        </p>
         {syncMessage ? (
           <p className="rounded-sm border border-primary/30 bg-primary-soft px-3 py-2 text-sm text-primary">
             {syncMessage}
@@ -208,21 +209,25 @@ export function IndicesView() {
             label={`Último valor · ${indice}`}
             value={latest ? formatIndexValue(latest.valor) : "—"}
             hint={latest ? formatPeriodoIndice(latest.periodo) : "Sin datos"}
+            tone={0}
           />
           <KpiCard
             label="Variación mensual"
             value={latestVariations.mensual ?? "—"}
             hint="Respecto al mes anterior"
+            tone={1}
           />
           <KpiCard
             label="Variación interanual"
             value={latestVariations.interanual ?? "—"}
             hint="Respecto al mismo mes del año anterior"
+            tone={3}
           />
           <KpiCard
             label="Variación acumulada"
             value={latestVariations.acumulada ?? "—"}
             hint="Desde diciembre del año anterior (criterio INDEC)"
+            tone={4}
           />
         </div>
       ) : null}

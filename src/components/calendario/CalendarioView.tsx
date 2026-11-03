@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Bell, CalendarDays, ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { Bell, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -181,21 +181,14 @@ export function CalendarioView() {
 
   return (
     <div className={`flex flex-col gap-6 ${pagePaddingClass}`}>
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary-soft text-primary">
-              <CalendarDays className="h-5 w-5" aria-hidden />
-            </div>
-            <div>
-              <h1 className="text-[22px] font-bold text-text-primary">Calendario interno</h1>
-              <p className="text-sm text-text-secondary">
-                Visitas a inmuebles, visas, reuniones y trámites del equipo.
-              </p>
-            </div>
-          </div>
+      <header className="flex flex-col gap-4">
+        <div className="flex max-w-2xl flex-col gap-1">
+          <h1 className="text-[26px] font-normal tracking-tight text-text-primary">Calendario interno</h1>
+          <p className="text-[13px] text-text-secondary">
+            Visitas a inmuebles, visas, reuniones y trámites del equipo.
+          </p>
         </div>
-        <ButtonPrimary onClick={openCreate}>
+        <ButtonPrimary className="w-fit" onClick={openCreate}>
           <Plus className="mr-2 h-4 w-4" />
           Nueva cita
         </ButtonPrimary>

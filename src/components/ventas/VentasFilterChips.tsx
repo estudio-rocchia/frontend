@@ -62,7 +62,7 @@ export function VentasFilterChips({
   return (
     <div
       ref={tablistRef}
-      className="flex flex-wrap gap-2"
+      className="inline-flex max-w-full flex-wrap items-center gap-1 rounded-xl border border-border bg-bg-page p-1"
       role="tablist"
       aria-label="Secciones de ventas"
     >
@@ -81,18 +81,16 @@ export function VentasFilterChips({
             tabIndex={selected ? 0 : -1}
             onClick={() => onChange(tabId)}
             onKeyDown={(event) => handleKeyDown(event, tabId)}
-            className={`inline-flex items-center gap-2 rounded-full border border-border px-3.5 py-2 text-[13px] transition-colors ${interactiveFocusClass} ${
+            className={`rocchia-action inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-[13px] ${interactiveFocusClass} ${
               selected
-                ? "bg-primary-soft font-semibold text-primary"
-                : "bg-bg-card font-normal text-text-secondary hover:text-text-primary"
+                ? "border-primary bg-bg-card font-medium text-text-primary"
+                : "border-transparent font-normal text-text-secondary hover:text-text-primary"
             }`}
           >
             <span>{label}</span>
             {count !== undefined ? (
               <span
-                className={`rounded-full px-1.5 py-0.5 text-[11px] font-bold tabular-nums ${
-                  selected ? "bg-primary/15 text-primary" : "bg-bg-page text-text-secondary"
-                }`}
+                className="text-[12px] tabular-nums text-text-secondary"
                 aria-label={`${count} en ${label}`}
               >
                 {count}

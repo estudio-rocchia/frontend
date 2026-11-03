@@ -36,7 +36,7 @@ export function Modal({
         onClick={onClose}
       />
       <div
-        className={`relative flex max-h-[90vh] w-full ${maxWidthClass} flex-col overflow-hidden rounded-md border border-border bg-bg-card shadow-[var(--shadow-card)]`}
+        className={`ui-pop-in relative flex max-h-[90vh] w-full ${maxWidthClass} flex-col overflow-hidden rounded-md border border-border bg-bg-card shadow-[var(--shadow-card)]`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"

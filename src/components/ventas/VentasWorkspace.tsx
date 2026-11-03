@@ -347,11 +347,11 @@ export function VentasWorkspace() {
   const tabCopy = VENTAS_TAB_COPY[tab];
 
   return (
-    <div className={`flex flex-col gap-6 ${pagePaddingClass}`}>
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex max-w-2xl flex-col gap-1.5">
-          <h1 className="text-2xl font-bold tracking-tight text-text-primary">Ventas</h1>
-          <p className="text-sm leading-relaxed text-text-secondary">{tabCopy.description}</p>
+    <div className={`flex flex-col gap-6 sm:gap-8 ${pagePaddingClass}`}>
+      <header className="flex flex-col gap-4">
+        <div className="flex max-w-2xl flex-col gap-1">
+          <h1 className="text-[26px] font-normal tracking-tight text-text-primary">Ventas</h1>
+          <p className="text-[13px] text-text-secondary">{tabCopy.description}</p>
         </div>
         <VentasCreateActions
           tab={tab}
