@@ -43,9 +43,11 @@ function sortByPeriodoDesc(items: ValorIndiceRecord[]) {
 function IndexSelector({
   value,
   onChange,
+  disabled,
 }: {
   value: IndiceCode;
   onChange: (code: IndiceCode) => void;
+  disabled?: boolean;
 }) {
   return (
     <div className="flex flex-wrap gap-2">
@@ -56,7 +58,8 @@ function IndexSelector({
             key={code}
             type="button"
             onClick={() => onChange(code)}
-            className={`rounded-full border border-border px-3.5 py-2 text-[13px] transition-colors ${
+            disabled={disabled}
+            className={`rounded-full border border-border px-3.5 py-2 text-[13px] transition-colors disabled:opacity-60 ${
               selected
                 ? "bg-primary-soft font-semibold text-primary"
                 : "bg-bg-card font-normal text-text-secondary hover:text-text-primary"
@@ -112,21 +115,19 @@ export function IndicesView() {
     setSyncMessage(null);
     setError(null);
     try {
-      const result: SyncIndicesResponse = await syncIndices(token);
-      const cacNote = result.CAC.skipped
-        ? " CAC no se actualiza desde este botón (solo ICL e IPC)."
-        : ` CAC: ${result.CAC.upserted} actualizado(s).`;
+      const code = indice;
+      const result: SyncIndicesResponse = await syncIndices(token, code);
+      const stats = result[code];
+      const hadUpdates = stats.upserted > 0;
 
-      const hadUpdates = result.ICL.upserted > 0 || result.IPC.upserted > 0;
-
-      if (result.ICL.upToDate && result.IPC.upToDate) {
-        setSyncMessage(`ICL e IPC ya están actualizados según las fuentes oficiales.${cacNote}`);
+      if (stats.skipped && stats.warning) {
+        setError(`No se pudo actualizar ${code}. ${stats.warning}`);
+      } else if (stats.upToDate) {
+        setSyncMessage(`${code} ya está actualizado según la fuente oficial.`);
       } else if (!hadUpdates) {
-        setSyncMessage(`No había cambios nuevos en ICL ni IPC.${cacNote}`);
+        setSyncMessage(`No había cambios nuevos en ${code}.`);
       } else {
-        setSyncMessage(
-          `ICL e IPC actualizados (ICL: ${result.ICL.upserted}, IPC: ${result.IPC.upserted}).${cacNote}`,
-        );
+        setSyncMessage(`${code} actualizado (${stats.upserted}).`);
       }
 
       // Solo recargar la grilla si hubo filas nuevas; evita el titileo cuando ya estaba al día.
@@ -152,7 +153,7 @@ export function IndicesView() {
     } finally {
       setSyncing(false);
     }
-  }, [token, syncing, load, logout]);
+  }, [token, syncing, load, logout, indice]);
 
   const rows = useMemo(() => {
     const inRange = allRows.filter((row) => periodoInUserRange(row.periodo, desde, hasta));
@@ -173,15 +174,20 @@ export function IndicesView() {
         <div className="flex flex-col gap-1">
           <h1 className="text-[22px] font-bold text-text-primary">Índices de ajuste</h1>
         </div>
-        <ButtonOutline
-          type="button"
-          onClick={() => void handleSync()}
-          disabled={syncing || loading}
-          className="shrink-0 gap-2 self-start"
-        >
-          <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
-          {syncing ? "Actualizando ICL e IPC…" : "Actualizar ICL e IPC"}
-        </ButtonOutline>
+        <div className="flex shrink-0 flex-col items-start gap-1 self-start">
+          <ButtonOutline
+            type="button"
+            onClick={() => void handleSync()}
+            disabled={syncing || loading}
+            className="gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
+            {syncing ? `Actualizando ${indice}…` : `Actualizar ${indice}`}
+          </ButtonOutline>
+          {indice === "CAC" ? (
+            <p className="text-xs text-text-secondary">CAMARCO puede tardar unos minutos.</p>
+          ) : null}
+        </div>
       </header>
 
       {syncMessage ? (
@@ -194,7 +200,7 @@ export function IndicesView() {
         <p className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
           Seleccionar índice
         </p>
-        <IndexSelector value={indice} onChange={setIndice} />
+        <IndexSelector value={indice} onChange={setIndice} disabled={syncing} />
         <p className="text-sm text-text-secondary">{INDEX_LABELS[indice]}</p>
       </section>
 

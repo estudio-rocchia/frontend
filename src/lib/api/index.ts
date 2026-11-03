@@ -772,11 +772,13 @@ export function fetchIndiceValores(
   });
 }
 
-export function syncIndices(token: string) {
+export function syncIndices(token: string, code: IndiceCode) {
+  const timeoutMs = code === "CAC" ? 300_000 : 120_000;
   return apiRequest<SyncIndicesResponse>("/indices/sync", {
     method: "POST",
     token,
-    signal: AbortSignal.timeout(120_000),
+    body: JSON.stringify({ code }),
+    signal: AbortSignal.timeout(timeoutMs),
   });
 }
 
