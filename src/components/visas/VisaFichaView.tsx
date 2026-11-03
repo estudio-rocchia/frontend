@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 
 import { CotizacionCard, CotizacionCardSkeleton } from "@/components/visas/CotizacionCard";
+import { CuestionarioCard } from "@/components/visas/CuestionarioCard";
 import { EnlacesOficiales } from "@/components/visas/EnlacesOficiales";
 import { ExpedienteCard, ExpedienteCardSkeleton } from "@/components/visas/ExpedienteCard";
 import { GrupoCard, GrupoCardSkeleton } from "@/components/visas/GrupoCard";
@@ -26,6 +27,7 @@ import {
 import type { CotizacionVisa, EstadoTramiteVisa, QuienAsignaTurno, TramiteVisaDetail } from "@/lib/api/types";
 import { downloadBlob, personaDisplayName } from "@/lib/format";
 import { pagePaddingClass } from "@/lib/layout";
+import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 import {
   canEditVisas,
   ESTADO_VISA_LABEL,
@@ -70,6 +72,7 @@ export function VisaFichaView() {
   const [cambiosTurno, setCambiosTurno] = useState("0");
   const [notasGrupo, setNotasGrupo] = useState("");
   const [honorarioPagadoEn, setHonorarioPagadoEn] = useState("");
+  const [pestana, setPestana] = useState<"tramite" | "cuestionario">("tramite");
 
   const applyDetail = useCallback((next: TramiteVisaDetail) => {
     setDetail(next);
@@ -348,8 +351,39 @@ export function VisaFichaView() {
         </p>
       ) : null}
 
-      {loading && !detail ? (
-        <div className="grid items-start gap-4 md:gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className="flex gap-1 border-b border-border" role="tablist" aria-label="Secciones del trámite">
+        {(
+          [
+            ["tramite", "Trámite"],
+            ["cuestionario", "Formulario"],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            id={`visa-tab-${id}`}
+            type="button"
+            role="tab"
+            aria-selected={pestana === id}
+            aria-controls={`visa-panel-${id}`}
+            onClick={() => setPestana(id)}
+            className={`inline-flex min-h-11 items-center border-b-2 px-3 text-sm font-medium transition-colors ${interactiveFocusClass} ${
+              pestana === id
+                ? "border-primary text-primary"
+                : "border-transparent text-text-secondary hover:text-text-primary"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {pestana === "tramite" && loading && !detail ? (
+        <div
+          id="visa-panel-tramite"
+          role="tabpanel"
+          aria-labelledby="visa-tab-tramite"
+          className="grid items-start gap-4 md:gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]"
+        >
           <ExpedienteCardSkeleton />
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
             <CotizacionCardSkeleton />
@@ -358,8 +392,13 @@ export function VisaFichaView() {
         </div>
       ) : null}
 
-      {detail && cotizacion ? (
-        <div className="grid items-start gap-4 md:gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+      {pestana === "tramite" && detail && cotizacion ? (
+        <div
+          id="visa-panel-tramite"
+          role="tabpanel"
+          aria-labelledby="visa-tab-tramite"
+          className="grid items-start gap-4 md:gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]"
+        >
           <ExpedienteCard
             canEdit={canEdit}
             estado={estado}
@@ -482,6 +521,21 @@ export function VisaFichaView() {
               onAdd={() => setAddOpen(true)}
             />
           </div>
+        </div>
+      ) : null}
+
+      {pestana === "cuestionario" ? (
+        <div
+          id="visa-panel-cuestionario"
+          role="tabpanel"
+          aria-labelledby="visa-tab-cuestionario"
+          className="max-w-5xl"
+        >
+          {token && detail ? (
+            <CuestionarioCard token={token} tramiteId={detail.id} canEdit={canEdit} />
+          ) : (
+            <p className="text-sm text-text-secondary">{loading ? "Cargando…" : "No se pudo abrir el formulario."}</p>
+          )}
         </div>
       ) : null}
 

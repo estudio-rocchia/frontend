@@ -11,7 +11,7 @@ import type {
   TramiteRpi,
 } from "../juridico/model";
 import { withCache } from "./cache";
-import { apiBlob, apiBlobWithFilename, apiRequest } from "./client";
+import { apiBlob, apiBlobWithFilename, apiRequest, apiUploadFile } from "./client";
 import type {
   CatalogoItem,
   ContratoDetail,
@@ -81,6 +81,7 @@ import type {
   CotizacionVisa,
   CreateTramiteVisaInput,
   EstadoTramiteVisa,
+  ArchivoVisa,
   TarifaVisa,
   TramiteVisaDetail,
   TramiteVisaListItem,
@@ -1242,6 +1243,34 @@ export function anularReciboVisa(token: string, reciboId: number) {
 
 export function downloadReciboVisaPdf(token: string, reciboId: number) {
   return apiBlobWithFilename(`/visas/recibos/${reciboId}/pdf`, token);
+}
+
+export function fetchPlantillaVisa(token: string) {
+  return apiRequest<{ items: ArchivoVisa[] }>("/visas/plantilla", { token });
+}
+
+export function uploadPlantillaVisa(token: string, file: File) {
+  return apiUploadFile<ArchivoVisa>("/visas/plantilla", token, file, "POST");
+}
+
+export function fetchArchivosVisa(token: string, tramiteId: number) {
+  return apiRequest<{ items: ArchivoVisa[] }>(`/visas/${tramiteId}/archivos`, { token });
+}
+
+export function uploadArchivoVisa(token: string, tramiteId: number, file: File) {
+  return apiUploadFile<ArchivoVisa>(`/visas/${tramiteId}/archivos`, token, file, "POST");
+}
+
+export function downloadArchivoVisa(token: string, archivoId: number) {
+  return apiBlobWithFilename(`/visas/archivos/${archivoId}`, token);
+}
+
+export function downloadFormularioVacioVisa(token: string, tramiteId: number, archivoId: number) {
+  return apiBlobWithFilename(`/visas/${tramiteId}/formularios/${archivoId}`, token);
+}
+
+export function deleteArchivoVisa(token: string, archivoId: number) {
+  return apiRequest<void>(`/visas/archivos/${archivoId}`, { method: "DELETE", token });
 }
 
 export function updateTramiteVisa(token: string, id: number, body: UpdateTramiteVisaInput) {

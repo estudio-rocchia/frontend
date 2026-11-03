@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronRight, CircleDollarSign, Plus, Search } from "lucide-react";
+import { ChevronRight, CircleDollarSign, FileText, Plus, Search } from "lucide-react";
 
 import { EnlacesOficiales } from "@/components/visas/EnlacesOficiales";
+import { PlantillaVisaModal } from "@/components/visas/PlantillaVisaModal";
 import { NuevoTramiteModal } from "@/components/visas/NuevoTramiteModal";
 import { PreciosVisaModal } from "@/components/visas/PreciosVisaModal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
@@ -61,6 +62,7 @@ export function VisasView() {
   const [error, setError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [preciosOpen, setPreciosOpen] = useState(false);
+  const [plantillaOpen, setPlantillaOpen] = useState(false);
   const canEdit = canEditVisas(user?.roles);
 
   useEffect(() => {
@@ -114,18 +116,24 @@ export function VisasView() {
             <EnlacesOficiales compact />
           </div>
         </div>
-        {canEdit ? (
-          <div className="flex flex-wrap gap-2">
-            <ButtonOutline onClick={() => setPreciosOpen(true)}>
-              <CircleDollarSign className="mr-1.5 h-4 w-4" aria-hidden />
-              Actualizar precios
-            </ButtonOutline>
-            <ButtonPrimary onClick={() => setCreateOpen(true)}>
-              <Plus className="mr-1.5 h-4 w-4" aria-hidden />
-              Nuevo trámite
-            </ButtonPrimary>
-          </div>
-        ) : null}
+        <div className="flex flex-wrap gap-2">
+          <ButtonOutline onClick={() => setPlantillaOpen(true)}>
+            <FileText className="mr-1.5 h-4 w-4" aria-hidden />
+            Subir formulario
+          </ButtonOutline>
+          {canEdit ? (
+            <>
+              <ButtonOutline onClick={() => setPreciosOpen(true)}>
+                <CircleDollarSign className="mr-1.5 h-4 w-4" aria-hidden />
+                Actualizar precios
+              </ButtonOutline>
+              <ButtonPrimary onClick={() => setCreateOpen(true)}>
+                <Plus className="mr-1.5 h-4 w-4" aria-hidden />
+                Nuevo trámite
+              </ButtonPrimary>
+            </>
+          ) : null}
+        </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -299,6 +307,15 @@ export function VisasView() {
         </table>
       </div>
       )}
+
+      {token ? (
+        <PlantillaVisaModal
+          open={plantillaOpen}
+          token={token}
+          canEdit={canEdit}
+          onClose={() => setPlantillaOpen(false)}
+        />
+      ) : null}
 
       {token && canEdit ? (
         <PreciosVisaModal

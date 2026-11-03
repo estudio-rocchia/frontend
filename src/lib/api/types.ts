@@ -1308,6 +1308,16 @@ export interface ConceptoCotizadoVisa extends ConceptoTarifaVisa {
   aplicado: boolean;
 }
 
+export interface ArchivoVisa {
+  id: number;
+  tramiteId: number | null;
+  nombre: string;
+  tipoMime: string;
+  proveedor: string;
+  ruta: string;
+  subidoEn: string;
+}
+
 export interface TarifaVisa {
   honorarioIndividualUsd: number;
   honorarioGrupoChicoUsd: number;
