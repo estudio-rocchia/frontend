@@ -8,7 +8,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import type { ConceptoCotizadoVisa, CotizacionVisa, IntegranteVisa, ReciboVisa } from "@/lib/api/types";
 import { formatDateDisplay, personaDisplayName } from "@/lib/format";
 import { formInputClass, interactiveFocusClass } from "@/lib/ui/interactive-focus";
-import { formatUsd } from "@/lib/visas/labels";
+import { formatArs, formatUsd } from "@/lib/visas/labels";
 
 type CobroLinea = {
   key: string;
@@ -16,9 +16,14 @@ type CobroLinea = {
   quien: string;
   nota: string | null;
   amount: number;
+  moneda: "usd" | "ars";
   pagadoEn: string | null;
   href: string | null;
 };
+
+function formatMoneda(moneda: "usd" | "ars" | undefined, amount: number) {
+  return moneda === "ars" ? formatArs(amount) : formatUsd(amount);
+}
 
 function conceptosDe(cotizacion: CotizacionVisa): ConceptoCotizadoVisa[] {
   return cotizacion.conceptos ?? [];
@@ -59,38 +64,46 @@ function buildCobroLineas({
   const quienEstudio = esGrupo ? "Grupo" : (nombreActual ?? "Esta persona");
   const lineas: CobroLinea[] = [];
 
-  if (cotizacion.honorarioTotalUsd > 0) {
+  const honorarioMonto = cotizacion.honorarioMoneda === "ars" ? (cotizacion.honorarioTotalArs ?? 0) : cotizacion.honorarioTotalUsd;
+  const honorarioUnitario = cotizacion.honorarioMoneda === "ars" ? (cotizacion.honorarioUnitarioArs ?? 0) : cotizacion.honorarioUnitarioUsd;
+  if (honorarioMonto > 0) {
     lineas.push({
       key: "honorario",
       concepto: "Honorario",
       quien: quienEstudio,
-      nota: esGrupo ? `${formatUsd(cotizacion.honorarioUnitarioUsd)} × ${cotizacion.personas}` : null,
-      amount: cotizacion.honorarioTotalUsd,
+      nota: esGrupo ? `${formatMoneda(cotizacion.honorarioMoneda, honorarioUnitario)} × ${cotizacion.personas}` : null,
+      amount: honorarioMonto,
+      moneda: cotizacion.honorarioMoneda === "ars" ? "ars" : "usd",
       pagadoEn: honorarioPagadoEn,
       href: null,
     });
   }
 
-  if (cotizacion.cambiosTurno > 0 && cotizacion.cambioTurnoTotalUsd > 0) {
+  const cambioMonto = cotizacion.cambioTurnoMoneda === "ars" ? (cotizacion.cambioTurnoTotalArs ?? 0) : cotizacion.cambioTurnoTotalUsd;
+  const cambioUnitario = cotizacion.cambioTurnoMoneda === "ars" ? (cotizacion.cambioTurnoUnitarioArs ?? 0) : cotizacion.cambioTurnoUnitarioUsd;
+  if (cotizacion.cambiosTurno > 0 && cambioMonto > 0) {
     lineas.push({
       key: "cambios",
       concepto: "Cambios de turno",
       quien: quienEstudio,
-      nota: `${formatUsd(cotizacion.cambioTurnoUnitarioUsd)} × ${cotizacion.cambiosTurno}`,
-      amount: cotizacion.cambioTurnoTotalUsd,
+      nota: `${formatMoneda(cotizacion.cambioTurnoMoneda, cambioUnitario)} × ${cotizacion.cambiosTurno}`,
+      amount: cambioMonto,
+      moneda: cotizacion.cambioTurnoMoneda === "ars" ? "ars" : "usd",
       pagadoEn: honorarioPagadoEn,
       href: null,
     });
   }
 
   for (const concepto of conceptosDe(cotizacion)) {
-    if (concepto.destino !== "estudio" || concepto.totalUsd <= 0) continue;
+    const totalExtra = concepto.moneda === "ars" ? (concepto.totalArs ?? 0) : concepto.totalUsd;
+    if (concepto.destino !== "estudio" || totalExtra <= 0) continue;
     lineas.push({
       key: `extra-${concepto.id}`,
       concepto: concepto.nombre,
       quien: quienEstudio,
-      nota: concepto.alcance === "persona" && concepto.cantidad > 1 ? `${formatUsd(concepto.montoUsd)} × ${concepto.cantidad}` : null,
-      amount: concepto.totalUsd,
+      nota: concepto.alcance === "persona" && concepto.cantidad > 1 ? `${formatMoneda(concepto.moneda, concepto.moneda === "ars" ? (concepto.montoArs ?? 0) : concepto.montoUsd)} × ${concepto.cantidad}` : null,
+      amount: concepto.moneda === "ars" ? (concepto.totalArs ?? 0) : concepto.totalUsd,
+      moneda: concepto.moneda === "ars" ? "ars" : "usd",
       pagadoEn: honorarioPagadoEn,
       href: null,
     });
@@ -102,7 +115,8 @@ function buildCobroLineas({
     return a.id - b.id;
   });
 
-  if (aranceles.length > 0 && cotizacion.arancelUnitarioUsd > 0) {
+  const arancelUnitario = cotizacion.arancelMoneda === "ars" ? (cotizacion.arancelUnitarioArs ?? 0) : cotizacion.arancelUnitarioUsd;
+  if (aranceles.length > 0 && arancelUnitario > 0) {
     for (const integrante of aranceles) {
       const esActual = integrante.id === tramiteId;
       lineas.push({
@@ -110,25 +124,28 @@ function buildCobroLineas({
         concepto: "Arancel",
         quien: personaDisplayName(integrante.persona),
         nota: esActual ? "Esta ficha" : null,
-        amount: cotizacion.arancelUnitarioUsd,
+        amount: cotizacion.arancelMoneda === "ars" ? (cotizacion.arancelUnitarioArs ?? 0) : cotizacion.arancelUnitarioUsd,
+        moneda: cotizacion.arancelMoneda === "ars" ? "ars" : "usd",
         pagadoEn: integrante.arancelPagadoEn,
         href: esActual ? null : `/visas/${integrante.id}`,
       });
     }
-  } else if (cotizacion.arancelUnitarioUsd > 0) {
+  } else if (arancelUnitario > 0) {
     lineas.push({
       key: "arancel",
       concepto: "Arancel",
       quien: nombreActual ?? "Esta persona",
       nota: null,
-      amount: cotizacion.arancelUnitarioUsd,
-      pagadoEn: arancelPagadoEn,
+        amount: cotizacion.arancelMoneda === "ars" ? (cotizacion.arancelUnitarioArs ?? 0) : cotizacion.arancelUnitarioUsd,
+        moneda: cotizacion.arancelMoneda === "ars" ? "ars" : "usd",
+        pagadoEn: arancelPagadoEn,
       href: null,
     });
   }
 
   for (const concepto of conceptosDe(cotizacion)) {
-    if (concepto.destino !== "consulado" || !concepto.aplicado || concepto.montoUsd <= 0) continue;
+    const unitarioExtra = concepto.moneda === "ars" ? (concepto.montoArs ?? 0) : concepto.montoUsd;
+    if (concepto.destino !== "consulado" || !concepto.aplicado || unitarioExtra <= 0) continue;
     if (aranceles.length > 0) {
       for (const integrante of aranceles) {
         const esActual = integrante.id === tramiteId;
@@ -137,7 +154,8 @@ function buildCobroLineas({
           concepto: concepto.nombre,
           quien: personaDisplayName(integrante.persona),
           nota: esActual ? "Esta ficha" : null,
-          amount: concepto.montoUsd,
+          amount: concepto.moneda === "ars" ? (concepto.montoArs ?? 0) : concepto.montoUsd,
+          moneda: concepto.moneda === "ars" ? "ars" : "usd",
           pagadoEn: integrante.arancelPagadoEn,
           href: esActual ? null : `/visas/${integrante.id}`,
         });
@@ -148,7 +166,8 @@ function buildCobroLineas({
         concepto: concepto.nombre,
         quien: nombreActual ?? "Esta persona",
         nota: null,
-        amount: concepto.montoUsd,
+        amount: concepto.moneda === "ars" ? (concepto.montoArs ?? 0) : concepto.montoUsd,
+        moneda: concepto.moneda === "ars" ? "ars" : "usd",
         pagadoEn: arancelPagadoEn,
         href: null,
       });
@@ -238,11 +257,16 @@ export function CotizacionCard({
   const honorarioListo = Boolean(honorarioPagadoEn);
   const arancelListo = Boolean(arancelPagadoEn);
   const arancelCobroUsd = arancelDeEstaPersonaUsd(cotizacion);
+  const arancelCobroArs =
+    (cotizacion.arancelUnitarioArs ?? 0) +
+    conceptosDe(cotizacion)
+      .filter((item) => item.destino === "consulado" && item.aplicado)
+      .reduce((sum, item) => sum + (item.montoArs ?? 0), 0);
   const extrasEstudio = conceptosDe(cotizacion).some((item) => item.destino === "estudio" && item.totalUsd > 0);
   const extrasConsulado = conceptosDe(cotizacion).some((item) => item.destino === "consulado" && item.aplicado && item.montoUsd > 0);
   const arancelPagado = Boolean(arancelPagadoEn) || integrantes.some((item) => item.arancelPagadoEn);
-  const faltaHonorario = !honorarioListo && cotizacion.totalEstudioUsd > 0;
-  const faltaArancel = !arancelListo && arancelCobroUsd > 0;
+  const faltaHonorario = !honorarioListo && (cotizacion.totalEstudioUsd > 0 || (cotizacion.totalEstudioArs ?? 0) > 0);
+  const faltaArancel = !arancelListo && (arancelCobroUsd > 0 || arancelCobroArs > 0);
   const faltaAlguno = faltaHonorario || faltaArancel;
   const faltaLosDos = faltaHonorario && faltaArancel;
   const esGrupo = cotizacion.personas > 1;
@@ -255,8 +279,10 @@ export function CotizacionCard({
   });
   const cobradas = lineas.filter((linea) => linea.pagadoEn);
   const pendientes = lineas.filter((linea) => !linea.pagadoEn);
-  const totalCobrado = cobradas.reduce((sum, linea) => sum + linea.amount, 0);
-  const totalPendiente = pendientes.reduce((sum, linea) => sum + linea.amount, 0);
+  const totalCobrado = cobradas.filter((linea) => linea.moneda !== "ars").reduce((sum, linea) => sum + linea.amount, 0);
+  const totalCobradoArs = cobradas.filter((linea) => linea.moneda === "ars").reduce((sum, linea) => sum + linea.amount, 0);
+  const totalPendiente = pendientes.filter((linea) => linea.moneda !== "ars").reduce((sum, linea) => sum + linea.amount, 0);
+  const totalPendienteArs = pendientes.filter((linea) => linea.moneda === "ars").reduce((sum, linea) => sum + linea.amount, 0);
   const badge = cobroBadge(cobradas.length, pendientes.length);
   const nombreActual = integrantes.find((item) => item.id === tramiteId);
   const quienActual = nombreActual ? personaDisplayName(nombreActual.persona) : null;
@@ -373,19 +399,25 @@ export function CotizacionCard({
         <div className="rounded-md bg-primary-soft px-3 py-3">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">Total</p>
           <p className="mt-1 text-[28px] font-bold leading-none tabular-nums text-primary">
-            {formatUsd(cotizacion.totalUsd)}
+            {(cotizacion.totalUsd > 0 || (cotizacion.totalArs ?? 0) === 0) ? formatUsd(cotizacion.totalUsd) : null}
+            {(cotizacion.totalArs ?? 0) > 0 ? (
+              <span className={cotizacion.totalUsd > 0 ? "mt-1 block text-lg" : undefined}>{formatArs(cotizacion.totalArs ?? 0)}</span>
+            ) : null}
           </p>
         </div>
         <dl className="flex flex-col gap-2">
-          {cotizacion.honorarioTotalUsd > 0 ? (
+          {(cotizacion.honorarioMoneda === "ars" ? (cotizacion.honorarioTotalArs ?? 0) : cotizacion.honorarioTotalUsd) > 0 ? (
             <QuoteLine
               title="Honorario"
               detail={
                 esGrupo
-                  ? `${formatUsd(cotizacion.honorarioUnitarioUsd)} × ${cotizacion.personas}`
+                  ? `${formatMoneda(cotizacion.honorarioMoneda, cotizacion.honorarioMoneda === "ars" ? (cotizacion.honorarioUnitarioArs ?? 0) : cotizacion.honorarioUnitarioUsd)} × ${cotizacion.personas}`
                   : quienActual ?? undefined
               }
-              amount={formatUsd(cotizacion.honorarioTotalUsd)}
+              amount={formatMoneda(
+                cotizacion.honorarioMoneda,
+                cotizacion.honorarioMoneda === "ars" ? (cotizacion.honorarioTotalArs ?? 0) : cotizacion.honorarioTotalUsd,
+              )}
             />
           ) : null}
           <ConceptosOpcionales
@@ -397,22 +429,28 @@ export function CotizacionCard({
             arancelPagado={arancelPagado}
             onToggle={alternarOpcional}
           />
-          {cotizacion.cambiosTurno > 0 && cotizacion.cambioTurnoTotalUsd > 0 ? (
+          {cotizacion.cambiosTurno > 0 && (cotizacion.cambioTurnoMoneda === "ars" ? (cotizacion.cambioTurnoTotalArs ?? 0) : cotizacion.cambioTurnoTotalUsd) > 0 ? (
             <QuoteLine
               title="Cambios de turno"
-              detail={`${formatUsd(cotizacion.cambioTurnoUnitarioUsd)} × ${cotizacion.cambiosTurno}`}
-              amount={formatUsd(cotizacion.cambioTurnoTotalUsd)}
+              detail={`${formatMoneda(cotizacion.cambioTurnoMoneda, cotizacion.cambioTurnoMoneda === "ars" ? (cotizacion.cambioTurnoUnitarioArs ?? 0) : cotizacion.cambioTurnoUnitarioUsd)} × ${cotizacion.cambiosTurno}`}
+              amount={formatMoneda(
+                cotizacion.cambioTurnoMoneda,
+                cotizacion.cambioTurnoMoneda === "ars" ? (cotizacion.cambioTurnoTotalArs ?? 0) : cotizacion.cambioTurnoTotalUsd,
+              )}
             />
           ) : null}
-          {cotizacion.arancelTotalUsd > 0 ? (
+          {(cotizacion.arancelMoneda === "ars" ? (cotizacion.arancelTotalArs ?? 0) : cotizacion.arancelTotalUsd) > 0 ? (
             <QuoteLine
               title="Arancel"
               detail={
                 esGrupo
-                  ? `${formatUsd(cotizacion.arancelUnitarioUsd)} × ${cotizacion.personas}`
+                  ? `${formatMoneda(cotizacion.arancelMoneda, cotizacion.arancelMoneda === "ars" ? (cotizacion.arancelUnitarioArs ?? 0) : cotizacion.arancelUnitarioUsd)} × ${cotizacion.personas}`
                   : quienActual ?? undefined
               }
-              amount={formatUsd(cotizacion.arancelTotalUsd)}
+              amount={formatMoneda(
+                cotizacion.arancelMoneda,
+                cotizacion.arancelMoneda === "ars" ? (cotizacion.arancelTotalArs ?? 0) : cotizacion.arancelTotalUsd,
+              )}
             />
           ) : null}
           <ConceptosOpcionales
@@ -440,13 +478,19 @@ export function CotizacionCard({
           <div className="rounded-md bg-success-bg px-3 py-3">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-success">Cobrado</p>
             <p className="mt-1 text-[22px] font-bold leading-none tabular-nums text-success">
-              {formatUsd(totalCobrado)}
+              {totalCobradoArs > 0 && totalCobrado === 0 ? formatArs(totalCobradoArs) : formatUsd(totalCobrado)}
+            {totalCobrado > 0 && totalCobradoArs > 0 ? (
+              <span className="mt-1 block text-sm font-semibold">{formatArs(totalCobradoArs)}</span>
+            ) : null}
             </p>
           </div>
           <div className="rounded-md bg-warning-bg px-3 py-3">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-warning">Pendiente</p>
             <p className="mt-1 text-[22px] font-bold leading-none tabular-nums text-warning">
-              {formatUsd(totalPendiente)}
+              {totalPendienteArs > 0 && totalPendiente === 0 ? formatArs(totalPendienteArs) : formatUsd(totalPendiente)}
+            {totalPendiente > 0 && totalPendienteArs > 0 ? (
+              <span className="mt-1 block text-sm font-semibold">{formatArs(totalPendienteArs)}</span>
+            ) : null}
             </p>
           </div>
         </div>
@@ -662,12 +706,17 @@ function ConceptosOpcionales({
   return (
     <>
       {visibles.map((item) => {
+        const enPesos = item.moneda === "ars";
+        const unitario = enPesos ? (item.montoArs ?? 0) : item.montoUsd;
         const total = item.aplicado
-          ? item.totalUsd
+          ? enPesos
+            ? (item.totalArs ?? 0)
+            : item.totalUsd
           : personas > 0 && item.alcance === "persona"
-            ? item.montoUsd * personas
-            : item.montoUsd;
-        const detalle = item.alcance === "persona" && personas > 1 ? `${formatUsd(item.montoUsd)} × ${personas}` : undefined;
+            ? unitario * personas
+            : unitario;
+        const formatImporte = enPesos ? formatArs : formatUsd;
+        const detalle = item.alcance === "persona" && personas > 1 ? `${formatImporte(unitario)} × ${personas}` : undefined;
         const bloqueado = item.destino === "consulado" ? arancelPagado : honorarioPagado;
 
         return (
@@ -691,7 +740,7 @@ function ConceptosOpcionales({
               </span>
             </span>
             <span className={`shrink-0 tabular-nums ${item.aplicado ? "text-text-primary" : "text-text-secondary"}`}>
-              {formatUsd(total)}
+              {formatImporte(total)}
             </span>
           </div>
         );
@@ -766,7 +815,7 @@ function CobroLista({
                   </span>
                 </span>
                 <span className={`shrink-0 text-sm font-semibold tabular-nums ${pagado ? "text-success" : "text-text-primary"}`}>
-                  {formatUsd(linea.amount)}
+                  {formatMoneda(linea.moneda, linea.amount)}
                 </span>
               </li>
             );

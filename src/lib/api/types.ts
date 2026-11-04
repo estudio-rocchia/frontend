@@ -1293,11 +1293,15 @@ export type AlcanceConceptoTarifa = "persona" | "grupo";
 
 export type DestinoConceptoTarifa = "estudio" | "consulado";
 
+export type MonedaConceptoTarifa = "usd" | "ars";
+
 export interface ConceptoTarifaVisa {
   id: string;
   nombre: string;
   categoria: CategoriaConceptoTarifa;
   montoUsd: number;
+  montoArs?: number;
+  moneda?: MonedaConceptoTarifa;
   alcance: AlcanceConceptoTarifa;
   destino: DestinoConceptoTarifa;
 }
@@ -1305,6 +1309,7 @@ export interface ConceptoTarifaVisa {
 export interface ConceptoCotizadoVisa extends ConceptoTarifaVisa {
   cantidad: number;
   totalUsd: number;
+  totalArs?: number;
   aplicado: boolean;
 }
 
@@ -1324,21 +1329,46 @@ export interface TarifaVisa {
   honorarioGrupoGrandeUsd: number;
   arancelConsularUsd: number;
   cambioTurnoUsd: number;
+  preciosArs?: PreciosArsVisa;
+  monedas?: MonedasPrecioVisa;
   conceptos: ConceptoTarifaVisa[];
 }
 
+export type ClavePrecioVisa =
+  | "honorarioIndividual"
+  | "honorarioGrupoChico"
+  | "honorarioGrupoGrande"
+  | "arancelConsular"
+  | "cambioTurno";
+
+export type PreciosArsVisa = Partial<Record<ClavePrecioVisa, number>>;
+
+export type MonedasPrecioVisa = Partial<Record<ClavePrecioVisa, "usd" | "ars">>;
+
 export interface CotizacionVisa {
   personas: number;
+  honorarioMoneda?: "usd" | "ars";
   honorarioUnitarioUsd: number;
+  honorarioUnitarioArs?: number;
   honorarioTotalUsd: number;
+  honorarioTotalArs?: number;
+  arancelMoneda?: "usd" | "ars";
   arancelUnitarioUsd: number;
+  arancelUnitarioArs?: number;
   arancelTotalUsd: number;
+  arancelTotalArs?: number;
   cambiosTurno: number;
+  cambioTurnoMoneda?: "usd" | "ars";
   cambioTurnoUnitarioUsd: number;
+  cambioTurnoUnitarioArs?: number;
   cambioTurnoTotalUsd: number;
+  cambioTurnoTotalArs?: number;
   totalEstudioUsd: number;
+  totalEstudioArs?: number;
   totalConsuladoUsd: number;
+  totalConsuladoArs?: number;
   totalUsd: number;
+  totalArs?: number;
   conceptos: ConceptoCotizadoVisa[];
 }
 

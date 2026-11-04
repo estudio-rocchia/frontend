@@ -10,33 +10,46 @@ import type {
   AlcanceConceptoTarifa,
   CategoriaConceptoTarifa,
   DestinoConceptoTarifa,
+  ClavePrecioVisa,
+  MonedaConceptoTarifa,
+  MonedasPrecioVisa,
+  PreciosArsVisa,
   TarifaVisa,
 } from "@/lib/api/types";
 import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 
-type PrecioFijo = Exclude<keyof TarifaVisa, "conceptos">;
+type PrecioFijo =
+  | "honorarioIndividualUsd"
+  | "honorarioGrupoChicoUsd"
+  | "honorarioGrupoGrandeUsd"
+  | "arancelConsularUsd"
+  | "cambioTurnoUsd";
 
-const HONORARIOS: { key: PrecioFijo; label: string; hint: string }[] = [
-  { key: "honorarioIndividualUsd", label: "Individual", hint: "1 persona" },
-  { key: "honorarioGrupoChicoUsd", label: "Grupo chico", hint: "2 o 3 personas, por integrante" },
-  { key: "honorarioGrupoGrandeUsd", label: "Grupo grande", hint: "4 o más personas, por integrante" },
+const HONORARIOS: { key: PrecioFijo; clave: ClavePrecioVisa; label: string; hint: string }[] = [
+  { key: "honorarioIndividualUsd", clave: "honorarioIndividual", label: "Individual", hint: "1 persona" },
+  { key: "honorarioGrupoChicoUsd", clave: "honorarioGrupoChico", label: "Grupo chico", hint: "2 o 3 personas, por integrante" },
+  { key: "honorarioGrupoGrandeUsd", clave: "honorarioGrupoGrande", label: "Grupo grande", hint: "4 o más personas, por integrante" },
 ];
 
 const CAMBIO_TURNO = {
   key: "cambioTurnoUsd",
+  clave: "cambioTurno",
   label: "Cambio de turno",
   hint: "Cada vez que se mueve o se adelanta",
 } as const;
 
 const ARANCEL = {
   key: "arancelConsularUsd",
+  clave: "arancelConsular",
   label: "Arancel consular",
   hint: "Lo cobra el consulado. No queda en el estudio.",
 } as const;
 
 const FIELDS = [...HONORARIOS, CAMBIO_TURNO, ARANCEL];
 const CONCEPTO_MAX = 12;
-const TARIFF_GRID = "grid grid-cols-[minmax(0,1fr)_7.25rem_2.25rem] gap-3";
+const PRECIO_USD_MAX = 9999;
+const PRECIO_ARS_MAX = 99_999_999;
+const TARIFF_GRID = "grid grid-cols-[minmax(0,1fr)_7.5rem_5.75rem_7.25rem] gap-x-2";
 
 type ExtraDraft = {
   id: string;
@@ -44,8 +57,37 @@ type ExtraDraft = {
   categoria: CategoriaConceptoTarifa;
   alcance: AlcanceConceptoTarifa;
   destino: DestinoConceptoTarifa;
-  monto: string;
+  moneda: MonedaConceptoTarifa;
+  montoUsd: string;
+  montoArs: string;
 };
+
+function emptyArs(): Record<ClavePrecioVisa, string> {
+  return {
+    honorarioIndividual: "",
+    honorarioGrupoChico: "",
+    honorarioGrupoGrande: "",
+    arancelConsular: "",
+    cambioTurno: "",
+  };
+}
+
+function monedasIniciales(): Record<ClavePrecioVisa, MonedaConceptoTarifa> {
+  return {
+    honorarioIndividual: "usd",
+    honorarioGrupoChico: "usd",
+    honorarioGrupoGrande: "usd",
+    arancelConsular: "usd",
+    cambioTurno: "usd",
+  };
+}
+
+function leerImporte(raw: string, tope: number): number | null | "invalido" {
+  if (raw.trim() === "") return null;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 0 || value > tope) return "invalido";
+  return value;
+}
 
 function emptyDraft(): Record<PrecioFijo, string> {
   return {
@@ -69,12 +111,16 @@ export function PreciosVisaModal({
   onSaved: () => void;
 }) {
   const [draft, setDraft] = useState(emptyDraft);
+  const [arsDraft, setArsDraft] = useState(emptyArs);
+  const [monedas, setMonedas] = useState(monedasIniciales);
   const [extras, setExtras] = useState<ExtraDraft[]>([]);
   const [adding, setAdding] = useState<CategoriaConceptoTarifa | null>(null);
   const [addNombre, setAddNombre] = useState("");
-  const [addMonto, setAddMonto] = useState("");
+  const [addMontoUsd, setAddMontoUsd] = useState("");
+  const [addMontoArs, setAddMontoArs] = useState("");
   const [addAlcance, setAddAlcance] = useState<AlcanceConceptoTarifa>("persona");
   const [addDestino, setAddDestino] = useState<DestinoConceptoTarifa>("estudio");
+  const [addMoneda, setAddMoneda] = useState<MonedaConceptoTarifa>("usd");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -97,13 +143,21 @@ export function PreciosVisaModal({
     void fetchTarifaVisa(token)
       .then((tarifa) => {
         if (cancelled) return;
-        setDraft({
-          honorarioIndividualUsd: String(tarifa.honorarioIndividualUsd),
-          honorarioGrupoChicoUsd: String(tarifa.honorarioGrupoChicoUsd),
-          honorarioGrupoGrandeUsd: String(tarifa.honorarioGrupoGrandeUsd),
-          arancelConsularUsd: String(tarifa.arancelConsularUsd),
-          cambioTurnoUsd: String(tarifa.cambioTurnoUsd),
-        });
+        const preciosArs = tarifa.preciosArs ?? {};
+        const guardadas = tarifa.monedas ?? {};
+        const nextMonedas = monedasIniciales();
+        const nextDraft = emptyDraft();
+        const nextArs = emptyArs();
+        for (const field of FIELDS) {
+          const usd = tarifa[field.key];
+          const ars = preciosArs[field.clave];
+          nextDraft[field.key] = String(usd);
+          nextArs[field.clave] = ars == null ? "" : String(ars);
+          nextMonedas[field.clave] = guardadas[field.clave] ?? (ars != null && usd === 0 ? "ars" : "usd");
+        }
+        setMonedas(nextMonedas);
+        setDraft(nextDraft);
+        setArsDraft(nextArs);
         setExtras(
           (tarifa.conceptos ?? []).map((item) => ({
             id: item.id,
@@ -111,7 +165,9 @@ export function PreciosVisaModal({
             categoria: item.categoria,
             alcance: item.alcance,
             destino: item.destino,
-            monto: String(item.montoUsd),
+            moneda: item.moneda === "ars" ? "ars" : "usd",
+            montoUsd: item.montoUsd ? String(item.montoUsd) : "",
+            montoArs: item.montoArs ? String(item.montoArs) : "",
           })),
         );
       })
@@ -127,19 +183,38 @@ export function PreciosVisaModal({
     };
   }, [open, token]);
 
+  function importesSeparados(
+    usd: number | null,
+    ars: number | null,
+    moneda: MonedaConceptoTarifa,
+    label: string,
+  ) {
+    const activo = moneda === "ars" ? ars : usd;
+    if (activo == null) {
+      setError(`Falta el importe en ${moneda === "ars" ? "pesos" : "dólares"} de ${label}`);
+      return false;
+    }
+    if (usd != null && ars != null && usd > 0 && ars > 0 && usd === ars) {
+      setError(`${label} no puede tener el mismo importe en dólares y en pesos`);
+      return false;
+    }
+    return true;
+  }
+
   function empezar(categoria: CategoriaConceptoTarifa) {
     setAdding(categoria);
     setAddNombre("");
-    setAddMonto("");
+    setAddMontoUsd("");
+    setAddMontoArs("");
     setAddAlcance("persona");
     setAddDestino("estudio");
+    setAddMoneda("usd");
     setError(null);
   }
 
   function confirmarExtra() {
     if (!adding) return;
     const nombre = addNombre.trim().replace(/\s+/g, " ");
-    const monto = Number(addMonto);
     if (nombre.length < 2 || nombre.length > 40) {
       setError("El nombre tiene que tener entre 2 y 40 caracteres");
       return;
@@ -148,15 +223,31 @@ export function PreciosVisaModal({
       setError("Ya hay un precio con ese nombre");
       return;
     }
-    if (!Number.isInteger(monto) || monto < 0 || monto > 9999) {
-      setError("El importe tiene que ser un entero entre 0 y 9999");
+    const usd = leerImporte(addMontoUsd, PRECIO_USD_MAX);
+    const ars = leerImporte(addMontoArs, PRECIO_ARS_MAX);
+    if (usd === "invalido") {
+      setError("El importe en dólares tiene que ser un entero entre 0 y 9999");
       return;
     }
+    if (ars === "invalido") {
+      setError("El importe en pesos tiene que ser un entero entre 0 y 99.999.999");
+      return;
+    }
+    if (!importesSeparados(usd, ars, addMoneda, nombre)) return;
     const destino = adding === "honorario" ? "estudio" : addDestino;
     const alcance = adding === "honorario" || destino === "consulado" ? "persona" : addAlcance;
     setExtras((current) => [
       ...current,
-      { id: crypto.randomUUID(), nombre, categoria: adding, alcance, destino, monto: String(monto) },
+      {
+        id: crypto.randomUUID(),
+        nombre,
+        categoria: adding,
+        alcance,
+        destino,
+        moneda: addMoneda,
+        montoUsd: usd == null ? "" : String(usd),
+        montoArs: ars == null ? "" : String(ars),
+      },
     ]);
     setAdding(null);
     setError(null);
@@ -168,24 +259,53 @@ export function PreciosVisaModal({
       return;
     }
     const precios = {} as Record<PrecioFijo, number>;
+    const preciosArs: PreciosArsVisa = {};
+    const monedasPrecio: MonedasPrecioVisa = {};
     for (const field of FIELDS) {
-      const value = Number(draft[field.key]);
-      if (!Number.isInteger(value) || value < 0 || value > 9999) {
-        setError(`${field.label} tiene que ser un entero entre 0 y 9999`);
+      const usd = leerImporte(draft[field.key], PRECIO_USD_MAX);
+      const ars = leerImporte(arsDraft[field.clave], PRECIO_ARS_MAX);
+      if (usd === "invalido") {
+        setError(`${field.label} tiene que ser un entero entre 0 y 9999 dólares`);
         return;
       }
-      precios[field.key] = value;
+      if (ars === "invalido") {
+        setError(`${field.label} tiene que ser un entero entre 0 y 99.999.999 pesos`);
+        return;
+      }
+      if (!importesSeparados(usd, ars, monedas[field.clave], field.label)) return;
+      precios[field.key] = usd ?? 0;
+      if (ars != null) preciosArs[field.clave] = ars;
+      monedasPrecio[field.clave] = monedas[field.clave];
     }
-    const body: TarifaVisa = {
-      ...precios,
-      conceptos: extras.map((item) => ({
+    const conceptos = [];
+    for (const item of extras) {
+      const usd = leerImporte(item.montoUsd, PRECIO_USD_MAX);
+      const ars = leerImporte(item.montoArs, PRECIO_ARS_MAX);
+      if (usd === "invalido") {
+        setError(`${item.nombre} tiene que ser un entero entre 0 y 9999 dólares`);
+        return;
+      }
+      if (ars === "invalido") {
+        setError(`${item.nombre} tiene que ser un entero entre 0 y 99.999.999 pesos`);
+        return;
+      }
+      if (!importesSeparados(usd, ars, item.moneda, item.nombre)) return;
+      conceptos.push({
         id: item.id,
         nombre: item.nombre,
         categoria: item.categoria,
         alcance: item.alcance,
         destino: item.destino,
-        montoUsd: Number(item.monto),
-      })),
+        moneda: item.moneda,
+        montoUsd: usd ?? 0,
+        montoArs: ars ?? 0,
+      });
+    }
+    const body: TarifaVisa = {
+      ...precios,
+      preciosArs,
+      monedas: monedasPrecio,
+      conceptos,
     };
     setSaving(true);
     setError(null);
@@ -209,7 +329,7 @@ export function PreciosVisaModal({
       onClose={onClose}
       title="Precios de visa"
       subtitle="Aplican a los trámites que se abran después. Los ya abiertos conservan el precio de ese momento."
-      maxWidthClass="max-w-lg"
+      maxWidthClass="max-w-2xl"
       footer={
         <div className="flex w-full justify-end gap-2">
           <ButtonOutline onClick={onClose} disabled={saving}>
@@ -239,9 +359,13 @@ export function PreciosVisaModal({
               key={field.key}
               label={field.label}
               hint={field.hint}
-              value={draft[field.key]}
+              usd={draft[field.key]}
+              ars={arsDraft[field.clave]}
+              moneda={monedas[field.clave]}
               disabled={busy}
-              onChange={(value) => setDraft((current) => ({ ...current, [field.key]: value }))}
+              onUsd={(value) => setDraft((current) => ({ ...current, [field.key]: value }))}
+              onArs={(value) => setArsDraft((current) => ({ ...current, [field.clave]: value }))}
+              onMoneda={(moneda) => setMonedas((current) => ({ ...current, [field.clave]: moneda }))}
             />
           ))}
           {extras
@@ -250,11 +374,23 @@ export function PreciosVisaModal({
               <TariffRow
                 key={item.id}
                 label={item.nombre}
-                value={item.monto}
+                usd={item.montoUsd}
+                ars={item.montoArs}
+                moneda={item.moneda}
                 disabled={busy}
-                onChange={(value) =>
+                onUsd={(value) =>
                   setExtras((current) =>
-                    current.map((extra) => (extra.id === item.id ? { ...extra, monto: value } : extra)),
+                    current.map((extra) => (extra.id === item.id ? { ...extra, montoUsd: value } : extra)),
+                  )
+                }
+                onArs={(value) =>
+                  setExtras((current) =>
+                    current.map((extra) => (extra.id === item.id ? { ...extra, montoArs: value } : extra)),
+                  )
+                }
+                onMoneda={(moneda) =>
+                  setExtras((current) =>
+                    current.map((extra) => (extra.id === item.id ? { ...extra, moneda } : extra)),
                   )
                 }
                 onRemove={() => setExtras((current) => current.filter((extra) => extra.id !== item.id))}
@@ -264,12 +400,16 @@ export function PreciosVisaModal({
             <NuevoPrecio
               categoria="honorario"
               nombre={addNombre}
-              monto={addMonto}
+              montoUsd={addMontoUsd}
+              montoArs={addMontoArs}
+              moneda={addMoneda}
               alcance={addAlcance}
               destino={addDestino}
               disabled={busy}
               onNombre={setAddNombre}
-              onMonto={setAddMonto}
+              onMontoUsd={setAddMontoUsd}
+              onMontoArs={setAddMontoArs}
+              onMoneda={setAddMoneda}
               onAlcance={setAddAlcance}
               onDestino={setAddDestino}
               onConfirm={confirmarExtra}
@@ -288,16 +428,24 @@ export function PreciosVisaModal({
           <TariffRow
             label={CAMBIO_TURNO.label}
             hint={CAMBIO_TURNO.hint}
-            value={draft.cambioTurnoUsd}
+            usd={draft.cambioTurnoUsd}
+            ars={arsDraft.cambioTurno}
+            moneda={monedas.cambioTurno}
             disabled={busy}
-            onChange={(value) => setDraft((current) => ({ ...current, cambioTurnoUsd: value }))}
+            onUsd={(value) => setDraft((current) => ({ ...current, cambioTurnoUsd: value }))}
+            onArs={(value) => setArsDraft((current) => ({ ...current, cambioTurno: value }))}
+            onMoneda={(moneda) => setMonedas((current) => ({ ...current, cambioTurno: moneda }))}
           />
           <TariffRow
             label={ARANCEL.label}
             hint={ARANCEL.hint}
-            value={draft.arancelConsularUsd}
+            usd={draft.arancelConsularUsd}
+            ars={arsDraft.arancelConsular}
+            moneda={monedas.arancelConsular}
             disabled={busy}
-            onChange={(value) => setDraft((current) => ({ ...current, arancelConsularUsd: value }))}
+            onUsd={(value) => setDraft((current) => ({ ...current, arancelConsularUsd: value }))}
+            onArs={(value) => setArsDraft((current) => ({ ...current, arancelConsular: value }))}
+            onMoneda={(moneda) => setMonedas((current) => ({ ...current, arancelConsular: moneda }))}
           />
           {extras
             .filter((item) => item.categoria === "otro")
@@ -305,11 +453,23 @@ export function PreciosVisaModal({
               <TariffRow
                 key={item.id}
                 label={item.nombre}
-                value={item.monto}
+                usd={item.montoUsd}
+                ars={item.montoArs}
+                moneda={item.moneda}
                 disabled={busy}
-                onChange={(value) =>
+                onUsd={(value) =>
                   setExtras((current) =>
-                    current.map((extra) => (extra.id === item.id ? { ...extra, monto: value } : extra)),
+                    current.map((extra) => (extra.id === item.id ? { ...extra, montoUsd: value } : extra)),
+                  )
+                }
+                onArs={(value) =>
+                  setExtras((current) =>
+                    current.map((extra) => (extra.id === item.id ? { ...extra, montoArs: value } : extra)),
+                  )
+                }
+                onMoneda={(moneda) =>
+                  setExtras((current) =>
+                    current.map((extra) => (extra.id === item.id ? { ...extra, moneda } : extra)),
                   )
                 }
                 onRemove={() => setExtras((current) => current.filter((extra) => extra.id !== item.id))}
@@ -319,12 +479,16 @@ export function PreciosVisaModal({
             <NuevoPrecio
               categoria="otro"
               nombre={addNombre}
-              monto={addMonto}
+              montoUsd={addMontoUsd}
+              montoArs={addMontoArs}
+              moneda={addMoneda}
               alcance={addAlcance}
               destino={addDestino}
               disabled={busy}
               onNombre={setAddNombre}
-              onMonto={setAddMonto}
+              onMontoUsd={setAddMontoUsd}
+              onMontoArs={setAddMontoArs}
+              onMoneda={setAddMoneda}
               onAlcance={setAddAlcance}
               onDestino={setAddDestino}
               onConfirm={confirmarExtra}
@@ -357,15 +521,16 @@ function TariffSection({
   return (
     <section aria-labelledby={id} className="overflow-hidden rounded-md border border-border">
       <header className="border-b border-border bg-bg-page px-4 py-3">
-        <div className={`${TARIFF_GRID} items-baseline`}>
+        <div className={`${TARIFF_GRID} items-end`}>
           <div className="min-w-0">
             <h3 id={id} className="text-[11px] font-semibold uppercase tracking-wide text-primary">
               {title}
             </h3>
             <p className="mt-0.5 text-xs text-text-secondary">{note}</p>
           </div>
-          <span className="text-right text-[11px] font-semibold uppercase tracking-wide text-text-secondary">USD</span>
-          <span aria-hidden />
+          <span className="text-center text-xs text-text-secondary">Cobra</span>
+          <span className="pr-2.5 text-right text-xs text-text-secondary">USD</span>
+          <span className="pr-2.5 text-right text-xs text-text-secondary">ARS</span>
         </div>
       </header>
       <div className="divide-y divide-border">{children}</div>
@@ -376,42 +541,71 @@ function TariffSection({
 function TariffRow({
   label,
   hint,
-  value,
+  usd,
+  ars,
+  moneda,
   disabled,
-  onChange,
+  onUsd,
+  onArs,
+  onMoneda,
   onRemove,
 }: {
   label: string;
   hint?: string;
-  value: string;
+  usd: string;
+  ars: string;
+  moneda: MonedaConceptoTarifa;
   disabled: boolean;
-  onChange: (value: string) => void;
+  onUsd: (value: string) => void;
+  onArs: (value: string) => void;
+  onMoneda: (moneda: MonedaConceptoTarifa) => void;
   onRemove?: () => void;
 }) {
   const inputId = `tarifa-${label.replace(/\s+/g, "-").toLowerCase()}`;
 
   return (
-    <div className={`${TARIFF_GRID} items-center px-4 py-3`}>
-      <div className="min-w-0">
-        <label htmlFor={inputId} className="block text-sm font-medium text-text-primary">
-          {label}
-        </label>
-        {hint ? <p className="mt-0.5 text-xs leading-snug text-text-secondary">{hint}</p> : null}
+    <div className={`${TARIFF_GRID} items-center px-4 py-2.5`}>
+      <div className="flex min-w-0 items-center gap-1">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-text-primary">{label}</p>
+          {hint ? <p className="mt-0.5 text-xs leading-snug text-text-secondary">{hint}</p> : null}
+        </div>
+        {onRemove ? (
+          <button
+            type="button"
+            aria-label={`Quitar ${label}`}
+            onClick={onRemove}
+            disabled={disabled}
+            className={`ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-sm text-text-secondary transition-transform duration-150 ease-out hover:bg-danger-bg hover:text-danger active:scale-[0.97] disabled:opacity-60 ${interactiveFocusClass}`}
+          >
+            <Trash2 className="h-4 w-4" aria-hidden />
+          </button>
+        ) : null}
       </div>
-      <AmountField id={inputId} label={label} value={value} disabled={disabled} onChange={onChange} />
-      {onRemove ? (
-        <button
-          type="button"
-          aria-label={`Quitar ${label}`}
-          onClick={onRemove}
-          disabled={disabled}
-          className={`flex h-9 w-9 items-center justify-center rounded-sm text-text-secondary hover:bg-danger-bg hover:text-danger disabled:opacity-60 ${interactiveFocusClass}`}
-        >
-          <Trash2 className="h-4 w-4" aria-hidden />
-        </button>
-      ) : (
-        <span className="h-9 w-9" aria-hidden />
-      )}
+      <MonedaSwitch
+        label={`Moneda que se cobra de ${label}`}
+        value={moneda}
+        disabled={disabled}
+        onChange={onMoneda}
+      />
+      <AmountField
+        id={inputId}
+        label={label}
+        value={usd}
+        moneda="usd"
+        charged={moneda === "usd"}
+        disabled={disabled}
+        onChange={onUsd}
+      />
+      <AmountField
+        id={`${inputId}-ars`}
+        label={label}
+        value={ars}
+        moneda="ars"
+        charged={moneda === "ars"}
+        disabled={disabled}
+        onChange={onArs}
+      />
     </div>
   );
 }
@@ -434,12 +628,16 @@ function AddRow({ label, disabled, onClick }: { label: string; disabled: boolean
 function NuevoPrecio({
   categoria,
   nombre,
-  monto,
+  montoUsd,
+  montoArs,
+  moneda,
   alcance,
   destino,
   disabled,
   onNombre,
-  onMonto,
+  onMontoUsd,
+  onMontoArs,
+  onMoneda,
   onAlcance,
   onDestino,
   onConfirm,
@@ -447,12 +645,16 @@ function NuevoPrecio({
 }: {
   categoria: CategoriaConceptoTarifa;
   nombre: string;
-  monto: string;
+  montoUsd: string;
+  montoArs: string;
+  moneda: MonedaConceptoTarifa;
   alcance: AlcanceConceptoTarifa;
   destino: DestinoConceptoTarifa;
   disabled: boolean;
   onNombre: (value: string) => void;
-  onMonto: (value: string) => void;
+  onMontoUsd: (value: string) => void;
+  onMontoArs: (value: string) => void;
+  onMoneda: (value: MonedaConceptoTarifa) => void;
   onAlcance: (value: AlcanceConceptoTarifa) => void;
   onDestino: (value: DestinoConceptoTarifa) => void;
   onConfirm: () => void;
@@ -474,8 +676,25 @@ function NuevoPrecio({
             className={`h-9 w-full rounded-sm border border-border bg-bg-card px-2.5 text-sm text-text-primary focus:border-primary disabled:opacity-60 ${interactiveFocusClass}`}
           />
         </label>
-        <AmountField id="nuevo-precio-monto" label="Importe" value={monto} disabled={disabled} onChange={onMonto} />
-        <span className="h-9 w-9" aria-hidden />
+        <MonedaSwitch label="Moneda que se cobra" value={moneda} disabled={disabled} onChange={onMoneda} />
+        <AmountField
+          id="nuevo-precio-usd"
+          label="Importe"
+          value={montoUsd}
+          moneda="usd"
+          charged={moneda === "usd"}
+          disabled={disabled}
+          onChange={onMontoUsd}
+        />
+        <AmountField
+          id="nuevo-precio-ars"
+          label="Importe"
+          value={montoArs}
+          moneda="ars"
+          charged={moneda === "ars"}
+          disabled={disabled}
+          onChange={onMontoArs}
+        />
       </div>
 
       {categoria === "otro" ? (
@@ -539,8 +758,27 @@ function NuevoPrecio({
 function ChoiceRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="w-16 text-[11px] font-semibold uppercase tracking-wide text-text-secondary">{label}</span>
-      {children}
+      <span className="w-16 text-xs text-text-secondary">{label}</span>
+      <span className="inline-flex h-9 rounded-sm bg-bg-card p-0.5">{children}</span>
+    </div>
+  );
+}
+
+function MonedaSwitch({
+  label,
+  value,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  value: MonedaConceptoTarifa;
+  disabled: boolean;
+  onChange: (value: MonedaConceptoTarifa) => void;
+}) {
+  return (
+    <div role="group" aria-label={label} className="flex h-9 rounded-sm border border-border bg-bg-card p-0.5">
+      <Choice label="USD" selected={value === "usd"} disabled={disabled} onClick={() => onChange("usd")} />
+      <Choice label="ARS" selected={value === "ars"} disabled={disabled} onClick={() => onChange("ars")} />
     </div>
   );
 }
@@ -562,10 +800,8 @@ function Choice({
       aria-pressed={selected}
       disabled={disabled}
       onClick={onClick}
-      className={`h-8 rounded-sm border px-2.5 text-xs font-semibold disabled:opacity-40 ${
-        selected
-          ? "border-primary bg-primary-soft text-primary"
-          : "border-border bg-bg-card text-text-secondary"
+      className={`h-8 min-w-0 flex-1 rounded-sm px-2 text-xs font-semibold transition-transform duration-150 ease-out active:scale-[0.97] disabled:opacity-40 ${
+        selected ? "bg-primary-soft text-primary" : "text-text-secondary"
       } ${interactiveFocusClass}`}
     >
       {label}
@@ -577,33 +813,35 @@ function AmountField({
   id,
   label,
   value,
+  moneda = "usd",
+  charged = false,
   disabled,
   onChange,
 }: {
   id: string;
   label: string;
   value: string;
+  moneda?: MonedaConceptoTarifa;
+  charged?: boolean;
   disabled: boolean;
   onChange: (value: string) => void;
 }) {
+  const enPesos = moneda === "ars";
   return (
-    <div className="relative">
-      <span className="pointer-events-none absolute inset-y-0 left-2.5 flex items-center text-[11px] font-medium text-text-secondary">
-        USD
-      </span>
-      <input
-        id={id}
-        type="number"
-        min={0}
-        max={9999}
-        step={1}
-        inputMode="numeric"
-        value={value}
-        disabled={disabled}
-        aria-label={`${label} en dólares`}
-        onChange={(event) => onChange(event.target.value)}
-        className={`h-9 w-full rounded-sm border border-border bg-bg-card pr-2.5 pl-10 text-right text-sm font-medium tabular-nums text-text-primary focus:border-primary disabled:opacity-60 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${interactiveFocusClass}`}
-      />
-    </div>
+    <input
+      id={id}
+      type="number"
+      min={0}
+      max={enPesos ? PRECIO_ARS_MAX : PRECIO_USD_MAX}
+      step={1}
+      inputMode="numeric"
+      value={value}
+      disabled={disabled}
+      aria-label={`${label} en ${enPesos ? "pesos" : "dólares"}`}
+      onChange={(event) => onChange(event.target.value)}
+      className={`h-9 w-full rounded-sm border bg-bg-card px-2.5 text-right text-sm tabular-nums text-text-primary transition-[border-color] duration-150 ease-out focus:border-primary disabled:opacity-60 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
+        charged ? "border-primary font-medium" : "border-border"
+      } ${interactiveFocusClass}`}
+    />
   );
 }

@@ -36,6 +36,10 @@ export function formatUsd(amount: number): string {
   return `${amount.toLocaleString("es-AR")} USD`;
 }
 
+export function formatArs(amount: number): string {
+  return `${amount.toLocaleString("es-AR")} ARS`;
+}
+
 export function canEditVisas(roles: string[] | undefined): boolean {
   return Boolean(roles?.some((role) => role === "admin" || role === "staff"));
 }
