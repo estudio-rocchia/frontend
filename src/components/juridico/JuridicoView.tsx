@@ -566,7 +566,13 @@ function ExpedienteCard({ item }: { item: ExpedienteListItem }) {
         <span className="shrink-0 tabular-nums">{formatDateDisplay(item.abiertoEn)}</span>
       </div>
       <span
-        className={`text-xs ${relativo?.tone === "overdue" ? "font-semibold text-danger" : "text-text-secondary"}`}
+        className={`text-xs ${
+          relativo?.tone === "overdue"
+            ? "font-semibold text-danger"
+            : relativo?.tone === "today" || relativo?.tone === "soon"
+              ? "font-semibold text-warning"
+              : "text-text-secondary"
+        }`}
       >
         {relativo ? relativo.text : "Sin plazos"}
       </span>
@@ -587,7 +593,15 @@ function PlazoCell({
   return (
     <div className="flex flex-col gap-0.5">
       <span className="text-[13px] font-medium text-text-primary">{formatDateDisplay(item.proximoPlazo)}</span>
-      <span className={`text-[11px] ${relativo.tone === "overdue" ? "font-semibold text-danger" : "text-text-secondary"}`}>
+      <span
+        className={`text-[11px] ${
+          relativo.tone === "overdue"
+            ? "font-semibold text-danger"
+            : relativo.tone === "today" || relativo.tone === "soon"
+              ? "font-semibold text-warning"
+              : "text-text-secondary"
+        }`}
+      >
         {relativo.text}
         {item.plazosPendientes > 1 ? ` · ${item.plazosPendientes} plazos` : ""}
       </span>

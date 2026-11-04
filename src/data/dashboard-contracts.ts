@@ -2,7 +2,7 @@ export type DashboardAlertTier = "urgente" | "proximo" | "admin";
 
 export type DashboardAlertRow = {
   id: string;
-  modulo: "alquiler" | "venta" | "calendario";
+  modulo: "alquiler" | "venta" | "calendario" | "juridico";
   moduloLabel: string;
   href: string;
   property: string;

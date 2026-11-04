@@ -15,7 +15,9 @@ const PRIORITY = {
   ventaSinFinanciacion: 31,
   ventaCobroSinRecibo: 32,
   citaUrgente: 14,
+  plazoVencido: 15,
   citaProxima: 22,
+  plazoProximo: 23,
   alquilerRenovacion: 40,
 } as const;
 
@@ -278,6 +280,33 @@ export function mapDashboardAlerts(resumen: DashboardResumen): DashboardAlertRow
       status: { label: "Renovación", variant: "warning" },
       action: "Revisar contrato",
       priority: PRIORITY.alquilerRenovacion,
+    });
+  }
+
+  for (const item of resumen.plazosAviso ?? []) {
+    const vencido = item.diasHasta < 0;
+    const cuando = vencido
+      ? `venció hace ${Math.abs(item.diasHasta)} día${Math.abs(item.diasHasta) === 1 ? "" : "s"}`
+      : item.diasHasta === 0
+        ? "vence hoy"
+        : item.diasHasta === 1
+          ? "vence mañana"
+          : `vence en ${item.diasHasta} días`;
+    rows.push({
+      id: `juridico-plazo-${item.plazoId}`,
+      modulo: "juridico",
+      moduloLabel: "Jurídico",
+      href: `/juridico/${item.expedienteId}`,
+      property: item.titulo,
+      party: item.personaNombre,
+      amount: formatDateDisplay(item.venceEn),
+      dueDate: `${item.descripcion} · ${cuando}`,
+      status: {
+        label: vencido ? "Plazo vencido" : item.diasHasta === 0 ? "Vence hoy" : "Plazo próximo",
+        variant: vencido || item.diasHasta === 0 ? "danger" : "warning",
+      },
+      action: "Ver expediente",
+      priority: vencido || item.diasHasta === 0 ? PRIORITY.plazoVencido : PRIORITY.plazoProximo,
     });
   }
 

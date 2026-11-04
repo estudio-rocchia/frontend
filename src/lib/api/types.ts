@@ -747,6 +747,7 @@ export interface DashboardResumen {
     ajustePendiente: { count: number };
     renovacionProxima: { count: number };
     citasProximas: { count: number };
+    plazosAviso?: { count: number };
   };
   cobrarEsteMes: Array<{
     contratoId: number;
@@ -801,6 +802,15 @@ export interface DashboardResumen {
     inmuebleTitle: string | null;
     personaNombre: string | null;
     asignadoUsername: string | null;
+  }>;
+  plazosAviso?: Array<{
+    plazoId: number;
+    expedienteId: number;
+    descripcion: string;
+    venceEn: string;
+    diasHasta: number;
+    titulo: string;
+    personaNombre: string;
   }>;
   ventas: {
     tarjetas: {

@@ -12,7 +12,7 @@ import type { DashboardAlertRow, DashboardAlertTier } from "@/data/dashboard-con
 import { countAlertsByTier } from "@/lib/mappers/dashboard";
 import { kpiTone } from "@/lib/ui/kpi-tones";
 
-type AlertFilter = "todos" | "urgente" | "proximo" | "admin" | "alquiler" | "venta" | "calendario";
+type AlertFilter = "todos" | "urgente" | "proximo" | "admin" | "alquiler" | "venta" | "calendario" | "juridico";
 
 const tierFilters: {
   tier: DashboardAlertTier;
@@ -30,11 +30,12 @@ const moduleFilters: { id: AlertFilter; label: string }[] = [
   { id: "alquiler", label: "Alquileres" },
   { id: "venta", label: "Ventas" },
   { id: "calendario", label: "Calendario" },
+  { id: "juridico", label: "Jurídico" },
 ];
 
 function filterAlerts(rows: DashboardAlertRow[], filter: AlertFilter): DashboardAlertRow[] {
   if (filter === "todos") return rows;
-  if (filter === "alquiler" || filter === "venta" || filter === "calendario") {
+  if (filter === "alquiler" || filter === "venta" || filter === "calendario" || filter === "juridico") {
     return rows.filter((row) => row.modulo === filter);
   }
   return rows.filter((row) => row.tier === filter);
@@ -46,7 +47,7 @@ function countFor(
   totals: ReturnType<typeof countAlertsByTier>,
 ): number {
   if (id === "todos") return rows.length;
-  if (id === "alquiler" || id === "venta" || id === "calendario") {
+  if (id === "alquiler" || id === "venta" || id === "calendario" || id === "juridico") {
     return rows.filter((row) => row.modulo === id).length;
   }
   return totals[id];
