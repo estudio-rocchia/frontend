@@ -66,7 +66,7 @@ export function ClienteVisasTab({
         {canEdit ? (
           <ButtonPrimary onClick={() => setCreateOpen(true)} className="px-3 py-2 text-[13px]">
             <Plus className="mr-1.5 h-4 w-4" aria-hidden />
-            Nuevo trámite
+            Crear trámite
           </ButtonPrimary>
         ) : null}
       </div>

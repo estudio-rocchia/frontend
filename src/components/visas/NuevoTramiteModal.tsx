@@ -77,7 +77,7 @@ export function NuevoTramiteModal({
     }
   }
 
-  const title = grupoId ? "Agregar integrante" : "Nuevo trámite";
+  const title = grupoId ? "Agregar integrante" : "Crear trámite";
   const subtitle = grupoId
     ? "La cotización del grupo se recalcula con la cantidad de personas."
     : "Un trámite por persona. Si viajan juntos, sumalos al mismo grupo.";

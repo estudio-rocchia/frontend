@@ -114,20 +114,6 @@ export function VisasView() {
             <EnlacesOficiales compact />
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {canEdit ? (
-            <ButtonPrimary onClick={() => setCreateOpen(true)}>
-              <Plus className="mr-1.5 h-4 w-4" aria-hidden />
-              Nuevo trámite
-            </ButtonPrimary>
-          ) : null}
-          {canEdit ? (
-            <ButtonOutline onClick={() => setPreciosOpen(true)}>
-              <CircleDollarSign className="mr-1.5 h-4 w-4" aria-hidden />
-              Actualizar precios
-            </ButtonOutline>
-          ) : null}
-        </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -203,6 +189,18 @@ export function VisasView() {
             ))}
           </select>
         </label>
+        {canEdit ? (
+          <div className="flex flex-wrap gap-2 lg:ml-auto">
+            <ButtonOutline onClick={() => setPreciosOpen(true)}>
+              <CircleDollarSign className="mr-1.5 h-4 w-4" aria-hidden />
+              Actualizar precios
+            </ButtonOutline>
+            <ButtonPrimary onClick={() => setCreateOpen(true)}>
+              <Plus className="mr-1.5 h-4 w-4" aria-hidden />
+              Crear trámite
+            </ButtonPrimary>
+          </div>
+        ) : null}
       </div>
 
       {error ? <p className="text-sm text-danger">{error}</p> : null}
@@ -220,7 +218,7 @@ export function VisasView() {
           {canEdit && !estado && !debouncedSearch.trim() ? (
             <ButtonPrimary onClick={() => setCreateOpen(true)}>
               <Plus className="mr-1.5 h-4 w-4" aria-hidden />
-              Nuevo trámite
+              Crear trámite
             </ButtonPrimary>
           ) : null}
         </div>
