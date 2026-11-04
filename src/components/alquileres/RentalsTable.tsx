@@ -101,7 +101,7 @@ function RowActions({
 
 const cellPad = "px-4";
 const headCell = `h-10 border-b border-border bg-bg-cream ${cellPad} text-[12px] font-medium text-text-primary`;
-const bodyCell = `min-h-[52px] border-b border-border py-3 ${cellPad}`;
+const bodyCell = `min-h-[52px] border-b border-border bg-bg-card py-3 ${cellPad} transition-colors duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:bg-bg-cream motion-reduce:transition-none`;
 
 function RentalMobileCard({
   row,
@@ -490,10 +490,10 @@ export function RentalsTable({
                       key={row.id}
                       tabIndex={0}
                       aria-label={`Abrir ficha de ${row.contractProperty}`}
-                      initial={stagger ? { opacity: 0, y: 8 } : false}
-                      animate={{ opacity: 1, y: 0 }}
+                      initial={stagger ? { opacity: 0 } : false}
+                      animate={{ opacity: 1 }}
                       transition={{ duration: 0.15, delay: stagger ? Math.min(index, 8) * 0.03 : 0, ease: riseEase }}
-                      className={`group dashboard-row cursor-pointer border-b border-border align-middle hover:bg-bg-cream ${interactiveFocusClass}`}
+                      className={`group cursor-pointer align-middle ${interactiveFocusClass}`}
                       onMouseEnter={() => onPrefetch?.(row)}
                       onClick={() => onViewFicha(row)}
                       onKeyDown={(event) => {
@@ -503,7 +503,7 @@ export function RentalsTable({
                         onViewFicha(row);
                       }}
                     >
-                      <td className={`sticky left-0 z-10 bg-bg-card text-left group-hover:bg-bg-cream ${bodyCell}`}>
+                      <td className={`sticky left-0 z-10 text-left ${bodyCell}`}>
                         <PropertyCell label={row.contractProperty} />
                       </td>
                       <td className={`text-left text-text-primary ${bodyCell}`}>{row.tenant}</td>
