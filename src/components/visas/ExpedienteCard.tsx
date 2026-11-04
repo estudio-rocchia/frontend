@@ -10,7 +10,23 @@ import { formInputClass, interactiveFocusClass } from "@/lib/ui/interactive-focu
 const DS160_PATTERN = /^[A-Za-z0-9]{6,20}$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const DATETIME_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
 const NOTAS_MAX = 4000;
+const ESTADOS_CON_TURNO = new Set<EstadoTramiteVisa>([
+  "arancel_pagado",
+  "turno_asignado",
+  "entrevista",
+  "aprobado",
+  "rechazado",
+  "procesamiento_administrativo",
+]);
+
+function toDateTimeLocal(value: string): string {
+  if (!value) return "";
+  if (DATETIME_PATTERN.test(value)) return value;
+  if (DATE_PATTERN.test(value)) return `${value}T00:00`;
+  return value.slice(0, 16);
+}
 
 function fieldError(id: string, message: string | null) {
   if (!message) return null;
@@ -54,15 +70,17 @@ function decisionMessage(abiertoEn: string, decisionEn: string): string | null {
 
 function beforeOpen(abiertoEn: string, value: string, label: string): string | null {
   if (!value) return null;
-  if (!DATE_PATTERN.test(value)) return "La fecha no es válida.";
-  if (DATE_PATTERN.test(abiertoEn) && value < abiertoEn) return `${label} no puede ser anterior a la apertura.`;
+  if (!DATETIME_PATTERN.test(value)) return "La fecha y el horario no son válidos.";
+  if (DATE_PATTERN.test(abiertoEn) && value.slice(0, 10) < abiertoEn) {
+    return `${label} no puede ser anterior a la apertura.`;
+  }
   return null;
 }
 
 function turnoFechaMessage(abiertoEn: string, turnoEn: string, quien: string): string | null {
-  const fecha = beforeOpen(abiertoEn, turnoEn, "La fecha del turno");
+  const fecha = beforeOpen(abiertoEn, turnoEn, "El turno CAS");
   if (fecha) return fecha;
-  if (!turnoEn && quien) return "Falta la fecha del turno.";
+  if (!turnoEn && quien) return "Falta la fecha y el horario del turno CAS.";
   return null;
 }
 
@@ -72,10 +90,16 @@ function turnoQuienMessage(turnoEn: string, quien: string): string | null {
 }
 
 function entrevistaMessage(abiertoEn: string, turnoEn: string, entrevistaEn: string): string | null {
-  const fecha = beforeOpen(abiertoEn, entrevistaEn, "La fecha de la entrevista");
+  const fecha = beforeOpen(abiertoEn, entrevistaEn, "El turno consulado");
   if (fecha) return fecha;
-  if (entrevistaEn && turnoEn && DATE_PATTERN.test(turnoEn) && entrevistaEn < turnoEn) {
-    return "No puede ser anterior al turno.";
+  if (
+    entrevistaEn &&
+    turnoEn &&
+    DATETIME_PATTERN.test(turnoEn) &&
+    DATETIME_PATTERN.test(entrevistaEn) &&
+    entrevistaEn < turnoEn
+  ) {
+    return "No puede ser anterior al turno CAS.";
   }
   return null;
 }
@@ -166,9 +190,13 @@ export function ExpedienteCard({
   const notasError = notasMessage(notas);
   const abiertoError = abiertoMessage(abiertoEn);
   const decisionError = decisionMessage(abiertoEn, decisionEn);
-  const turnoError = turnoFechaMessage(abiertoEn, turnoEn, turnoAsignadoPor);
-  const quienError = turnoQuienMessage(turnoEn, turnoAsignadoPor);
-  const entrevistaError = entrevistaMessage(abiertoEn, turnoEn, entrevistaEn);
+  const turnoLocal = toDateTimeLocal(turnoEn);
+  const entrevistaLocal = toDateTimeLocal(entrevistaEn);
+  const turnosHabilitados = ESTADOS_CON_TURNO.has(estado);
+  const turnosBloqueados = !canEdit || saving || !turnosHabilitados;
+  const turnoError = turnosHabilitados ? turnoFechaMessage(abiertoEn, turnoLocal, turnoAsignadoPor) : null;
+  const quienError = turnosHabilitados ? turnoQuienMessage(turnoLocal, turnoAsignadoPor) : null;
+  const entrevistaError = turnosHabilitados ? entrevistaMessage(abiertoEn, turnoLocal, entrevistaLocal) : null;
   const valid =
     !ds160Error &&
     !emailError &&
@@ -196,33 +224,44 @@ export function ExpedienteCard({
       <EstadoVisaStepper estado={estado} disabled={!canEdit || saving} onChange={onEstado} />
 
       <div className="flex flex-col gap-4 border-t border-border pt-4">
-        <h3 className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Registro</h3>
+        <h3 className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Turnos</h3>
+        {!turnosHabilitados ? (
+          <p id="turnos-bloqueo" className="text-xs text-text-secondary">
+            Se habilitan cuando marcás Arancel pagado.
+          </p>
+        ) : null}
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-1.5">
             <label htmlFor="fecha-turno" className="text-[11px] font-semibold text-text-secondary">
-              Turno
+              Turno CAS
             </label>
             <input
               id="fecha-turno"
-              type="date"
-              value={turnoEn}
-              disabled={!canEdit || saving}
+              type="datetime-local"
+              value={turnoLocal}
+              disabled={turnosBloqueados}
               aria-invalid={Boolean(turnoError)}
               aria-describedby={
-                turnoError ? "fecha-turno-ayuda" : !turnoEn && !turnoAsignadoPor ? "fecha-turno-vacio" : undefined
+                !turnosHabilitados
+                  ? "turnos-bloqueo"
+                  : turnoError
+                    ? "fecha-turno-ayuda"
+                    : !turnoLocal && !turnoAsignadoPor
+                      ? "fecha-turno-vacio"
+                      : undefined
               }
-              onChange={(event) => onTurnoEn(event.target.value)}
+              onChange={(event) => onTurnoEn(event.target.value.slice(0, 16))}
               className={`${formInputClass} w-full disabled:opacity-60`}
             />
             <label htmlFor="turno-quien" className="sr-only">
-              Quién asignó el turno
+              Quién asignó el turno CAS
             </label>
             <select
               id="turno-quien"
               value={turnoAsignadoPor}
-              disabled={!canEdit || saving}
+              disabled={turnosBloqueados}
               aria-invalid={Boolean(quienError)}
-              aria-describedby={quienError ? "turno-quien-ayuda" : undefined}
+              aria-describedby={quienError ? "turno-quien-ayuda" : !turnosHabilitados ? "turnos-bloqueo" : undefined}
               onChange={(event) => onTurnoAsignadoPor(event.target.value as QuienAsignaTurno | "")}
               className={`${formInputClass} w-full disabled:opacity-60`}
             >
@@ -232,33 +271,32 @@ export function ExpedienteCard({
             </select>
             {fieldError("fecha-turno-ayuda", turnoError)}
             {fieldError("turno-quien-ayuda", quienError)}
-            {!turnoEn && !turnoAsignadoPor ? (
+            {turnosHabilitados && !turnoLocal && !turnoAsignadoPor ? (
               <p id="fecha-turno-vacio" className="text-xs text-text-secondary">
-                Sin turno.
+                Sin turno CAS.
               </p>
             ) : null}
           </div>
 
           <div className="flex flex-col gap-1.5">
             <label htmlFor="fecha-entrevista" className="text-[11px] font-semibold text-text-secondary">
-              Entrevista
+              Turno Consulado
             </label>
             <input
               id="fecha-entrevista"
-              type="date"
-              value={entrevistaEn}
-              disabled={!canEdit || saving}
+              type="datetime-local"
+              value={entrevistaLocal}
+              disabled={turnosBloqueados}
               aria-invalid={Boolean(entrevistaError)}
-              aria-describedby={entrevistaError ? "fecha-entrevista-ayuda" : "fecha-entrevista-quien"}
-              onChange={(event) => onEntrevistaEn(event.target.value)}
+              aria-describedby={
+                !turnosHabilitados ? "turnos-bloqueo" : entrevistaError ? "fecha-entrevista-ayuda" : undefined
+              }
+              onChange={(event) => onEntrevistaEn(event.target.value.slice(0, 16))}
               className={`${formInputClass} w-full disabled:opacity-60`}
             />
-            <p id="fecha-entrevista-quien" className="text-xs text-text-secondary">
-              La hace un oficial consular en la embajada.
-            </p>
             {fieldError("fecha-entrevista-ayuda", entrevistaError)}
-            {!entrevistaEn && !entrevistaError ? (
-              <p className="text-xs text-text-secondary">Sin fecha.</p>
+            {turnosHabilitados && !entrevistaLocal && !entrevistaError ? (
+              <p className="text-xs text-text-secondary">Sin turno consulado.</p>
             ) : null}
           </div>
         </div>

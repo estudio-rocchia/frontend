@@ -3,10 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronRight, CircleDollarSign, FileText, Plus, Search } from "lucide-react";
+import { ChevronRight, CircleDollarSign, Plus, Search } from "lucide-react";
 
 import { EnlacesOficiales } from "@/components/visas/EnlacesOficiales";
-import { PlantillaVisaModal } from "@/components/visas/PlantillaVisaModal";
 import { NuevoTramiteModal } from "@/components/visas/NuevoTramiteModal";
 import { PreciosVisaModal } from "@/components/visas/PreciosVisaModal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
@@ -62,7 +61,6 @@ export function VisasView() {
   const [error, setError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [preciosOpen, setPreciosOpen] = useState(false);
-  const [plantillaOpen, setPlantillaOpen] = useState(false);
   const canEdit = canEditVisas(user?.roles);
 
   useEffect(() => {
@@ -123,10 +121,6 @@ export function VisasView() {
               Nuevo trámite
             </ButtonPrimary>
           ) : null}
-          <ButtonOutline onClick={() => setPlantillaOpen(true)}>
-            <FileText className="mr-1.5 h-4 w-4" aria-hidden />
-            Subir formulario
-          </ButtonOutline>
           {canEdit ? (
             <ButtonOutline onClick={() => setPreciosOpen(true)}>
               <CircleDollarSign className="mr-1.5 h-4 w-4" aria-hidden />
@@ -310,15 +304,6 @@ export function VisasView() {
         </table>
       </div>
       )}
-
-      {token ? (
-        <PlantillaVisaModal
-          open={plantillaOpen}
-          token={token}
-          canEdit={canEdit}
-          onClose={() => setPlantillaOpen(false)}
-        />
-      ) : null}
 
       {token && canEdit ? (
         <PreciosVisaModal
