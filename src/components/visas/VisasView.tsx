@@ -1,22 +1,23 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronRight, CircleDollarSign, Plus, Search } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronsUpDown, ChevronUp, CircleDollarSign, Plus, Search } from "lucide-react";
 
 import { EnlacesOficiales } from "@/components/visas/EnlacesOficiales";
 import { NuevoTramiteModal } from "@/components/visas/NuevoTramiteModal";
 import { PreciosVisaModal } from "@/components/visas/PreciosVisaModal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { KpiCard } from "@/components/ui/KpiCard";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useAuth } from "@/context/auth-context";
 import { ApiError, fetchVisas, fetchVisasResumen } from "@/lib/api";
 import type { EstadoTramiteVisa, TramiteVisaListItem, VisasResumen } from "@/lib/api/types";
-import { formatDateDisplay, personaDisplayName } from "@/lib/format";
+import { formatDateDisplay, moneyClassName, personaDisplayName } from "@/lib/format";
 import { pagePaddingClass } from "@/lib/layout";
-import { formInputClass } from "@/lib/ui/interactive-focus";
+import { formInputClass, interactiveFocusClass } from "@/lib/ui/interactive-focus";
 import {
   canEditVisas,
   ESTADO_VISA_LABEL,
@@ -24,6 +25,34 @@ import {
   estadoVisaVariant,
   formatUsd,
 } from "@/lib/visas/labels";
+
+const PAGE_SIZE = 15;
+const cellPad = "px-4";
+const headCell = `h-12 border-b border-border bg-bg-cream ${cellPad} text-[12px] font-medium text-text-primary`;
+const bodyCell = `border-b border-border bg-bg-card py-3 ${cellPad} align-middle transition-colors duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:bg-bg-cream motion-reduce:transition-none`;
+
+type VisaSortKey = "solicitantes" | "total" | "abierto";
+
+function visaMembers(item: TramiteVisaListItem) {
+  if (item.miembros.length > 0) return item.miembros;
+  return [{
+    id: item.id,
+    personaId: item.personaId,
+    estado: item.estado,
+    arancelPagadoEn: null,
+    persona: item.persona,
+  }];
+}
+
+function solicitantesSortKey(item: TramiteVisaListItem): string {
+  return visaMembers(item).map((miembro) => personaDisplayName(miembro.persona)).join(" ");
+}
+
+function estadosDeFila(item: TramiteVisaListItem): EstadoTramiteVisa[] {
+  const miembros = visaMembers(item);
+  const estados = miembros.map((miembro) => miembro.estado);
+  return new Set(estados).size === 1 ? [estados[0]!] : estados;
+}
 
 function emptyResumen(anio: number | null): VisasResumen {
   return {
@@ -47,6 +76,86 @@ function emptyResumen(anio: number | null): VisasResumen {
   };
 }
 
+function SortableHeader({
+  label,
+  align,
+  active,
+  dir,
+  onClick,
+  className = "",
+}: {
+  label: string;
+  align: "left" | "right";
+  active: boolean;
+  dir: "asc" | "desc";
+  onClick: () => void;
+  className?: string;
+}) {
+  const Icon = !active ? ChevronsUpDown : dir === "asc" ? ChevronUp : ChevronDown;
+  return (
+    <th className={`${align === "right" ? "text-right" : "text-left"} ${headCell} ${className}`}>
+      <button
+        type="button"
+        onClick={onClick}
+        className={`inline-flex items-center gap-1 ${align === "right" ? "ml-auto" : ""} ${interactiveFocusClass}`}
+        aria-sort={active ? (dir === "asc" ? "ascending" : "descending") : "none"}
+      >
+        {label}
+        <Icon className={`h-3.5 w-3.5 ${active ? "text-text-primary" : "text-text-secondary/70"}`} aria-hidden />
+      </button>
+    </th>
+  );
+}
+
+function VisaMobileCard({ item, onOpen }: { item: TramiteVisaListItem; onOpen: () => void }) {
+  const miembros = visaMembers(item);
+  return (
+    <article className="flex flex-col gap-3 border-t border-border px-4 py-4 first:border-t-0">
+      <button
+        type="button"
+        onClick={onOpen}
+        className={`flex items-start justify-between gap-3 text-left ${interactiveFocusClass}`}
+      >
+        <span className="flex min-w-0 flex-col gap-2">
+          {miembros.map((miembro) => (
+            <span key={miembro.id} className="flex flex-wrap items-center gap-2">
+              <span className="font-medium text-text-primary">{personaDisplayName(miembro.persona)}</span>
+              <StatusBadge label={ESTADO_VISA_LABEL[miembro.estado]} variant={estadoVisaVariant(miembro.estado)} />
+            </span>
+          ))}
+        </span>
+        <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-text-secondary" aria-hidden />
+      </button>
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-[13px]">
+        <div>
+          <dt className="text-[12px] text-text-secondary">DS-160</dt>
+          <dd className="mt-0.5 font-mono text-text-primary">{item.numeroDs160 ?? "—"}</dd>
+        </div>
+        <div className="text-right">
+          <dt className="text-[12px] text-text-secondary">Total</dt>
+          <dd className={`mt-0.5 font-medium text-text-primary ${moneyClassName}`}>
+            {formatUsd(item.cotizacion.totalUsd)}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-[12px] text-text-secondary">
+            {miembros.length === 1 ? "Documento" : "Grupo"}
+          </dt>
+          <dd className="mt-0.5 text-text-secondary">
+            {miembros.length === 1
+              ? (miembros[0]?.persona.numeroDocumento ?? "Sin documento")
+              : `${miembros.length} personas`}
+          </dd>
+        </div>
+        <div className="text-right">
+          <dt className="text-[12px] text-text-secondary">Abierto</dt>
+          <dd className="mt-0.5 tabular-nums text-text-primary">{formatDateDisplay(item.abiertoEn)}</dd>
+        </div>
+      </dl>
+    </article>
+  );
+}
+
 export function VisasView() {
   const router = useRouter();
   const { token, user, logout } = useAuth();
@@ -61,6 +170,11 @@ export function VisasView() {
   const [error, setError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [preciosOpen, setPreciosOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const [sort, setSort] = useState<{ key: VisaSortKey; dir: "asc" | "desc" }>({
+    key: "abierto",
+    dir: "desc",
+  });
   const canEdit = canEditVisas(user?.roles);
 
   useEffect(() => {
@@ -102,6 +216,37 @@ export function VisasView() {
     }, 0);
     return () => window.clearTimeout(handle);
   }, [load]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [anio, estado, debouncedSearch, sort.key, sort.dir]);
+
+  const sortedItems = useMemo(() => {
+    const direction = sort.dir === "asc" ? 1 : -1;
+    return [...items].sort((left, right) => {
+      if (sort.key === "total") {
+        return (left.cotizacion.totalUsd - right.cotizacion.totalUsd) * direction;
+      }
+      if (sort.key === "abierto") {
+        return left.abiertoEn.localeCompare(right.abiertoEn) * direction;
+      }
+      return solicitantesSortKey(left).localeCompare(solicitantesSortKey(right), "es") * direction;
+    });
+  }, [items, sort]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedItems.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const rangeStart = sortedItems.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+  const rangeEnd = Math.min(currentPage * PAGE_SIZE, sortedItems.length);
+  const paginated = sortedItems.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  function toggleSort(key: VisaSortKey) {
+    setSort((current) =>
+      current.key === key
+        ? { key, dir: current.dir === "asc" ? "desc" : "asc" }
+        : { key, dir: key === "solicitantes" ? "asc" : "desc" },
+    );
+  }
 
   const years = [currentYear + 1, currentYear, currentYear - 1, currentYear - 2];
 
@@ -223,84 +368,159 @@ export function VisasView() {
           ) : null}
         </div>
       ) : (
-      <div className="overflow-x-auto rounded-md border border-border bg-bg-card shadow-[var(--shadow-card)]">
-        <table className="w-full min-w-[760px] border-collapse text-left">
-          <thead>
-            <tr className="bg-bg-cream">
-              {["Solicitantes", "DS-160", "Total", "Abierto", ""].map((header) => (
-                <th key={header || "abrir"} className="h-11 px-5 text-xs font-semibold text-text-secondary">
-                  {header}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              Array.from({ length: 5 }).map((_, index) => (
-                <tr key={index} className="border-t border-border">
-                  {Array.from({ length: 5 }).map((__, cell) => (
-                    <td key={cell} className="h-[60px] px-5">
-                      <div className="h-4 animate-pulse rounded-sm bg-border/70" />
-                    </td>
-                  ))}
-                </tr>
+      <section className="overflow-hidden rounded-md border border-border bg-bg-card shadow-[var(--shadow-card)]">
+        <div className="border-b border-border md:hidden">
+          {loading
+            ? Array.from({ length: 4 }).map((_, index) => (
+                <div key={index} className="flex flex-col gap-2 border-t border-border px-4 py-4 first:border-t-0">
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-4 w-32" />
+                </div>
               ))
-            ) : (
-              items.map((item) => {
-                const miembros = item.miembros.length > 0
-                  ? item.miembros
-                  : [{ id: item.id, personaId: item.personaId, estado: item.estado, persona: item.persona }];
-                return (
-                <tr
-                  key={item.id}
-                  className="cursor-pointer border-t border-border transition-colors hover:bg-bg-page"
-                  onClick={() => router.push(`/visas/${item.id}`)}
-                >
-                  <td className="h-16 px-5">
-                    <div className="flex items-center gap-x-3 overflow-x-auto">
-                      {miembros.map((miembro, index) => (
-                        <span key={miembro.id} className="inline-flex shrink-0 items-center gap-2">
-                          {index > 0 ? <span className="text-text-secondary" aria-hidden>·</span> : null}
-                          <Link
-                            href={`/visas/${miembro.id}`}
-                            onClick={(event) => event.stopPropagation()}
-                            className="max-w-[14rem] truncate text-sm font-semibold text-text-primary hover:underline"
-                          >
-                            {personaDisplayName(miembro.persona)}
-                          </Link>
-                          <StatusBadge
-                            label={ESTADO_VISA_LABEL[miembro.estado]}
-                            variant={estadoVisaVariant(miembro.estado)}
-                          />
-                        </span>
+            : paginated.map((item) => (
+                <VisaMobileCard key={item.id} item={item} onOpen={() => router.push(`/visas/${item.id}`)} />
+              ))}
+        </div>
+
+        <div className="hidden overflow-x-auto md:block">
+          <table className="w-full min-w-[880px] border-separate border-spacing-0 text-left text-[13px]">
+            <thead>
+              <tr>
+                <SortableHeader
+                  label="Solicitantes"
+                  align="left"
+                  active={sort.key === "solicitantes"}
+                  dir={sort.dir}
+                  onClick={() => toggleSort("solicitantes")}
+                  className="sticky left-0 z-20"
+                />
+                <th className={`text-center ${headCell}`}>Estado</th>
+                <th className={`text-left ${headCell}`}>DS-160</th>
+                <SortableHeader
+                  label="Total"
+                  align="right"
+                  active={sort.key === "total"}
+                  dir={sort.dir}
+                  onClick={() => toggleSort("total")}
+                />
+                <SortableHeader
+                  label="Abierto"
+                  align="right"
+                  active={sort.key === "abierto"}
+                  dir={sort.dir}
+                  onClick={() => toggleSort("abierto")}
+                />
+                <th className={`text-center ${headCell}`}>
+                  <span className="sr-only">Abrir</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading
+                ? Array.from({ length: 6 }).map((_, index) => (
+                    <tr key={index}>
+                      {Array.from({ length: 6 }).map((__, cell) => (
+                        <td key={cell} className={bodyCell}>
+                          <Skeleton className="h-4 w-full max-w-[120px]" />
+                        </td>
                       ))}
-                    </div>
-                    <span className="mt-0.5 block truncate text-xs text-text-secondary">
-                      {miembros.length === 1
-                        ? (miembros[0]?.persona.numeroDocumento ?? "Sin documento")
-                        : `${miembros.length} personas`}
-                    </span>
-                  </td>
-                  <td className="px-5 font-mono text-sm text-text-secondary">{item.numeroDs160 ?? "—"}</td>
-                  <td className="px-5">
-                    <span className="block text-sm font-semibold tabular-nums text-text-primary">
-                      {formatUsd(item.cotizacion.totalUsd)}
-                    </span>
-                    <span className="block text-xs tabular-nums text-text-secondary">
-                      Estudio {formatUsd(item.cotizacion.totalEstudioUsd)}
-                    </span>
-                  </td>
-                  <td className="px-5 text-sm text-text-secondary">{formatDateDisplay(item.abiertoEn)}</td>
-                  <td className="px-5 text-text-secondary">
-                    <ChevronRight className="h-4 w-4" aria-hidden />
-                  </td>
-                </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+                    </tr>
+                  ))
+                : paginated.map((item) => {
+                    const miembros = visaMembers(item);
+                    const estados = estadosDeFila(item);
+                    return (
+                      <tr
+                        key={item.id}
+                        tabIndex={0}
+                        aria-label={`Abrir trámite de ${solicitantesSortKey(item)}`}
+                        className={`group cursor-pointer ${interactiveFocusClass}`}
+                        onClick={() => router.push(`/visas/${item.id}`)}
+                        onKeyDown={(event) => {
+                          if (event.target !== event.currentTarget) return;
+                          if (event.key !== "Enter" && event.key !== " ") return;
+                          event.preventDefault();
+                          router.push(`/visas/${item.id}`);
+                        }}
+                      >
+                        <td className={`sticky left-0 z-10 text-left ${bodyCell}`}>
+                          <div className="flex min-w-[180px] flex-col gap-1">
+                            {miembros.map((miembro) => (
+                              <Link
+                                key={miembro.id}
+                                href={`/visas/${miembro.id}`}
+                                onClick={(event) => event.stopPropagation()}
+                                className="max-w-[16rem] truncate font-medium text-text-primary hover:underline"
+                              >
+                                {personaDisplayName(miembro.persona)}
+                              </Link>
+                            ))}
+                            <span className="text-[12px] text-text-secondary">
+                              {miembros.length === 1
+                                ? (miembros[0]?.persona.numeroDocumento ?? "Sin documento")
+                                : `${miembros.length} personas`}
+                            </span>
+                          </div>
+                        </td>
+                        <td className={`text-center ${bodyCell}`}>
+                          <div className="flex flex-col items-center gap-1">
+                            {estados.map((estadoFila, index) => (
+                              <StatusBadge
+                                key={`${item.id}-${estadoFila}-${index}`}
+                                label={ESTADO_VISA_LABEL[estadoFila]}
+                                variant={estadoVisaVariant(estadoFila)}
+                              />
+                            ))}
+                          </div>
+                        </td>
+                        <td className={`text-left font-mono text-text-secondary ${bodyCell}`}>
+                          {item.numeroDs160 ?? "—"}
+                        </td>
+                        <td className={`text-right ${bodyCell}`}>
+                          <span className={`block text-[14px] font-medium text-text-primary ${moneyClassName}`}>
+                            {formatUsd(item.cotizacion.totalUsd)}
+                          </span>
+                          <span className={`block text-[12px] text-text-secondary ${moneyClassName}`}>
+                            Estudio {formatUsd(item.cotizacion.totalEstudioUsd)}
+                          </span>
+                        </td>
+                        <td className={`whitespace-nowrap text-right tabular-nums text-text-secondary ${bodyCell}`}>
+                          {formatDateDisplay(item.abiertoEn)}
+                        </td>
+                        <td className={`text-center text-text-secondary ${bodyCell}`}>
+                          <ChevronRight className="mx-auto h-4 w-4" aria-hidden />
+                        </td>
+                      </tr>
+                    );
+                  })}
+            </tbody>
+          </table>
+        </div>
+
+        <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">
+          <p className="text-[12px] text-text-secondary">
+            {sortedItems.length === 0
+              ? "0 trámites"
+              : `Mostrando ${rangeStart}–${rangeEnd} de ${sortedItems.length} trámites`}
+          </p>
+          <div className="flex items-center gap-2">
+            <ButtonOutline type="button" disabled={currentPage <= 1 || loading} onClick={() => setPage(currentPage - 1)}>
+              Anterior
+            </ButtonOutline>
+            <span className="min-w-[88px] text-center text-[12px] font-semibold text-text-secondary">
+              Página {currentPage} de {totalPages}
+            </span>
+            <ButtonOutline
+              type="button"
+              disabled={currentPage >= totalPages || loading}
+              onClick={() => setPage(currentPage + 1)}
+            >
+              Siguiente
+            </ButtonOutline>
+          </div>
+        </footer>
+      </section>
       )}
 
       {token && canEdit ? (
