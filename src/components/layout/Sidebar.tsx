@@ -4,13 +4,14 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { memo, useEffect, useState } from "react";
-import { X } from "lucide-react";
+import { LogOut, X } from "lucide-react";
 
 import rocchiaLogo from "@/assets/rocchia-logo.png";
 import { useAuth } from "@/context/auth-context";
-import { isNavActive, navGroups, type NavItem } from "@/config/navigation";
+import { isNavActive, navGroups, userInitials, type NavItem } from "@/config/navigation";
 import { fetchDashboardResumen } from "@/lib/api";
-import { withCache } from "@/lib/api/cache";
+import { invalidateCache, withCache } from "@/lib/api/cache";
+import { subscribeDashboardAlertsInvalidate } from "@/lib/dashboard-alerts-events";
 import { prefetchClientesList } from "@/lib/api/clientes-list";
 import { canManageUsers } from "@/lib/auth/roles";
 
@@ -34,15 +35,27 @@ function useAlquileresMoraCount(token: string | null) {
       return;
     }
     let cancelled = false;
-    withCache(`dashboard-resumen:${token}:30`, () => fetchDashboardResumen(token, 30), { ttlMs: 45_000 })
-      .then((resumen) => {
-        if (!cancelled) setCount(resumen.tarjetas.enMora.count);
-      })
-      .catch(() => {
-        if (!cancelled) setCount(null);
-      });
+    const cacheKey = `dashboard-resumen:${token}:30`;
+
+    function load(force: boolean) {
+      if (force) invalidateCache(cacheKey);
+      const request = force
+        ? fetchDashboardResumen(token!, 30)
+        : withCache(cacheKey, () => fetchDashboardResumen(token!, 30), { ttlMs: 45_000 });
+      void request
+        .then((resumen) => {
+          if (!cancelled) setCount(resumen.tarjetas.enMora.count);
+        })
+        .catch(() => {
+          if (!cancelled && !force) setCount(null);
+        });
+    }
+
+    load(false);
+    const unsubscribe = subscribeDashboardAlertsInvalidate(() => load(true));
     return () => {
       cancelled = true;
+      unsubscribe();
     };
   }, [token]);
 
@@ -129,8 +142,48 @@ const SidebarNav = memo(function SidebarNav({ onNavigate }: { onNavigate?: () =>
   );
 });
 
+const roleLabel: Record<string, string> = {
+  admin: "Admin",
+  staff: "Equipo",
+  readonly: "Lectura",
+};
+
+const SidebarAccount = memo(function SidebarAccount() {
+  const { user, logout } = useAuth();
+  const displayName = user?.username ?? "Usuario";
+  const role = user?.roles[0];
+  const roleName = role ? (roleLabel[role] ?? role) : null;
+
+  return (
+    <div className="mt-4 flex items-center gap-2.5 border-t border-white/10 px-1.5 pt-4">
+      <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/15 text-[11px] font-semibold text-white">
+        <span className="sr-only">{displayName}{roleName ? `, ${roleName}` : ""}</span>
+        <span aria-hidden>{userInitials(displayName)}</span>
+        <span className="absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full bg-[#45B3A6] ring-2 ring-[#107077]" aria-hidden />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[13px] font-medium text-white">{displayName}</span>
+        {roleName ? <span className="block truncate text-[11px] text-white/60">{roleName}</span> : null}
+      </span>
+      <button
+        type="button"
+        onClick={logout}
+        className="rounded-md p-2 text-white/70 transition-all duration-100 ease-out hover:bg-white/10 hover:text-white motion-reduce:transition-none"
+        aria-label="Cerrar sesión"
+      >
+        <LogOut className="h-4 w-4" strokeWidth={1.75} />
+      </button>
+    </div>
+  );
+});
+
 function SidebarFrame({ onNavigate }: { onNavigate?: () => void }) {
-  return <SidebarNav onNavigate={onNavigate} />;
+  return (
+    <>
+      <SidebarNav onNavigate={onNavigate} />
+      <SidebarAccount />
+    </>
+  );
 }
 
 export function Sidebar({
