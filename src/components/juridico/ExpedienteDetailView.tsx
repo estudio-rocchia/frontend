@@ -6,46 +6,37 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { ArrowLeft, CircleCheck, Eye, Plus, RotateCcw, Trash2 } from "lucide-react";
 
 import { FichaSucesionForm } from "@/components/juridico/FichaSucesionForm";
-import {
-  emptyInmuebleAlta,
-  InmuebleAltaFields,
-  isInmuebleAltaValid,
-  type InmuebleAltaValue,
-} from "@/components/inmuebles/InmuebleAltaFields";
-import { EstadoBadge, Field, Notice, OfficialLink, RpiBadge, editSurfaceClass, plazoRelativo, ramaLabel } from "@/components/juridico/juridico-ui";
+import { EstadoBadge, Field, Notice, OfficialLink, RpiBadge, editSurfaceClass, plazoRelativo, ramaLabel, useTimedNotice } from "@/components/juridico/juridico-ui";
 import { ButtonDanger, ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { useAuth } from "@/context/auth-context";
 import {
   ApiError,
+  createHijoExpediente,
   createPlazoExpediente,
-  fetchCatalog,
   createTramiteRpi,
   deleteExpediente,
+  deleteHijoExpediente,
   deletePlazoExpediente,
   fetchExpediente,
-  linkExpedienteInmueble,
   saveFichaSucesion,
-  searchCatalogo,
-  unlinkExpedienteInmueble,
   updateExpediente,
   updatePlazoExpediente,
   updateTramiteRpi,
 } from "@/lib/api";
-import type { CatalogoItem, CatalogSearchItem } from "@/lib/api/types";
-import { altaInmuebleCatalogo } from "@/lib/inmuebles/alta-inmueble";
-import { fetchAllInmuebleCodes } from "@/lib/inmuebles/inmueble-codes";
 import { formatDateDisplay, personaDisplayName } from "@/lib/format";
 import {
   ENLACE_JUSTICIA_CHACO,
   ENLACE_RPI,
   ESTADO_LABEL,
   RPI_LABEL,
+  bienesDeFicha,
   emptyFichaSucesion,
   expedienteTitulo,
   type EstadoExpediente,
   type EstadoTramiteRpi,
   type ExpedienteDetail,
+  type HijoExpediente,
   type FichaSucesion,
   type PlazoExpediente,
 } from "@/lib/juridico/model";
@@ -55,7 +46,7 @@ import { formInputClass, interactiveFocusClass } from "@/lib/ui/interactive-focu
 const estados = Object.keys(ESTADO_LABEL) as EstadoExpediente[];
 const estadosRpi = Object.keys(RPI_LABEL) as EstadoTramiteRpi[];
 
-type ExpedienteTab = "resumen" | "caratula" | "plazos" | "inmuebles" | "registro" | "consulta";
+type ExpedienteTab = "resumen" | "caratula" | "plazos" | "inmuebles" | "hijos" | "registro" | "consulta";
 
 export function ExpedienteDetailView() {
   const router = useRouter();
@@ -67,13 +58,13 @@ export function ExpedienteDetailView() {
   const [tab, setTab] = useState<ExpedienteTab>("resumen");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useTimedNotice();
   const [saving, setSaving] = useState(false);
   const [confirmarBaja, setConfirmarBaja] = useState(false);
   const [plazoDescripcion, setPlazoDescripcion] = useState("");
   const [plazoFecha, setPlazoFecha] = useState("");
-  const [inmuebleQuery, setInmuebleQuery] = useState("");
-  const [inmuebles, setInmuebles] = useState<CatalogSearchItem[]>([]);
+  const [hijoNombre, setHijoNombre] = useState("");
+  const [hijoDni, setHijoDni] = useState("");
   const [numeroTramite, setNumeroTramite] = useState("");
   const [escribano, setEscribano] = useState("");
   const [inmuebleTramiteId, setInmuebleTramiteId] = useState<number | "">("");
@@ -103,19 +94,6 @@ export function ExpedienteDetailView() {
   useEffect(() => {
     void load();
   }, [load]);
-
-  useEffect(() => {
-    if (!token || tab !== "inmuebles" || inmuebleQuery.trim().length < 2) {
-      setInmuebles([]);
-      return;
-    }
-    const timer = window.setTimeout(() => {
-      void searchCatalogo(token, { q: inmuebleQuery.trim(), limit: 8 })
-        .then((page) => setInmuebles(page.items))
-        .catch(() => setInmuebles([]));
-    }, 300);
-    return () => window.clearTimeout(timer);
-  }, [token, inmuebleQuery, tab]);
 
   function openTab(next: ExpedienteTab) {
     setTab(next);
@@ -191,17 +169,21 @@ export function ExpedienteDetailView() {
   const tituloEsCliente = titulo.trim().toLowerCase() === nombreCliente.trim().toLowerCase();
   const dni = expediente.persona.numeroDocumento?.trim();
   const esSucesion = expediente.rama === "sucesion";
+  const esFamilia = expediente.rama === "familia";
   const tituloFicha = esSucesion ? "Primera consulta" : "Ficha";
   const pendientes = expediente.plazos
     .filter((plazo) => !plazo.cumplidoEn)
     .sort((a, b) => a.venceEn.localeCompare(b.venceEn));
   const vencidos = pendientes.filter((plazo) => plazoRelativo(plazo.venceEn).tone === "overdue").length;
+  const bienesConsulta = bienesDeFicha(ficha);
   const tabs: { id: ExpedienteTab; label: string; count?: number; alert?: boolean }[] = [
     { id: "resumen", label: "Resumen" },
     { id: "caratula", label: "Carátula" },
     { id: "plazos", label: "Plazos", count: pendientes.length, alert: vencidos > 0 },
-    { id: "inmuebles", label: "Inmuebles", count: expediente.inmuebles.length },
-    { id: "registro", label: "Registro", count: expediente.tramitesRpi.length },
+    esFamilia
+      ? { id: "hijos" as const, label: "Hijos", count: expediente.hijos.length }
+      : { id: "inmuebles" as const, label: "Bienes", count: bienesConsulta.length },
+    ...(esFamilia ? [] : [{ id: "registro" as const, label: "Registro", count: expediente.tramitesRpi.length }]),
     { id: "consulta", label: tituloFicha },
   ];
 
@@ -383,30 +365,50 @@ export function ExpedienteDetailView() {
             />
           ) : null}
 
-          {tab === "inmuebles" ? (
-            <InmueblesPanel
-              token={token ?? ""}
-              vinculados={expediente.inmuebles}
-              tramites={expediente.tramitesRpi}
-              query={inmuebleQuery}
-              resultados={inmuebles}
+          {tab === "inmuebles" && !esFamilia ? (
+            <InmueblesPanel bienes={bienesConsulta} />
+          ) : null}
+
+          {tab === "hijos" && esFamilia ? (
+            <HijosPanel
+              hijos={expediente.hijos}
               saving={saving}
-              onQuery={setInmuebleQuery}
-              onLink={(inmuebleId) =>
-                run(async () => {
-                  const next = await linkExpedienteInmueble(token!, expediente.id, inmuebleId);
-                  setInmuebleQuery("");
-                  setInmuebles([]);
-                  return next;
-                }, "Inmueble vinculado")
-              }
-              onUnlink={(inmuebleId) =>
-                void run(() => unlinkExpedienteInmueble(token!, expediente.id, inmuebleId), "Inmueble desvinculado")
-              }
+              nombre={hijoNombre}
+              dni={hijoDni}
+              onNombre={setHijoNombre}
+              onDni={setHijoDni}
+              onCreate={async () => {
+                if (!token) return;
+                setSaving(true);
+                setError(null);
+                setNotice(null);
+                try {
+                  const next = await createHijoExpediente(token, expediente.id, {
+                    nombre: hijoNombre.trim(),
+                    dni: hijoDni.trim() || null,
+                  });
+                  setHijoNombre("");
+                  setHijoDni("");
+                  apply(next);
+                  setNotice("Hijo guardado");
+                } catch (err) {
+                  if (err instanceof ApiError && err.status === 401) {
+                    logout();
+                    return;
+                  }
+                  const message = err instanceof ApiError ? err.message : "No se pudo guardar el hijo";
+                  const dniMessage = mensajeDniHijo(message);
+                  if (dniMessage) return dniMessage;
+                  setError(message);
+                } finally {
+                  setSaving(false);
+                }
+              }}
+              onDelete={(hijoId) => void run(() => deleteHijoExpediente(token!, expediente.id, hijoId), "Hijo quitado")}
             />
           ) : null}
 
-          {tab === "registro" ? (
+          {tab === "registro" && !esFamilia ? (
             <RegistroPanel
               expediente={expediente}
               saving={saving}
@@ -416,7 +418,6 @@ export function ExpedienteDetailView() {
               onNumero={setNumeroTramite}
               onEscribano={setEscribano}
               onInmueble={setInmuebleTramiteId}
-              onOpenInmuebles={() => openTab("inmuebles")}
               onCreate={() =>
                 void run(async () => {
                   await createTramiteRpi(token!, {
@@ -478,10 +479,8 @@ function Resumen({
       ? `Causante: ${causante}`
       : "Todavía sin causante"
     : "Categorías y preguntas de esta causa";
-  const inmueblesLinea =
-    expediente.inmuebles.length === 0
-      ? "Ninguno vinculado"
-      : expediente.inmuebles.map((inmueble) => inmueble.code).join(", ");
+  const bienes = bienesDeFicha(expediente.ficha);
+  const inmueblesLinea = bienes.length === 0 ? "Ninguno" : bienes.map((bien) => bien.label).join(", ");
   const registroLinea =
     expediente.tramitesRpi.length === 0
       ? "Sin trámites"
@@ -511,8 +510,19 @@ function Resumen({
       <ul className="overflow-hidden rounded-md border border-border bg-bg-page">
         <ResumenFila titulo="Carátula" detalle={caratula || "Todavía sin carátula judicial"} accion="Editar" onOpen={() => onOpen("caratula")} />
         <ResumenFila titulo={esSucesion ? "Primera consulta" : "Ficha"} detalle={fichaLinea} accion="Abrir" onOpen={() => onOpen("consulta")} />
-        <ResumenFila titulo="Inmuebles" detalle={inmueblesLinea} accion="Elegir" onOpen={() => onOpen("inmuebles")} />
-        <ResumenFila titulo="Registro" detalle={registroLinea} accion="Ver" onOpen={() => onOpen("registro")} />
+        {expediente.rama === "familia" ? (
+          <ResumenFila
+            titulo="Hijos"
+            detalle={expediente.hijos.length === 0 ? "Ninguno" : expediente.hijos.map((hijo) => hijo.nombre).join(", ")}
+            accion="Ver"
+            onOpen={() => onOpen("hijos")}
+          />
+        ) : (
+          <ResumenFila titulo="Bienes" detalle={inmueblesLinea} accion="Ver" onOpen={() => onOpen("inmuebles")} />
+        )}
+        {expediente.rama === "familia" ? null : (
+          <ResumenFila titulo="Registro" detalle={registroLinea} accion="Ver" onOpen={() => onOpen("registro")} />
+        )}
       </ul>
     </div>
   );
@@ -825,204 +835,173 @@ function PlazoFila({
   );
 }
 
-function InmueblesPanel({
-  token,
-  vinculados,
-  tramites,
-  query,
-  resultados,
+const DNI_HIJO_ERROR = "El DNI tiene que ser numérico, de 7 u 8 dígitos";
+
+function dniHijoInvalido(value: string): boolean {
+  return value.trim().length > 0 && !/^\d{7,8}$/.test(value.trim());
+}
+
+function mensajeDniHijo(message: string): string | null {
+  if (message === "Request validation failed" || /dni/i.test(message)) return DNI_HIJO_ERROR;
+  return null;
+}
+
+function HijosPanel({
+  hijos,
   saving,
-  onQuery,
-  onLink,
-  onUnlink,
+  nombre,
+  dni,
+  onNombre,
+  onDni,
+  onCreate,
+  onDelete,
 }: {
-  token: string;
-  vinculados: ExpedienteDetail["inmuebles"];
-  tramites: ExpedienteDetail["tramitesRpi"];
-  query: string;
-  resultados: CatalogSearchItem[];
+  hijos: HijoExpediente[];
   saving: boolean;
-  onQuery: (value: string) => void;
-  onLink: (inmuebleId: number) => Promise<boolean>;
-  onUnlink: (inmuebleId: number) => void;
+  nombre: string;
+  dni: string;
+  onNombre: (value: string) => void;
+  onDni: (value: string) => void;
+  onCreate: () => Promise<string | void> | void;
+  onDelete: (hijoId: number) => void;
 }) {
-  const [editando, setEditando] = useState(false);
-  const [creando, setCreando] = useState(false);
-  const [alta, setAlta] = useState<InmuebleAltaValue>(emptyInmuebleAlta());
-  const [tipos, setTipos] = useState<CatalogoItem[]>([]);
-  const [codes, setCodes] = useState<string[]>([]);
-  const [loadingTipos, setLoadingTipos] = useState(false);
-  const [creandoAlta, setCreandoAlta] = useState(false);
-  const [altaError, setAltaError] = useState<string | null>(null);
-  const sinResultados = query.trim().length >= 2 && resultados.length === 0;
-
-  useEffect(() => {
-    if (!creando || !token) return;
-    let active = true;
-    setLoadingTipos(true);
-    void Promise.all([
-      fetchCatalog<CatalogoItem>(token, "/catalogos/tipos-inmueble"),
-      fetchAllInmuebleCodes(token),
-    ])
-      .then(([catalogo, existentes]) => {
-        if (!active) return;
-        setTipos(catalogo.items);
-        setCodes(existentes);
-      })
-      .catch(() => {
-        if (active) setAltaError("No se pudo preparar el alta de la propiedad");
-      })
-      .finally(() => {
-        if (active) setLoadingTipos(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [creando, token]);
-
-  async function crearYVincular() {
-    if (!token) return;
-    if (!isInmuebleAltaValid(alta)) {
-      setAltaError("Completá la dirección de la propiedad");
-      return;
-    }
-    setCreandoAlta(true);
-    setAltaError(null);
-    try {
-      const creado = await altaInmuebleCatalogo(token, {
-        localidadId: Number(alta.direccion.localidadId),
-        calle: alta.direccion.calle,
-        numero: alta.direccion.numero,
-        referencia: alta.direccion.referencia,
-        alias: alta.alias,
-        tipoInmuebleCode: alta.tipoInmuebleCode,
-        reservedCodes: codes,
-        tiposInmueble: tipos,
-      });
-      const ok = await onLink(creado.id);
-      if (!ok) return;
-      setCreando(false);
-      setAlta(emptyInmuebleAlta());
-      onQuery("");
-    } catch (err) {
-      setAltaError(err instanceof ApiError ? err.message : err instanceof Error ? err.message : "No se pudo crear la propiedad");
-    } finally {
-      setCreandoAlta(false);
-    }
-  }
+  const [modo, setModo] = useState<"ver" | "cargar">(hijos.length === 0 ? "cargar" : "ver");
+  const [dniError, setDniError] = useState<string | null>(null);
+  const dniMal = dniHijoInvalido(dni);
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-text-secondary">Propiedades de esta causa.</p>
-        <ButtonOutline className="shrink-0" aria-pressed={editando} onClick={() => setEditando((current) => !current)}>
-          {editando ? "Listo" : "Editar"}
-        </ButtonOutline>
+      <div className="grid grid-cols-2 gap-2" role="tablist" aria-label="Hijos">
+        {(
+          [
+            { id: "ver" as const, label: "Ver hijos", Icon: Eye },
+            { id: "cargar" as const, label: "Cargar hijo", Icon: Plus },
+          ]
+        ).map((opcion) => {
+          const activo = modo === opcion.id;
+          return (
+            <button
+              key={opcion.id}
+              type="button"
+              role="tab"
+              aria-selected={activo}
+              onClick={() => setModo(opcion.id)}
+              className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-md border px-3 text-sm font-semibold ${interactiveFocusClass} ${
+                activo && opcion.id === "cargar"
+                  ? "border-primary bg-primary text-text-on-primary"
+                  : activo
+                    ? "border-border bg-bg-page text-text-primary"
+                    : "border-border bg-bg-card text-text-secondary hover:text-text-primary"
+              }`}
+            >
+              <opcion.Icon className="h-3.5 w-3.5" aria-hidden />
+              {opcion.label}
+            </button>
+          );
+        })}
       </div>
-      {vinculados.length === 0 ? (
-        <p className="text-sm text-text-secondary">Ninguna en esta causa.</p>
+      {modo === "ver" ? (
+        hijos.length === 0 ? (
+          <p className="text-sm text-text-secondary">Todavía no hay hijos cargados.</p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {hijos.map((hijo) => (
+              <li
+                key={hijo.id}
+                className="flex flex-col gap-3 rounded-md border border-border bg-bg-page px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-text-primary">{hijo.nombre}</p>
+                  <p className="text-xs text-text-secondary">{hijo.dni ? `DNI ${hijo.dni}` : "Sin DNI"}</p>
+                </div>
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => onDelete(hijo.id)}
+                  className={`inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-danger disabled:opacity-50 ${interactiveFocusClass}`}
+                >
+                  <Trash2 className="h-4 w-4" aria-hidden />
+                  Quitar
+                </button>
+              </li>
+            ))}
+          </ul>
+        )
+      ) : (
+        <div className={`flex flex-col gap-3 ${editSurfaceClass}`}>
+          <h2 className="text-sm font-semibold text-text-primary">Hijo que interviene</h2>
+          <div className="grid gap-3 md:grid-cols-2">
+            <Field label="Nombre y apellido">
+              <input value={nombre} onChange={(event) => onNombre(event.target.value)} className={`${formInputClass} w-full`} />
+            </Field>
+            <Field label="DNI" hint={dniError ? undefined : "Numérico, de 7 u 8 dígitos."}>
+              <span
+                className={`flex w-full flex-col justify-center rounded-sm border bg-bg-page px-3 py-2 ${
+                  dniError ? "border-danger" : "border-border"
+                } focus-within:border-primary`}
+              >
+                <input
+                  value={dni}
+                  inputMode="numeric"
+                  autoComplete="off"
+                  aria-invalid={dniError ? true : undefined}
+                  aria-describedby={dniError ? "hijo-dni-error" : undefined}
+                  onChange={(event) => {
+                    onDni(event.target.value);
+                    setDniError(null);
+                  }}
+                  className={`min-h-7 w-full bg-transparent text-sm text-text-primary outline-none ${interactiveFocusClass}`}
+                />
+                {dniError ? (
+                  <span id="hijo-dni-error" className="text-xs text-danger">
+                    {dniError}
+                  </span>
+                ) : null}
+              </span>
+            </Field>
+          </div>
+          <div className="flex justify-end">
+            <ButtonPrimary
+              className="w-full md:w-auto"
+              disabled={saving || !nombre.trim()}
+              onClick={() => {
+                if (dniMal) {
+                  setDniError(DNI_HIJO_ERROR);
+                  return;
+                }
+                setDniError(null);
+                void Promise.resolve(onCreate()).then((message) => {
+                  if (message) setDniError(message);
+                });
+              }}
+            >
+              Guardar hijo
+            </ButtonPrimary>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function InmueblesPanel({ bienes }: { bienes: { label: string; value: string }[] }) {
+  return (
+    <div className="flex flex-col gap-3">
+      {bienes.length === 0 ? (
+        <p className="text-sm text-text-secondary">Todavía no hay bienes cargados.</p>
       ) : (
         <ul className="flex flex-col gap-2">
-          {vinculados.map((inmueble) => {
-            const estados = tramites.filter((tramite) => tramite.inmueble.id === inmueble.id);
-            return (
-              <li
-                key={inmueble.id}
-                className="flex flex-col gap-3 rounded-md border border-border bg-bg-page px-4 py-3 text-sm md:flex-row md:items-center md:justify-between"
-              >
-                <div className="flex min-w-0 flex-col gap-1">
-                  <p className="font-semibold text-text-primary">
-                    {inmueble.code}
-                    <span className="font-normal text-text-secondary"> · {inmueble.displayLabel}</span>
-                  </p>
-                  {estados.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {estados.map((tramite) => (
-                        <RpiBadge key={tramite.id} estado={tramite.estado} />
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-text-secondary">Sin trámite en el registro</p>
-                  )}
-                </div>
-                {editando ? (
-                  <ButtonOutline className="w-full md:w-auto" disabled={saving} onClick={() => onUnlink(inmueble.id)}>
-                    Quitar
-                  </ButtonOutline>
-                ) : null}
-              </li>
-            );
-          })}
+          {bienes.map((bien, index) => (
+            <li
+              key={`${bien.label}-${index}`}
+              className="flex flex-col gap-1 rounded-md border border-border bg-bg-page px-4 py-3"
+            >
+              <p className="text-xs font-semibold text-text-secondary">{bien.label}</p>
+              <p className="whitespace-pre-wrap text-sm text-text-primary">{bien.value}</p>
+            </li>
+          ))}
         </ul>
       )}
-      {editando ? (
-        <div className={`flex flex-col gap-3 ${editSurfaceClass}`}>
-          <Field label="Sumar del catálogo">
-            <input
-              value={query}
-              onChange={(event) => onQuery(event.target.value)}
-              placeholder="Código o dirección"
-              aria-label="Buscar inmueble en el catálogo"
-              className={`${formInputClass} w-full`}
-            />
-          </Field>
-          {sinResultados ? <p className="text-sm text-text-secondary">No está en el catálogo.</p> : null}
-          {resultados.length > 0 ? (
-            <ul className="overflow-hidden rounded-sm border border-border bg-bg-card">
-              {resultados.map((item) => (
-                <li key={item.inmueble.id} className="border-b border-border last:border-0">
-                  <button
-                    type="button"
-                    className={`min-h-11 w-full px-3 py-2.5 text-left text-sm text-text-primary hover:bg-bg-page ${interactiveFocusClass}`}
-                    onClick={() => void onLink(item.inmueble.id)}
-                  >
-                    <span className="font-semibold">{item.inmueble.code}</span>
-                    <span className="text-text-secondary"> · {item.inmueble.displayLabel}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-          {creando ? (
-            <div className="flex flex-col gap-3">
-              {altaError ? <Notice tone="danger">{altaError}</Notice> : null}
-              <InmuebleAltaFields
-                token={token}
-                value={alta}
-                onChange={setAlta}
-                tiposInmueble={tipos}
-                existingCodes={codes}
-                loadingTipos={loadingTipos}
-              />
-              <div className="flex flex-col gap-2 md:flex-row md:justify-end">
-                <ButtonOutline
-                  className="w-full md:w-auto"
-                  disabled={creandoAlta}
-                  onClick={() => {
-                    setCreando(false);
-                    setAltaError(null);
-                  }}
-                >
-                  Cancelar
-                </ButtonOutline>
-                <ButtonPrimary className="w-full md:w-auto" disabled={saving || creandoAlta} onClick={() => void crearYVincular()}>
-                  {creandoAlta ? "Creando…" : "Crear y vincular"}
-                </ButtonPrimary>
-              </div>
-            </div>
-          ) : (
-            sinResultados ? (
-              <ButtonPrimary className="w-full md:w-auto" onClick={() => setCreando(true)}>
-                Crear propiedad
-              </ButtonPrimary>
-            ) : (
-              <ButtonOutline className="w-full md:w-auto" onClick={() => setCreando(true)}>
-                Crear propiedad
-              </ButtonOutline>
-            )
-          )}
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -1036,7 +1015,6 @@ function RegistroPanel({
   onNumero,
   onEscribano,
   onInmueble,
-  onOpenInmuebles,
   onCreate,
   onEstado,
 }: {
@@ -1048,7 +1026,6 @@ function RegistroPanel({
   onNumero: (value: string) => void;
   onEscribano: (value: string) => void;
   onInmueble: (value: number | "") => void;
-  onOpenInmuebles: () => void;
   onCreate: () => void;
   onEstado: (tramiteId: number, estado: EstadoTramiteRpi) => void;
 }) {
@@ -1057,7 +1034,7 @@ function RegistroPanel({
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <p className="text-sm text-text-secondary">Trámite de inscripción de cada inmueble.</p>
+        <p className="text-sm text-text-secondary">Servicios profesionales.</p>
         <div className="flex flex-wrap items-center gap-3">
           <OfficialLink href={expediente.enlaces.rpi || ENLACE_RPI}>Abrir el Registro</OfficialLink>
           <ButtonOutline aria-pressed={editando} onClick={() => setEditando((current) => !current)}>
@@ -1107,12 +1084,7 @@ function RegistroPanel({
       )}
 
       {editando && expediente.inmuebles.length === 0 ? (
-        <div className="flex flex-col items-start gap-3 rounded-md border border-dashed border-border bg-bg-page p-4">
-          <p className="text-sm text-text-secondary">Esta causa todavía no tiene inmuebles.</p>
-          <ButtonPrimary className="w-full md:w-auto" onClick={onOpenInmuebles}>
-            Ir a inmuebles
-          </ButtonPrimary>
-        </div>
+        <p className="text-sm text-text-secondary">Esta causa todavía no tiene inmuebles para anotar.</p>
       ) : null}
       {editando && expediente.inmuebles.length > 0 ? (
         <div className={`flex flex-col gap-3 ${editSurfaceClass}`}>

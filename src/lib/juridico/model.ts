@@ -1,3 +1,5 @@
+import { formatDateDisplay } from "@/lib/format";
+
 export const ENLACE_JUSTICIA_CHACO = "https://www.justiciachaco.gov.ar/";
 export const ENLACE_RPI = "https://rpi.chaco.gob.ar/tramites";
 
@@ -42,6 +44,12 @@ export interface InmuebleJuridico {
   code: string;
   title: string | null;
   displayLabel: string;
+}
+
+export interface HijoExpediente {
+  id: number;
+  nombre: string;
+  dni: string | null;
 }
 
 export interface PlazoExpediente {
@@ -187,6 +195,7 @@ export interface ExpedienteDetail {
   persona: PersonaJuridico;
   ficha: FichaSucesion | null;
   plazos: PlazoExpediente[];
+  hijos: HijoExpediente[];
   inmuebles: InmuebleJuridico[];
   tramitesRpi: TramiteRpi[];
   enlaces: { justiciaChaco: string; rpi: string };
@@ -384,4 +393,65 @@ export function expedienteTitulo(item: {
   if (item.rama === "otra" && item.ramaDetalle?.trim()) return item.ramaDetalle.trim();
   const nombre = [item.persona.nombre, item.persona.apellido].filter(Boolean).join(" ").trim();
   return nombre || item.persona.razonSocial || RAMA_LABEL[item.rama];
+}
+
+export interface BienConsulta {
+  label: string;
+  value: string;
+}
+
+function tituloEsBienes(titulo: string): boolean {
+  const normal = titulo
+    .trim()
+    .toLocaleLowerCase("es")
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "");
+  return normal === "bienes" || normal.startsWith("bienes ") || normal.startsWith("bienes y");
+}
+
+function filaDePregunta(pregunta: FichaPreguntaLibre): BienConsulta | null {
+  const tipo = pregunta.tipo ?? "texto";
+  const label = pregunta.enunciado.trim() || "Pregunta";
+  if (tipo === "casilla") {
+    if (!pregunta.enunciado.trim() && pregunta.respuesta !== "sí") return null;
+    return { label, value: pregunta.respuesta === "sí" ? "Sí" : "No" };
+  }
+  const respuesta = pregunta.respuesta?.trim() ?? "";
+  if (!pregunta.enunciado.trim() && !respuesta) return null;
+  if (!respuesta) return { label, value: "Sin respuesta" };
+  if (tipo === "fecha") return { label, value: formatDateDisplay(respuesta) };
+  return { label, value: respuesta };
+}
+
+/** Respuestas con datos de la categoría Bienes de la primera consulta. */
+export function bienesDeFicha(ficha: FichaSucesion | null | undefined): BienConsulta[] {
+  if (!ficha) return [];
+  const filas: BienConsulta[] = [];
+  const section = FICHA_SECTIONS.find((item) => item.id === "bienes");
+  if (section) {
+    for (const field of section.fields) {
+      if (field.kind === "check") {
+        if (ficha[field.key]) filas.push({ label: field.label, value: "Sí" });
+        continue;
+      }
+      const raw = ficha[field.key];
+      if (typeof raw !== "string" || !raw.trim()) continue;
+      filas.push({
+        label: field.label,
+        value: field.kind === "date" ? formatDateDisplay(raw) : raw.trim(),
+      });
+    }
+    for (const pregunta of ficha.extras?.preguntas.bienes ?? []) {
+      const fila = filaDePregunta(pregunta);
+      if (fila) filas.push(fila);
+    }
+  }
+  for (const punto of ficha.extras?.puntos ?? []) {
+    if (!tituloEsBienes(punto.titulo)) continue;
+    for (const pregunta of punto.preguntas) {
+      const fila = filaDePregunta(pregunta);
+      if (fila) filas.push(fila);
+    }
+  }
+  return filas;
 }

@@ -15,8 +15,10 @@ import { formatDateDisplay, personaDisplayName } from "@/lib/format";
 import {
   ENLACE_JUSTICIA_CHACO,
   ENLACE_RPI,
+  ESTADO_LABEL,
   RAMA_LABEL,
   expedienteTitulo,
+  type EstadoExpediente,
   type ExpedienteListItem,
   type JuridicoResumen,
   type RamaExpediente,
@@ -28,6 +30,7 @@ import { kpiTone } from "@/lib/ui/kpi-tones";
 
 const tableHeaders = ["Expediente", "Rama", "Estado", "Inicio", "Próximo plazo"];
 const ramasFijas: Array<"sucesion" | "familia"> = ["sucesion", "familia"];
+const estadosExpediente = Object.keys(ESTADO_LABEL) as EstadoExpediente[];
 
 function claveRama(nombre: string) {
   return nombre.trim().toLocaleLowerCase();
@@ -45,6 +48,7 @@ export function JuridicoView() {
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [ramaFilter, setRamaFilter] = useState<RamaExpediente | "todas">("todas");
   const [ramaDetalleFilter, setRamaDetalleFilter] = useState<string | null>(null);
+  const [estadoFilter, setEstadoFilter] = useState<EstadoExpediente | "">("");
   const [personaQuery, setPersonaQuery] = useState("");
   const [debouncedPersonaQuery, setDebouncedPersonaQuery] = useState("");
   const [personas, setPersonas] = useState<PersonaRecord[]>([]);
@@ -67,6 +71,7 @@ export function JuridicoView() {
           q: debouncedQuery.trim() || undefined,
           rama: ramaFilter === "todas" ? undefined : ramaFilter,
           ramaDetalle: ramaDetalleFilter ?? undefined,
+          estado: estadoFilter || undefined,
         }),
         fetchJuridicoResumen(token),
       ]);
@@ -81,7 +86,7 @@ export function JuridicoView() {
     } finally {
       setLoading(false);
     }
-  }, [token, logout, debouncedQuery, ramaFilter, ramaDetalleFilter]);
+  }, [token, logout, debouncedQuery, ramaFilter, ramaDetalleFilter, estadoFilter]);
 
   useSyncScope("clientes", () => void load(), Boolean(token));
 
@@ -120,6 +125,12 @@ export function JuridicoView() {
   function elegirFiltro(next: RamaExpediente | "todas", detalle: string | null = null) {
     setRamaFilter(next);
     setRamaDetalleFilter(detalle);
+  }
+
+  function limpiarFiltros() {
+    setRamaFilter("todas");
+    setRamaDetalleFilter(null);
+    setEstadoFilter("");
   }
 
   function cantidadRama(nombre: string) {
@@ -204,13 +215,12 @@ export function JuridicoView() {
   }
 
   const hasSearch = query.trim().length > 0;
+  const filtersActive = ramaFilter !== "todas" || ramaDetalleFilter !== null || estadoFilter !== "";
   const emptyCopy = hasSearch
     ? "No hay expedientes para esta búsqueda."
-    : ramaFilter !== "todas"
-      ? "No hay expedientes de esta rama."
+    : filtersActive
+      ? "No hay expedientes con estos filtros."
       : "Todavía no hay expedientes.";
-
-  const filtersActive = ramaFilter !== "todas" || ramaDetalleFilter !== null;
 
   const filtros: Array<{ id: string; label: string; count: number; rama: RamaExpediente | "todas"; detalle: string | null }> = [
     { id: "todas", label: "Todas", count: resumen?.total ?? 0, rama: "todas", detalle: null },
@@ -280,7 +290,7 @@ export function JuridicoView() {
         <div className="flex flex-wrap items-center gap-2">
           <ButtonPrimary className="gap-2" onClick={openCreate}>
             <FolderPlus className="h-4 w-4" aria-hidden />
-            Nuevo expediente
+            Crear expediente
           </ButtonPrimary>
           <Link
             href="/juridico/formularios"
@@ -292,7 +302,7 @@ export function JuridicoView() {
         </div>
 
       <section className="overflow-hidden rounded-md border border-border bg-bg-card shadow-[var(--shadow-card)]" aria-busy={loading}>
-        <div className="flex flex-col gap-3 border-b border-border px-4 py-4 md:flex-row md:items-center md:justify-between md:px-5">
+        <div className="flex flex-col gap-3 border-b border-border px-4 py-4 md:flex-row md:items-end md:px-5">
             <label className="flex min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-sm border border-border bg-bg-page px-3 focus-within:border-primary focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-primary md:max-w-md">
               <Search className="h-4 w-4 shrink-0 text-text-secondary" aria-hidden />
               <input
@@ -304,13 +314,25 @@ export function JuridicoView() {
                 className="min-w-0 flex-1 bg-transparent py-2.5 text-sm text-text-primary outline-none placeholder:text-text-secondary"
               />
             </label>
+            <label className="flex w-full min-w-0 flex-col gap-1.5 md:w-52">
+              <span className="text-[11px] font-semibold text-text-secondary">Estado</span>
+              <select
+                value={estadoFilter}
+                onChange={(event) => setEstadoFilter(event.target.value as EstadoExpediente | "")}
+                className={formInputClass}
+              >
+                <option value="">Todos</option>
+                {estadosExpediente.map((estado) => (
+                  <option key={estado} value={estado}>
+                    {ESTADO_LABEL[estado]}
+                  </option>
+                ))}
+              </select>
+            </label>
             {filtersActive ? (
               <button
                 type="button"
-                onClick={() => {
-                  setRamaFilter("todas");
-                  setRamaDetalleFilter(null);
-                }}
+                onClick={limpiarFiltros}
                 className={`min-h-11 shrink-0 text-sm font-semibold text-primary ${interactiveFocusClass}`}
               >
                 Limpiar filtros
@@ -328,15 +350,12 @@ export function JuridicoView() {
               !hasSearch && !filtersActive ? (
                 <ButtonPrimary className="w-full gap-2 md:w-auto" onClick={openCreate}>
                   <FolderPlus className="h-4 w-4" aria-hidden />
-                  Nuevo expediente
+                  Crear expediente
                 </ButtonPrimary>
               ) : filtersActive ? (
                   <ButtonOutline
                   className="w-full md:w-auto"
-                  onClick={() => {
-                    setRamaFilter("todas");
-                    setRamaDetalleFilter(null);
-                  }}
+                  onClick={limpiarFiltros}
                 >
                   Limpiar filtros
                 </ButtonOutline>
@@ -409,7 +428,7 @@ export function JuridicoView() {
       <Modal
         open={creating}
         onClose={closeCreate}
-        title="Nuevo expediente"
+        title="Crear expediente"
         subtitle="Dejá la carátula vacía si el juzgado todavía no tituló la causa."
         footer={
           <>

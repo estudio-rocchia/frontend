@@ -4,7 +4,7 @@ import { ArrowLeft, Plus } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { Notice } from "@/components/juridico/juridico-ui";
+import { Notice, useTimedNotice } from "@/components/juridico/juridico-ui";
 import { ButtonDanger, ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { useAuth } from "@/context/auth-context";
@@ -53,7 +53,7 @@ export function FormulariosView() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useTimedNotice();
   const [confirmarBaja, setConfirmarBaja] = useState(false);
 
   const load = useCallback(async () => {
@@ -302,17 +302,16 @@ export function FormulariosView() {
         </div>
       </div>
       {agregando ? null : (
-            <button
-              type="button"
-              aria-label="Agregar rama"
+            <ButtonPrimary
+              className="shrink-0 gap-2"
               onClick={() => {
                 setAgregando(true);
                 setError(null);
               }}
-              className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-border bg-bg-card text-primary shadow-[var(--shadow-card)] ${interactiveFocusClass}`}
             >
               <Plus className="h-4 w-4" aria-hidden />
-            </button>
+              Crear Rama
+            </ButtonPrimary>
       )}
       </div>
       {agregando ? (

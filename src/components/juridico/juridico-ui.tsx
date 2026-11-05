@@ -1,7 +1,7 @@
 "use client";
 
 import { ExternalLink } from "lucide-react";
-import type { ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { daysUntilDate } from "@/lib/format";
@@ -48,6 +48,23 @@ export function OfficialLink({ href, children }: { href: string; children: strin
       <ExternalLink className="h-3.5 w-3.5" aria-hidden />
     </a>
   );
+}
+
+export function useTimedNotice(ms = 5000) {
+  const [notice, setNoticeState] = useState<string | null>(null);
+  const [epoch, setEpoch] = useState(0);
+  const setNotice = useCallback((message: string | null) => {
+    setNoticeState(message);
+    if (message) setEpoch((value) => value + 1);
+  }, []);
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNoticeState(null), ms);
+    return () => window.clearTimeout(timer);
+  }, [notice, epoch, ms]);
+
+  return [notice, setNotice] as const;
 }
 
 export function Notice({ tone, children }: { tone: "danger" | "success"; children: string }) {

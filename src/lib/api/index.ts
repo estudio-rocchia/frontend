@@ -1429,6 +1429,25 @@ export function unlinkExpedienteInmueble(token: string, id: number, inmuebleId: 
   });
 }
 
+export function createHijoExpediente(
+  token: string,
+  id: number,
+  body: { nombre: string; dni?: string | null },
+) {
+  return apiRequest<ExpedienteDetail>(`/expedientes/${id}/hijos`, {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function deleteHijoExpediente(token: string, id: number, hijoId: number) {
+  return apiRequest<ExpedienteDetail>(`/expedientes/${id}/hijos/${hijoId}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
 export function createPlazoExpediente(
   token: string,
   id: number,
