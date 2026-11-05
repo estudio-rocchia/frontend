@@ -14,6 +14,7 @@ export function Modal({
   footer,
   children,
   maxWidthClass = "max-w-lg",
+  titleId = "modal-title",
 }: {
   open: boolean;
   onClose: () => void;
@@ -22,6 +23,7 @@ export function Modal({
   footer?: ReactNode;
   children: ReactNode;
   maxWidthClass?: string;
+  titleId?: string;
 }) {
   useScrollLock(open);
 
@@ -39,11 +41,11 @@ export function Modal({
         className={`ui-pop-in relative flex max-h-[90vh] w-full ${maxWidthClass} flex-col overflow-hidden rounded-md border border-border bg-bg-card shadow-[var(--shadow-card)]`}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="modal-title"
+        aria-labelledby={titleId}
       >
         <header className="flex shrink-0 items-start justify-between gap-3 border-b border-border px-4 py-4 sm:px-6 sm:py-5">
           <div className="flex flex-col gap-1">
-            <h2 id="modal-title" className="text-lg font-bold text-text-primary">
+            <h2 id={titleId} className="text-lg font-bold text-text-primary">
               {title}
             </h2>
             {subtitle ? (

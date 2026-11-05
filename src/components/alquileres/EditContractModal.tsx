@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Loader2 } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { ContractAdjustmentFields } from "@/components/alquileres/ContractAdjustmentFields";
@@ -158,15 +159,22 @@ export function EditContractModal({
           </ButtonOutline>
           <ButtonPrimary
             type="button"
+            className="gap-2"
             disabled={!canSubmit || submitting}
             onClick={() => onSubmit(form)}
           >
+            {submitting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
             {submitting ? "Guardando…" : "Guardar cambios"}
           </ButtonPrimary>
         </>
       }
     >
-      {contrato ? (
+      {submitting ? (
+        <div className="flex min-h-72 flex-col items-center justify-center gap-3" role="status">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" aria-hidden />
+          <p className="text-sm font-medium text-text-primary">Guardando los datos del contrato</p>
+        </div>
+      ) : contrato ? (
         <div className="flex flex-col gap-8">
           <FormSection title="Propiedad" variant="prominent">
             <div className="flex flex-col gap-4">

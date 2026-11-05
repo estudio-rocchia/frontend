@@ -531,6 +531,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
     setSubmitting(true);
     setError(null);
     setSuccess(null);
+    const started = Date.now();
     try {
       const amount = Number(form.amount.replace(/\D/g, ""));
       if (!Number.isFinite(amount) || amount <= 0) {
@@ -599,7 +600,10 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
 
       await loadCore();
       invalidateDashboardAlerts();
-      setSuccess("Datos del contrato actualizados.");
+      const remaining = 900 - (Date.now() - started);
+      if (remaining > 0) {
+        await new Promise((resolve) => window.setTimeout(resolve, remaining));
+      }
       return true;
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {

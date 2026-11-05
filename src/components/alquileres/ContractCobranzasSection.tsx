@@ -98,7 +98,7 @@ export function ContractCobranzasSection({
         <div className="flex flex-col gap-3">
           <p className="text-[13px] text-text-secondary">
             Cada fila es un mes de alquiler: cuánto corresponde, cuánto se cobró y cuánto falta. Para registrar un
-            cobro, usá <strong className="font-medium text-text-primary">Cobrar</strong> arriba a la derecha.
+            cobro, usá <strong className="font-medium text-text-primary">Cobrar alquiler</strong> arriba a la derecha.
           </p>
 
           {loading ? (

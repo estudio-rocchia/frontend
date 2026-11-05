@@ -754,6 +754,27 @@ export function previewFinalizarContrato(token: string, contratoId: number) {
   });
 }
 
+export function rescindirContrato(
+  token: string,
+  contratoId: number,
+  file: File,
+  fecha: string,
+  notas: string,
+) {
+  const query = new URLSearchParams({ fecha });
+  if (notas.trim()) query.set("notas", notas.trim());
+  return apiUploadFile<ContratoRecord>(
+    `/contratos/${contratoId}/rescision?${query}`,
+    token,
+    file,
+    "POST",
+  );
+}
+
+export function downloadRescisionContrato(token: string, contratoId: number) {
+  return apiBlobWithFilename(`/contratos/${contratoId}/rescision`, token);
+}
+
 export function finalizarContrato(token: string, contratoId: number) {
   return apiRequest<ContratoRecord>(`/contratos/${contratoId}/finalizar`, {
     method: "POST",
