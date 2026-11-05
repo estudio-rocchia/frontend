@@ -473,11 +473,11 @@ export function VisasView() {
                                 </span>
                               );
                             })}
-                            <span className="text-[12px] text-text-secondary">
-                              {miembros.length === 1
-                                ? (miembros[0]?.persona.numeroDocumento ?? "Sin documento")
-                                : `${miembros.length} personas`}
-                            </span>
+                            {miembros.length === 1 ? (
+                              <span className="text-[12px] text-text-secondary">
+                                {miembros[0]?.persona.numeroDocumento ?? "Sin documento"}
+                              </span>
+                            ) : null}
                           </div>
                         </td>
                         <td className={`text-center ${bodyCell}`}>

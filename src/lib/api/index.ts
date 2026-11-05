@@ -14,6 +14,7 @@ import { withCache } from "./cache";
 import { apiBlob, apiBlobWithFilename, apiRequest, apiUploadFile } from "./client";
 import type {
   CatalogoItem,
+  ClienteHistorialItem,
   ContratoDetail,
   ContratoListItem,
   ContratoRecord,
@@ -672,6 +673,10 @@ export function createPersona(
 
 export function fetchPersona(token: string, id: number) {
   return apiRequest<PersonaRecord>(`/personas/${id}`, { token });
+}
+
+export function fetchPersonaHistorial(token: string, id: number) {
+  return apiRequest<{ items: ClienteHistorialItem[] }>(`/personas/${id}/historial`, { token });
 }
 
 export function createLocalidad(token: string, body: { name: string; province: string; country?: string }) {

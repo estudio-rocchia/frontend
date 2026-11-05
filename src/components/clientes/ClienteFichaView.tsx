@@ -26,6 +26,13 @@ const ClienteJuridicoTab = dynamic(
     })),
   { ssr: false },
 );
+const ClienteHistorialTab = dynamic(
+  () =>
+    import("@/components/clientes/ClienteHistorialTab").then((mod) => ({
+      default: mod.ClienteHistorialTab,
+    })),
+  { ssr: false },
+);
 const EditarClienteModal = dynamic(
   () =>
     import("@/components/clientes/EditarClienteModal").then((mod) => ({
@@ -34,7 +41,7 @@ const EditarClienteModal = dynamic(
   { ssr: false },
 );
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
-import { FieldBlock } from "@/components/ui/FormLayout";
+import { ClienteResumenSection } from "@/components/clientes/ClienteResumenSection";
 import { PageHeaderSkeleton, Skeleton } from "@/components/ui/Skeleton";
 import { useAuth } from "@/context/auth-context";
 import { type ClienteRow } from "@/data/clientes";
@@ -75,13 +82,6 @@ function SectionTitle({ children }: { children: string }) {
   );
 }
 
-function formatPorcentaje(value: string | null | undefined): string {
-  if (!value) return "6%";
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return `${value}%`;
-  return `${numeric.toLocaleString("es-AR", { maximumFractionDigits: 2 })}%`;
-}
-
 function personaInitials(persona: PersonaRecord): string {
   const first = persona.nombre?.trim().charAt(0) ?? "";
   const last = persona.apellido?.trim().charAt(0) ?? "";
@@ -114,7 +114,6 @@ export function ClienteFichaView() {
   const [success, setSuccess] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
 
-  const tienePropiedades = propiedades.length > 0;
   const modoHonorarios = normalizeModoHonorariosAdministracion(persona?.modoHonorariosAdministracion);
   const porcentajeCliente = persona?.porcentajeAdministracion ?? "6";
 
@@ -354,19 +353,6 @@ export function ClienteFichaView() {
         Volver al listado
       </button>
 
-      <div className="flex flex-wrap gap-2 border-b border-border pb-1">
-        <button
-          type="button"
-          onClick={() => router.push("/clientes")}
-          className="rounded-t-sm px-4 py-2.5 text-sm font-medium text-text-secondary hover:text-text-primary"
-        >
-          Listado
-        </button>
-        <span className="rounded-t-sm border-b-2 border-primary px-4 py-2.5 text-sm font-medium text-primary">
-          Perfil 360°
-        </span>
-      </div>
-
       <header className="flex flex-col gap-4 rounded-md border border-border bg-bg-card p-5 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 flex-1 gap-4">
           <div
@@ -455,35 +441,14 @@ export function ClienteFichaView() {
         ) : null}
 
         {!loadingDetail && activeTab === "resumen" ? (
-          <div className="flex flex-col gap-5">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <FieldBlock label="Tipo" value={persona.tipoPersona === "juridica" ? "Jurídica" : "Natural"} />
-              <FieldBlock label="Estado" value={persona.activo === false ? "Inactivo" : "Activo"} />
-              <FieldBlock label="Documento" value={persona.numeroDocumento ?? "—"} />
-              <FieldBlock label="CUIT/CUIL" value={persona.cuit ?? "—"} />
-              <FieldBlock label="Correo" value={persona.email ?? "—"} />
-              <FieldBlock label="Teléfono" value={persona.phone ?? "—"} />
-              <FieldBlock label="Dirección" value={persona.address ?? "—"} />
-              {tienePropiedades ? (
-                <FieldBlock
-                  label="% administración"
-                  value={
-                    modoHonorarios === "por_cliente"
-                      ? formatPorcentaje(porcentajeCliente)
-                      : propiedades.length === 1
-                        ? formatPorcentaje(propiedades[0]?.porcentajeAdministracion)
-                        : "Varía por propiedad"
-                  }
-                />
-              ) : null}
-            </div>
-            {persona.notas ? (
-              <div className="flex flex-col gap-1">
-                <SectionTitle>Notas</SectionTitle>
-                <p className="text-[13px] text-text-primary">{persona.notas}</p>
-              </div>
-            ) : null}
-          </div>
+          <ClienteResumenSection
+            persona={persona}
+            clienteRow={clienteRow}
+            contratosActivos={contratosInquilino.length}
+            propiedades={propiedades}
+            modoHonorarios={modoHonorarios}
+            porcentajeCliente={porcentajeCliente}
+          />
         ) : null}
 
         {!loadingDetail && activeTab === "inmobiliaria" ? (
@@ -532,13 +497,8 @@ export function ClienteFichaView() {
           />
         ) : null}
 
-        {!loadingDetail && activeTab === "historial" ? (
-          <div className="flex flex-col gap-3">
-            <SectionTitle>Historial unificado</SectionTitle>
-            <p className="text-sm text-text-secondary">
-              El historial consolidado entre áreas se habilitará cuando esté activo el módulo jurídico.
-            </p>
-          </div>
+        {!loadingDetail && activeTab === "historial" && token ? (
+          <ClienteHistorialTab token={token} personaId={personaId} onAuthError={logout} />
         ) : null}
         </div>
       </section>

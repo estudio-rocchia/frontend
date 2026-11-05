@@ -1,15 +1,12 @@
 "use client";
 
-import type { ReactNode } from "react";
-
 import { ContractGarantesSection } from "@/components/alquileres/ContractGarantesSection";
 import { FichaSummaryCard } from "@/components/alquileres/FichaSummaryCard";
 import { ButtonOutline } from "@/components/ui/Button";
-import { StatusBadge } from "@/components/ui/StatusBadge";
+import { resumenFieldGridClass, ResumenField, ResumenPanel } from "@/components/ui/ResumenFields";
 import type { ContractDetail } from "@/data/alquileres-contract-details";
 import type { ContratoDetail } from "@/lib/api/types";
 import { formatDateDisplay } from "@/lib/format";
-import { VENTA_EMPTY_FIELD } from "@/lib/ventas/empty-field";
 
 type ContractResumenSectionProps = {
   detail: ContractDetail;
@@ -21,69 +18,10 @@ type ContractResumenSectionProps = {
   onGarantesChanged: () => void;
 };
 
-/** 8px dentro del campo; 16px entre campos; 32px entre bloques del panel. */
-const fieldGridClass = "grid min-w-0 gap-4 sm:grid-cols-[repeat(2,minmax(0,1fr))]";
-
 function contractEstadoVariant(estado: string): "success" | "warning" | "danger" {
   if (estado === "Activo") return "success";
   if (estado === "Rescindido") return "danger";
   return "warning";
-}
-
-function ResumenPanel({
-  title,
-  description,
-  children,
-}: {
-  title: string;
-  description?: string;
-  children: ReactNode;
-}) {
-  return (
-    <section className="flex min-w-0 flex-col overflow-hidden rounded-md border border-border bg-bg-card shadow-[var(--shadow-card)]">
-      <header className="bg-bg-cream px-4 py-3">
-        <h3 className="text-[13px] font-semibold text-text-primary">{title}</h3>
-        {description ? (
-          <p className="mt-1 text-[12px] leading-snug text-text-secondary">{description}</p>
-        ) : null}
-      </header>
-      <div className="flex min-w-0 flex-col gap-8 p-4">{children}</div>
-    </section>
-  );
-}
-
-function ResumenField({
-  label,
-  value,
-  numeric = false,
-  span = 1,
-}: {
-  label: string;
-  value: string;
-  numeric?: boolean;
-  span?: 1 | 2;
-}) {
-  const empty = value === VENTA_EMPTY_FIELD;
-  return (
-    <div className={`min-w-0 ${span === 2 ? "sm:col-span-2" : ""}`}>
-      <div className="flex min-w-0 flex-col gap-2 rounded-sm border border-border bg-bg-page px-3 py-2.5">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
-          {label}
-        </span>
-        {label === "Estado" ? (
-          <StatusBadge label={value} variant={contractEstadoVariant(value)} />
-        ) : (
-          <p
-            className={`min-w-0 break-words text-[13px] ${
-              empty ? "text-text-secondary" : "font-medium text-text-primary"
-            } ${numeric ? "tabular-nums" : ""}`}
-          >
-            {value}
-          </p>
-        )}
-      </div>
-    </div>
-  );
 }
 
 function VigenciaTimeline({ start, end }: { start: string; end: string }) {
@@ -129,7 +67,7 @@ export function ContractResumenSection({
 
       {contrato?.rescisionDocumentoId ? (
         <ResumenPanel title="Rescisión" description="Documentación y datos del cierre anticipado">
-          <div className={fieldGridClass}>
+          <div className={resumenFieldGridClass}>
             <ResumenField
               label="Fecha"
               value={contrato.rescisionEn ? formatDateDisplay(contrato.rescisionEn) : "—"}
@@ -155,9 +93,9 @@ export function ContractResumenSection({
 
       <div className="grid min-w-0 gap-8 lg:grid-cols-[repeat(2,minmax(0,1fr))]">
         <ResumenPanel title="Inmueble" description="Identificación y vigencia contractual">
-          <div className={fieldGridClass}>
+          <div className={resumenFieldGridClass}>
             <ResumenField label="Código" value={detail.propertyCode} />
-            <ResumenField label="Estado" value={detail.estado} />
+            <ResumenField label="Estado" value={detail.estado} statusVariant={contractEstadoVariant(detail.estado)} />
             <ResumenField label="Propiedad" value={detail.property} span={2} />
             <ResumenField label="Ubicación" value={detail.propertyLocation} span={2} />
             {detail.contractNotes ? (
@@ -168,7 +106,7 @@ export function ContractResumenSection({
         </ResumenPanel>
 
         <ResumenPanel title="Partes" description="Inquilino, propietario y garantes">
-          <div className={fieldGridClass}>
+          <div className={resumenFieldGridClass}>
             <ResumenField label="Inquilino" value={detail.tenant} span={2} />
             <ResumenField label="Propietario" value={detail.owner} span={2} />
           </div>
@@ -183,7 +121,7 @@ export function ContractResumenSection({
         </ResumenPanel>
 
         <ResumenPanel title="Condiciones de ajuste" description="Indexación y periodicidad">
-          <div className={fieldGridClass}>
+          <div className={resumenFieldGridClass}>
             <ResumenField label="Índice" value={detail.adjustmentIndex} />
             <ResumenField label="Frecuencia" value={detail.adjustmentFrequency} />
             <ResumenField label="Vencimiento mensual" value={detail.paymentDueDay} span={2} />
@@ -194,7 +132,7 @@ export function ContractResumenSection({
         </ResumenPanel>
 
         <ResumenPanel title="Mora punitoria" description="Recargo por atraso en el pago">
-          <div className={fieldGridClass}>
+          <div className={resumenFieldGridClass}>
             <ResumenField label="Tipo de mora" value={detail.moraTipo} />
             <ResumenField
               label={detail.moraRecargoLabel}

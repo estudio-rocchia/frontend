@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useSyncScope } from "@/lib/sync/use-sync-scope";
-import { Search } from "lucide-react";
+import { Search, UserPlus } from "lucide-react";
 
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { KpiCard } from "@/components/ui/KpiCard";
@@ -16,6 +16,7 @@ import { prefetchClientesList } from "@/lib/api/clientes-list";
 import type { ClientesKpis } from "@/lib/api/types";
 import { useCursorPagination } from "@/lib/hooks/use-cursor-pagination";
 import { pagePaddingClass } from "@/lib/layout";
+import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 import { useClientePrefetch } from "@/lib/use-cliente-prefetch";
 import {
   clienteFilterToVinculo,
@@ -26,7 +27,7 @@ import {
 } from "@/lib/mappers/clientes";
 
 const PAGE_SIZE = 20;
-const tableHeaders = ["Cliente", "Documento", "Vínculos", "Contacto", "Estado", "Acciones"];
+const tableHeaders = ["Cliente", "Documento", "Vínculos", "Contacto", "Estado"];
 
 export function ClientesView() {
   const router = useRouter();
@@ -54,7 +55,6 @@ export function ClientesView() {
   const [kpis, setKpis] = useState<ClientesKpis | null>(null);
   const [visaSolicitantes, setVisaSolicitantes] = useState(0);
   const [juridicoCount, setJuridicoCount] = useState(0);
-  const [listTab, setListTab] = useState<"listado" | "nuevo">("listado");
 
   const load = useCallback(async (options?: { silent?: boolean }) => {
     if (!token) return;
@@ -247,35 +247,7 @@ export function ClientesView() {
               Base centralizada con vínculos a inmobiliaria, causas jurídicas y trámites de visas
             </p>
           </div>
-          <ButtonPrimary className="w-fit" onClick={() => router.push("/clientes/nuevo")}>
-            Nuevo cliente
-          </ButtonPrimary>
         </header>
-
-        <div className="inline-flex w-fit items-center gap-1 rounded-xl border border-border bg-bg-page p-1">
-          <button
-            type="button"
-            onClick={() => setListTab("listado")}
-            className={`rocchia-action rounded-lg border px-3 py-1.5 text-[13px] ${
-              listTab === "listado"
-                ? "border-primary bg-bg-card text-text-primary"
-                : "border-transparent text-text-secondary hover:text-text-primary"
-            }`}
-          >
-            Listado
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push("/clientes/nuevo")}
-            className={`rocchia-action rounded-lg border px-3 py-1.5 text-[13px] ${
-              listTab === "nuevo"
-                ? "border-primary bg-bg-card text-text-primary"
-                : "border-transparent text-text-secondary hover:text-text-primary"
-            }`}
-          >
-            Nuevo cliente
-          </button>
-        </div>
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {loading && !kpis
@@ -292,12 +264,18 @@ export function ClientesView() {
                 <h2 className="text-[15px] font-semibold tracking-tight text-text-primary">Listado de clientes</h2>
                 <p className="text-xs text-text-secondary">{resultSummary}</p>
               </div>
-              <button
-                type="button"
-                className="w-fit rounded-sm border border-border bg-bg-card px-[18px] py-2.5 text-sm font-medium text-text-primary"
-              >
-                Exportar listado
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <ButtonPrimary className="w-fit" onClick={() => router.push("/clientes/nuevo")}>
+                  <UserPlus className="mr-1.5 h-4 w-4" aria-hidden />
+                  Crear Cliente
+                </ButtonPrimary>
+                <button
+                  type="button"
+                  className="w-fit rounded-sm border border-border bg-bg-card px-[18px] py-2.5 text-sm font-medium text-text-primary"
+                >
+                  Exportar listado
+                </button>
+              </div>
             </div>
 
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -376,9 +354,18 @@ export function ClientesView() {
                   filteredRows.map((row) => (
                     <tr
                       key={row.id}
-                      className={`border-t border-border transition-colors hover:bg-bg-page ${
+                      tabIndex={0}
+                      aria-label={`Abrir ficha de ${row.nombre}`}
+                      className={`cursor-pointer border-t border-border transition-colors hover:bg-bg-page ${interactiveFocusClass} ${
                         !row.activo ? "opacity-70" : ""
                       }`}
+                      onClick={() => router.push(`/clientes/${row.id}`)}
+                      onKeyDown={(event) => {
+                        if (event.target !== event.currentTarget) return;
+                        if (event.key !== "Enter" && event.key !== " ") return;
+                        event.preventDefault();
+                        router.push(`/clientes/${row.id}`);
+                      }}
                       onMouseEnter={() => prefetchCliente(row.id)}
                     >
                       <td className="h-[52px] px-5">
@@ -407,15 +394,6 @@ export function ClientesView() {
                       <td className="h-[52px] px-5 text-[13px] text-text-primary">{row.email}</td>
                       <td className="h-[52px] px-5">
                         <StatusBadge label={row.estado.label} variant={row.estado.variant} />
-                      </td>
-                      <td className="h-[52px] px-5">
-                        <button
-                          type="button"
-                          onClick={() => router.push(`/clientes/${row.id}`)}
-                          className="text-[13px] font-semibold text-primary hover:underline"
-                        >
-                          Ver ficha
-                        </button>
                       </td>
                     </tr>
                   ))

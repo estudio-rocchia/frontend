@@ -262,6 +262,17 @@ export interface PersonaVinculos {
   moroso: boolean;
 }
 
+export type ClienteHistorialModulo = "cliente" | "alquiler" | "venta" | "juridico" | "visa";
+
+export interface ClienteHistorialItem {
+  id: string;
+  modulo: ClienteHistorialModulo;
+  fecha: string;
+  titulo: string;
+  descripcion: string;
+  href: string | null;
+}
+
 export interface ClientesKpis {
   total: number;
   inquilinos: number;
