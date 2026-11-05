@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Plus } from "lucide-react";
 
 import { FichaSummaryCard } from "@/components/alquileres/FichaSummaryCard";
 import { PeriodoServicioModal, type PeriodoFormValues } from "@/components/alquileres/PeriodoServicioModal";
@@ -12,7 +13,8 @@ import { AguaConsultaModal } from "@/components/alquileres/AguaConsultaModal";
 import { SameepConsultaModal } from "@/components/alquileres/SameepConsultaModal";
 import { SecheepImportModal } from "@/components/alquileres/SecheepImportModal";
 import { ServicioFormModal, type ServicioFormValues } from "@/components/alquileres/ServicioFormModal";
-import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
+import { ButtonDanger, ButtonOutline } from "@/components/ui/Button";
+import { Modal } from "@/components/ui/Modal";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import type {
   AguaConsultaResult,
@@ -90,14 +92,14 @@ function PeriodosServicioTable({
             {canRegisterPago ? (
               <td className="px-4 py-2.5 text-right">
                 {Number(periodo.saldo) > 0 ? (
-                  <ButtonPrimary
+                  <ButtonOutline
                     type="button"
                     className="px-2.5 py-1 text-xs"
                     onClick={() => onRegisterPago(periodo, servicio)}
                     disabled={submitting}
                   >
                     Registrar pago
-                  </ButtonPrimary>
+                  </ButtonOutline>
                 ) : (
                   <span className="text-[12px] text-text-secondary">—</span>
                 )}
@@ -174,6 +176,7 @@ export function ContractServiciosSection({
   const [aguaServicio, setAguaServicio] = useState<ServicioContratoRecord | null>(null);
   const [sameepModalOpen, setSameepModalOpen] = useState(false);
   const [sameepServicio, setSameepServicio] = useState<ServicioContratoRecord | null>(null);
+  const [deactivateTarget, setDeactivateTarget] = useState<ServicioContratoRecord | null>(null);
   const activeServicios = useMemo(() => servicios.filter((s) => s.activo), [servicios]);
   const inactiveServicios = useMemo(() => servicios.filter((s) => !s.activo), [servicios]);
   const saldoTotal = useMemo(() => totalSaldoPendiente(periodos, servicios), [periodos, servicios]);
@@ -249,23 +252,22 @@ export function ContractServiciosSection({
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <p className="text-[13px] text-text-secondary">
-          El agua se cobra desde acá. La luz se controla por SECHEEP y otros cargos se gestionan aparte.
-        </p>
-        {canEdit ? (
+      {canEdit ? (
+        <div className="flex flex-wrap items-start gap-3">
           <ButtonOutline
             type="button"
+            className="gap-2"
             onClick={() => {
               setEditingServicio(null);
-                        setServicioModalOpen(true);
+              setServicioModalOpen(true);
             }}
             disabled={submitting || !canAddServicio}
           >
+            <Plus className="h-4 w-4" aria-hidden />
             Agregar otro servicio
           </ButtonOutline>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
 
       <div className="grid gap-3 sm:grid-cols-3">
         <FichaSummaryCard
@@ -305,7 +307,7 @@ export function ContractServiciosSection({
             className={`rounded-t-sm px-3 py-2 text-sm font-medium transition-colors ${
               activePanel === tab.id
                 ? "border-b-2 border-primary text-primary"
-                : "text-text-secondary hover:text-text-primary"
+                : "border-b-2 border-transparent text-text-secondary hover:text-text-primary"
             }`}
           >
             {tab.label}
@@ -515,7 +517,7 @@ export function ContractServiciosSection({
                               <ButtonOutline
                                 type="button"
                                 className="px-2.5 py-1 text-xs"
-                                onClick={() => void onDeactivateServicio(servicio.id)}
+                                onClick={() => setDeactivateTarget(servicio)}
                                 disabled={submitting}
                               >
                                 Desactivar
@@ -662,6 +664,38 @@ export function ContractServiciosSection({
           )}
         </div>
       )}
+
+      <Modal
+        open={deactivateTarget !== null}
+        onClose={() => {
+          if (!submitting) setDeactivateTarget(null);
+        }}
+        title="¿Desactivar este servicio?"
+        titleId="desactivar-servicio-titulo"
+        footer={
+          <>
+            <ButtonOutline type="button" onClick={() => setDeactivateTarget(null)} disabled={submitting}>
+              Cancelar
+            </ButtonOutline>
+            <ButtonDanger
+              type="button"
+              disabled={submitting}
+              onClick={() => {
+                if (!deactivateTarget) return;
+                const servicioId = deactivateTarget.id;
+                void onDeactivateServicio(servicioId).finally(() => setDeactivateTarget(null));
+              }}
+            >
+              {submitting ? "Desactivando…" : "Desactivar servicio"}
+            </ButtonDanger>
+          </>
+        }
+      >
+        <p className="text-sm text-text-secondary">
+          {deactivateTarget ? servicioDisplayName(deactivateTarget) : "Este servicio"} deja de generar períodos
+          nuevos. Los períodos ya cargados se conservan y esta acción no se puede deshacer desde la ficha.
+        </p>
+      </Modal>
 
       <ServicioFormModal
         open={servicioModalOpen}

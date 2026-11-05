@@ -125,7 +125,7 @@ export function ContractGarantesSection({
           <button
             type="button"
             onClick={startAdding}
-            className={`text-[13px] font-semibold text-primary ${interactiveFocusClass}`}
+            className={`rocchia-action text-[13px] font-semibold text-primary ${interactiveFocusClass}`}
           >
             Agregar garante
           </button>
@@ -153,7 +153,7 @@ export function ContractGarantesSection({
                     type="button"
                     onClick={() => void handleRemove(garante.personaId)}
                     disabled={removing || saving}
-                    className={`shrink-0 text-[12px] font-semibold text-danger disabled:opacity-50 ${interactiveFocusClass}`}
+                    className={`rocchia-action shrink-0 text-[12px] font-semibold text-danger disabled:opacity-50 ${interactiveFocusClass}`}
                   >
                     {removing ? "Quitando…" : "Quitar"}
                   </button>
@@ -165,7 +165,7 @@ export function ContractGarantesSection({
       )}
 
       {adding ? (
-        <div className="flex flex-col gap-3 rounded-sm border border-dashed border-primary/40 bg-primary-soft/20 p-3">
+        <div className="flex flex-col gap-3 rounded-[21px] border border-dashed border-primary/40 bg-primary-soft/20 p-3">
           <PersonaSelectField
             label="Garante"
             value={draft}

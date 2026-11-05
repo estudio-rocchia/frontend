@@ -57,23 +57,38 @@ export function FormField({
   onChange,
   placeholder,
   type = "text",
+  id,
+  invalid = false,
+  error,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   type?: string;
+  id?: string;
+  invalid?: boolean;
+  error?: string;
 }) {
+  const errorId = id && invalid && error ? `${id}-error` : undefined;
   return (
     <label className="flex flex-col gap-1.5">
       <span className="text-[11px] font-semibold text-text-secondary">{label}</span>
       <input
+        id={id}
         type={type}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
+        aria-invalid={invalid || undefined}
+        aria-describedby={errorId}
         className={formInputClass}
       />
+      {errorId ? (
+        <span id={errorId} className="text-sm text-danger">
+          {error}
+        </span>
+      ) : null}
     </label>
   );
 }

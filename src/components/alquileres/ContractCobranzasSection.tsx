@@ -85,7 +85,7 @@ export function ContractCobranzasSection({
             className={`rounded-t-sm px-3 py-2 text-sm font-medium transition-colors ${
               activePanel === tab.id
                 ? "border-b-2 border-primary text-primary"
-                : "text-text-secondary hover:text-text-primary"
+                : "border-b-2 border-transparent text-text-secondary hover:text-text-primary"
             }`}
           >
             {tab.label}

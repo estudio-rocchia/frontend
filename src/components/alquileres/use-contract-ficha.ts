@@ -50,6 +50,15 @@ import { resolveMoraPunitoriaPayload } from "@/lib/mora-punitoria";
 import { mapContratoDetailToFicha } from "@/lib/mappers/rentals";
 import { useContratoPrefetch } from "@/lib/use-contrato-prefetch";
 
+function withRecovery(message: string): string {
+  if (/\b(intentá|actualizá|ingresá|cobrá|usá|volvé|ejecutá|restaurá)\b/i.test(message)) return message;
+  return `${message} Intentá de nuevo.`;
+}
+
+function reportFailure(err: unknown, fallback: string): string {
+  return withRecovery(rentalApiErrorMessage(err, fallback));
+}
+
 interface UseContractFichaOptions {
   contratoId: number;
   validId: boolean;
@@ -101,7 +110,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
         if (!tiposServicio.length) setTiposServicio(tiposRes.items);
         if (!mediosPago.length) setMediosPago(mediosRes.items);
       } catch (err) {
-        setError(err instanceof ApiError ? err.message : "No se pudieron cargar los servicios");
+        setError(err instanceof ApiError ? withRecovery(err.message) : withRecovery("No se pudieron cargar los servicios"));
       } finally {
         setServiciosLoading(false);
       }
@@ -156,7 +165,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
           setError("Contrato no encontrado.");
           return;
         }
-        setError(err instanceof ApiError ? err.message : "No se pudo cargar la ficha del contrato");
+        setError(err instanceof ApiError ? withRecovery(err.message) : withRecovery("No se pudo cargar la ficha del contrato"));
       })
       .finally(() => setLoading(false));
   }, [validId, token, logout, loadCore]);
@@ -233,7 +242,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
       );
       await loadServicios(contrato.id);
     } catch (err) {
-      setError(rentalApiErrorMessage(err, "No se pudo agregar el servicio"));
+      setError(reportFailure(err, "No se pudo agregar el servicio"));
     } finally {
       setSubmitting(false);
     }
@@ -278,7 +287,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
       );
       await loadServicios(contrato.id);
     } catch (err) {
-      setError(rentalApiErrorMessage(err, "No se pudo actualizar el servicio"));
+      setError(reportFailure(err, "No se pudo actualizar el servicio"));
     } finally {
       setSubmitting(false);
     }
@@ -294,7 +303,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
       setSuccess("Servicio desactivado.");
       await loadServicios(contrato.id);
     } catch (err) {
-      setError(rentalApiErrorMessage(err, "No se pudo desactivar el servicio"));
+      setError(reportFailure(err, "No se pudo desactivar el servicio"));
     } finally {
       setSubmitting(false);
     }
@@ -319,7 +328,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
       );
       await loadServicios(contrato.id);
     } catch (err) {
-      setError(rentalApiErrorMessage(err, "No se pudo consultar SAMEEP"));
+      setError(reportFailure(err, "No se pudo consultar SAMEEP"));
       throw err;
     } finally {
       setSubmitting(false);
@@ -348,7 +357,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
       }
       return result;
     } catch (err) {
-      setError(rentalApiErrorMessage(err, "No se pudo consultar el agua"));
+      setError(reportFailure(err, "No se pudo consultar el agua"));
       throw err;
     } finally {
       setSubmitting(false);
@@ -368,7 +377,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
       );
       await loadServicios(contrato.id);
     } catch (err) {
-      setError(rentalApiErrorMessage(err, "No se pudo consultar SECHEEP"));
+      setError(reportFailure(err, "No se pudo consultar SECHEEP"));
       throw err;
     } finally {
       setSubmitting(false);
@@ -387,7 +396,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
       );
       await loadServicios(contrato.id);
     } catch (err) {
-      setError(rentalApiErrorMessage(err, "No se pudo importar desde SECHEEP"));
+      setError(reportFailure(err, "No se pudo importar desde SECHEEP"));
       throw err;
     } finally {
       setSubmitting(false);
@@ -414,7 +423,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
       setSuccess("Período registrado.");
       await loadServicios(contrato.id);
     } catch (err) {
-      setError(rentalApiErrorMessage(err, "No se pudo registrar el período"));
+      setError(reportFailure(err, "No se pudo registrar el período"));
       throw err;
     } finally {
       setSubmitting(false);
@@ -455,7 +464,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
       setSuccess("Plan de actualización de depósito creado.");
       await loadServicios(contrato.id);
     } catch (err) {
-      setError(rentalApiErrorMessage(err, "No se pudo crear el plan de depósito"));
+      setError(reportFailure(err, "No se pudo crear el plan de depósito"));
       throw err;
     } finally {
       setSubmitting(false);
@@ -495,7 +504,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
           downloadBlob(blob, filename ?? `recibo-${recibo.reciboNumber}.pdf`);
           setSuccess(`Pago registrado. Recibo ${recibo.reciboNumber} descargado.`);
         } catch (reciboErr) {
-          setError(rentalApiErrorMessage(reciboErr, "Pago registrado, pero no se pudo emitir el recibo."));
+          setError(reportFailure(reciboErr, "Pago registrado, pero no se pudo emitir el recibo"));
         }
       } else {
         setSuccess("Pago de servicio registrado.");
@@ -504,7 +513,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
       invalidateDashboardAlerts();
       await loadServicios(contrato.id);
     } catch (err) {
-      setError(rentalApiErrorMessage(err, "No se pudo registrar el pago"));
+      setError(reportFailure(err, "No se pudo registrar el pago"));
     } finally {
       setSubmitting(false);
     }
@@ -610,7 +619,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
         logout();
         return false;
       }
-      setError(rentalApiErrorMessage(err, "No se pudieron guardar los cambios"));
+      setError(reportFailure(err, "No se pudieron guardar los cambios"));
       return false;
     } finally {
       setSubmitting(false);
@@ -632,7 +641,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
       downloadBlob(blob, filename ?? `recibo-${recibo.reciboNumber}.pdf`);
       setSuccess(`Recibo ${recibo.reciboNumber} descargado.`);
     } catch (err) {
-      setError(rentalApiErrorMessage(err, "No se pudo obtener el recibo"));
+      setError(reportFailure(err, "No se pudo obtener el recibo"));
     } finally {
       setSubmitting(false);
     }

@@ -19,8 +19,9 @@
   --accent-sky-bg: #e8f6fc;
   --success: #2d6a4f;
   --success-bg: #e8f3ed;
-  --warning: #b8860b;
+  --warning: #8a6208;
   --warning-bg: #fbf3e0;
+  --border-input: #8d8478;
   --danger: #9b3d3d;
   --danger-bg: #fbeaea;
   --nav-muted: #e7f3f2;
@@ -79,6 +80,20 @@ body {
   font-family: var(--font-dm-sans), system-ui, sans-serif;
 }
 
+.rocchia-dialog {
+  width: calc(100vw - 2rem);
+  max-height: 90vh;
+  margin: auto;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+}
+
+.rocchia-dialog::backdrop {
+  background: #1a2b3266;
+}
+
 @keyframes dashboard-rise-in {
   from {
     opacity: 0;
@@ -108,7 +123,7 @@ body {
 }
 
 .dashboard-press {
-  transition: transform 100ms cubic-bezier(0.23, 1, 0.32, 1);
+  transition: transform 150ms ease-out;
 }
 
 .dashboard-row {
@@ -147,21 +162,23 @@ body {
 
 .rocchia-action {
   transition:
-    transform 100ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 150ms ease-out,
     background-color 100ms cubic-bezier(0.16, 1, 0.3, 1),
     opacity 100ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.rocchia-action:hover {
-  transform: translateY(-1px);
+@media (hover: hover) {
+  .rocchia-action:not(:disabled):hover {
+    transform: translateY(-1px);
+  }
 }
 
-.rocchia-action:active {
-  transform: translateY(0) scale(0.98);
+.rocchia-action:not(:disabled):active {
+  transform: translateY(0) scale(0.96);
 }
 
-.dashboard-press:active {
-  transform: scale(0.98);
+.dashboard-press:not(:disabled):active {
+  transform: scale(0.96);
 }
 
 .login-alert-enter {
@@ -562,12 +579,15 @@ body {
 
   .dashboard-press,
   .dashboard-press:active,
+  .dashboard-press:not(:disabled):active,
   .dashboard-row,
   .ui-pop-in,
   .ui-draw-in,
   .rocchia-action,
   .rocchia-action:hover,
-  .rocchia-action:active {
+  .rocchia-action:not(:disabled):hover,
+  .rocchia-action:active,
+  .rocchia-action:not(:disabled):active {
     animation: none;
     transition: none;
     transform: none;

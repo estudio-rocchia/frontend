@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { FichaSummaryCard } from "@/components/alquileres/FichaSummaryCard";
 import { PlanActualizacionDepositoModal } from "@/components/alquileres/PlanActualizacionDepositoModal";
 import type { PlanActualizacionDepositoFormValues } from "@/components/alquileres/PlanActualizacionDepositoModal";
-import { ButtonPrimary } from "@/components/ui/Button";
+import { ButtonOutline } from "@/components/ui/Button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import type { ContratoDetail, PlanActualizacionDepositoDetail } from "@/lib/api/types";
 import { formatDateDisplay, formatMoney, moneyClassName } from "@/lib/format";
@@ -87,9 +87,9 @@ export function ContractDepositoPlanSection({
           Planes de cuotas para incrementar el depósito en garantía. Las cuotas se pueden cobrar junto al alquiler.
         </p>
         {canManage && !activePlan ? (
-          <ButtonPrimary type="button" onClick={() => setModalOpen(true)} disabled={loading || submitting}>
+          <ButtonOutline type="button" onClick={() => setModalOpen(true)} disabled={loading || submitting}>
             Nuevo plan
-          </ButtonPrimary>
+          </ButtonOutline>
         ) : null}
       </div>
 
@@ -128,7 +128,7 @@ export function ContractDepositoPlanSection({
             className={`rounded-t-sm px-3 py-2 text-sm font-medium transition-colors ${
               activePanel === tab.id
                 ? "border-b-2 border-primary text-primary"
-                : "text-text-secondary hover:text-text-primary"
+                : "border-b-2 border-transparent text-text-secondary hover:text-text-primary"
             }`}
           >
             {tab.label}

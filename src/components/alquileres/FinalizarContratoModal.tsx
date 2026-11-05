@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { ApiError, finalizarContrato, previewFinalizarContrato } from "@/lib/api";
 import type { PreviewFinalizarContrato } from "@/lib/api/types";
 import { rentalApiErrorMessage } from "@/lib/format";
+import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 
 export function FinalizarContratoModal({
   open,
@@ -27,6 +28,7 @@ export function FinalizarContratoModal({
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const blockedRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open || !token) return;
@@ -87,8 +89,14 @@ export function FinalizarContratoModal({
           <ButtonPrimary
             type="button"
             data-testid="finalizar-confirmar"
-            disabled={!puedeFinalizar || loading || submitting}
-            onClick={() => void confirm()}
+            disabled={loading || submitting}
+            onClick={() => {
+              if (!puedeFinalizar) {
+                (blockedRef.current ?? document.getElementById("finalizar-error"))?.focus();
+                return;
+              }
+              void confirm();
+            }}
           >
             {submitting ? "Finalizando…" : "Finalizar contrato"}
           </ButtonPrimary>
@@ -98,10 +106,16 @@ export function FinalizarContratoModal({
       <div className="flex flex-col gap-4 text-sm text-text-primary">
         {loading ? <p className="text-text-secondary">Revisando mora, servicios y depósito…</p> : null}
         {error ? (
-          <p className="rounded-sm border border-danger bg-danger-bg px-3 py-2 text-danger">{error}</p>
+          <p
+            id="finalizar-error"
+            tabIndex={-1}
+            className={`rounded-sm border border-danger bg-danger-bg px-3 py-2 text-danger ${interactiveFocusClass}`}
+          >
+            {error}
+          </p>
         ) : null}
         {preview && !preview.puedeFinalizar ? (
-          <div className="flex flex-col gap-3">
+          <div ref={blockedRef} tabIndex={-1} className={`flex flex-col gap-3 ${interactiveFocusClass}`}>
             <p>No se puede finalizar mientras quede saldo pendiente.</p>
             <ul className="flex flex-col gap-2">
               {preview.motivos.map((motivo) => (
@@ -121,7 +135,7 @@ export function FinalizarContratoModal({
         {puedeFinalizar ? (
           <div className="flex flex-col gap-3">
             <p>
-              La inquilina no renueva. El contrato pasa a finalizado y no se crea uno nuevo.
+              El inquilino no renueva. El contrato pasa a finalizado y no se crea uno nuevo.
             </p>
             <p className="text-text-secondary">
               Mora, servicios y las cuotas del depósito están al día. El depósito de garantía queda

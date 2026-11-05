@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { FileX2 } from "lucide-react";
 
 import { ButtonDanger, ButtonOutline } from "@/components/ui/Button";
@@ -39,6 +39,9 @@ export function RescindirContratoModal({
   const [submitting, setSubmitting] = useState(false);
   const [confirmar, setConfirmar] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [invalidField, setInvalidField] = useState<"fecha" | "archivo" | null>(null);
+  const fechaRef = useRef<HTMLInputElement>(null);
+  const archivoRef = useRef<HTMLInputElement>(null);
   const hoy = fechaLocalHoy();
 
   async function confirm() {
@@ -75,8 +78,24 @@ export function RescindirContratoModal({
           <ButtonDanger
             type="button"
             className="gap-2"
-            disabled={!archivo || !fecha || submitting}
-            onClick={() => setConfirmar(true)}
+            disabled={submitting}
+            onClick={() => {
+              if (!fecha) {
+                setInvalidField("fecha");
+                setError("Ingresá la fecha de rescisión.");
+                fechaRef.current?.focus();
+                return;
+              }
+              if (!archivo) {
+                setInvalidField("archivo");
+                setError("Adjuntá el documento de rescisión, en PDF o imagen.");
+                archivoRef.current?.focus();
+                return;
+              }
+              setInvalidField(null);
+              setError(null);
+              setConfirmar(true);
+            }}
           >
             <FileX2 className="h-4 w-4" aria-hidden />
             Rescindir contrato
@@ -89,15 +108,20 @@ export function RescindirContratoModal({
           El contrato queda rescindido y el inmueble se libera. El documento del contrato no se reemplaza.
         </p>
         {error ? (
-          <p className="rounded-sm border border-danger bg-danger-bg px-3 py-2 text-danger">{error}</p>
+          <p id="rescindir-error" className="rounded-sm border border-danger bg-danger-bg px-3 py-2 text-danger" role="alert">
+            {error}
+          </p>
         ) : null}
         <label className="flex flex-col gap-1.5">
           <span className="text-[11px] font-semibold text-text-secondary">Fecha de rescisión</span>
           <input
+            ref={fechaRef}
             type="date"
             value={fecha}
             min={fechaInicio}
             max={hoy}
+            aria-invalid={invalidField === "fecha" || undefined}
+            aria-describedby={invalidField === "fecha" ? "rescindir-error" : undefined}
             onChange={(event) => setFecha(event.target.value)}
             className={formInputClass}
           />
@@ -105,8 +129,11 @@ export function RescindirContratoModal({
         <label className="flex flex-col gap-1.5">
           <span className="text-[11px] font-semibold text-text-secondary">Documento</span>
           <input
+            ref={archivoRef}
             type="file"
             accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/png,image/jpeg,image/webp"
+            aria-invalid={invalidField === "archivo" || undefined}
+            aria-describedby={invalidField === "archivo" ? "rescindir-error" : undefined}
             onChange={(event) => setArchivo(event.target.files?.[0] ?? null)}
             className={formInputClass}
           />
@@ -128,7 +155,7 @@ export function RescindirContratoModal({
       onClose={() => {
         if (!submitting) setConfirmar(false);
       }}
-      title="¿Rescindir Contrato?"
+      title="¿Rescindir este contrato?"
       titleId="confirmar-rescision-titulo"
       maxWidthClass="max-w-md"
       footer={
@@ -141,7 +168,7 @@ export function RescindirContratoModal({
             disabled={submitting}
             onClick={() => void confirm()}
           >
-            {submitting ? "Rescindiendo…" : "Rescindir"}
+            {submitting ? "Rescindiendo…" : "Rescindir contrato"}
           </ButtonDanger>
         </>
       }

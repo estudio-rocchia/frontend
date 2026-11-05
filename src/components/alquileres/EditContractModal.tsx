@@ -82,6 +82,7 @@ export function EditContractModal({
   submitting?: boolean;
 }) {
   const [form, setForm] = useState<EditContractForm>(emptyForm);
+  const [fieldError, setFieldError] = useState<{ id: string; message: string } | null>(null);
   const [depositPreview, setDepositPreview] = useState<{
     montoAnterior: string;
     montoNuevo: string;
@@ -119,7 +120,45 @@ export function EditContractModal({
 
   function handleClose() {
     setForm(emptyForm);
+    setFieldError(null);
     onClose();
+  }
+
+  function validate(): { id: string; message: string } | null {
+    if (!form.fechaInicio) return { id: "edit-fecha-inicio", message: "Ingresá la fecha de inicio." };
+    if (!form.fechaFin) return { id: "edit-fecha-fin", message: "Ingresá la fecha de fin." };
+    if (form.fechaFin <= form.fechaInicio) {
+      return { id: "edit-fecha-fin", message: "La fecha de fin tiene que ser posterior al inicio." };
+    }
+    const amount = Number.parseFloat(form.amount.replace(/\D/g, ""));
+    if (!form.amount.trim() || !Number.isFinite(amount) || amount <= 0) {
+      return { id: "edit-monto", message: "Ingresá un monto mensual mayor a cero." };
+    }
+    const deposit = Number.parseFloat(form.depositAmount.replace(/\D/g, ""));
+    if (!form.depositAmount.trim() || !Number.isFinite(deposit) || deposit <= 0) {
+      return { id: "edit-deposito", message: "Ingresá un depósito de garantía mayor a cero." };
+    }
+    if (!isMoraPunitoriaValid(form.mora)) {
+      const dia = Number.parseInt(form.mora.diaVencimientoPago, 10);
+      if (!Number.isInteger(dia) || dia < 1 || dia > 31) {
+        return { id: "edit-mora-dia", message: "Ingresá un día de vencimiento entre 1 y 31." };
+      }
+      if (form.mora.moraTipo === "daily_percentage") {
+        return { id: "edit-mora-tasa", message: "Ingresá un recargo diario mayor a 0 y menor a 100." };
+      }
+      return { id: "edit-mora-fijo", message: "Ingresá un monto fijo por día mayor a cero." };
+    }
+    return null;
+  }
+
+  function handleSave() {
+    const failure = validate();
+    setFieldError(failure);
+    if (failure) {
+      document.getElementById(failure.id)?.focus();
+      return;
+    }
+    onSubmit(form);
   }
 
   function patch(partial: Partial<EditContractForm>) {
@@ -133,17 +172,6 @@ export function EditContractModal({
   const propertyAddress = contrato?.inmueble?.direccion ?? contrato?.inmueble?.title ?? "—";
   const rentCurrency = contrato?.codigoMoneda.trim() === "USD" ? "USD" : "ARS";
   const freqOptions = contrato ? frecuenciaOptions(contrato) : [];
-
-  const canSubmit =
-    Boolean(contrato) &&
-    form.fechaInicio &&
-    form.fechaFin &&
-    form.fechaFin > form.fechaInicio &&
-    form.amount.trim() &&
-    form.depositAmount.trim() &&
-    Number.parseFloat(form.amount.replace(/\D/g, "")) > 0 &&
-    Number.parseFloat(form.depositAmount.replace(/\D/g, "")) > 0 &&
-    isMoraPunitoriaValid(form.mora);
 
   return (
     <Modal
@@ -160,10 +188,10 @@ export function EditContractModal({
           <ButtonPrimary
             type="button"
             className="gap-2"
-            disabled={!canSubmit || submitting}
-            onClick={() => onSubmit(form)}
+            disabled={submitting}
+            onClick={handleSave}
           >
-            {submitting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
+            {submitting ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
             {submitting ? "Guardando…" : "Guardar cambios"}
           </ButtonPrimary>
         </>
@@ -171,7 +199,7 @@ export function EditContractModal({
     >
       {submitting ? (
         <div className="flex min-h-72 flex-col items-center justify-center gap-3" role="status">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" aria-hidden />
+          <Loader2 className="h-8 w-8 animate-spin text-primary motion-reduce:animate-none" aria-hidden />
           <p className="text-sm font-medium text-text-primary">Guardando los datos del contrato</p>
         </div>
       ) : contrato ? (
@@ -191,30 +219,42 @@ export function EditContractModal({
             <div className="flex flex-col gap-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <FormField
+                  id="edit-fecha-inicio"
                   label="Inicio del contrato"
                   type="date"
                   value={form.fechaInicio}
                   onChange={(v) => patch({ fechaInicio: v })}
+                  invalid={fieldError?.id === "edit-fecha-inicio"}
+                  error={fieldError?.id === "edit-fecha-inicio" ? fieldError.message : undefined}
                 />
                 <FormField
+                  id="edit-fecha-fin"
                   label="Fin del contrato"
                   type="date"
                   value={form.fechaFin}
                   onChange={(v) => patch({ fechaFin: v })}
+                  invalid={fieldError?.id === "edit-fecha-fin"}
+                  error={fieldError?.id === "edit-fecha-fin" ? fieldError.message : undefined}
                 />
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <FormField
+                  id="edit-monto"
                   label={`Monto mensual (${rentCurrency})`}
                   value={form.amount}
                   onChange={(v) => patch({ amount: v })}
                   placeholder="485000 o 1200"
+                  invalid={fieldError?.id === "edit-monto"}
+                  error={fieldError?.id === "edit-monto" ? fieldError.message : undefined}
                 />
                 <FormField
+                  id="edit-deposito"
                   label="Depósito de garantía"
                   value={form.depositAmount}
                   onChange={(v) => patch({ depositAmount: v })}
                   placeholder="Igual al alquiler mensual"
+                  invalid={fieldError?.id === "edit-deposito"}
+                  error={fieldError?.id === "edit-deposito" ? fieldError.message : undefined}
                 />
                 <div className="flex flex-col gap-1.5">
                   <span className="text-[11px] font-semibold text-text-secondary">
@@ -256,6 +296,9 @@ export function EditContractModal({
             value={form.mora}
             onChange={(mora) => patch({ mora })}
             sectionVariant="prominent"
+            ids={{ dia: "edit-mora-dia", tasa: "edit-mora-tasa", fijo: "edit-mora-fijo" }}
+            invalidId={fieldError?.id}
+            error={fieldError?.message}
           />
         </div>
       ) : (

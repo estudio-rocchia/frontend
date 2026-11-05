@@ -12,10 +12,16 @@ export function MoraPunitoriaFields({
   value,
   onChange,
   sectionVariant = "default",
+  ids,
+  invalidId,
+  error,
 }: {
   value: MoraPunitoriaForm;
   onChange: (next: MoraPunitoriaForm) => void;
   sectionVariant?: "default" | "prominent";
+  ids?: { dia?: string; tasa?: string; fijo?: string };
+  invalidId?: string | null;
+  error?: string | null;
 }) {
   function patch(partial: Partial<MoraPunitoriaForm>) {
     onChange({ ...value, ...partial });
@@ -29,11 +35,14 @@ export function MoraPunitoriaFields({
     >
       <div className="flex flex-col gap-4">
         <FormField
+          id={ids?.dia}
           label="Día de vencimiento del alquiler"
           type="number"
           value={value.diaVencimientoPago}
           onChange={(v) => patch({ diaVencimientoPago: v })}
           placeholder="10"
+          invalid={invalidId === ids?.dia}
+          error={invalidId === ids?.dia ? error ?? undefined : undefined}
         />
         <div className="flex flex-col gap-1.5">
           <span className="text-[11px] font-semibold text-text-secondary">Tipo de punitorio</span>
@@ -45,17 +54,23 @@ export function MoraPunitoriaFields({
         </div>
         {value.moraTipo === "daily_percentage" ? (
           <FormField
+            id={ids?.tasa}
             label="Recargo punitorio diario (%)"
             value={value.moraTasaPct}
             onChange={(v) => patch({ moraTasaPct: v })}
             placeholder="2,5"
+            invalid={invalidId === ids?.tasa}
+            error={invalidId === ids?.tasa ? error ?? undefined : undefined}
           />
         ) : (
           <FormField
+            id={ids?.fijo}
             label="Monto fijo por día de mora"
             value={value.moraMontoFijo}
             onChange={(v) => patch({ moraMontoFijo: v })}
             placeholder="2000"
+            invalid={invalidId === ids?.fijo}
+            error={invalidId === ids?.fijo ? error ?? undefined : undefined}
           />
         )}
         <p className="text-[11px] leading-relaxed text-text-secondary">

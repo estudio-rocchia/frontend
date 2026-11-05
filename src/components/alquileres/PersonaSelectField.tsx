@@ -225,30 +225,31 @@ export function PersonaSelectField({
 
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-[11px] font-semibold text-text-secondary">{label}</span>
-
       {!creatingNew ? (
         <>
-          <label className="flex items-center gap-2 rounded-sm border border-border bg-bg-page px-3 py-2.5 focus-within:border-primary">
-            <Search className="h-4 w-4 shrink-0 text-text-secondary" aria-hidden />
-            <input
-              type="text"
-              name={inputName}
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder={placeholder}
-              autoComplete="off"
-              autoCorrect="off"
-              autoCapitalize="off"
-              spellCheck={false}
-              data-lpignore="true"
-              data-1p-ignore="true"
-              aria-autocomplete="list"
-              className="min-w-0 flex-1 bg-transparent text-[13px] text-text-primary outline-none placeholder:text-text-secondary"
-            />
+          <label className="flex flex-col gap-2">
+            <span className="text-[11px] font-semibold text-text-secondary">{label}</span>
+            <span className="flex items-center gap-2 rounded-sm border border-border bg-bg-page px-3 py-2.5 focus-within:border-primary">
+              <Search className="h-4 w-4 shrink-0 text-text-secondary" aria-hidden />
+              <input
+                type="text"
+                name={inputName}
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder={placeholder}
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
+                data-lpignore="true"
+                data-1p-ignore="true"
+                aria-autocomplete="list"
+                className="min-w-0 flex-1 bg-transparent text-base text-text-primary outline-none placeholder:text-text-secondary sm:text-sm"
+              />
+            </span>
           </label>
           {!queryTooShort ? (
-            <div className="rounded-sm border border-border">
+            <div className="rounded-[13px] border border-border">
               {searching ? (
                 <p className="px-3 py-3 text-[12px] text-text-secondary">Buscando clientes...</p>
               ) : results.length === 0 ? (
@@ -297,6 +298,7 @@ export function PersonaSelectField({
         </>
       ) : (
         <>
+          <span className="text-[11px] font-semibold text-text-secondary">{label}</span>
           <NewPersonaFields value={value} onChange={onChange} />
           <button
             type="button"
