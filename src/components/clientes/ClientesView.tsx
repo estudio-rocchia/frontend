@@ -4,9 +4,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useSyncScope } from "@/lib/sync/use-sync-scope";
-import { Search, UserPlus } from "lucide-react";
+import { Download, Search, UserPlus } from "lucide-react";
 
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
+import { CrearClienteModal } from "@/components/clientes/CrearClienteModal";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useAuth } from "@/context/auth-context";
@@ -18,6 +19,7 @@ import { useCursorPagination } from "@/lib/hooks/use-cursor-pagination";
 import { pagePaddingClass } from "@/lib/layout";
 import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 import { useClientePrefetch } from "@/lib/use-cliente-prefetch";
+import { personaDisplayName } from "@/lib/format";
 import {
   clienteFilterToVinculo,
   filterClientes,
@@ -25,6 +27,7 @@ import {
   mapPersonaToClienteRow,
   vinculoBadgeClass,
 } from "@/lib/mappers/clientes";
+import { exportClientesListado, fetchAllClienteRowsForExport } from "@/lib/clientes/export-listado";
 
 const PAGE_SIZE = 20;
 const tableHeaders = ["Cliente", "Documento", "Vínculos", "Contacto", "Estado"];
@@ -55,6 +58,8 @@ export function ClientesView() {
   const [kpis, setKpis] = useState<ClientesKpis | null>(null);
   const [visaSolicitantes, setVisaSolicitantes] = useState(0);
   const [juridicoCount, setJuridicoCount] = useState(0);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const load = useCallback(async (options?: { silent?: boolean }) => {
     if (!token) return;
@@ -174,9 +179,15 @@ export function ClientesView() {
 
   useEffect(() => {
     const creado = searchParams.get("creado");
-    if (!creado) return;
-    setSuccessMessage(`El cliente ${creado} fue registrado correctamente.`);
-    router.replace("/clientes");
+    if (creado) {
+      setSuccessMessage(`El cliente ${creado} fue registrado correctamente.`);
+      router.replace("/clientes");
+      return;
+    }
+    if (searchParams.get("crear") === "1") {
+      setCreateOpen(true);
+      router.replace("/clientes");
+    }
   }, [searchParams, router]);
 
   const kpiCards = useMemo(
@@ -220,6 +231,35 @@ export function ClientesView() {
     return `${countLabel} · ${filterLabel}`;
   }, [hasSearch, activeFilter, totalPersonas]);
 
+  async function handleExportListado() {
+    if (!token || exporting) return;
+    setExporting(true);
+    setError(null);
+    try {
+      const rows = await fetchAllClienteRowsForExport(token, {
+        filter: activeFilter,
+        search: debouncedSearch,
+      });
+      const filtered =
+        activeFilter === "visas" || activeFilter === "juridico"
+          ? rows
+          : filterClientes(rows, activeFilter);
+      if (filtered.length === 0) {
+        setError("No hay clientes para exportar con los filtros actuales.");
+        return;
+      }
+      exportClientesListado(filtered, activeFilter);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        logout();
+        return;
+      }
+      setError(err instanceof ApiError ? err.message : "No se pudo exportar el listado de clientes.");
+    } finally {
+      setExporting(false);
+    }
+  }
+
   if (error && clienteRows.length === 0 && !kpis) {
     return (
       <div className={pagePaddingClass}>
@@ -238,6 +278,10 @@ export function ClientesView() {
           <p className="rounded-sm border border-success bg-success-bg px-3 py-2 text-sm text-success">
             {successMessage}
           </p>
+        ) : null}
+
+        {error ? (
+          <p className="rounded-sm border border-danger bg-danger-bg px-3 py-2 text-sm text-danger">{error}</p>
         ) : null}
 
         <header className="flex flex-col gap-4">
@@ -265,15 +309,18 @@ export function ClientesView() {
                 <p className="text-xs text-text-secondary">{resultSummary}</p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <ButtonPrimary className="w-fit" onClick={() => router.push("/clientes/nuevo")}>
+                <ButtonPrimary className="w-fit" onClick={() => setCreateOpen(true)}>
                   <UserPlus className="mr-1.5 h-4 w-4" aria-hidden />
                   Crear Cliente
                 </ButtonPrimary>
                 <button
                   type="button"
-                  className="w-fit rounded-sm border border-border bg-bg-card px-[18px] py-2.5 text-sm font-medium text-text-primary"
+                  disabled={exporting || loading || !token}
+                  onClick={() => void handleExportListado()}
+                  className="inline-flex w-fit items-center rounded-sm border border-border bg-bg-card px-[18px] py-2.5 text-sm font-medium text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Exportar listado
+                  <Download className="mr-1.5 h-4 w-4" aria-hidden />
+                  {exporting ? "Exportando…" : "Exportar listado"}
                 </button>
               </div>
             </div>
@@ -369,10 +416,7 @@ export function ClientesView() {
                       onMouseEnter={() => prefetchCliente(row.id)}
                     >
                       <td className="h-[52px] px-5">
-                        <div className="flex flex-col gap-0.5">
-                          <span className="text-[13px] font-semibold text-text-primary">{row.nombre}</span>
-                          <span className="text-[11px] text-text-secondary">Perfil 360° disponible</span>
-                        </div>
+                        <span className="text-[13px] font-semibold text-text-primary">{row.nombre}</span>
                       </td>
                       <td className="h-[52px] px-5 text-[13px] text-text-primary">{row.documento}</td>
                       <td className="h-[52px] px-5">
@@ -391,7 +435,14 @@ export function ClientesView() {
                           )}
                         </div>
                       </td>
-                      <td className="h-[52px] px-5 text-[13px] text-text-primary">{row.email}</td>
+                      <td className="h-[52px] px-5">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-[13px] text-text-primary">{row.email}</span>
+                          {row.telefono !== "—" ? (
+                            <span className="text-[12px] text-text-secondary">{row.telefono}</span>
+                          ) : null}
+                        </div>
+                      </td>
                       <td className="h-[52px] px-5">
                         <StatusBadge label={row.estado.label} variant={row.estado.variant} />
                       </td>
@@ -430,6 +481,19 @@ export function ClientesView() {
           </footer>
         </section>
       </div>
+
+      {token ? (
+        <CrearClienteModal
+          open={createOpen}
+          onClose={() => setCreateOpen(false)}
+          token={token}
+          onAuthError={logout}
+          onCreated={(persona) => {
+            setSuccessMessage(`El cliente ${personaDisplayName(persona)} fue registrado correctamente.`);
+            void load({ silent: true });
+          }}
+        />
+      ) : null}
     </>
   );
 }

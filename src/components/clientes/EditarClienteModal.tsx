@@ -2,19 +2,26 @@
 
 import { useEffect, useState } from "react";
 
+import { PersonaDireccionFields } from "@/components/clientes/PersonaDireccionFields";
 import { Modal } from "@/components/ui/Modal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { ChipToggle, FormField, FormSection } from "@/components/ui/FormLayout";
-import { ApiError, updatePersona } from "@/lib/api";
+import type { LocalidadOption } from "@/components/inmuebles/LocalidadSelectField";
+import { ApiError, fetchLocalidades, updatePersona } from "@/lib/api";
 import { invalidateClientesContext } from "@/lib/api/clientes-context";
 import { invalidateClientesList } from "@/lib/api/clientes-list";
 import type { PersonaRecord } from "@/lib/api/types";
+import {
+  personaDireccionFromRecord,
+  personaDireccionToApi,
+  type PersonaDireccionValue,
+} from "@/lib/clientes/direccion";
 import {
   estadoCivilFromApi,
   estadoCivilOptions,
   estadoCivilToApi,
 } from "@/lib/clientes/persona-form";
-import { normalizePhoneToE164 } from "@/lib/format";
+import { normalizePhoneToE164, resolveCuitInput } from "@/lib/format";
 
 type EditarClienteModalProps = {
   open: boolean;
@@ -41,7 +48,11 @@ export function EditarClienteModal({
   const [estadoCivil, setEstadoCivil] = useState<string>(estadoCivilOptions[0]);
   const [email, setEmail] = useState("");
   const [telefono, setTelefono] = useState("");
-  const [direccion, setDireccion] = useState("");
+  const [direccion, setDireccion] = useState<PersonaDireccionValue>(
+    personaDireccionFromRecord(persona),
+  );
+  const [localidades, setLocalidades] = useState<LocalidadOption[]>([]);
+  const [loadingLocalidades, setLoadingLocalidades] = useState(false);
   const [notas, setNotas] = useState("");
   const [activo, setActivo] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -60,11 +71,27 @@ export function EditarClienteModal({
     );
     setEmail(persona.email ?? "");
     setTelefono(persona.phone ?? "");
-    setDireccion(persona.address ?? "");
+    setDireccion(personaDireccionFromRecord(persona));
     setNotas(persona.notas ?? "");
     setActivo(persona.activo ?? true);
     setError(null);
   }, [open, persona]);
+
+  useEffect(() => {
+    if (!open || !token) return;
+    let cancelled = false;
+    setLoadingLocalidades(true);
+    void fetchLocalidades(token)
+      .then((res) => {
+        if (!cancelled) setLocalidades(res.items);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingLocalidades(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, token]);
 
   async function handleSubmit() {
     if (isJuridica) {
@@ -83,10 +110,17 @@ export function EditarClienteModal({
       return;
     }
 
+    const { cuit, error: cuitError } = resolveCuitInput(cuil);
+    if (cuitError) {
+      setError(cuitError);
+      return;
+    }
+
     setSaving(true);
     setError(null);
 
     try {
+      const domicilio = personaDireccionToApi(direccion);
       const updated = await updatePersona(
         token,
         persona.id,
@@ -94,10 +128,10 @@ export function EditarClienteModal({
           ? {
               razonSocial: razonSocial.trim(),
               nombreRepresentante: nombreRepresentante.trim() || null,
-              cuit: cuil.trim() || null,
+              cuit,
               email: email.trim() || null,
               phone,
-              address: direccion.trim() || null,
+              ...domicilio,
               notas: notas.trim() || null,
               activo,
             }
@@ -106,11 +140,11 @@ export function EditarClienteModal({
               apellido: apellido.trim(),
               tipoDocumento: dni.trim() ? "DNI" : null,
               numeroDocumento: dni.trim() || null,
-              cuit: cuil.trim() || null,
+              cuit,
               estadoCivil: estadoCivilToApi[estadoCivil] ?? null,
               email: email.trim() || null,
               phone,
-              address: direccion.trim() || null,
+              ...domicilio,
               notas: notas.trim() || null,
               activo,
             },
@@ -136,7 +170,9 @@ export function EditarClienteModal({
       maxWidthClass="max-w-2xl"
       footer={
         <>
-          <ButtonOutline type="button" onClick={onClose} disabled={saving}>Cancelar</ButtonOutline>
+          <ButtonOutline type="button" onClick={onClose} disabled={saving}>
+            Cancelar
+          </ButtonOutline>
           <ButtonPrimary type="button" onClick={() => void handleSubmit()} disabled={saving}>
             {saving ? "Guardando…" : "Guardar cambios"}
           </ButtonPrimary>
@@ -161,7 +197,7 @@ export function EditarClienteModal({
                 onChange={setNombreRepresentante}
                 placeholder="Nombre del representante"
               />
-              <FormField label="CUIT" value={cuil} onChange={setCuil} placeholder="30-71122233-9" />
+              <FormField label="CUIT (opcional)" value={cuil} onChange={setCuil} placeholder="30-71122233-9" />
             </div>
           ) : (
             <>
@@ -169,7 +205,7 @@ export function EditarClienteModal({
                 <FormField label="Nombre" value={nombre} onChange={setNombre} placeholder="Ej. Elena" />
                 <FormField label="Apellido" value={apellido} onChange={setApellido} placeholder="Ej. Rossi" />
                 <FormField label="DNI" value={dni} onChange={setDni} placeholder="28.456.901" />
-                <FormField label="CUIL/CUIT" value={cuil} onChange={setCuil} placeholder="27-28456901-3" />
+                <FormField label="CUIL/CUIT (opcional)" value={cuil} onChange={setCuil} placeholder="27-28456901-3" />
               </div>
               <div className="flex flex-col gap-2">
                 <span className="text-[11px] font-semibold text-text-secondary">Estado civil</span>
@@ -193,14 +229,20 @@ export function EditarClienteModal({
               placeholder="+54 11 4455-8899"
             />
           </div>
+        </FormSection>
 
-          <FormField
-            label="Dirección"
+        <FormSection title="Domicilio" description="Dirección postal del cliente (opcional)">
+          <PersonaDireccionFields
             value={direccion}
             onChange={setDireccion}
-            placeholder="Calle, número, localidad, provincia"
+            localidades={localidades}
+            onLocalidadesChange={setLocalidades}
+            token={token}
+            loadingLocalidades={loadingLocalidades}
           />
+        </FormSection>
 
+        <FormSection title="Observaciones">
           <FormField label="Notas" value={notas} onChange={setNotas} placeholder="Observaciones internas" />
 
           <label className="flex items-center gap-2 text-[13px] text-text-primary">

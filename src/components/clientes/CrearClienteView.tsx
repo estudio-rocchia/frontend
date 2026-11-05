@@ -7,7 +7,7 @@ import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { ChipToggle, FormField, FormSection } from "@/components/ui/FormLayout";
 import { useAuth } from "@/context/auth-context";
 import { ApiError, createPersona } from "@/lib/api";
-import { normalizePhoneToE164, personaDisplayName } from "@/lib/format";
+import { normalizePhoneToE164, personaDisplayName, resolveCuitInput } from "@/lib/format";
 import { pagePaddingClass } from "@/lib/layout";
 
 import { estadoCivilOptions, estadoCivilToApi } from "@/lib/clientes/persona-form";
@@ -48,6 +48,12 @@ export function CrearClienteView() {
       return;
     }
 
+    const { cuit, error: cuitError } = resolveCuitInput(cuil);
+    if (cuitError) {
+      setError(cuitError);
+      return;
+    }
+
     setSaving(true);
     setError(null);
 
@@ -58,7 +64,7 @@ export function CrearClienteView() {
         apellido: apellido.trim() || null,
         tipoDocumento: dni.trim() ? "DNI" : null,
         numeroDocumento: dni.trim() || null,
-        cuit: cuil.trim() || null,
+        cuit,
         estadoCivil: estadoCivilToApi[estadoCivil] ?? null,
         email: email.trim() || null,
         phone,
@@ -82,9 +88,6 @@ export function CrearClienteView() {
     <div className={`flex flex-col gap-6 ${pagePaddingClass}`}>
       <header className="flex flex-col gap-1">
         <h1 className="text-[26px] font-bold text-primary">Nuevo cliente</h1>
-        <p className="text-sm text-text-secondary">
-          Alta en base centralizada — perfil 360° para inmobiliaria, jurídico y visas
-        </p>
       </header>
 
       <div className="flex flex-wrap gap-2 border-b border-border pb-1">
@@ -113,7 +116,7 @@ export function CrearClienteView() {
             <FormField label="Nombre" value={nombre} onChange={setNombre} placeholder="Ej. Elena" />
             <FormField label="Apellido" value={apellido} onChange={setApellido} placeholder="Ej. Rossi" />
             <FormField label="DNI" value={dni} onChange={setDni} placeholder="28.456.901" />
-            <FormField label="CUIL" value={cuil} onChange={setCuil} placeholder="27-28456901-3" />
+            <FormField label="CUIL (opcional)" value={cuil} onChange={setCuil} placeholder="27-28456901-3" />
           </div>
 
           <div className="flex flex-col gap-2">

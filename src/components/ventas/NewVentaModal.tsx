@@ -262,7 +262,7 @@ export function NewVentaModal({
     }
 
     if (!isVentaNuevaPropiedadValid(nuevaPropiedad)) {
-      throw new Error("Completá la dirección de la propiedad nueva.");
+      throw new Error("Completá la dirección del inmueble nuevo.");
     }
 
     const created = await altaInmuebleCatalogo(token, {
@@ -421,14 +421,14 @@ export function NewVentaModal({
             ) : !catalogSearch ? (
               <div className="flex flex-col gap-2">
                 <p className="text-sm text-text-secondary">
-                  El catálogo no está disponible. Podés registrar la propiedad manualmente.
+                  El catálogo no está disponible. Podés registrar el inmueble manualmente.
                 </p>
                 <button
                   type="button"
                   className="text-left text-sm font-semibold text-primary"
                   onClick={switchToNuevaPropiedad}
                 >
-                  Registrar propiedad nueva →
+                  Registrar inmueble nuevo →
                 </button>
               </div>
             ) : (
@@ -471,7 +471,7 @@ export function NewVentaModal({
                           onMouseDown={(event) => event.preventDefault()}
                           onClick={switchToNuevaPropiedad}
                         >
-                          Registrar como propiedad nueva →
+                          Registrar como inmueble nuevo →
                         </button>
                       </div>
                     ) : (
@@ -502,7 +502,7 @@ export function NewVentaModal({
                     className="font-semibold text-primary hover:underline"
                     onClick={switchToNuevaPropiedad}
                   >
-                    Registrar propiedad nueva
+                    Registrar inmueble nuevo
                   </button>
                 </p>
               </div>
@@ -524,6 +524,7 @@ export function NewVentaModal({
                 existingCodes={existingCodes}
                 loadingTipos={loadingTipos}
                 onLoadTipos={() => void ensureTiposInmueble()}
+                intro="El inmueble se dará de alta en el catálogo al crear la venta. El código se asigna automáticamente."
               />
             </div>
           )}

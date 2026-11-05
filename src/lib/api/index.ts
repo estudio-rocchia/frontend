@@ -549,7 +549,12 @@ export function updatePersona(
     cuit?: string | null;
     email?: string | null;
     phone?: string | null;
+    calle?: string | null;
+    numero?: string | null;
+    pisoDepto?: string | null;
+    codigoPostal?: string | null;
     address?: string | null;
+    localidadId?: number | null;
     notas?: string | null;
     activo?: boolean;
     porcentajeAdministracion?: number;
@@ -659,7 +664,12 @@ export function createPersona(
     cuit?: string | null;
     email?: string | null;
     phone?: string | null;
+    calle?: string | null;
+    numero?: string | null;
+    pisoDepto?: string | null;
+    codigoPostal?: string | null;
     address?: string | null;
+    localidadId?: number | null;
     notas?: string | null;
     activo?: boolean;
   },

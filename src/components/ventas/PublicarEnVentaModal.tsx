@@ -18,7 +18,7 @@ import {
   VentaNuevaPropiedadFields,
   type VentaNuevaPropiedadValue,
 } from "@/components/ventas/VentaNuevaPropiedadFields";
-import { WizardStepIndicator } from "@/components/ventas/WizardStepIndicator";
+import { WizardStepIndicator } from "@/components/ui/WizardStepIndicator";
 import { Modal } from "@/components/ui/Modal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { ChipToggle, FormField, FormSection } from "@/components/ui/FormLayout";

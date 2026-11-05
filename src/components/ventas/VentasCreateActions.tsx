@@ -1,10 +1,12 @@
 "use client";
 
+import { Building2, Handshake } from "lucide-react";
+
 import type { VentasTabId } from "@/components/ventas/VentasFilterChips";
 import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 
-const ghost = `rocchia-action inline-flex h-9 items-center rounded-lg border border-border bg-bg-card px-3 text-[13px] text-text-primary hover:bg-bg-page disabled:cursor-not-allowed disabled:opacity-50 ${interactiveFocusClass}`;
-const primary = `rocchia-action inline-flex h-9 items-center rounded-lg bg-primary px-3.5 text-[13px] font-semibold text-text-on-primary hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50 ${interactiveFocusClass}`;
+const actionBase =
+  "rocchia-action flex min-w-[220px] max-w-sm flex-1 flex-col items-start gap-1 rounded-lg px-4 py-3 text-left disabled:cursor-not-allowed disabled:opacity-50";
 
 type VentasCreateActionsProps = {
   tab: VentasTabId;
@@ -24,12 +26,35 @@ export function VentasCreateActions({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <button type="button" onClick={onPublicar} disabled={disabled} className={primary}>
-        Nueva publicación
+    <div className="flex flex-wrap gap-3">
+      <button
+        type="button"
+        onClick={onPublicar}
+        disabled={disabled}
+        className={`${actionBase} border border-primary/20 bg-primary text-text-on-primary hover:bg-primary-dark ${interactiveFocusClass}`}
+      >
+        <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold">
+          <Building2 className="h-4 w-4 shrink-0" aria-hidden />
+          Crear publicación
+        </span>
+        <span className="text-[11px] leading-snug text-text-on-primary/85">
+          Sumá un inmueble al catálogo con precio, vendedor y condiciones de venta.
+        </span>
       </button>
-      <button type="button" onClick={onNuevaVenta} disabled={disabled} className={ghost}>
-        Nueva venta
+
+      <button
+        type="button"
+        onClick={onNuevaVenta}
+        disabled={disabled}
+        className={`${actionBase} border border-border bg-bg-card text-text-primary hover:bg-bg-page ${interactiveFocusClass}`}
+      >
+        <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold">
+          <Handshake className="h-4 w-4 shrink-0" aria-hidden />
+          Crear venta
+        </span>
+        <span className="text-[11px] leading-snug text-text-secondary">
+          Registrá una operación en curso sobre un inmueble ya publicado.
+        </span>
       </button>
     </div>
   );

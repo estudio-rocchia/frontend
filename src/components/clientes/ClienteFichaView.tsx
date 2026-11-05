@@ -362,7 +362,9 @@ export function ClienteFichaView() {
             {personaInitials(persona)}
           </div>
           <div className="flex flex-col gap-2">
-            <h1 className="text-[26px] font-bold text-primary">{personaDisplayName(persona)}</h1>
+            <h1 className="min-w-0 text-[26px] font-normal tracking-tight text-text-primary">
+              {personaDisplayName(persona)}
+            </h1>
             {metaLine ? <p className="text-sm text-text-secondary">{metaLine}</p> : null}
             {clienteRow && clienteRow.vinculos.length > 0 ? (
               <div className="flex flex-wrap gap-2">

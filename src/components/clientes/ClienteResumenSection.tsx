@@ -8,6 +8,7 @@ import {
   normalizeModoHonorariosAdministracion,
   type ModoHonorariosAdministracion,
 } from "@/lib/honorarios-admin";
+import { personaDireccionDisplay } from "@/lib/clientes/direccion";
 import type { PropiedadAdministrada } from "@/lib/mappers/propietario-inmuebles";
 
 type ClienteResumenSectionProps = {
@@ -103,7 +104,7 @@ export function ClienteResumenSection({
           <div className={resumenFieldGridClass}>
             <ResumenField label="Correo" value={displayValue(persona.email)} span={2} />
             <ResumenField label="Teléfono" value={displayValue(persona.phone)} />
-            <ResumenField label="Dirección" value={displayValue(persona.address)} span={2} />
+            <ResumenField label="Domicilio" value={displayValue(personaDireccionDisplay(persona))} span={2} />
           </div>
         </ResumenPanel>
 

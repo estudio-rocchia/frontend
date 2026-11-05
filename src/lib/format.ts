@@ -142,6 +142,17 @@ export function formatMonthYear(anio: number, mes: number): string {
 }
 
 const E164_PHONE_REGEX = /^\+[1-9]\d{6,14}$/;
+const CUIT_DIGITS_REGEX = /^\d{11}$/;
+
+export function resolveCuitInput(raw: string): { cuit: string | null; error?: string } {
+  const trimmed = raw.trim();
+  if (!trimmed) return { cuit: null };
+
+  const digits = trimmed.replace(/\D/g, "");
+  if (CUIT_DIGITS_REGEX.test(digits)) return { cuit: digits };
+
+  return { cuit: null, error: "El CUIL no tiene un formato válido." };
+}
 
 export function parsePersonName(full: string): { nombre: string; apellido: string | null } {
   const trimmed = full.trim();

@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
-import { FieldBlock } from "@/components/ui/FormLayout";
+import { resumenFieldGridClass, ResumenField, ResumenPanel } from "@/components/ui/ResumenFields";
 import { ApiError, upsertInmuebleDetalle } from "@/lib/api";
 import type { DetalleInmuebleRecord } from "@/lib/api/types";
 import { formatDetalleSummary } from "@/lib/ventas/detalle-labels";
@@ -14,10 +14,8 @@ import {
 import { VENTA_EMPTY_FIELD } from "@/lib/ventas/empty-field";
 import { formInputClass } from "@/lib/ui/interactive-focus";
 
-function SectionTitle({ children }: { children: string }) {
-  return (
-    <h3 className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">{children}</h3>
-  );
+function displayDetalleValue(value: string): string {
+  return value === VENTA_EMPTY_FIELD ? "—" : value;
 }
 
 function DetalleEditorForm({
@@ -244,26 +242,22 @@ export function InmuebleDetalleSection({
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <SectionTitle>{profile.sectionTitle}</SectionTitle>
-        {canEdit && !editing ? (
+    <ResumenPanel title={profile.sectionTitle} description={profile.sectionHint}>
+      {canEdit && !editing ? (
+        <div className="flex min-w-0 justify-end">
           <ButtonOutline type="button" onClick={startEditing}>
             {detalle ? "Editar" : "Cargar detalle"}
           </ButtonOutline>
-        ) : null}
-      </div>
-      {profile.sectionHint ? (
-        <p className="text-[12px] text-text-secondary">{profile.sectionHint}</p>
+        </div>
       ) : null}
 
       {!editing ? (
-        <>
-          <FieldBlock label="Resumen" value={summary} />
+        <div className={resumenFieldGridClass}>
+          <ResumenField label="Resumen" value={displayDetalleValue(summary)} span={2} />
           {showsDetalleEditorField(tipoInmuebleCode, "observacion") ? (
-            <FieldBlock label="Observación" value={observacionDisplay} />
+            <ResumenField label="Observación" value={displayDetalleValue(observacionDisplay)} span={2} />
           ) : null}
-        </>
+        </div>
       ) : (
         <DetalleEditorForm
           key={editKey}
@@ -278,6 +272,6 @@ export function InmuebleDetalleSection({
           }}
         />
       )}
-    </div>
+    </ResumenPanel>
   );
 }

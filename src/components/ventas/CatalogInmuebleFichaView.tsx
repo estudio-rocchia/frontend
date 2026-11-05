@@ -13,11 +13,10 @@ import {
 import { ActualizarPrecioModal } from "@/components/ventas/ActualizarPrecioModal";
 import { CambiarEstadoOfertaModal, type CambiarEstadoMode } from "@/components/ventas/CambiarEstadoOfertaModal";
 import { EditarFormaPagoOfertaModal } from "@/components/ventas/EditarFormaPagoOfertaModal";
-import { InmuebleDetalleSection } from "@/components/ventas/InmuebleDetalleSection";
+import { CatalogInmuebleResumenSection } from "@/components/ventas/CatalogInmuebleResumenSection";
 import { NewVentaModal } from "@/components/ventas/NewVentaModal";
 import { PrecioHistorialSection } from "@/components/ventas/PrecioHistorialSection";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
-import { FieldBlock } from "@/components/ui/FormLayout";
 import { PageHeaderSkeleton, Skeleton } from "@/components/ui/Skeleton";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useAuth } from "@/context/auth-context";
@@ -31,12 +30,11 @@ import {
   fetchVentas,
 } from "@/lib/api";
 import type { CatalogSearchItem, HistorialPrecioRecord, InmuebleFicha, OfertaRecord, VentaDetail } from "@/lib/api/types";
-import { formatDateDisplay, formatMoney, moneyClassName } from "@/lib/format";
+import { formatMoney, moneyClassName } from "@/lib/format";
 import { pagePaddingClass } from "@/lib/layout";
 import { parseRouteId } from "@/lib/parse-route-id";
 import { catalogMotivo, propietarioDisplay } from "@/lib/ventas/catalog-helpers";
 import { VENTA_EMPTY_FIELD } from "@/lib/ventas/empty-field";
-import { formaPagoLabel } from "@/lib/ventas/forma-pago";
 import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 import { ofertaEstadoLabel, ofertaEstadoVariant, ventaEstadoLabel, ventaEstadoVariant } from "@/lib/ventas/status-labels";
 import type { VentasTabId } from "@/components/ventas/VentasFilterChips";
@@ -44,17 +42,6 @@ import type { VentasTabId } from "@/components/ventas/VentasFilterChips";
 function tabFromQuery(value: string | null): CatalogInmuebleFichaTabId | null {
   if (value === "resumen" || value === "precio") return value;
   return null;
-}
-
-function orEmpty(value: string | null | undefined): string {
-  const trimmed = value?.trim();
-  return trimmed ? trimmed : VENTA_EMPTY_FIELD;
-}
-
-function SectionTitle({ children }: { children: string }) {
-  return (
-    <h3 className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">{children}</h3>
-  );
 }
 
 function inmuebleInitials(code: string): string {
@@ -403,98 +390,25 @@ export function CatalogInmuebleFichaView() {
           ) : null}
 
           {activeTab === "resumen" ? (
-            <div className="flex flex-col gap-6">
-              <div className="flex flex-col gap-4">
-                <SectionTitle>Identificación</SectionTitle>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <FieldBlock label="Código de inmueble" value={inmuebleCode} />
-                  <FieldBlock label="Propiedad" value={inmuebleTitle} />
-                  <FieldBlock label="Tipo" value={ficha.tipoInmueble?.name ?? VENTA_EMPTY_FIELD} />
-                  <FieldBlock
-                    label="Localidad"
-                    value={
-                      ficha.localidad
-                        ? `${ficha.localidad.name}, ${ficha.localidad.province}`
-                        : VENTA_EMPTY_FIELD
-                    }
-                  />
-                  <FieldBlock label="Dirección" value={orEmpty(inmueble.direccion)} />
-                  <FieldBlock label="Propietario" value={propietario} />
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-4">
-                <SectionTitle>Oferta de venta</SectionTitle>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <FieldBlock
-                    label="Estado"
-                    value={oferta ? ofertaEstadoLabel(oferta.estadoCode) : VENTA_EMPTY_FIELD}
-                  />
-                  {isOffMarket ? <FieldBlock label="Motivo" value={motivo} /> : null}
-                  <FieldBlock label="Notas de precio" value={orEmpty(oferta?.notasPrecio)} />
-                  <FieldBlock label="Forma de pago" value={formaPagoLabel(oferta?.formaPagoCode)} />
-                  <FieldBlock label="Financiación" value={orEmpty(oferta?.condicionesFinanciacion)} />
-                  <FieldBlock
-                    label="Acepta permuta"
-                    value={inmueble.aceptaPermuta ? "Sí" : "No"}
-                  />
-                  <FieldBlock
-                    label="Acepta financiación"
-                    value={inmueble.aceptaFinanciacion ? "Sí" : "No"}
-                  />
-                </div>
-              </div>
-
-              {token && inmuebleId !== null ? (
-                <InmuebleDetalleSection
-                  token={token}
-                  inmuebleId={inmuebleId}
-                  tipoInmuebleCode={ficha.tipoInmueble?.code}
-                  detalle={ficha.detalle}
-                  canEdit={canEditDetalle}
-                  onSaved={() => {
-                    setSuccess("Detalle edilicio actualizado.");
-                    void load();
-                  }}
-                />
-              ) : null}
-
-              {ventaVinculada ? (
-                <div className="flex flex-col gap-4">
-                  <SectionTitle>Cierre de venta</SectionTitle>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <FieldBlock
-                      label="Operación"
-                      value={`Venta #${ventaVinculada.id} · ${ventaEstadoLabel(ventaVinculada.estado)}`}
-                    />
-                    <FieldBlock
-                      label="Fecha de boleto"
-                      value={
-                        ventaVinculada.fechaBoleto
-                          ? formatDateDisplay(ventaVinculada.fechaBoleto)
-                          : VENTA_EMPTY_FIELD
-                      }
-                    />
-                    <FieldBlock
-                      label="Fecha de escritura"
-                      value={
-                        ventaVinculada.fechaEscritura
-                          ? formatDateDisplay(ventaVinculada.fechaEscritura)
-                          : VENTA_EMPTY_FIELD
-                      }
-                    />
-                    <FieldBlock label="Escribano" value={orEmpty(ventaVinculada.nombreEscribano)} />
-                    <FieldBlock label="Forma de pago" value={formaPagoLabel(ventaVinculada.formaPagoCode)} />
-                    <FieldBlock label="Condiciones de pago" value={orEmpty(ventaVinculada.condicionesPago)} />
-                  </div>
-                  <div>
-                    <ButtonOutline type="button" onClick={() => router.push(`/ventas/${ventaVinculada.id}`)}>
-                      Abrir ficha de operación
-                    </ButtonOutline>
-                  </div>
-                </div>
-              ) : null}
-            </div>
+            <CatalogInmuebleResumenSection
+              ficha={ficha}
+              inmueble={inmueble}
+              oferta={oferta}
+              ventaVinculada={ventaVinculada}
+              propietario={propietario}
+              motivo={motivo}
+              isOffMarket={isOffMarket}
+              headerPrecio={headerPrecio}
+              historialCount={historial.length}
+              inmuebleId={inmueble.id}
+              token={token}
+              canEditDetalle={canEditDetalle}
+              onDetalleSaved={() => {
+                setSuccess("Detalle edilicio actualizado.");
+                void load();
+              }}
+              onOpenVenta={() => ventaVinculada && router.push(`/ventas/${ventaVinculada.id}`)}
+            />
           ) : null}
 
           {activeTab === "precio" ? (
