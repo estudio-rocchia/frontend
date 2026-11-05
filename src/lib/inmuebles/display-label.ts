@@ -90,3 +90,22 @@ export function contractPropertyLabel(inmuebleCode: string, inmuebleTitle: strin
   if (code && title.startsWith(`${code} ·`)) return title;
   return code ? `${code} · ${title}` : title;
 }
+
+/** Label de inmueble sin el código interno (ej. "DEP999 · Depto centro" → "Depto centro"). */
+export function inmuebleLabelSinCodigo(inmuebleCode: string, inmuebleTitle: string): string {
+  const title = inmuebleTitle.trim();
+  const code = inmuebleCode.trim();
+  if (!title) return "—";
+  if (!code) return title;
+
+  for (const sep of [" · ", " — ", " - "] as const) {
+    const prefix = `${code}${sep}`;
+    if (title.startsWith(prefix)) {
+      const rest = title.slice(prefix.length).trim();
+      if (rest) return rest;
+    }
+  }
+
+  if (title === code) return "—";
+  return title;
+}

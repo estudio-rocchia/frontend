@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { HandCoins, History, Plus } from "lucide-react";
+import { Archive, HandCoins, History, Plus } from "lucide-react";
 
 import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 
@@ -31,9 +31,13 @@ export function AlquileresPageActions({
         <HandCoins className="h-4 w-4" aria-hidden />
         Liquidar propietarios
       </button>
+      <Link href="/alquileres/historial" className={ghost}>
+        <Archive className="h-4 w-4" aria-hidden />
+        Ver historial de contratos
+      </Link>
       <Link href="/alquileres/liquidaciones" className={ghost}>
         <History className="h-4 w-4" aria-hidden />
-        Ver historial
+        Ver historial de liquidaciones
       </Link>
     </div>
   );

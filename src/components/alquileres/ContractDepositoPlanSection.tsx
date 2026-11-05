@@ -9,6 +9,7 @@ import { ButtonOutline } from "@/components/ui/Button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import type { ContratoDetail, PlanActualizacionDepositoDetail } from "@/lib/api/types";
 import { formatDateDisplay, formatMoney, moneyClassName } from "@/lib/format";
+import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 import {
   activePlanActualizacionDeposito,
   cuotaDepositoSaldoPendiente,
@@ -118,14 +119,16 @@ export function ContractDepositoPlanSection({
         />
       </div>
 
-      <div className="flex flex-wrap gap-2 border-b border-border">
+      <div role="tablist" aria-label="Depósito del contrato" className="flex flex-wrap gap-2 border-b border-border">
         {subTabs.map((tab) => (
           <button
             key={tab.id}
             type="button"
+            role="tab"
+            aria-selected={activePanel === tab.id}
             data-testid={`deposito-subtab-${tab.id}`}
             onClick={() => setActivePanel(tab.id)}
-            className={`rounded-t-sm px-3 py-2 text-sm font-medium transition-colors ${
+            className={`rounded-t-sm px-3 py-2 text-sm font-medium transition-colors ${interactiveFocusClass} ${
               activePanel === tab.id
                 ? "border-b-2 border-primary text-primary"
                 : "border-b-2 border-transparent text-text-secondary hover:text-text-primary"

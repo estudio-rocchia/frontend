@@ -7,7 +7,7 @@ import { Modal } from "@/components/ui/Modal";
 import { ApiError, createTramiteVisa, fetchPersonas } from "@/lib/api";
 import type { PersonaRecord } from "@/lib/api/types";
 import { personaDisplayName } from "@/lib/format";
-import { formInputClass } from "@/lib/ui/interactive-focus";
+import { formInputClass, interactiveFocusClass } from "@/lib/ui/interactive-focus";
 
 interface NuevoTramiteModalProps {
   open: boolean;
@@ -100,7 +100,11 @@ export function NuevoTramiteModal({
       }
     >
       <div className="flex flex-col gap-3">
-        {error ? <p className="text-sm text-danger">{error}</p> : null}
+        {error ? (
+          <p role="alert" className="text-sm text-danger">
+            {error} Revisá los datos e intentá de nuevo.
+          </p>
+        ) : null}
         {personaFija ? (
           <p className="text-sm text-text-primary">
             Solicitante: <span className="font-semibold">{personaFija.nombre}</span>
@@ -134,7 +138,7 @@ export function NuevoTramiteModal({
                   <li key={persona.id} className="border-t border-border first:border-t-0">
                     <button
                       type="button"
-                      className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left text-sm hover:bg-bg-page"
+                      className={`flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left text-sm hover:bg-bg-page ${interactiveFocusClass}`}
                       onClick={() => {
                         setSelected(persona);
                         setQuery(personaDisplayName(persona));

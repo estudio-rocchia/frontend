@@ -15,6 +15,7 @@ import {
 } from "@/lib/api";
 import type { LiquidacionRecord, PropietarioAdministracionSummary } from "@/lib/api/types";
 import { downloadBlob, formatMoney, normalizeCurrency, rentalApiErrorMessage } from "@/lib/format";
+import { formInputClass } from "@/lib/ui/interactive-focus";
 
 function currentPeriod() {
   const now = new Date();
@@ -218,7 +219,7 @@ export function LiquidacionPropietarioModal({
             <span className="text-text-secondary">Año</span>
             <input
               type="number"
-              className="rounded border border-border px-2 py-1.5"
+              className={formInputClass}
               value={anio}
               onChange={(e) => setPeriod({ anio: Number(e.target.value), mes })}
             />
@@ -229,7 +230,7 @@ export function LiquidacionPropietarioModal({
               type="number"
               min={1}
               max={12}
-              className="rounded border border-border px-2 py-1.5"
+              className={formInputClass}
               value={mes}
               onChange={(e) => setPeriod({ anio, mes: Number(e.target.value) })}
             />
@@ -237,14 +238,18 @@ export function LiquidacionPropietarioModal({
         </div>
 
         {loading ? <p className="text-sm text-text-secondary">Cargando propietarios…</p> : null}
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        {error ? (
+          <p className="rounded-sm border border-danger bg-danger-bg px-3 py-2 text-sm text-danger" role="alert">
+            {error}
+          </p>
+        ) : null}
 
         {!liquidacion ? (
           <>
             <label className="flex flex-col gap-1 text-sm">
               <span className="text-text-secondary">Propietario</span>
               <select
-                className="rounded border border-border px-2 py-1.5"
+                className={formInputClass}
                 value={selectedOwnerId ?? ""}
                 onChange={(e) => setSelectedOwnerId(Number(e.target.value))}
               >
@@ -304,7 +309,7 @@ export function LiquidacionPropietarioModal({
             <label className="flex flex-col gap-1 text-sm">
               <span className="font-medium text-text-primary">Aclaraciones</span>
               <textarea
-                className="min-h-[180px] rounded border border-border px-2 py-1.5 font-mono text-xs leading-relaxed disabled:opacity-70"
+                className={`min-h-[180px] font-mono text-xs leading-relaxed disabled:opacity-70 ${formInputClass}`}
                 value={aclaraciones}
                 onChange={(e) => setAclaraciones(e.target.value)}
                 readOnly={!isDraftLiquidacion}

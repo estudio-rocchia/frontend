@@ -7,7 +7,8 @@ import { Plus } from "lucide-react";
 
 import { EnlacesOficiales } from "@/components/visas/EnlacesOficiales";
 import { NuevoTramiteModal } from "@/components/visas/NuevoTramiteModal";
-import { ButtonPrimary } from "@/components/ui/Button";
+import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
+import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ApiError, fetchVisas } from "@/lib/api";
 import type { TramiteVisaListItem } from "@/lib/api/types";
@@ -73,7 +74,22 @@ export function ClienteVisasTab({
 
       <EnlacesOficiales compact />
 
-      {error ? <p className="text-sm text-danger">{error}</p> : null}
+      {error ? (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center gap-3 rounded-sm bg-danger-bg px-3 py-2"
+        >
+          <p className="text-sm text-danger">{error} Reintentá o volvé más tarde.</p>
+          <button
+            type="button"
+            onClick={() => void load()}
+            disabled={loading}
+            className={`text-sm font-semibold text-primary hover:underline disabled:opacity-50 ${interactiveFocusClass}`}
+          >
+            Reintentar
+          </button>
+        </div>
+      ) : null}
 
       {loading ? (
         <p className="text-sm text-text-secondary">Cargando trámites…</p>

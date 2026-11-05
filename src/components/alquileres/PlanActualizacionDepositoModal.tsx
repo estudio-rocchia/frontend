@@ -6,6 +6,7 @@ import { Modal } from "@/components/ui/Modal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import type { ContratoDetail } from "@/lib/api/types";
 import { formatMoney, rentalApiErrorMessage } from "@/lib/format";
+import { formInputClass } from "@/lib/ui/interactive-focus";
 
 export type PlanActualizacionDepositoFormValues = {
   montoTotal: string;
@@ -106,7 +107,7 @@ export function PlanActualizacionDepositoModal({
             value={form.montoTotal}
             onChange={(e) => setForm({ ...form, montoTotal: e.target.value })}
             placeholder="240000"
-            className="rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
+            className={formInputClass}
           />
         </label>
 
@@ -119,7 +120,7 @@ export function PlanActualizacionDepositoModal({
               max={120}
               value={form.cantidadCuotas}
               onChange={(e) => setForm({ ...form, cantidadCuotas: e.target.value })}
-              className="rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
+              className={formInputClass}
             />
           </label>
           <label className="flex flex-col gap-1.5">
@@ -130,7 +131,7 @@ export function PlanActualizacionDepositoModal({
               max={31}
               value={form.diaVencimiento}
               onChange={(e) => setForm({ ...form, diaVencimiento: e.target.value })}
-              className="rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
+              className={formInputClass}
             />
           </label>
         </div>
@@ -141,7 +142,7 @@ export function PlanActualizacionDepositoModal({
             type="date"
             value={form.fechaPrimeraCuota}
             onChange={(e) => setForm({ ...form, fechaPrimeraCuota: e.target.value })}
-            className="rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
+            className={formInputClass}
           />
         </label>
 
@@ -151,7 +152,7 @@ export function PlanActualizacionDepositoModal({
             value={form.notas}
             onChange={(e) => setForm({ ...form, notas: e.target.value })}
             rows={2}
-            className="rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
+            className={formInputClass}
           />
         </label>
 

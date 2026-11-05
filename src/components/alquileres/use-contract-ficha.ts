@@ -8,6 +8,7 @@ import type { PeriodoFormValues } from "@/components/alquileres/PeriodoServicioM
 import type { ServicioFormValues } from "@/components/alquileres/ServicioFormModal";
 import type { RegistrarPagoServicioFormValues } from "@/components/alquileres/RegistrarPagoServicioModal";
 import type { ContractDetail } from "@/data/alquileres-contract-details";
+import { resolveBreakUiFichaBundle } from "@/data/alquileres-break-ui-fixtures";
 import {
   ApiError,
   createPeriodoServicio,
@@ -48,6 +49,7 @@ import { invalidateDashboardAlerts } from "@/lib/dashboard-alerts-events";
 import { downloadBlob, rentalApiErrorMessage } from "@/lib/format";
 import { resolveMoraPunitoriaPayload } from "@/lib/mora-punitoria";
 import { mapContratoDetailToFicha } from "@/lib/mappers/rentals";
+import { useBreakUiMode } from "@/lib/alquileres/break-ui-mode";
 import { useContratoPrefetch } from "@/lib/use-contrato-prefetch";
 
 function withRecovery(message: string): string {
@@ -67,6 +69,7 @@ interface UseContractFichaOptions {
 }
 
 export function useContractFicha({ contratoId, validId, token, logout }: UseContractFichaOptions) {
+  const breakUi = useBreakUiMode();
   const { consume: consumePrefetchedContrato } = useContratoPrefetch(token);
   const [detail, setDetail] = useState<ContractDetail | null>(null);
   const [contrato, setContrato] = useState<ContratoDetail | null>(null);
@@ -87,6 +90,18 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
   const loadServicios = useCallback(
     async (id: number) => {
       if (!token) return;
+      const fixture = breakUi.active ? resolveBreakUiFichaBundle(breakUi.mode, id) : null;
+      if (fixture) {
+        setServicios(fixture.servicios);
+        setPeriodos(fixture.periodos);
+        setPlanesDeposito(fixture.planesDeposito);
+        setCuotas(fixture.cuotas);
+        setPagos(fixture.pagos);
+        setTiposServicio(fixture.tiposServicio);
+        setMediosPago(fixture.mediosPago);
+        setServiciosLoading(false);
+        return;
+      }
       setServiciosLoading(true);
       try {
         const [serviciosRes, periodosRes, planesRes, cuotasRes, pagosRes, tiposRes, mediosRes] = await Promise.all([
@@ -115,11 +130,32 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
         setServiciosLoading(false);
       }
     },
-    [token, tiposServicio, mediosPago],
+    [token, tiposServicio, mediosPago, breakUi.active, breakUi.mode],
   );
 
   const loadCore = useCallback(async () => {
     if (!token || !validId) return;
+
+    const fixture = breakUi.active ? resolveBreakUiFichaBundle(breakUi.mode, contratoId) : null;
+    if (breakUi.active) {
+      if (!fixture) {
+        setContrato(null);
+        setDetail(null);
+        setError("Contrato no encontrado.");
+        return;
+      }
+      setContrato(fixture.contrato);
+      setDetail(mapContratoDetailToFicha(fixture.contrato, fixture.propietarios, fixture.inmuebleContext));
+      setServicios(fixture.servicios);
+      setPeriodos(fixture.periodos);
+      setPlanesDeposito(fixture.planesDeposito);
+      setCuotas(fixture.cuotas);
+      setPagos(fixture.pagos);
+      setTiposServicio(fixture.tiposServicio);
+      setMediosPago(fixture.mediosPago);
+      setServiciosLoading(false);
+      return;
+    }
 
     const cached = await consumePrefetchedContrato(contratoId);
     const detailRes = cached?.detail ?? await fetchContrato(token, contratoId);
@@ -141,7 +177,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
     }
     setDetail(mapContratoDetailToFicha(detailRes, propietarios, inmuebleContext ?? undefined));
     await loadServicios(contratoId);
-  }, [token, validId, contratoId, consumePrefetchedContrato, loadServicios]);
+  }, [token, validId, contratoId, consumePrefetchedContrato, loadServicios, breakUi.active, breakUi.mode]);
 
   useEffect(() => {
     if (!validId) {
@@ -526,9 +562,13 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
   }, [contrato, loadServicios]);
 
   const handleCobrarSuccess = useCallback(async () => {
+    if (breakUi.active) {
+      setSuccess("Cobro simulado (modo break-ui).");
+      return;
+    }
     setSuccess("Cobro registrado.");
     await refreshBilling();
-  }, [refreshBilling]);
+  }, [refreshBilling, breakUi.active]);
 
   async function handleUpdateContrato(form: EditContractForm): Promise<boolean> {
     if (!token || !contrato) return false;
@@ -600,6 +640,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
         codigoMonedaDeposito: form.depositCurrency,
         tipoIndiceId: indexItem.id,
         notasIndice,
+        notas: form.notas.trim() || null,
         frecuenciaAjusteMeses: form.frecuenciaAjusteMeses,
         tipoMoraId: moraPayload.tipoMoraId,
         tasaMora: moraPayload.tasaMora,

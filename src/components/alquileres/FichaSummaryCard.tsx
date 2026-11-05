@@ -1,4 +1,11 @@
-import { moneyClassName } from "@/lib/format";
+"use client";
+
+import { moneyDisplaySizeClass } from "@/lib/format";
+
+function isMoneyValue(value: string): boolean {
+  const trimmed = value.trim();
+  return trimmed.startsWith("$") || trimmed.startsWith("USD");
+}
 
 export function FichaSummaryCard({
   label,
@@ -11,11 +18,19 @@ export function FichaSummaryCard({
   hint?: string;
   valueClassName?: string;
 }) {
+  const money = isMoneyValue(value);
+
   return (
-    <div className="rounded-md border border-border bg-bg-page px-4 py-3">
+    <div className="min-w-0 rounded-md border border-border bg-bg-page px-4 py-3">
       <p className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">{label}</p>
-      <p className={`mt-1 text-lg font-bold text-text-primary ${valueClassName ?? moneyClassName}`}>{value}</p>
-      {hint ? <p className="mt-0.5 text-[12px] text-text-secondary">{hint}</p> : null}
+      <p
+        className={`mt-2 min-w-0 break-words font-medium tabular-nums text-text-primary ${
+          money ? moneyDisplaySizeClass(value) : "text-lg font-bold"
+        } ${valueClassName ?? ""}`}
+      >
+        {value}
+      </p>
+      {hint ? <p className="mt-2 min-w-0 break-words text-[12px] text-text-secondary">{hint}</p> : null}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useState } from "react";
 
 import { useSyncScope } from "@/lib/sync/use-sync-scope";
@@ -47,6 +47,9 @@ import type {
 import { nextContratoCode, nextInmuebleCode, prefixForTipoInmueble } from "@/lib/codes";
 import { rentalApiErrorMessage } from "@/lib/format";
 import { pagePaddingClass } from "@/lib/layout";
+import { useBreakUiMode, withBreakUiQuery } from "@/lib/alquileres/break-ui-mode";
+import { resolveBreakUiFichaBundle } from "@/data/alquileres-break-ui-fixtures";
+import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 import { resolveMoraPunitoriaPayload } from "@/lib/mora-punitoria";
 import {
   loadInmueblesSinAlquiler,
@@ -102,6 +105,8 @@ const RenewContractModal = dynamic(
 
 export function AlquileresWorkspace() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const breakUi = useBreakUiMode();
   const { token, logout } = useAuth();
   const { prefetch: prefetchContrato } = useContratoPrefetch(token);
   const {
@@ -163,13 +168,18 @@ export function AlquileresWorkspace() {
 
   const openFicha = useCallback(
     (contratoId: string | number) => {
-      router.push(`/alquileres/${contratoId}`);
+      router.push(withBreakUiQuery(`/alquileres/${contratoId}`, searchParams));
     },
-    [router],
+    [router, searchParams],
   );
 
   async function handleRenewContract(form: RenewContractForm) {
     if (!token || !selectedContrato) return;
+    if (breakUi.active) {
+      setRenewModalOpen(false);
+      showToast("Renovación simulada (modo break-ui).");
+      return;
+    }
     if (selectedContrato.estado !== "active") {
       showToast("Solo se pueden renovar contratos activos.");
       return;
@@ -326,6 +336,16 @@ export function AlquileresWorkspace() {
       showToast("Este contrato no está por vencer.");
       return;
     }
+    const fixture = breakUi.active ? resolveBreakUiFichaBundle(breakUi.mode, Number(row.id)) : null;
+    if (fixture) {
+      if (fixture.contrato.estado !== "active") {
+        showToast("Solo se pueden renovar contratos activos.");
+        return;
+      }
+      setSelectedContrato(fixture.contrato);
+      setRenewModalOpen(true);
+      return;
+    }
     try {
       const detailRes = await fetchContrato(token, Number(row.id));
       if (detailRes.estado !== "active") {
@@ -349,6 +369,17 @@ export function AlquileresWorkspace() {
       showToast("Este contrato no tiene ajuste pendiente.");
       return;
     }
+    const fixture = breakUi.active ? resolveBreakUiFichaBundle(breakUi.mode, Number(row.id)) : null;
+    if (fixture) {
+      if (fixture.contrato.estado !== "active") {
+        showToast("Solo se pueden ajustar contratos activos.");
+        return;
+      }
+      setSelectedContrato(fixture.contrato);
+      setSelectedUltimoAjusteEn(row.ultimoAjusteEn);
+      setAdjustModalOpen(true);
+      return;
+    }
     try {
       const detailRes = await fetchContrato(token, Number(row.id));
       if (detailRes.estado !== "active") {
@@ -370,6 +401,11 @@ export function AlquileresWorkspace() {
     depositoPlan?: { crearPlan: boolean; cantidadCuotas: number };
   }) {
     if (!token || !selectedContrato) return;
+    if (breakUi.active) {
+      setAdjustModalOpen(false);
+      showToast("Ajuste simulado (modo break-ui).");
+      return;
+    }
     if (selectedContrato.estado !== "active") {
       showToast("Solo se pueden ajustar contratos activos.");
       return;
@@ -612,6 +648,7 @@ export function AlquileresWorkspace() {
             frecuenciaAjusteMeses: form.frecuenciaAjusteMeses,
             tipoIndiceId: indexItem.id,
             notasIndice,
+            notas: form.notas.trim() || null,
             tipoMoraId: moraPayload.tipoMoraId,
             tasaMora: moraPayload.tasaMora,
             montoMoraFijo: moraPayload.montoMoraFijo,
@@ -692,7 +729,11 @@ export function AlquileresWorkspace() {
         {error ? (
           <div>
             <p className="rounded-sm border border-danger bg-danger-bg px-3 py-2 text-sm text-danger">{error}</p>
-            <button type="button" onClick={() => void loadRows()} className="dashboard-press mt-3 h-[34px] border border-border px-3 text-[13px] text-text-primary">
+            <button
+              type="button"
+              onClick={() => void loadRows()}
+              className={`dashboard-press mt-3 h-[34px] border border-border px-3 text-[13px] text-text-primary ${interactiveFocusClass}`}
+            >
               Reintentar
             </button>
           </div>
@@ -744,7 +785,9 @@ export function AlquileresWorkspace() {
           token={token}
           mediosPago={mediosPago}
           onSuccess={() => {
-            showToast("Cobro registrado.");
+            showToast(
+              breakUi.active ? "Cobro simulado (modo break-ui)." : "Cobro registrado.",
+            );
             void loadRows();
           }}
         />

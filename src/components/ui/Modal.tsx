@@ -67,7 +67,11 @@ export function Modal({
             <h2 id={titleId} className="text-lg font-bold text-text-primary">
               {title}
             </h2>
-            {subtitle ? <p className="text-sm text-text-secondary">{subtitle}</p> : null}
+            {subtitle ? (
+             <p className="line-clamp-2 break-words text-sm text-text-secondary" title={subtitle}>
+               {subtitle}
+             </p>
+           ) : null}
           </div>
           <button
             type="button"

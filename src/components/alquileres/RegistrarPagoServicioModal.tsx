@@ -8,6 +8,7 @@ import type { CatalogoItem, PeriodoServicioRecord } from "@/lib/api/types";
 import { formatMoney } from "@/lib/format";
 import { defaultMedioPagoParaCobro, mediosPagoParaCobro } from "@/lib/mappers/medios-pago";
 import { periodoRangeLabel } from "@/lib/mappers/servicios";
+import { formInputClass } from "@/lib/ui/interactive-focus";
 
 export type RegistrarPagoServicioFormValues = {
   fechaPago: string;
@@ -43,7 +44,7 @@ function Field({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
+        className={formInputClass}
       />
     </label>
   );
@@ -152,7 +153,7 @@ export function RegistrarPagoServicioModal({
           <select
             value={form.medioPagoId || ""}
             onChange={(e) => setForm((prev) => ({ ...prev, medioPagoId: Number(e.target.value) }))}
-            className="rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
+            className={formInputClass}
           >
             {mediosPagoOpciones.length === 0 ? (
               <option value="">Sin medios disponibles</option>

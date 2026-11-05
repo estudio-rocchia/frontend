@@ -14,7 +14,23 @@ const PASOS: EstadoTramiteVisa[] = [
   "entrevista",
 ];
 
-const RESOLUCIONES: EstadoTramiteVisa[] = ["aprobado", "rechazado", "procesamiento_administrativo"];
+const POST_ENTREVISTA: EstadoTramiteVisa = "procesamiento_administrativo";
+const RESOLUCIONES: EstadoTramiteVisa[] = ["aprobado", "rechazado"];
+
+function pasoActualIndex(estado: EstadoTramiteVisa): number {
+  if (
+    estado === POST_ENTREVISTA ||
+    RESOLUCIONES.includes(estado)
+  ) {
+    return PASOS.length;
+  }
+  return PASOS.indexOf(estado);
+}
+
+function postEntrevistaHabilitado(estado: EstadoTramiteVisa): boolean {
+  if (estado === POST_ENTREVISTA || RESOLUCIONES.includes(estado)) return true;
+  return PASOS.indexOf(estado) >= PASOS.indexOf("entrevista");
+}
 
 export function EstadoVisaStepper({
   estado,
@@ -25,15 +41,18 @@ export function EstadoVisaStepper({
   disabled?: boolean;
   onChange: (estado: EstadoTramiteVisa) => void;
 }) {
-  const enResolucion = RESOLUCIONES.includes(estado);
-  const pasoActual = enResolucion ? PASOS.length : PASOS.indexOf(estado);
+  const pasoActual = pasoActualIndex(estado);
+  const ocultarPasoActual =
+    estado === POST_ENTREVISTA || RESOLUCIONES.includes(estado);
+  const enPostEntrevista = estado === POST_ENTREVISTA;
+  const postEntrevistaDisponible = postEntrevistaHabilitado(estado);
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       <ol className="flex gap-2 overflow-x-auto pb-1">
         {PASOS.map((paso, index) => {
           const hecho = index < pasoActual;
-          const actual = !enResolucion && index === pasoActual;
+          const actual = !ocultarPasoActual && index === pasoActual;
           return (
             <li key={paso} className="min-w-[7.5rem] flex-1">
               <button
@@ -61,7 +80,39 @@ export function EstadoVisaStepper({
           );
         })}
       </ol>
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+
+      <div className="flex flex-col gap-2 border-t border-border pt-3">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
+            Después de la entrevista
+          </span>
+          <button
+            type="button"
+            disabled={disabled || !postEntrevistaDisponible}
+            aria-pressed={enPostEntrevista}
+            aria-describedby={!postEntrevistaDisponible ? "post-entrevista-ayuda" : undefined}
+            onClick={() => onChange(POST_ENTREVISTA)}
+            className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-default disabled:opacity-50 ${
+              enPostEntrevista
+                ? "border-warning bg-warning-bg text-warning"
+                : "border-border text-text-secondary hover:border-warning/40"
+            }`}
+          >
+            {ESTADO_VISA_LABEL[POST_ENTREVISTA]}
+          </button>
+        </div>
+        {!postEntrevistaDisponible ? (
+          <p id="post-entrevista-ayuda" className="text-xs text-text-secondary">
+            Se habilita cuando marcás Entrevista. Usalo si el consulado dejó el caso en revisión administrativa (AP).
+          </p>
+        ) : enPostEntrevista ? (
+          <p className="text-xs text-text-secondary">
+            El trámite sigue en curso: el consulado revisa el caso antes de aprobar o rechazar.
+          </p>
+        ) : null}
+      </div>
+
+      <div className="flex flex-col gap-2 border-t border-border pt-3 sm:flex-row sm:items-center">
         <span className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Resolución</span>
         <div className="flex flex-wrap gap-2">
           {RESOLUCIONES.map((paso) => {
@@ -71,13 +122,9 @@ export function EstadoVisaStepper({
                 ? actual
                   ? "border-success bg-success-bg text-success"
                   : "border-border text-text-secondary hover:border-success/40"
-                : paso === "rechazado"
-                  ? actual
-                    ? "border-danger bg-danger-bg text-danger"
-                    : "border-border text-text-secondary hover:border-danger/40"
-                  : actual
-                    ? "border-warning bg-warning-bg text-warning"
-                    : "border-border text-text-secondary hover:border-warning/40";
+                : actual
+                  ? "border-danger bg-danger-bg text-danger"
+                  : "border-border text-text-secondary hover:border-danger/40";
             return (
               <button
                 key={paso}

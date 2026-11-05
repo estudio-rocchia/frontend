@@ -323,6 +323,8 @@ export interface ContratoRecord {
   montoDeposito: string | null;
   codigoMonedaDeposito: string | null;
   estado: "active" | "finished" | "terminated";
+  renewalOfContratoId?: number | null;
+  notas?: string | null;
   rescisionDocumentoId?: number | null;
   rescisionEn?: string | null;
   rescisionNotas?: string | null;

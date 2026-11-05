@@ -100,7 +100,9 @@ export function GrupoCard({
                   {initialsOf(label) || "?"}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold text-text-primary">{label}</span>
+                  <span className="block truncate text-sm font-semibold text-text-primary" title={label}>
+                    {label}
+                  </span>
                   <span className="block text-xs text-text-secondary">
                     {current ? "Este expediente" : ESTADO_VISA_LABEL[integrante.estado]}
                   </span>

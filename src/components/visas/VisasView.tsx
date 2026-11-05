@@ -348,7 +348,22 @@ export function VisasView() {
         ) : null}
       </div>
 
-      {error ? <p className="text-sm text-danger">{error}</p> : null}
+      {error ? (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center gap-3 rounded-sm bg-danger-bg px-3 py-2"
+        >
+          <p className="text-sm text-danger">{error} Reintentá o ajustá los filtros.</p>
+          <button
+            type="button"
+            onClick={() => void load()}
+            disabled={loading}
+            className={`text-sm font-semibold text-primary hover:underline disabled:opacity-50 ${interactiveFocusClass}`}
+          >
+            Reintentar
+          </button>
+        </div>
+      ) : null}
 
       {!loading && items.length === 0 ? (
         <div className="flex flex-col items-start gap-3 rounded-md border border-dashed border-border bg-bg-card px-6 py-10">
@@ -446,16 +461,18 @@ export function VisasView() {
                       >
                         <td className={`sticky left-0 z-10 text-left ${bodyCell}`}>
                           <div className="flex min-w-[180px] flex-col gap-1">
-                            {miembros.map((miembro) => (
-                              <Link
-                                key={miembro.id}
-                                href={`/visas/${miembro.id}`}
-                                onClick={(event) => event.stopPropagation()}
-                                className="max-w-[16rem] truncate font-medium text-text-primary hover:underline"
-                              >
-                                {personaDisplayName(miembro.persona)}
-                              </Link>
-                            ))}
+                            {miembros.map((miembro) => {
+                              const nombre = personaDisplayName(miembro.persona);
+                              return (
+                                <span
+                                  key={miembro.id}
+                                  className="max-w-[16rem] truncate font-medium text-text-primary"
+                                  title={nombre}
+                                >
+                                  {nombre}
+                                </span>
+                              );
+                            })}
                             <span className="text-[12px] text-text-secondary">
                               {miembros.length === 1
                                 ? (miembros[0]?.persona.numeroDocumento ?? "Sin documento")

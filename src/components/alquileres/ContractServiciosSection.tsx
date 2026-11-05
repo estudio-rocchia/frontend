@@ -13,7 +13,7 @@ import { AguaConsultaModal } from "@/components/alquileres/AguaConsultaModal";
 import { SameepConsultaModal } from "@/components/alquileres/SameepConsultaModal";
 import { SecheepImportModal } from "@/components/alquileres/SecheepImportModal";
 import { ServicioFormModal, type ServicioFormValues } from "@/components/alquileres/ServicioFormModal";
-import { ButtonDanger, ButtonOutline } from "@/components/ui/Button";
+import { ButtonDanger, ButtonOutline, buttonOutlineClass } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import type {
@@ -24,6 +24,7 @@ import type {
   ServicioContratoRecord,
 } from "@/lib/api/types";
 import { formatDateDisplay, formatMoney, moneyClassName } from "@/lib/format";
+import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 import { isSecheepElectricity, secheepConfigured, secheepStatusForServicio } from "@/lib/mappers/secheep";
 import {
   buildPeriodosGroupedByServicio,
@@ -43,6 +44,63 @@ import {
 } from "@/lib/mappers/servicios";
 
 type ServiciosPanel = "servicios" | "periodos" | "inactivos";
+
+type ServicioRowAction = {
+  key: string;
+  label: string;
+  onClick: () => void;
+};
+
+const servicioActionButtonClass = "px-2.5 py-1 text-xs";
+
+function ServicioRowActions({
+  actions,
+  disabled,
+}: {
+  actions: ServicioRowAction[];
+  disabled: boolean;
+}) {
+  const visible = actions.slice(0, 2);
+  const overflow = actions.slice(2);
+
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-1.5">
+      {visible.map((action) => (
+        <ButtonOutline
+          key={action.key}
+          type="button"
+          className={servicioActionButtonClass}
+          onClick={action.onClick}
+          disabled={disabled}
+        >
+          {action.label}
+        </ButtonOutline>
+      ))}
+      {overflow.length > 0 ? (
+        <details className="relative">
+          <summary
+            className={`${buttonOutlineClass} cursor-pointer list-none px-2.5 py-1 text-xs [&::-webkit-details-marker]:hidden ${interactiveFocusClass}`}
+          >
+            Más
+          </summary>
+          <div className="absolute right-0 z-20 mt-1 flex min-w-36 flex-col rounded-md border border-border bg-bg-card p-1 shadow-[var(--shadow-card)]">
+            {overflow.map((action) => (
+              <button
+                key={action.key}
+                type="button"
+                disabled={disabled}
+                onClick={action.onClick}
+                className={`rounded-sm px-3 py-2 text-left text-xs font-medium text-text-primary hover:bg-bg-page disabled:opacity-50 ${interactiveFocusClass}`}
+              >
+                {action.label}
+              </button>
+            ))}
+          </div>
+        </details>
+      ) : null}
+    </div>
+  );
+}
 
 function PeriodosServicioTable({
   group,
@@ -297,14 +355,16 @@ export function ContractServiciosSection({
       </div>
 
 
-      <div className="flex flex-wrap gap-2 border-b border-border">
+      <div role="tablist" aria-label="Servicios del contrato" className="flex flex-wrap gap-2 border-b border-border">
         {subTabs.map((tab) => (
           <button
             key={tab.id}
             type="button"
+            role="tab"
+            aria-selected={activePanel === tab.id}
             data-testid={`servicios-subtab-${tab.id}`}
             onClick={() => setActivePanel(tab.id)}
-            className={`rounded-t-sm px-3 py-2 text-sm font-medium transition-colors ${
+            className={`rounded-t-sm px-3 py-2 text-sm font-medium transition-colors ${interactiveFocusClass} ${
               activePanel === tab.id
                 ? "border-b-2 border-primary text-primary"
                 : "border-b-2 border-transparent text-text-secondary hover:text-text-primary"
@@ -365,6 +425,56 @@ export function ContractServiciosSection({
                           Boolean(servicio.numeroSocioAgua?.trim()) &&
                           servicio.numeroServicioAgua !== null));
                     const monedaSaldo = servicioPeriodos.find((p) => Number(p.saldo) > 0)?.codigoMoneda;
+
+                    const rowActions: ServicioRowAction[] = [];
+                    if (servicioEsCobrable(servicio)) {
+                      rowActions.push({
+                        key: "periodo",
+                        label: "Período",
+                        onClick: () => {
+                          setPeriodoServicio(servicio);
+                          setPeriodoModalOpen(true);
+                        },
+                      });
+                    }
+                    if (showAguaConsulta) {
+                      rowActions.push({
+                        key: "agua",
+                        label: "Agua",
+                        onClick: () => {
+                          if (servicio.proveedorAgua === "sameep") {
+                            setSameepServicio(servicio);
+                            setSameepModalOpen(true);
+                            return;
+                          }
+                          setAguaServicio(servicio);
+                          setAguaModalOpen(true);
+                        },
+                      });
+                    }
+                    if (showSecheepImport) {
+                      rowActions.push({
+                        key: "secheep",
+                        label: "Facturas",
+                        onClick: () => {
+                          setSecheepServicio(servicio);
+                          setSecheepModalOpen(true);
+                        },
+                      });
+                    }
+                    rowActions.push({
+                      key: "editar",
+                      label: "Editar",
+                      onClick: () => {
+                        setEditingServicio(servicio);
+                        setServicioModalOpen(true);
+                      },
+                    });
+                    rowActions.push({
+                      key: "desactivar",
+                      label: "Desactivar",
+                      onClick: () => setDeactivateTarget(servicio),
+                    });
 
                     return (
                       <tr key={servicio.id} className="bg-bg-card align-top">
@@ -458,71 +568,7 @@ export function ContractServiciosSection({
                         </td>
                         {canEdit ? (
                           <td className="px-4 py-3">
-                            <div className="flex flex-wrap justify-end gap-1.5">
-                              {servicioEsCobrable(servicio) ? (
-                                <ButtonOutline
-                                  type="button"
-                                  className="px-2.5 py-1 text-xs"
-                                  onClick={() => {
-                                    setPeriodoServicio(servicio);
-                                    setPeriodoModalOpen(true);
-                                  }}
-                                  disabled={submitting}
-                                >
-                                  Período
-                                </ButtonOutline>
-                              ) : null}
-                              {showAguaConsulta ? (
-                                <ButtonOutline
-                                  type="button"
-                                  className="px-2.5 py-1 text-xs"
-                                  onClick={() => {
-                                    if (servicio.proveedorAgua === "sameep") {
-                                      setSameepServicio(servicio);
-                                      setSameepModalOpen(true);
-                                      return;
-                                    }
-                                    setAguaServicio(servicio);
-                                    setAguaModalOpen(true);
-                                  }}
-                                  disabled={submitting}
-                                >
-                                  Agua
-                                </ButtonOutline>
-                              ) : null}
-                              {showSecheepImport ? (
-                                <ButtonOutline
-                                  type="button"
-                                  className="px-2.5 py-1 text-xs"
-                                  onClick={() => {
-                                    setSecheepServicio(servicio);
-                                    setSecheepModalOpen(true);
-                                  }}
-                                  disabled={submitting}
-                                >
-                                  Facturas
-                                </ButtonOutline>
-                              ) : null}
-                              <ButtonOutline
-                                type="button"
-                                className="px-2.5 py-1 text-xs"
-                                onClick={() => {
-                                  setEditingServicio(servicio);
-                                  setServicioModalOpen(true);
-                                }}
-                                disabled={submitting}
-                              >
-                                Editar
-                              </ButtonOutline>
-                              <ButtonOutline
-                                type="button"
-                                className="px-2.5 py-1 text-xs"
-                                onClick={() => setDeactivateTarget(servicio)}
-                                disabled={submitting}
-                              >
-                                Desactivar
-                              </ButtonOutline>
-                            </div>
+                            <ServicioRowActions actions={rowActions} disabled={Boolean(submitting)} />
                           </td>
                         ) : null}
                       </tr>

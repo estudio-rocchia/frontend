@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 
 import { CotizacionCard, CotizacionCardSkeleton } from "@/components/visas/CotizacionCard";
@@ -73,6 +73,16 @@ export function VisaFichaView() {
   const [notasGrupo, setNotasGrupo] = useState("");
   const [honorarioPagadoEn, setHonorarioPagadoEn] = useState("");
   const [pestana, setPestana] = useState<"tramite" | "cuestionario">("tramite");
+  const tramitePanelRef = useRef<HTMLDivElement>(null);
+  const cuestionarioPanelRef = useRef<HTMLDivElement>(null);
+
+  const selectPestana = useCallback((id: "tramite" | "cuestionario") => {
+    setPestana(id);
+    window.requestAnimationFrame(() => {
+      const panel = id === "tramite" ? tramitePanelRef.current : cuestionarioPanelRef.current;
+      panel?.focus();
+    });
+  }, []);
 
   const applyDetail = useCallback((next: TramiteVisaDetail) => {
     setDetail(next);
@@ -365,7 +375,7 @@ export function VisaFichaView() {
             role="tab"
             aria-selected={pestana === id}
             aria-controls={`visa-panel-${id}`}
-            onClick={() => setPestana(id)}
+            onClick={() => selectPestana(id)}
             className={`inline-flex min-h-11 items-center border-b-2 px-3 text-sm font-medium transition-colors ${interactiveFocusClass} ${
               pestana === id
                 ? "border-primary text-primary"
@@ -380,9 +390,11 @@ export function VisaFichaView() {
       {pestana === "tramite" && loading && !detail ? (
         <div
           id="visa-panel-tramite"
+          ref={tramitePanelRef}
           role="tabpanel"
+          tabIndex={-1}
           aria-labelledby="visa-tab-tramite"
-          className="grid items-start gap-4 md:gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]"
+          className="grid items-start gap-4 outline-none md:gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]"
         >
           <ExpedienteCardSkeleton />
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
@@ -395,9 +407,11 @@ export function VisaFichaView() {
       {pestana === "tramite" && detail && cotizacion ? (
         <div
           id="visa-panel-tramite"
+          ref={tramitePanelRef}
           role="tabpanel"
+          tabIndex={-1}
           aria-labelledby="visa-tab-tramite"
-          className="grid items-start gap-4 md:gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]"
+          className="grid items-start gap-4 outline-none md:gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]"
         >
           <ExpedienteCard
             canEdit={canEdit}
@@ -527,9 +541,11 @@ export function VisaFichaView() {
       {pestana === "cuestionario" ? (
         <div
           id="visa-panel-cuestionario"
+          ref={cuestionarioPanelRef}
           role="tabpanel"
+          tabIndex={-1}
           aria-labelledby="visa-tab-cuestionario"
-          className="max-w-5xl"
+          className="max-w-5xl outline-none"
         >
           {token && detail ? (
             <CuestionarioCard token={token} tramiteId={detail.id} canEdit={canEdit} />

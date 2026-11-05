@@ -25,6 +25,24 @@ function formatMoneda(moneda: "usd" | "ars" | undefined, amount: number) {
   return moneda === "ars" ? formatArs(amount) : formatUsd(amount);
 }
 
+function CobroImporte({ usd, ars }: { usd: number; ars: number }) {
+  if (ars > 0 && usd === 0) {
+    return <span className="shrink-0 tabular-nums">{formatArs(ars)}</span>;
+  }
+  if (usd > 0 && ars === 0) {
+    return <span className="shrink-0 tabular-nums">{formatUsd(usd)}</span>;
+  }
+  if (usd > 0 && ars > 0) {
+    return (
+      <span className="shrink-0 text-right tabular-nums">
+        <span className="block">{formatUsd(usd)}</span>
+        <span className="block text-xs font-semibold">{formatArs(ars)}</span>
+      </span>
+    );
+  }
+  return <span className="shrink-0 tabular-nums">{formatUsd(0)}</span>;
+}
+
 function conceptosDe(cotizacion: CotizacionVisa): ConceptoCotizadoVisa[] {
   return cotizacion.conceptos ?? [];
 }
@@ -250,6 +268,7 @@ export function CotizacionCard({
   const [arancel, setArancel] = useState(false);
   const [fecha, setFecha] = useState(todayIso);
   const [fechaError, setFechaError] = useState<string | null>(null);
+  const [selectionError, setSelectionError] = useState<string | null>(null);
   const [busyRecibo, setBusyRecibo] = useState<number | null>(null);
   const [anularId, setAnularId] = useState<number | null>(null);
 
@@ -328,6 +347,7 @@ export function CotizacionCard({
     setArancel(faltaArancel);
     setFecha(todayIso());
     setFechaError(null);
+    setSelectionError(null);
     setAnularId(null);
     setOpen(true);
   }
@@ -343,7 +363,12 @@ export function CotizacionCard({
     }
     const cobraHonorario = faltaHonorario && (faltaLosDos ? honorario : true);
     const cobraArancel = faltaArancel && (faltaLosDos ? arancel : true);
+    if (faltaLosDos && !honorario && !arancel) {
+      setSelectionError("Marcá al menos un concepto.");
+      return;
+    }
     if (!cobraHonorario && !cobraArancel) return;
+    setSelectionError(null);
     setFechaError(null);
     try {
       await onCobrar({ honorario: cobraHonorario, arancel: cobraArancel, fecha });
@@ -520,29 +545,49 @@ export function CotizacionCard({
               }}
             >
               {faltaLosDos ? (
-                <fieldset className="flex flex-col gap-2" disabled={saving}>
+                <fieldset
+                  className="flex flex-col gap-2"
+                  disabled={saving}
+                  aria-invalid={Boolean(selectionError)}
+                  aria-describedby={selectionError ? "cobro-seleccion-ayuda" : undefined}
+                >
                   <legend className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
                     Qué se pagó
                   </legend>
                   <ConceptoCheck
                     label={honorarioLabel}
-                    amount={formatUsd(cotizacion.totalEstudioUsd)}
+                    usd={cotizacion.totalEstudioUsd}
+                    ars={cotizacion.totalEstudioArs ?? 0}
                     checked={honorario}
-                    onChange={setHonorario}
+                    onChange={(checked) => {
+                      setHonorario(checked);
+                      setSelectionError(null);
+                    }}
                   />
                   <ConceptoCheck
                     label={arancelLabel}
-                    amount={formatUsd(arancelCobroUsd)}
+                    usd={arancelCobroUsd}
+                    ars={arancelCobroArs}
                     checked={arancel}
-                    onChange={setArancel}
+                    onChange={(checked) => {
+                      setArancel(checked);
+                      setSelectionError(null);
+                    }}
                   />
+                  {selectionError ? (
+                    <span id="cobro-seleccion-ayuda" className="text-xs text-danger">
+                      {selectionError}
+                    </span>
+                  ) : null}
                 </fieldset>
               ) : (
                 <p className="flex items-baseline justify-between gap-3 text-sm text-text-primary">
                   <span className="font-semibold">{faltaHonorario ? honorarioLabel : arancelLabel}</span>
-                  <span className="shrink-0 tabular-nums">
-                    {formatUsd(faltaHonorario ? cotizacion.totalEstudioUsd : arancelCobroUsd)}
-                  </span>
+                  {faltaHonorario ? (
+                    <CobroImporte usd={cotizacion.totalEstudioUsd} ars={cotizacion.totalEstudioArs ?? 0} />
+                  ) : (
+                    <CobroImporte usd={arancelCobroUsd} ars={arancelCobroArs} />
+                  )}
                 </p>
               )}
 
@@ -567,11 +612,7 @@ export function CotizacionCard({
               </label>
 
               <div className="flex items-center gap-2">
-                <ButtonPrimary
-                  type="submit"
-                  disabled={saving || (faltaLosDos && !honorario && !arancel)}
-                  className="min-w-0 flex-1"
-                >
+                <ButtonPrimary type="submit" disabled={saving} className="min-w-0 flex-1">
                   {saving ? "Guardando…" : "Confirmar"}
                 </ButtonPrimary>
                 <ButtonOutline onClick={() => setOpen(false)} disabled={saving}>
@@ -639,6 +680,7 @@ export function CotizacionCard({
                           className={`block truncate text-sm font-semibold ${
                             anulado ? "text-text-secondary line-through" : "text-text-primary"
                           }`}
+                          title={recibo.reciboNumber}
                         >
                           {recibo.reciboNumber}
                         </span>
@@ -788,11 +830,15 @@ function CobroLista({
                 className={`block truncate text-sm font-semibold hover:underline ${interactiveFocusClass} ${
                   pagado ? "text-success" : "text-primary"
                 }`}
+                title={linea.quien}
               >
                 {linea.quien}
               </Link>
             ) : (
-              <span className={`block truncate text-sm font-semibold ${pagado ? "text-success" : "text-text-primary"}`}>
+              <span
+                className={`block truncate text-sm font-semibold ${pagado ? "text-success" : "text-text-primary"}`}
+                title={linea.quien}
+              >
                 {linea.quien}
               </span>
             );
@@ -828,12 +874,14 @@ function CobroLista({
 
 function ConceptoCheck({
   label,
-  amount,
+  usd,
+  ars,
   checked,
   onChange,
 }: {
   label: string;
-  amount: string;
+  usd: number;
+  ars: number;
   checked: boolean;
   onChange: (checked: boolean) => void;
 }) {
@@ -852,7 +900,7 @@ function ConceptoCheck({
         />
         {label}
       </span>
-      <span className="shrink-0 tabular-nums">{amount}</span>
+      <CobroImporte usd={usd} ars={ars} />
     </label>
   );
 }

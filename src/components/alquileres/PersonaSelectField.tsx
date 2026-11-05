@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import { Search, UserPlus, X } from "lucide-react";
 
 import { fetchPersonas } from "@/lib/api";
@@ -8,6 +8,7 @@ import type { PersonaRecord } from "@/lib/api/types";
 import { personaDisplayName, parsePersonName } from "@/lib/format";
 import { dedupePersonaResults } from "@/lib/persona-dedupe";
 import { ADMIN_PORCENTAJE_OPTIONS } from "@/data/clientes";
+import { formInputClass, interactiveFocusClass } from "@/lib/ui/interactive-focus";
 
 export type PersonaFieldValue =
   | { mode: "existing"; personaId: number; label: string }
@@ -52,8 +53,6 @@ function updateNewPersona(
 
 const MIN_SEARCH_LEN = 2;
 const RESULT_LIMIT = 10;
-const newPersonInputClass =
-  "rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary";
 
 function personaSearchMeta(persona: PersonaRecord): string {
   const documento =
@@ -106,7 +105,7 @@ function NewPersonaFields({
           onChange={(event) => onChange(updateNewPersona(value, { nombre: event.target.value }))}
           placeholder="Nombre"
           autoComplete="given-name"
-          className={newPersonInputClass}
+          className={formInputClass}
         />
       </div>
       <div className="flex flex-col gap-1.5">
@@ -117,7 +116,7 @@ function NewPersonaFields({
           onChange={(event) => onChange(updateNewPersona(value, { apellido: event.target.value }))}
           placeholder="Apellido"
           autoComplete="family-name"
-          className={newPersonInputClass}
+          className={formInputClass}
         />
       </div>
     </div>
@@ -145,6 +144,7 @@ export function PersonaSelectField({
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [remoteResults, setRemoteResults] = useState<PersonaRecord[]>([]);
   const [searching, setSearching] = useState(false);
+  const [activeOptionIndex, setActiveOptionIndex] = useState(-1);
   const [creatingNew, setCreatingNew] = useState(
     value.mode === "new" && (value.nombre.trim().length > 0 || value.apellido.trim().length > 0),
   );
@@ -196,7 +196,51 @@ export function PersonaSelectField({
 
   const results = token ? remoteResults : localResults;
   const inputName = searchId ?? `persona-search-${label.toLowerCase().replace(/\s+/g, "-")}`;
+  const listboxId = `${inputName}-listbox`;
   const queryTooShort = query.trim().length < MIN_SEARCH_LEN;
+  const listOpen = !creatingNew && !queryTooShort;
+
+  useEffect(() => {
+    setActiveOptionIndex(-1);
+  }, [results, debouncedQuery, creatingNew]);
+
+  function selectPersona(persona: PersonaRecord) {
+    const name = personaDisplayName(persona);
+    onChange({ mode: "existing", personaId: persona.id, label: name });
+    setCreatingNew(false);
+    setQuery("");
+    setDebouncedQuery("");
+    setRemoteResults([]);
+    setActiveOptionIndex(-1);
+  }
+
+  function handleSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setQuery("");
+      setActiveOptionIndex(-1);
+      return;
+    }
+
+    if (!listOpen || results.length === 0 || searching) return;
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setActiveOptionIndex((index) => (index + 1) % results.length);
+      return;
+    }
+
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setActiveOptionIndex((index) => (index <= 0 ? results.length - 1 : index - 1));
+      return;
+    }
+
+    if (event.key === "Enter" && activeOptionIndex >= 0) {
+      event.preventDefault();
+      selectPersona(results[activeOptionIndex]);
+    }
+  }
 
   if (value.mode === "existing" && !creatingNew) {
     return (
@@ -213,15 +257,20 @@ export function PersonaSelectField({
               setRemoteResults([]);
               onChange(emptyNewPersonaField());
             }}
-            className="text-text-secondary hover:text-text-primary"
+            className={`rounded-sm p-1 text-text-secondary hover:text-text-primary ${interactiveFocusClass}`}
             aria-label="Cambiar persona"
           >
-            <X className="h-4 w-4" />
+            <X className="h-4 w-4" aria-hidden />
           </button>
         </div>
       </div>
     );
   }
+
+  const activeDescendantId =
+    activeOptionIndex >= 0 && results[activeOptionIndex]
+      ? `${listboxId}-option-${results[activeOptionIndex].id}`
+      : undefined;
 
   return (
     <div className="flex flex-col gap-2">
@@ -236,6 +285,7 @@ export function PersonaSelectField({
                 name={inputName}
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
+                onKeyDown={handleSearchKeyDown}
                 placeholder={placeholder}
                 autoComplete="off"
                 autoCorrect="off"
@@ -243,39 +293,46 @@ export function PersonaSelectField({
                 spellCheck={false}
                 data-lpignore="true"
                 data-1p-ignore="true"
+                role="combobox"
                 aria-autocomplete="list"
-                className="min-w-0 flex-1 bg-transparent text-base text-text-primary outline-none placeholder:text-text-secondary sm:text-sm"
+                aria-expanded={listOpen && results.length > 0}
+                aria-controls={listboxId}
+                aria-activedescendant={activeDescendantId}
+                className={`min-w-0 flex-1 bg-transparent text-base text-text-primary outline-none placeholder:text-text-secondary sm:text-sm ${interactiveFocusClass}`}
               />
             </span>
           </label>
-          {!queryTooShort ? (
+          {listOpen ? (
             <div className="rounded-[13px] border border-border">
               {searching ? (
-                <p className="px-3 py-3 text-[12px] text-text-secondary">Buscando clientes...</p>
+                <p className="px-3 py-3 text-[12px] text-text-secondary">Buscando clientes…</p>
               ) : results.length === 0 ? (
                 <p className="px-3 py-3 text-[12px] text-text-secondary">
                   Sin clientes para &quot;{query.trim()}&quot;.
                 </p>
               ) : (
-                <ul className="flex flex-col gap-1 p-1" role="listbox" aria-label={`Resultados de ${label}`}>
-                  {results.map((persona) => {
+                <ul className="flex flex-col gap-1 p-1" id={listboxId} role="listbox" aria-label={`Resultados de ${label}`}>
+                  {results.map((persona, index) => {
                     const name = personaDisplayName(persona);
                     const meta = personaSearchMeta(persona);
+                    const selected = activeOptionIndex === index;
                     return (
-                      <li key={persona.id} role="option">
+                      <li key={persona.id} role="presentation">
                         <button
+                          id={`${listboxId}-option-${persona.id}`}
                           type="button"
-                          onClick={() => {
-                            onChange({ mode: "existing", personaId: persona.id, label: name });
-                            setCreatingNew(false);
-                            setQuery("");
-                            setDebouncedQuery("");
-                            setRemoteResults([]);
-                          }}
-                          className="flex w-full flex-col gap-0.5 rounded-sm px-3 py-2 text-left hover:bg-bg-page"
+                          role="option"
+                          aria-selected={selected}
+                          onMouseEnter={() => setActiveOptionIndex(index)}
+                          onClick={() => selectPersona(persona)}
+                          className={`flex w-full flex-col gap-0.5 rounded-sm px-3 py-2 text-left hover:bg-bg-page ${interactiveFocusClass} ${
+                            selected ? "bg-bg-page" : ""
+                          }`}
                         >
                           <span className="text-[13px] font-medium text-text-primary">{name}</span>
-                          {meta ? <span className="text-[11px] text-text-secondary">{meta}</span> : null}
+                          {meta ? (
+                            <span className="break-all text-[11px] text-text-secondary">{meta}</span>
+                          ) : null}
                         </button>
                       </li>
                     );
@@ -290,7 +347,7 @@ export function PersonaSelectField({
               setCreatingNew(true);
               onChange(newPersonaFromSearchQuery(query));
             }}
-            className="flex items-center gap-2 text-[12px] font-semibold text-primary hover:underline"
+            className={`flex items-center gap-2 text-[12px] font-semibold text-primary hover:underline ${interactiveFocusClass}`}
           >
             <UserPlus className="h-3.5 w-3.5" aria-hidden />
             Crear persona nueva
@@ -309,7 +366,7 @@ export function PersonaSelectField({
               setRemoteResults([]);
               onChange(emptyNewPersonaField());
             }}
-            className="text-left text-[12px] font-semibold text-primary hover:underline"
+            className={`text-left text-[12px] font-semibold text-primary hover:underline ${interactiveFocusClass}`}
           >
             Buscar cliente existente
           </button>
@@ -364,8 +421,9 @@ function PorcentajeAdministracionFields({
             <button
               key={option}
               type="button"
+              aria-pressed={selected}
               onClick={() => onChange(option)}
-              className={`rounded-full border border-border px-3.5 py-2 text-[13px] transition-colors ${
+              className={`rounded-full border border-border px-3.5 py-2 text-[13px] transition-colors ${interactiveFocusClass} ${
                 selected
                   ? "bg-primary-soft font-semibold text-primary"
                   : "bg-bg-card text-text-secondary hover:text-text-primary"
@@ -406,7 +464,7 @@ function PorcentajeAdministracionFields({
                 commitCustomValue(inputValue);
               }
             }}
-            className="w-10 min-w-0 border-0 bg-transparent p-0 text-center text-[13px] font-semibold text-inherit tabular-nums outline-none placeholder:font-normal placeholder:text-text-secondary"
+            className={`w-10 min-w-0 border-0 bg-transparent p-0 text-center text-[13px] font-semibold text-inherit tabular-nums outline-none placeholder:font-normal placeholder:text-text-secondary ${interactiveFocusClass}`}
             placeholder="—"
           />
           <span className="text-[12px] font-medium opacity-80">%</span>

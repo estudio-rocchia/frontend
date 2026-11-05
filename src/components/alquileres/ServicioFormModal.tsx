@@ -6,6 +6,7 @@ import { Modal } from "@/components/ui/Modal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import type { CatalogoItem, ModoFacturacion, ServicioContratoRecord } from "@/lib/api/types";
 import { defaultModoForTipo, filterAddableTiposServicio } from "@/lib/mappers/servicios";
+import { formInputClass, interactiveFocusClass } from "@/lib/ui/interactive-focus";
 
 export type ServicioFormValues = {
   tipoServicioId: number;
@@ -64,7 +65,7 @@ function Field({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
+        className={formInputClass}
       />
       {hint ? <span className="text-[11px] text-text-secondary">{hint}</span> : null}
     </label>
@@ -105,8 +106,9 @@ function ModoFacturacionToggle({
             <button
               key={option.id}
               type="button"
+              aria-pressed={selected}
               onClick={() => onChange(option.id)}
-              className={`rounded-sm border px-3 py-2.5 text-left transition-colors ${
+              className={`rounded-sm border px-3 py-2.5 text-left transition-colors ${interactiveFocusClass} ${
                 selected
                   ? "border-primary bg-primary/10"
                   : "border-border bg-bg-page hover:border-primary/40"
@@ -293,7 +295,7 @@ export function ServicioFormModal({
             <select
               value={form.tipoServicioId || ""}
               onChange={(e) => handleTipoChange(Number(e.target.value))}
-              className="rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
+              className={formInputClass}
             >
               {availableTipos.length === 0 ? (
                 <option value="">Sin tipos disponibles</option>
@@ -345,7 +347,7 @@ export function ServicioFormModal({
                         proveedorAgua: e.target.value === "sameep" ? "sameep" : "cooperativa",
                       }))
                     }
-                    className="rounded-sm border border-border bg-bg-card px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
+                    className={`rounded-sm border border-border bg-bg-card px-3 py-2.5 text-[13px] text-text-primary focus:border-primary ${interactiveFocusClass}`}
                   >
                     <option value="cooperativa">Cooperativa Las Breñas</option>
                     <option value="sameep">SAMEEP</option>
@@ -440,7 +442,7 @@ export function ServicioFormModal({
                   modoFacturacion: e.target.value as ModoFacturacion,
                 }))
               }
-              className="rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
+              className={formInputClass}
             >
               <option value="fixed">Monto fijo mensual</option>
               <option value="variable">Por boleta / período</option>
@@ -474,7 +476,7 @@ export function ServicioFormModal({
                     codigoMoneda: e.target.value as "ARS" | "USD",
                   }))
                 }
-                className="rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
+                className={formInputClass}
               >
                 <option value="ARS">ARS</option>
                 <option value="USD">USD</option>

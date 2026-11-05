@@ -3,14 +3,18 @@
 import { useCallback, useEffect, useState } from "react";
 
 import type { RentalChipId, RentalRow } from "@/data/alquileres-rentals";
+import { filterRentals, rentalSummaryStats, searchRentals } from "@/data/alquileres-rentals";
+import { resolveBreakUiTablePage } from "@/data/alquileres-break-ui-fixtures";
 import { ApiError, fetchContratosTableSummary } from "@/lib/api";
 import type { ContratoOperativaFilter, ContratoTableStats } from "@/lib/api/types";
+import { useBreakUiMode } from "@/lib/alquileres/break-ui-mode";
 import { useCursorPagination } from "@/lib/hooks/use-cursor-pagination";
 import { mapContratoTableItemToRentalRow } from "@/lib/mappers/rentals";
 
 export const ALQUILERES_PAGE_SIZE = 15;
 
 export function useAlquileresTable(token: string | null, logout: () => void) {
+  const breakUi = useBreakUiMode();
   const [rows, setRows] = useState<RentalRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -38,6 +42,23 @@ export function useAlquileresTable(token: string | null, logout: () => void) {
     }
     setError(null);
     try {
+      const fixture = breakUi.active ? resolveBreakUiTablePage(breakUi.mode) : null;
+      if (fixture) {
+        const allRows = fixture.items.map((contrato) => mapContratoTableItemToRentalRow(contrato));
+        let filtered = allRows;
+        if (activeChip !== "todos") {
+          filtered = filterRentals(filtered, activeChip);
+        }
+        if (debouncedSearch.trim()) {
+          filtered = searchRentals(filtered, debouncedSearch);
+        }
+        setRows(filtered);
+        setTableTotal(filtered.length);
+        setTableStats(rentalSummaryStats(allRows));
+        applyResponse(fixture.nextCursor ?? null);
+        return;
+      }
+
       const contratosRes = await fetchContratosTableSummary(token, {
         estado: "active",
         limit: ALQUILERES_PAGE_SIZE,
@@ -60,7 +81,7 @@ export function useAlquileresTable(token: string | null, logout: () => void) {
         setLoading(false);
       }
     }
-  }, [token, logout, currentCursor, debouncedSearch, activeChip, applyResponse]);
+  }, [token, logout, currentCursor, debouncedSearch, activeChip, applyResponse, breakUi.active, breakUi.mode]);
 
   const isSearchPending = searchQuery !== debouncedSearch;
 

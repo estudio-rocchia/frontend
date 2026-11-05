@@ -32,6 +32,7 @@ import {
   formatDateDisplay,
   formatMoney,
   moneyClassName,
+  moneyHeroClass,
   rentalApiErrorMessage,
 } from "@/lib/format";
 import {
@@ -57,6 +58,9 @@ import {
   servicioPeriodoCobroLabel,
 } from "@/lib/mappers/servicios";
 import { defaultMedioPagoParaCobro, mediosPagoParaCobro } from "@/lib/mappers/medios-pago";
+import { formInputClass } from "@/lib/ui/interactive-focus";
+import { resolveBreakUiFichaBundle } from "@/data/alquileres-break-ui-fixtures";
+import { useBreakUiMode } from "@/lib/alquileres/break-ui-mode";
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -93,6 +97,7 @@ export function CobrarAlquilerModal({
   mediosPago: CatalogoItem[];
   onSuccess: () => void;
 }) {
+  const breakUi = useBreakUiMode();
   const mediosPagoOpciones = useMemo(() => mediosPagoParaCobro(mediosPago), [mediosPago]);
 
   const [loading, setLoading] = useState(false);
@@ -134,6 +139,32 @@ export function CobrarAlquilerModal({
       setEmitRecibo(true);
 
       try {
+        const fixture = breakUi.active ? resolveBreakUiFichaBundle(breakUi.mode, id) : null;
+        if (fixture) {
+          const target = pickCuotaParaCobrar(fixture.cuotas);
+          if (!target) {
+            throw new Error("No hay períodos de alquiler pendientes de cobro");
+          }
+          const activePlan = activePlanActualizacionDeposito(fixture.planesDeposito);
+          const pendingDeposito = pickCuotaDepositoParaCobrar(activePlan);
+          const pendientesServicios = periodosServiciosParaCobroCuota(
+            fixture.periodos,
+            target,
+            fixture.servicios,
+          );
+          const periodosMesCuota = periodosServiciosMesCuota(pendientesServicios, target);
+          if (!cancelled) {
+            setCuota(target);
+            setPlanDeposito(activePlan);
+            setCuotaDeposito(pendingDeposito);
+            setIncludeDeposito(Boolean(pendingDeposito));
+            setServicios(fixture.servicios);
+            setPeriodosServicio(pendientesServicios);
+            setIncludedPeriodoIds(periodosMesCuota.map((periodo) => periodo.id));
+          }
+          return;
+        }
+
         const [cuotasRes, serviciosRes, periodosRes, contratoRes] = await Promise.all([
           fetchCuotas(authToken, id),
           fetchServicios(authToken, id),
@@ -193,10 +224,10 @@ export function CobrarAlquilerModal({
     return () => {
       cancelled = true;
     };
-  }, [open, token, contratoId, mediosPago]);
+  }, [open, token, contratoId, mediosPago, breakUi.active, breakUi.mode]);
 
   useEffect(() => {
-    if (!open || !token || contratoId === null || !cuota || loading) return;
+    if (!open || !token || contratoId === null || !cuota || loading || breakUi.active) return;
     if (!isCuotaOverdue(cuota, fechaPago)) return;
 
     const authToken = token;
@@ -254,6 +285,12 @@ export function CobrarAlquilerModal({
     );
     if (saldoCuotaInicial + saldoServiciosInicial <= 0) {
       setError("No hay saldo pendiente para cobrar.");
+      return;
+    }
+
+    if (breakUi.active) {
+      onSuccess();
+      onClose();
       return;
     }
 
@@ -358,6 +395,7 @@ export function CobrarAlquilerModal({
     periodosIncluidos.find((periodo) => periodo.codigoMoneda.trim() !== moneda)?.codigoMoneda.trim() ??
     null;
   const saldo = saldoAlquiler + saldoMora + saldoDeposito + saldoServiciosMismaMoneda;
+  const saldoFormatted = formatMoney(String(saldo), moneda);
   const tieneCobroTotal =
     saldoAlquiler + saldoMora + saldoDeposito + saldoServiciosMismaMoneda + saldoServiciosOtraMoneda > 0;
   const diasMora = cuota?.mora?.diasAtraso ?? 0;
@@ -428,8 +466,8 @@ export function CobrarAlquilerModal({
                 </span>
               ) : null}
             </p>
-            <p className={`mt-4 text-[32px] font-bold leading-none text-primary ${moneyClassName}`}>
-              {formatMoney(String(saldo), moneda)}
+            <p className={`mt-4 font-bold text-primary ${moneyHeroClass(saldoFormatted)}`}>
+              {saldoFormatted}
             </p>
             {saldoServiciosOtraMoneda > 0 && monedaServiciosExtra ? (
               <p className={`mt-2 text-sm font-semibold text-text-secondary ${moneyClassName}`}>
@@ -539,7 +577,7 @@ export function CobrarAlquilerModal({
                 type="date"
                 value={fechaPago}
                 onChange={(e) => setFechaPago(e.target.value)}
-                className="rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
+                className={formInputClass}
               />
             </label>
             <label className="flex flex-col gap-1.5">
@@ -547,7 +585,7 @@ export function CobrarAlquilerModal({
               <select
                 value={medioPagoId || ""}
                 onChange={(e) => setMedioPagoId(Number(e.target.value))}
-                className="rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
+                className={formInputClass}
               >
                 {mediosPagoOpciones.map((medio) => (
                   <option key={medio.id} value={medio.id}>

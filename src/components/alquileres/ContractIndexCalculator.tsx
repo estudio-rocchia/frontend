@@ -5,6 +5,7 @@ import type { AdjustmentIndex } from "@/data/alquileres-contract-details";
 import { ApiError, previewAjusteIndice } from "@/lib/api";
 import type { ContratoDetail, IndiceCode, PreviewAjusteResponse } from "@/lib/api/types";
 import { formatIndicePunto, formatMoney, rentalApiErrorMessage } from "@/lib/format";
+import { formInputClass } from "@/lib/ui/interactive-focus";
 import {
   ADJUSTMENT_INDICES,
   type MonthYear,
@@ -62,9 +63,6 @@ function MonthYearSelect({
   years: number[];
   onChange: (value: MonthYear) => void;
 }) {
-  const selectClass =
-    "rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary";
-
   return (
     <div className="flex flex-col gap-1.5">
       <span className="text-[11px] font-semibold text-text-secondary">{label}</span>
@@ -73,7 +71,7 @@ function MonthYearSelect({
         <select
           value={value.mes}
           onChange={(e) => onChange({ ...value, mes: Number(e.target.value) })}
-          className={selectClass}
+          className={formInputClass}
         >
           {MONTHS.map((m) => (
             <option key={m.value} value={m.value}>
@@ -84,7 +82,7 @@ function MonthYearSelect({
         <select
           value={value.anio}
           onChange={(e) => onChange({ ...value, anio: Number(e.target.value) })}
-          className={selectClass}
+          className={formInputClass}
         >
           {years.map((y) => (
             <option key={y} value={y}>

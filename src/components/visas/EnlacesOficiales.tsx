@@ -29,6 +29,7 @@ export function EnlacesOficiales({ compact = false }: { compact?: boolean }) {
             className={`inline-flex items-center gap-1.5 rounded-sm border border-border bg-bg-card px-3 py-2 text-sm font-medium text-text-primary shadow-[var(--shadow-card)] ${interactiveFocusClass}`}
           >
             {link.label}
+            <span className="sr-only"> (se abre en nueva pestaña)</span>
             <ExternalLink className="h-3.5 w-3.5 text-primary" aria-hidden />
           </a>
         ))}
@@ -47,7 +48,10 @@ export function EnlacesOficiales({ compact = false }: { compact?: boolean }) {
           className={`flex items-center justify-between gap-3 rounded-md border border-border bg-bg-card px-4 py-3 shadow-[var(--shadow-card)] ${interactiveFocusClass}`}
         >
           <span className="flex flex-col gap-0.5">
-            <span className="text-sm font-semibold text-text-primary">{link.label}</span>
+            <span className="text-sm font-semibold text-text-primary">
+              {link.label}
+              <span className="sr-only"> (se abre en nueva pestaña)</span>
+            </span>
             <span className="text-xs text-text-secondary">{link.hint}</span>
           </span>
           <ExternalLink className="h-4 w-4 shrink-0 text-primary" aria-hidden />

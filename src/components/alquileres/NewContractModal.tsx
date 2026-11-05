@@ -27,6 +27,7 @@ import { MoraPunitoriaFields } from "@/components/alquileres/MoraPunitoriaFields
 import { DEFAULT_MORA_PUNITORIA, type MoraPunitoriaForm, isMoraPunitoriaValid } from "@/lib/mora-punitoria";
 import type { InmuebleSinAlquiler } from "@/lib/mappers/propietario-inmuebles";
 import { personaDisplayName } from "@/lib/format";
+import { formInputClass } from "@/lib/ui/interactive-focus";
 
 export type PropertyFieldValue =
   | {
@@ -48,6 +49,7 @@ export type NewContractForm = {
   index: AdjustmentIndex;
   frecuenciaAjusteMeses: number;
   notasIndice: string;
+  notas: string;
   mora: MoraPunitoriaForm;
   garantes: Array<{ key: string; field: PersonaFieldValue }>;
 };
@@ -74,6 +76,7 @@ function emptyForm(hasVacantes: boolean): NewContractForm {
     index: "ICL",
     frecuenciaAjusteMeses: 12,
     notasIndice: "",
+    notas: "",
     mora: DEFAULT_MORA_PUNITORIA,
     garantes: [],
   };
@@ -547,6 +550,21 @@ export function NewContractModal({
           onChange={(mora) => patch({ mora })}
           sectionVariant="prominent"
         />
+
+        <FormSection title="Notas del contrato" variant="prominent">
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[11px] font-semibold text-text-secondary">
+              Observaciones internas (opcional)
+            </span>
+            <textarea
+              value={form.notas}
+              maxLength={500}
+              onChange={(event) => patch({ notas: event.target.value })}
+              placeholder="Cláusulas, acuerdos verbales, recordatorios…"
+              className={`${formInputClass} min-h-24`}
+            />
+          </label>
+        </FormSection>
       </div>
     </Modal>
   );

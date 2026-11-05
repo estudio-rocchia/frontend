@@ -16,7 +16,7 @@ import {
   type RentalRow,
 } from "@/data/alquileres-rentals";
 import type { ContratoTableStats } from "@/lib/api/types";
-import { contractEndHint, moneyClassName } from "@/lib/format";
+import { contractEndHint, moneyTableClass } from "@/lib/format";
 import { rentCollectionWindowHint } from "@/lib/rental-collection";
 import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 
@@ -36,27 +36,17 @@ function serviceTone(variant: RentalRow["servicios"]["status"]["variant"]): stri
 }
 
 function ServiceMarks({ servicios }: { servicios: RentalRow["servicios"] }) {
-  const names = servicios.summary
-    .split(" · ")
-    .map((name) => name.trim())
-    .filter((name) => name && name !== "Sin servicios");
-  const visible = names.slice(0, 2);
-  const extra = names.length - visible.length;
+  const tooltip = [servicios.summary, servicios.detail, servicios.status.label]
+    .filter(Boolean)
+    .join(" — ");
 
   return (
-    <div className="flex max-w-[220px] flex-wrap gap-1">
-      {visible.map((name) => (
-        <span key={name} className="rounded-md bg-bg-page px-1.5 py-0.5 text-[11px] text-text-primary">
-          {name}
-        </span>
-      ))}
-      {extra > 0 ? (
-        <span className="rounded-md bg-bg-page px-1.5 py-0.5 text-[11px] text-text-secondary">+{extra}</span>
-      ) : null}
-      <span className={`rounded-md px-1.5 py-0.5 text-[11px] ${serviceTone(servicios.status.variant)}`} title={servicios.status.label}>
-        {servicios.status.label}
-      </span>
-    </div>
+    <span
+      className={`block w-full min-w-0 truncate rounded-md px-1.5 py-0.5 text-[11px] ${serviceTone(servicios.status.variant)}`}
+      title={tooltip}
+    >
+      {servicios.status.label}
+    </span>
   );
 }
 
@@ -134,17 +124,26 @@ function RentalMobileCard({
         onClick={onOpen}
         className={`flex items-start justify-between gap-3 text-left ${interactiveFocusClass}`}
       >
-        <PropertyCell label={row.contractProperty} />
-        <span className={`rounded-md px-2 py-0.5 text-[12px] ${contractTone(row)}`}>{row.status.label}</span>
+        <div className="min-w-0 flex-1">
+          <PropertyCell label={row.contractProperty} />
+        </div>
+        <span
+          className={`max-w-[40%] shrink-0 truncate whitespace-nowrap rounded-md px-2 py-0.5 text-[12px] ${contractTone(row)}`}
+          title={row.status.label}
+        >
+          {row.status.label}
+        </span>
       </button>
       <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-[13px]">
         <div>
           <dt className="text-[12px] text-text-secondary">Inquilino</dt>
-          <dd className="mt-0.5 text-text-primary">{row.tenant}</dd>
+          <dd className="mt-0.5 truncate text-text-primary" title={row.tenant}>
+            {row.tenant}
+          </dd>
         </div>
-        <div className="text-right">
+        <div className="text-right min-w-0">
           <dt className="text-[12px] text-text-secondary">Alquiler</dt>
-          <dd className={`mt-0.5 font-medium tabular-nums text-text-primary ${moneyClassName}`}>{row.amount}</dd>
+          <dd className={`mt-0.5 font-medium text-text-primary ${moneyTableClass(row.amount)}`}>{row.amount}</dd>
         </div>
         <div>
           <dt className="text-[12px] text-text-secondary">Período</dt>
@@ -202,9 +201,13 @@ function PropertyCell({ label }: { label: string }) {
     return <span className="font-semibold text-text-primary">{label}</span>;
   }
   return (
-    <span className="flex min-w-0 flex-col gap-0.5">
-      <span className="text-[12px] font-medium text-text-secondary">{code}</span>
-      <span className="font-medium text-text-primary">{title}</span>
+    <span className="flex min-w-0 max-w-[14rem] flex-col gap-0.5">
+      <span className="truncate text-[12px] font-medium text-text-secondary" title={code}>
+        {code}
+      </span>
+      <span className="line-clamp-2 break-words font-medium text-text-primary" title={title}>
+        {title}
+      </span>
     </span>
   );
 }
@@ -336,6 +339,7 @@ export function RentalsTable({
               }}
               placeholder="Código, dirección, propiedad o inquilino…"
               aria-label="Buscar contratos"
+              maxLength={120}
               className={`w-full rounded-md border border-border bg-bg-page py-2 pl-9 pr-9 text-[13px] text-text-primary placeholder:text-text-secondary focus:border-primary ${interactiveFocusClass}`}
             />
             {isSearchPending ? (
@@ -374,7 +378,7 @@ export function RentalsTable({
               <button
                 type="button"
                 onClick={onClearFilters}
-                className="text-[12px] font-semibold text-primary underline-offset-2 hover:underline"
+                className={`text-[12px] font-semibold text-primary underline-offset-2 hover:underline ${interactiveFocusClass}`}
               >
                 Limpiar todo
               </button>
@@ -434,7 +438,9 @@ export function RentalsTable({
                 <th className={`text-center ${headCell}`}>Estado</th>
                 <th className={`hidden text-right xl:table-cell ${headCell}`}>Inicio</th>
                 <th className={`text-right ${headCell}`}>Fin</th>
-                <th className={`hidden text-left lg:table-cell ${headCell}`}>Servicios</th>
+                <th className={`hidden w-[8.5rem] max-w-[8.5rem] text-left lg:table-cell ${headCell}`}>
+                  Servicios
+                </th>
                 <th className={`text-right ${headCell}`}>Acciones</th>
               </tr>
             </thead>
@@ -503,12 +509,16 @@ export function RentalsTable({
                         onViewFicha(row);
                       }}
                     >
-                      <td className={`sticky left-0 z-10 text-left ${bodyCell}`}>
+                      <td className={`sticky left-0 z-10 max-w-[14rem] text-left ${bodyCell}`}>
                         <PropertyCell label={row.contractProperty} />
                       </td>
-                      <td className={`text-left text-text-primary ${bodyCell}`}>{row.tenant}</td>
+                      <td className={`max-w-[11rem] text-left text-text-primary ${bodyCell}`}>
+                        <span className="block truncate" title={row.tenant}>
+                          {row.tenant}
+                        </span>
+                      </td>
                       <td className={`hidden text-left text-text-secondary 2xl:table-cell ${bodyCell}`}>{row.month}</td>
-                      <td className={`text-right text-[14px] font-medium tabular-nums text-text-primary ${bodyCell} ${moneyClassName}`}>
+                      <td className={`max-w-[8rem] text-right font-medium text-text-primary ${bodyCell} ${moneyTableClass(row.amount)}`}>
                         {row.amount}
                       </td>
                       <td className={`hidden text-right lg:table-cell ${bodyCell}`}>
@@ -533,8 +543,10 @@ export function RentalsTable({
                       <td className={`whitespace-nowrap text-right ${bodyCell}`}>
                         <ContractEndCell row={row} />
                       </td>
-                      <td className={`hidden text-left lg:table-cell ${bodyCell}`}>
-                        <ServiceMarks servicios={row.servicios} />
+                      <td className={`hidden lg:table-cell ${bodyCell}`}>
+                        <div className="w-[8.5rem] max-w-[8.5rem] overflow-hidden">
+                          <ServiceMarks servicios={row.servicios} />
+                        </div>
                       </td>
                       <td
                         className={`whitespace-nowrap text-right ${bodyCell}`}

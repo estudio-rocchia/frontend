@@ -42,7 +42,7 @@ function Accion({
       title={label}
       disabled={disabled}
       onClick={onClick}
-      className={`flex h-9 w-9 items-center justify-center rounded-sm disabled:opacity-50 ${interactiveFocusClass} ${
+      className={`flex min-h-11 min-w-11 items-center justify-center rounded-sm disabled:opacity-50 ${interactiveFocusClass} ${
         tone === "danger"
           ? "text-text-secondary hover:bg-danger-bg hover:text-danger"
           : "text-text-secondary hover:bg-primary-soft hover:text-primary"
@@ -185,7 +185,9 @@ export function CuestionarioCard({
                         {extensionDe(archivo.nombre)}
                       </span>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold text-text-primary">{archivo.nombre}</p>
+                        <p className="truncate text-sm font-semibold text-text-primary" title={archivo.nombre}>
+                          {archivo.nombre}
+                        </p>
                         <p className="text-xs text-text-secondary">{fechaDe(archivo.subidoEn)}</p>
                       </div>
                       <div className="flex shrink-0 items-center">

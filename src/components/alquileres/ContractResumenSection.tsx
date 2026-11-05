@@ -1,11 +1,15 @@
 "use client";
 
+import type { ReactNode } from "react";
+
 import { ContractGarantesSection } from "@/components/alquileres/ContractGarantesSection";
+import { FichaSummaryCard } from "@/components/alquileres/FichaSummaryCard";
 import { ButtonOutline } from "@/components/ui/Button";
-import { FieldBlock } from "@/components/ui/FormLayout";
+import { StatusBadge } from "@/components/ui/StatusBadge";
 import type { ContractDetail } from "@/data/alquileres-contract-details";
 import type { ContratoDetail } from "@/lib/api/types";
 import { formatDateDisplay } from "@/lib/format";
+import { VENTA_EMPTY_FIELD } from "@/lib/ventas/empty-field";
 
 type ContractResumenSectionProps = {
   detail: ContractDetail;
@@ -17,18 +21,84 @@ type ContractResumenSectionProps = {
   onGarantesChanged: () => void;
 };
 
-function SectionTitle({ children }: { children: string }) {
-  return <h3 className="text-[17px] font-semibold leading-[1.3] text-text-primary">{children}</h3>;
+/** 8px dentro del campo; 16px entre campos; 32px entre bloques del panel. */
+const fieldGridClass = "grid min-w-0 gap-4 sm:grid-cols-[repeat(2,minmax(0,1fr))]";
+
+function contractEstadoVariant(estado: string): "success" | "warning" | "danger" {
+  if (estado === "Activo") return "success";
+  if (estado === "Rescindido") return "danger";
+  return "warning";
 }
 
-function Fact({ label, value, numeric = false }: { label: string; value: string; numeric?: boolean }) {
+function ResumenPanel({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: ReactNode;
+}) {
   return (
-    <div className="flex min-w-0 flex-col gap-1 border-b border-border py-3">
-      <dt className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">{label}</dt>
-      <dd className={`text-[15px] font-medium break-words text-text-primary ${numeric ? "tabular-nums" : ""}`}>
-        {value}
-      </dd>
+    <section className="flex min-w-0 flex-col overflow-hidden rounded-md border border-border bg-bg-card shadow-[var(--shadow-card)]">
+      <header className="bg-bg-cream px-4 py-3">
+        <h3 className="text-[13px] font-semibold text-text-primary">{title}</h3>
+        {description ? (
+          <p className="mt-1 text-[12px] leading-snug text-text-secondary">{description}</p>
+        ) : null}
+      </header>
+      <div className="flex min-w-0 flex-col gap-8 p-4">{children}</div>
+    </section>
+  );
+}
+
+function ResumenField({
+  label,
+  value,
+  numeric = false,
+  span = 1,
+}: {
+  label: string;
+  value: string;
+  numeric?: boolean;
+  span?: 1 | 2;
+}) {
+  const empty = value === VENTA_EMPTY_FIELD;
+  return (
+    <div className={`min-w-0 ${span === 2 ? "sm:col-span-2" : ""}`}>
+      <div className="flex min-w-0 flex-col gap-2 rounded-sm border border-border bg-bg-page px-3 py-2.5">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
+          {label}
+        </span>
+        {label === "Estado" ? (
+          <StatusBadge label={value} variant={contractEstadoVariant(value)} />
+        ) : (
+          <p
+            className={`min-w-0 break-words text-[13px] ${
+              empty ? "text-text-secondary" : "font-medium text-text-primary"
+            } ${numeric ? "tabular-nums" : ""}`}
+          >
+            {value}
+          </p>
+        )}
+      </div>
     </div>
+  );
+}
+
+function VigenciaTimeline({ start, end }: { start: string; end: string }) {
+  return (
+    <dl className="grid min-w-0 grid-cols-1 gap-4 rounded-sm bg-bg-page px-3 py-3 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:items-center sm:gap-3">
+      <div className="min-w-0">
+        <dt className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Inicio</dt>
+        <dd className="mt-2 text-[14px] font-medium tabular-nums text-text-primary">{start}</dd>
+      </div>
+      <div className="hidden h-px w-8 shrink-0 bg-border sm:block" aria-hidden />
+      <div className="min-w-0 sm:text-end">
+        <dt className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Fin</dt>
+        <dd className="mt-2 text-[14px] font-medium tabular-nums text-text-primary">{end}</dd>
+      </div>
+    </dl>
   );
 }
 
@@ -42,69 +112,97 @@ export function ContractResumenSection({
   onGarantesChanged,
 }: ContractResumenSectionProps) {
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex min-w-0 flex-col gap-8">
+      <div className="grid min-w-0 gap-4 sm:grid-cols-[repeat(2,minmax(0,1fr))] lg:grid-cols-[repeat(3,minmax(0,1fr))]">
+        <FichaSummaryCard label="Depósito de garantía" value={detail.depositAmount} hint="Constituido al inicio" />
+        <FichaSummaryCard
+          label="Índice de ajuste"
+          value={detail.adjustmentIndex}
+          hint={detail.adjustmentFrequency}
+        />
+        <FichaSummaryCard
+          label="Vencimiento de cuota"
+          value={detail.paymentDueDay}
+          hint={`Contrato hasta ${detail.contractEnd}`}
+        />
+      </div>
+
       {contrato?.rescisionDocumentoId ? (
-        <div className="flex flex-col gap-3">
-          <SectionTitle>Rescisión</SectionTitle>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <FieldBlock label="Fecha" value={contrato.rescisionEn ? formatDateDisplay(contrato.rescisionEn) : "—"} />
-            <FieldBlock label="Nota" value={contrato.rescisionNotas?.trim() || "—"} />
+        <ResumenPanel title="Rescisión" description="Documentación y datos del cierre anticipado">
+          <div className={fieldGridClass}>
+            <ResumenField
+              label="Fecha"
+              value={contrato.rescisionEn ? formatDateDisplay(contrato.rescisionEn) : "—"}
+              numeric
+            />
+            <ResumenField label="Nota" value={contrato.rescisionNotas?.trim() || "—"} span={2} />
           </div>
-          <div className="flex flex-col items-start gap-2">
-            {rescisionError ? <p className="text-sm text-danger">{rescisionError}</p> : null}
+          <div className="flex min-w-0 flex-col items-start gap-4">
+            {rescisionError ? (
+              <p
+                className="rounded-sm border border-danger bg-danger-bg px-3 py-2 text-sm text-danger"
+                role="alert"
+              >
+                {rescisionError}
+              </p>
+            ) : null}
             <ButtonOutline type="button" onClick={onDownloadRescision}>
               Descargar documento
             </ButtonOutline>
           </div>
-        </div>
+        </ResumenPanel>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-10 md:grid-cols-2">
-        <div className="flex min-w-0 flex-col gap-8">
-          <section className="flex flex-col gap-2">
-            <SectionTitle>Identificación</SectionTitle>
-            <dl>
-              <Fact label="Código de propiedad" value={detail.propertyCode} />
-              <Fact label="Propiedad" value={detail.property} />
-              <Fact label="Ubicación" value={detail.propertyLocation} />
-              <Fact label="Inicio" value={detail.contractStart} />
-              <Fact label="Fin" value={detail.contractEnd} />
-            </dl>
-          </section>
-          <section className="flex flex-col gap-2">
-            <SectionTitle>Partes</SectionTitle>
-            <dl>
-              <Fact label="Inquilino" value={detail.tenant} />
-              <Fact label="Propietario" value={detail.owner} />
-            </dl>
-            {contrato && token ? (
-              <ContractGarantesSection
-                contrato={contrato}
-                editable={canEdit}
-                token={token}
-                onChanged={onGarantesChanged}
-              />
+      <div className="grid min-w-0 gap-8 lg:grid-cols-[repeat(2,minmax(0,1fr))]">
+        <ResumenPanel title="Inmueble" description="Identificación y vigencia contractual">
+          <div className={fieldGridClass}>
+            <ResumenField label="Código" value={detail.propertyCode} />
+            <ResumenField label="Estado" value={detail.estado} />
+            <ResumenField label="Propiedad" value={detail.property} span={2} />
+            <ResumenField label="Ubicación" value={detail.propertyLocation} span={2} />
+            {detail.contractNotes ? (
+              <ResumenField label="Notas del contrato" value={detail.contractNotes} span={2} />
             ) : null}
-          </section>
-        </div>
-        <div className="flex min-w-0 flex-col gap-8">
-          <section className="flex flex-col gap-2">
-            <SectionTitle>Condiciones económicas</SectionTitle>
-            <dl>
-              <Fact label="Depósito de garantía" value={detail.depositAmount} numeric />
-              <Fact label="Índice de ajuste" value={detail.adjustmentIndex} />
-              <Fact label="Frecuencia de ajuste" value={detail.adjustmentFrequency} />
-              <Fact label="Día de vencimiento" value={detail.paymentDueDay} />
-            </dl>
-          </section>
-          <section className="flex flex-col gap-2">
-            <SectionTitle>Mora</SectionTitle>
-            <dl>
-              <Fact label="Recargo (%)" value={detail.surchargePercent} numeric />
-              <Fact label="Observaciones" value={detail.punitiveHint} />
-            </dl>
-          </section>
-        </div>
+          </div>
+          <VigenciaTimeline start={detail.contractStart} end={detail.contractEnd} />
+        </ResumenPanel>
+
+        <ResumenPanel title="Partes" description="Inquilino, propietario y garantes">
+          <div className={fieldGridClass}>
+            <ResumenField label="Inquilino" value={detail.tenant} span={2} />
+            <ResumenField label="Propietario" value={detail.owner} span={2} />
+          </div>
+          {contrato && token ? (
+            <ContractGarantesSection
+              contrato={contrato}
+              editable={canEdit}
+              token={token}
+              onChanged={onGarantesChanged}
+            />
+          ) : null}
+        </ResumenPanel>
+
+        <ResumenPanel title="Condiciones de ajuste" description="Indexación y periodicidad">
+          <div className={fieldGridClass}>
+            <ResumenField label="Índice" value={detail.adjustmentIndex} />
+            <ResumenField label="Frecuencia" value={detail.adjustmentFrequency} />
+            <ResumenField label="Vencimiento mensual" value={detail.paymentDueDay} span={2} />
+            {detail.adjustmentNotes ? (
+              <ResumenField label="Notas del índice" value={detail.adjustmentNotes} span={2} />
+            ) : null}
+          </div>
+        </ResumenPanel>
+
+        <ResumenPanel title="Mora punitoria" description="Recargo por atraso en el pago">
+          <div className={fieldGridClass}>
+            <ResumenField label="Tipo de mora" value={detail.moraTipo} />
+            <ResumenField
+              label={detail.moraRecargoLabel}
+              value={detail.moraRecargoValue}
+              numeric={detail.moraRecargoLabel === "Recargo diario"}
+            />
+          </div>
+        </ResumenPanel>
       </div>
     </div>
   );

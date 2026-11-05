@@ -28,6 +28,16 @@ function toDateTimeLocal(value: string): string {
   return value.slice(0, 16);
 }
 
+function focusFirstField(ids: string[]) {
+  for (const id of ids) {
+    const element = document.getElementById(id);
+    if (element instanceof HTMLElement && element.getAttribute("aria-invalid") === "true") {
+      element.focus();
+      return;
+    }
+  }
+}
+
 function fieldError(id: string, message: string | null) {
   if (!message) return null;
   return (
@@ -207,6 +217,23 @@ export function ExpedienteCard({
     !quienError &&
     !entrevistaError;
   const abiertoLabel = DATE_PATTERN.test(abiertoEn) ? `Abierto el ${formatDateDisplay(abiertoEn)}` : "Sin fecha de apertura";
+
+  function handleSave() {
+    if (!valid) {
+      focusFirstField([
+        "fecha-apertura",
+        "fecha-resolucion",
+        "fecha-turno",
+        "turno-quien",
+        "fecha-entrevista",
+        "numero-ds160",
+        "email-ais",
+        "notas-expediente",
+      ]);
+      return;
+    }
+    onSave();
+  }
 
   return (
     <section
@@ -413,7 +440,7 @@ export function ExpedienteCard({
         ) : null}
         {canEdit && dirty ? (
           <div className="flex flex-wrap items-center gap-2">
-            <ButtonPrimary onClick={onSave} disabled={saving || !valid}>
+            <ButtonPrimary onClick={handleSave} disabled={saving}>
               {saving ? "Guardando…" : "Guardar expediente"}
             </ButtonPrimary>
             <button

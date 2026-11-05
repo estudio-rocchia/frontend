@@ -187,14 +187,70 @@ export function unmarkDashboardAlertaLeida(token: string, alertId: string) {
 
 export function fetchContratos(
   token: string,
-  params?: { estado?: string; inquilinoId?: number; inmuebleId?: number; limit?: number },
+  params?: {
+    estado?: string;
+    inquilinoId?: number;
+    inmuebleId?: number;
+    limit?: number;
+    offset?: number;
+    q?: string;
+    activo?: boolean;
+  },
 ) {
   const query = new URLSearchParams();
   if (params?.estado) query.set("estado", params.estado);
   if (params?.inquilinoId) query.set("inquilinoId", String(params.inquilinoId));
   if (params?.inmuebleId) query.set("inmuebleId", String(params.inmuebleId));
+  if (params?.q?.trim()) query.set("q", params.q.trim());
+  if (params?.activo !== undefined) query.set("activo", String(params.activo));
   query.set("limit", String(params?.limit ?? 100));
+  if (params?.offset !== undefined) query.set("offset", String(params.offset));
   return apiRequest<{ items: ContratoListItem[] }>(`/contratos?${query}`, { token });
+}
+
+export type ContratoHistorialEstadoFilter = "all" | "finished" | "terminated";
+
+export function indexContratoRenewalSuccessors(
+  contracts: ContratoListItem[],
+): Map<number, ContratoListItem> {
+  const map = new Map<number, ContratoListItem>();
+  for (const contract of contracts) {
+    if (contract.renewalOfContratoId != null) {
+      map.set(contract.renewalOfContratoId, contract);
+    }
+  }
+  return map;
+}
+
+/** Contratos cerrados + sucesores activos (para enlazar renovaciones). */
+export async function fetchContratosHistorial(
+  token: string,
+  params?: { q?: string; estado?: ContratoHistorialEstadoFilter; limit?: number },
+): Promise<{ items: ContratoListItem[]; renewalSuccessors: ContratoListItem[] }> {
+  const base = {
+    q: params?.q?.trim() || undefined,
+    activo: true as const,
+    limit: params?.limit ?? 200,
+  };
+  const estado = params?.estado ?? "all";
+
+  let items: ContratoListItem[];
+  if (estado === "finished") {
+    items = (await fetchContratos(token, { ...base, estado: "finished" })).items;
+  } else if (estado === "terminated") {
+    items = (await fetchContratos(token, { ...base, estado: "terminated" })).items;
+  } else {
+    const [finished, terminated] = await Promise.all([
+      fetchContratos(token, { ...base, estado: "finished" }),
+      fetchContratos(token, { ...base, estado: "terminated" }),
+    ]);
+    items = [...finished.items, ...terminated.items];
+  }
+
+  const active = (await fetchContratos(token, { ...base, estado: "active" })).items;
+  const renewalSuccessors = active.filter((contract) => contract.renewalOfContratoId != null);
+
+  return { items, renewalSuccessors };
 }
 
 export function fetchContratosTableSummary(

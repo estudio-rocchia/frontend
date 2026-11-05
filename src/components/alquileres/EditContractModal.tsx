@@ -23,6 +23,7 @@ import {
   indiceCodeFromContrato,
   montoFromApi,
 } from "@/lib/rental-adjustment";
+import { formInputClass } from "@/lib/ui/interactive-focus";
 
 export type EditContractForm = {
   fechaInicio: string;
@@ -33,6 +34,7 @@ export type EditContractForm = {
   index: AdjustmentIndex;
   frecuenciaAjusteMeses: number;
   notasIndice: string;
+  notas: string;
   mora: MoraPunitoriaForm;
 };
 
@@ -50,6 +52,7 @@ function buildFormFromContrato(contrato: ContratoDetail): EditContractForm {
     index: indiceCodeFromContrato(contrato) ?? "ICL",
     frecuenciaAjusteMeses: defaultFrecuenciaAjuste(contrato),
     notasIndice: contrato.notasIndice ?? "",
+    notas: contrato.notas ?? "",
     mora: moraPunitoriaFromContrato(contrato),
   };
 }
@@ -63,6 +66,7 @@ const emptyForm: EditContractForm = {
   index: "ICL",
   frecuenciaAjusteMeses: 12,
   notasIndice: "",
+  notas: "",
   mora: DEFAULT_MORA_PUNITORIA,
 };
 
@@ -300,6 +304,22 @@ export function EditContractModal({
             invalidId={fieldError?.id}
             error={fieldError?.message}
           />
+
+          <FormSection title="Notas del contrato" variant="prominent">
+            <label className="flex flex-col gap-1.5">
+              <span className="text-[11px] font-semibold text-text-secondary">
+                Observaciones internas (opcional)
+              </span>
+              <textarea
+                id="edit-notas"
+                value={form.notas}
+                maxLength={500}
+                onChange={(event) => patch({ notas: event.target.value })}
+                placeholder="Cláusulas, acuerdos verbales, recordatorios…"
+                className={`${formInputClass} min-h-24`}
+              />
+            </label>
+          </FormSection>
         </div>
       ) : (
         <p className="py-8 text-center text-sm text-text-secondary">Cargando contrato…</p>

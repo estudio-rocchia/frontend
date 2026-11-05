@@ -6,6 +6,7 @@ import { Modal } from "@/components/ui/Modal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import type { ServicioContratoRecord } from "@/lib/api/types";
 import { servicioBillingSummary, servicioDisplayName } from "@/lib/mappers/servicios";
+import { formInputClass } from "@/lib/ui/interactive-focus";
 
 export type PeriodoFormValues = {
   inicioPeriodo: string;
@@ -53,7 +54,7 @@ function Field({
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
+        className={formInputClass}
       />
     </label>
   );
@@ -167,7 +168,7 @@ export function PeriodoServicioModal({
                     codigoMoneda: e.target.value as "ARS" | "USD",
                   }))
                 }
-                className="rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
+                className={formInputClass}
               >
                 <option value="ARS">ARS</option>
                 <option value="USD">USD</option>

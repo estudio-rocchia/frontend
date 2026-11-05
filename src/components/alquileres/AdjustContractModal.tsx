@@ -19,6 +19,7 @@ import {
   formatMoney,
   formatMonthYear,
   moneyClassName,
+  moneyDisplaySizeClass,
   personaDisplayName,
 } from "@/lib/format";
 import {
@@ -41,6 +42,7 @@ import {
   toIsoMonthDate,
   type MonthYear,
 } from "@/lib/rental-adjustment";
+import { formInputClass, interactiveFocusClass } from "@/lib/ui/interactive-focus";
 
 export type AdjustContractSubmitInput = {
   fechaAjuste: string;
@@ -536,7 +538,7 @@ export function AdjustContractModal({
                         node.setSelectionRange(next, next);
                       });
                     }}
-                    className={`w-full max-w-[16rem] rounded-sm border border-primary/30 bg-bg-page px-3 py-2 text-center text-[32px] font-bold leading-none text-primary outline-none focus:border-primary ${moneyClassName}`}
+                    className={`w-full min-w-0 rounded-sm border border-primary/30 bg-bg-page px-3 py-2 text-center font-bold leading-none text-primary focus:border-primary ${moneyDisplaySizeClass(montoNuevoInput)} ${moneyClassName} overflow-x-auto ${interactiveFocusClass}`}
                   />
                   <span className="text-[12px] text-text-secondary">
                     Calculado por {indiceCode}
@@ -629,7 +631,7 @@ export function AdjustContractModal({
                     max={120}
                     value={cantidadCuotasDeposito}
                     onChange={(e) => setCantidadCuotasDeposito(e.target.value)}
-                    className="w-28 rounded-sm border border-border bg-bg-page px-3 py-2 text-[13px] text-text-primary outline-none focus:border-primary"
+                    className={`w-28 ${formInputClass}`}
                   />
                 </label>
                 {cuotaDepositoEstimada ? (
@@ -654,7 +656,7 @@ export function AdjustContractModal({
           <button
             type="button"
             onClick={() => setShowDetails((v) => !v)}
-            className="flex w-full items-center justify-between text-left text-sm font-medium text-text-secondary hover:text-text-primary"
+            className={`flex w-full items-center justify-between text-left text-sm font-medium text-text-secondary hover:text-text-primary ${interactiveFocusClass}`}
           >
             <span>{showDetails ? "Ocultar cálculo" : "Ver cómo se calculó"}</span>
             <span className="text-lg leading-none">{showDetails ? "▾" : "▸"}</span>

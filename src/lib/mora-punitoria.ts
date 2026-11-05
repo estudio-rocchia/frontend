@@ -1,4 +1,5 @@
 import type { CatalogoItem, ContratoDetail } from "@/lib/api/types";
+import { formatMoney } from "@/lib/format";
 
 export type MoraTipoCode = "daily_percentage" | "fixed_daily_amount";
 
@@ -47,6 +48,29 @@ function tasaPctFromApi(tasaMora: string | null | undefined): string {
   if (!Number.isFinite(num) || num <= 0) return DEFAULT_MORA_PUNITORIA.moraTasaPct;
   const pct = num * 100;
   return pct % 1 === 0 ? String(pct) : pct.toFixed(1).replace(".", ",");
+}
+
+export function moraResumenFromContrato(contrato: ContratoDetail): {
+  tipoLabel: string;
+  recargoFieldLabel: string;
+  recargoValue: string;
+} {
+  const currency = contrato.codigoMoneda.trim() || "ARS";
+  if (contrato.tipoMora?.code === "fixed_daily_amount") {
+    return {
+      tipoLabel: contrato.tipoMora.name ?? moraTipoLabel("fixed_daily_amount"),
+      recargoFieldLabel: "Monto fijo por día",
+      recargoValue: contrato.montoMoraFijo
+        ? formatMoney(contrato.montoMoraFijo, currency)
+        : "—",
+    };
+  }
+  const pct = tasaPctFromApi(contrato.tasaMora);
+  return {
+    tipoLabel: contrato.tipoMora?.name ?? moraTipoLabel("daily_percentage"),
+    recargoFieldLabel: "Recargo diario",
+    recargoValue: `${pct}%`,
+  };
 }
 
 export function moraPunitoriaFromContrato(contrato: ContratoDetail): MoraPunitoriaForm {

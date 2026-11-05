@@ -17,6 +17,11 @@ import type {
   TarifaVisa,
 } from "@/lib/api/types";
 import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
+import {
+  monedaPreferidaConceptoVisa,
+  monedasPrecioVisaIniciales,
+  resolverMonedaPrecioVisa,
+} from "@/lib/visas/monedas-precio";
 
 type PrecioFijo =
   | "honorarioIndividualUsd"
@@ -35,21 +40,23 @@ const CAMBIO_TURNO = {
   key: "cambioTurnoUsd",
   clave: "cambioTurno",
   label: "Cambio de turno",
-  hint: "Cada vez que se mueve o se adelanta",
+  hint: "Cada vez que se mueve o se adelanta. Suele cobrarse en pesos.",
 } as const;
 
 const ARANCEL = {
   key: "arancelConsularUsd",
   clave: "arancelConsular",
   label: "Arancel consular",
-  hint: "Lo cobra el consulado. No queda en el estudio.",
+  hint: "Lo cobra el consulado en dólares. No queda en el estudio.",
 } as const;
 
 const FIELDS = [...HONORARIOS, CAMBIO_TURNO, ARANCEL];
 const CONCEPTO_MAX = 12;
 const PRECIO_USD_MAX = 9999;
 const PRECIO_ARS_MAX = 99_999_999;
-const TARIFF_GRID = "grid grid-cols-[minmax(0,1fr)_7.5rem_5.75rem_7.25rem] gap-x-2";
+const TARIFF_GRID =
+  "grid grid-cols-1 gap-y-2 sm:grid-cols-[minmax(0,1fr)_7.5rem_5.75rem_7.25rem] sm:gap-x-2 sm:gap-y-0";
+const TARIFF_HEADER_GRID = `${TARIFF_GRID} max-sm:hidden items-end`;
 
 type ExtraDraft = {
   id: string;
@@ -72,14 +79,8 @@ function emptyArs(): Record<ClavePrecioVisa, string> {
   };
 }
 
-function monedasIniciales(): Record<ClavePrecioVisa, MonedaConceptoTarifa> {
-  return {
-    honorarioIndividual: "usd",
-    honorarioGrupoChico: "usd",
-    honorarioGrupoGrande: "usd",
-    arancelConsular: "usd",
-    cambioTurno: "usd",
-  };
+function monedasIniciales() {
+  return monedasPrecioVisaIniciales();
 }
 
 function leerImporte(raw: string, tope: number): number | null | "invalido" {
@@ -153,7 +154,7 @@ export function PreciosVisaModal({
           const ars = preciosArs[field.clave];
           nextDraft[field.key] = String(usd);
           nextArs[field.clave] = ars == null ? "" : String(ars);
-          nextMonedas[field.clave] = guardadas[field.clave] ?? (ars != null && usd === 0 ? "ars" : "usd");
+          nextMonedas[field.clave] = resolverMonedaPrecioVisa(field.clave, guardadas[field.clave], usd, ars);
         }
         setMonedas(nextMonedas);
         setDraft(nextDraft);
@@ -208,7 +209,7 @@ export function PreciosVisaModal({
     setAddMontoArs("");
     setAddAlcance("persona");
     setAddDestino("estudio");
-    setAddMoneda("usd");
+    setAddMoneda(categoria === "honorario" ? "ars" : monedaPreferidaConceptoVisa("estudio"));
     setError(null);
   }
 
@@ -352,7 +353,7 @@ export function PreciosVisaModal({
         <TariffSection
           id="precios-honorarios"
           title="Honorarios"
-          note="Por persona, según cuántas viajan juntas."
+          note="Por persona, según cuántas viajan juntas. Suelen cobrarse en pesos."
         >
           {HONORARIOS.map((field) => (
             <TariffRow
@@ -519,9 +520,9 @@ function TariffSection({
   children: ReactNode;
 }) {
   return (
-    <section aria-labelledby={id} className="overflow-hidden rounded-md border border-border">
+    <section aria-labelledby={id} className="rounded-md border border-border">
       <header className="border-b border-border bg-bg-page px-4 py-3">
-        <div className={`${TARIFF_GRID} items-end`}>
+        <div className={TARIFF_HEADER_GRID}>
           <div className="min-w-0">
             <h3 id={id} className="text-[11px] font-semibold uppercase tracking-wide text-primary">
               {title}
@@ -576,7 +577,7 @@ function TariffRow({
             aria-label={`Quitar ${label}`}
             onClick={onRemove}
             disabled={disabled}
-            className={`ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-sm text-text-secondary transition-transform duration-150 ease-out hover:bg-danger-bg hover:text-danger active:scale-[0.97] disabled:opacity-60 ${interactiveFocusClass}`}
+            className={`ml-auto flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-sm text-text-secondary transition-transform duration-150 ease-out hover:bg-danger-bg hover:text-danger active:scale-[0.97] disabled:opacity-60 ${interactiveFocusClass}`}
           >
             <Trash2 className="h-4 w-4" aria-hidden />
           </button>
@@ -718,13 +719,19 @@ function NuevoPrecio({
               label="El estudio"
               selected={destino === "estudio"}
               disabled={disabled}
-              onClick={() => onDestino("estudio")}
+              onClick={() => {
+                onDestino("estudio");
+                onMoneda(monedaPreferidaConceptoVisa("estudio"));
+              }}
             />
             <Choice
               label="El consulado"
               selected={destino === "consulado"}
               disabled={disabled}
-              onClick={() => onDestino("consulado")}
+              onClick={() => {
+                onDestino("consulado");
+                onMoneda(monedaPreferidaConceptoVisa("consulado"));
+              }}
             />
           </ChoiceRow>
           {consulado ? (
