@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   CalendarDays,
+  ClipboardList,
   Handshake,
   KeyRound,
   LayoutDashboard,
@@ -16,6 +17,7 @@ export type NavItem = {
   href: string;
   icon: LucideIcon;
   adminOnly?: boolean;
+  reportesOnly?: boolean;
 };
 
 export type NavGroup = {
@@ -45,6 +47,7 @@ export const navGroups: NavGroup[] = [
     label: "Sistema",
     items: [
       { label: "Índices", href: "/indices", icon: TrendingUp },
+      { label: "Balance", href: "/reportes", icon: ClipboardList, reportesOnly: true },
       { label: "Usuarios", href: "/usuarios", icon: ShieldCheck, adminOnly: true },
     ],
   },

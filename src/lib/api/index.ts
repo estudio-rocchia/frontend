@@ -88,6 +88,7 @@ import type {
   TramiteVisaListItem,
   UpdateTramiteVisaInput,
   VisasResumen,
+  CierreReporte,
 } from "./types";
 
 export { ApiError, NetworkError, getApiBaseUrl } from "./client";
@@ -1608,4 +1609,15 @@ export function updateTramiteRpi(
     token,
     body: JSON.stringify(body),
   });
+}
+
+export function fetchCierreReporte(
+  token: string,
+  params: { desde: string; hasta: string; compararAnioAnterior?: boolean },
+) {
+  const qs = new URLSearchParams({ desde: params.desde, hasta: params.hasta });
+  if (params.compararAnioAnterior === false) {
+    qs.set("compararAnioAnterior", "false");
+  }
+  return apiRequest<CierreReporte>(`/reportes/cierre?${qs.toString()}`, { token });
 }

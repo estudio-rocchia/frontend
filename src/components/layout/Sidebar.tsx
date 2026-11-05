@@ -13,7 +13,7 @@ import { fetchDashboardResumen } from "@/lib/api";
 import { invalidateCache, withCache } from "@/lib/api/cache";
 import { subscribeDashboardAlertsInvalidate } from "@/lib/dashboard-alerts-events";
 import { prefetchClientesList } from "@/lib/api/clientes-list";
-import { canManageUsers } from "@/lib/auth/roles";
+import { canManageUsers, canViewReportes } from "@/lib/auth/roles";
 
 const navLinkFocus =
   "outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#00C2CB]";
@@ -22,8 +22,12 @@ const itemClass =
   "group flex items-center gap-3 rounded-lg border px-3.5 py-2.5 text-sm transition-all duration-100 ease-out motion-reduce:transition-none " +
   navLinkFocus;
 
-function visibleItems(items: NavItem[], canAdmin: boolean) {
-  return items.filter((item) => !item.adminOnly || canAdmin);
+function visibleItems(items: NavItem[], canAdmin: boolean, canReportes: boolean) {
+  return items.filter((item) => {
+    if (item.adminOnly && !canAdmin) return false;
+    if (item.reportesOnly && !canReportes) return false;
+    return true;
+  });
 }
 
 function useAlquileresMoraCount(token: string | null) {
@@ -66,6 +70,7 @@ const SidebarNav = memo(function SidebarNav({ onNavigate }: { onNavigate?: () =>
   const pathname = usePathname();
   const { user, token } = useAuth();
   const canAdmin = canManageUsers(user);
+  const canReportes = canViewReportes(user);
   const moraCount = useAlquileresMoraCount(token);
 
   return (
@@ -93,7 +98,7 @@ const SidebarNav = memo(function SidebarNav({ onNavigate }: { onNavigate?: () =>
 
       <nav className="rocchia-scroll flex flex-1 flex-col gap-6 overflow-y-auto">
         {navGroups.map((group) => {
-          const items = visibleItems(group.items, canAdmin);
+          const items = visibleItems(group.items, canAdmin, canReportes);
           if (items.length === 0) return null;
           return (
             <div key={group.label} className="flex flex-col gap-1">

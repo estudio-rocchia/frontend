@@ -1496,3 +1496,86 @@ export interface UpdateTramiteVisaInput {
   entrevistaEn?: string | null;
   arancelPagadoEn?: string | null;
 }
+
+export interface MontosMoneda {
+  ARS: number;
+  USD: number;
+}
+
+export interface IngresosEstudio {
+  honorariosAdministracion: MontosMoneda;
+  honorariosVisas: MontosMoneda;
+  honorariosJuridicos: MontosMoneda;
+  cobrosVentas: MontosMoneda;
+  mora: MontosMoneda;
+  total: MontosMoneda;
+}
+
+export interface MovimientosAdministrados {
+  alquileresLiquidados: MontosMoneda;
+  arancelesConsulares: MontosMoneda;
+  gastosJuridicos: MontosMoneda;
+}
+
+export interface PropietarioCierre {
+  personaId: number;
+  nombre: string;
+  honorarios: MontosMoneda;
+  alquileresLiquidados: MontosMoneda;
+}
+
+export interface MesEnPeriodo {
+  anioPeriodo: number;
+  mesPeriodo: number;
+}
+
+export interface PropietarioMesAMes {
+  personaId: number;
+  nombre: string;
+  honorariosPorMes: MontosMoneda[];
+  alquileresPorMes: MontosMoneda[];
+}
+
+export interface LiquidacionesMesAMes {
+  meses: MesEnPeriodo[];
+  totalesHonorarios: MontosMoneda[];
+  totalesAlquileres: MontosMoneda[];
+  porPropietario: PropietarioMesAMes[];
+}
+
+export interface FormaPagoTotal {
+  medioPagoId: number;
+  code: string;
+  name: string;
+  montos: MontosMoneda;
+}
+
+export interface OperacionCierre {
+  contratosActivos: number;
+  liquidacionesEmitidas: number;
+  expedientesAbiertos: number;
+  expedientesCerrados: number;
+  tramitesVisa: number;
+  ventasCerradas: number;
+}
+
+export interface CierreReporteResumen {
+  periodo: { desde: string; hasta: string };
+  ingresosEstudio: IngresosEstudio;
+  movimientosAdministrados: MovimientosAdministrados;
+  operacion: OperacionCierre;
+}
+
+export interface CierreReporte extends CierreReporteResumen {
+  pendientes: MontosMoneda;
+  formaPago: FormaPagoTotal[];
+  porPropietario: PropietarioCierre[];
+  liquidacionesMesAMes: LiquidacionesMesAMes;
+  comparacionAnterior?: CierreReporteResumen;
+}
+
+export interface CierreQuery {
+  desde: string;
+  hasta: string;
+  compararAnioAnterior?: boolean;
+}

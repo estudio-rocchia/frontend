@@ -9,3 +9,8 @@ export function isAdmin(user: AuthUser | null | undefined): boolean {
 export function canManageUsers(user: AuthUser | null | undefined): boolean {
   return isAdmin(user);
 }
+
+/** Reporte de balance: roles admin y staff (permiso reporte.view en backend). */
+export function canViewReportes(user: AuthUser | null | undefined): boolean {
+  return user?.roles.some((role) => role === ADMIN_ROLE || role === "staff") ?? false;
+}
