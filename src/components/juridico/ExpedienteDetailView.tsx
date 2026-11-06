@@ -1,10 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { ArrowLeft, CircleCheck, Eye, Plus, RotateCcw, Trash2 } from "lucide-react";
 
+import { PersonaFichaCard } from "@/components/clientes/PersonaFichaCard";
 import { FichaSucesionForm } from "@/components/juridico/FichaSucesionForm";
 import { EstadoBadge, Field, Notice, OfficialLink, RpiBadge, editSurfaceClass, plazoRelativo, ramaLabel, useTimedNotice } from "@/components/juridico/juridico-ui";
 import { ButtonDanger, ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
@@ -140,7 +140,7 @@ export function ExpedienteDetailView() {
       <div className={`flex flex-col gap-4 ${pagePaddingClass}`} aria-busy="true" aria-live="polite">
         <p className="sr-only">Cargando expediente</p>
         <div className="h-4 w-28 animate-pulse rounded-sm bg-border/70" />
-        <div className="h-28 animate-pulse rounded-md border border-border bg-bg-card shadow-[var(--shadow-card)]" />
+        <div className="h-28 animate-pulse rounded-md border border-border bg-bg-card" />
         <div className="h-64 animate-pulse rounded-md border border-border bg-bg-card shadow-[var(--shadow-card)]" />
       </div>
     );
@@ -165,9 +165,6 @@ export function ExpedienteDetailView() {
   }
 
   const titulo = expedienteTitulo(expediente);
-  const nombreCliente = personaDisplayName(expediente.persona);
-  const tituloEsCliente = titulo.trim().toLowerCase() === nombreCliente.trim().toLowerCase();
-  const dni = expediente.persona.numeroDocumento?.trim();
   const esSucesion = expediente.rama === "sucesion";
   const esFamilia = expediente.rama === "familia";
   const tituloFicha = esSucesion ? "Primera consulta" : "Ficha";
@@ -198,63 +195,62 @@ export function ExpedienteDetailView() {
         Expedientes
       </button>
 
-      <header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div className="flex flex-col gap-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <EstadoBadge estado={expediente.estado} />
-            <span className="text-xs font-semibold text-text-secondary">{ramaLabel(expediente.rama, expediente.ramaDetalle)}</span>
+      <PersonaFichaCard
+        persona={expediente.persona}
+        badges={
+          <div className="flex flex-col gap-2">
+            {titulo.trim().toLowerCase() !== personaDisplayName(expediente.persona).trim().toLowerCase() ? (
+              <p className="text-sm text-text-secondary">{titulo}</p>
+            ) : null}
+            <div className="flex flex-wrap items-center gap-2">
+              <EstadoBadge estado={expediente.estado} />
+              <span className="text-xs font-semibold text-text-secondary">{ramaLabel(expediente.rama, expediente.ramaDetalle)}</span>
+              <span className="text-xs text-text-secondary">Inicio {formatDateDisplay(expediente.abiertoEn)}</span>
+            </div>
           </div>
-          <h1 className="text-xl font-bold text-text-primary xl:text-[22px]">{titulo}</h1>
-          <p className="text-sm leading-snug text-text-secondary">
-            {tituloEsCliente ? (
-              <Link href={`/clientes/${expediente.personaId}`} className="font-medium text-primary hover:underline">
-                {dni ? `DNI ${dni}` : "Ficha del cliente"}
-              </Link>
-            ) : (
-              <>
-                <Link href={`/clientes/${expediente.personaId}`} className="font-medium text-primary hover:underline">
-                  {nombreCliente}
-                </Link>
-                {dni ? ` · DNI ${dni}` : ""}
-              </>
-            )}
-            {` · inicio ${formatDateDisplay(expediente.abiertoEn)}`}
-          </p>
-        </div>
-        <ButtonDanger
-          className="w-full md:w-auto"
-          onClick={() => {
-            setError(null);
-            setConfirmarBaja(true);
-          }}
-        >
-          Eliminar expediente
-        </ButtonDanger>
-      </header>
+        }
+        action={
+          <ButtonDanger
+            className="w-full gap-2 sm:w-auto"
+            onClick={() => {
+              setError(null);
+              setConfirmarBaja(true);
+            }}
+          >
+            <Trash2 className="h-4 w-4" aria-hidden />
+            Eliminar expediente
+          </ButtonDanger>
+        }
+      />
 
       <Modal
         open={confirmarBaja}
         onClose={() => {
           if (!saving) setConfirmarBaja(false);
         }}
-        title="Eliminar expediente"
-        subtitle={titulo}
+        title="¿Eliminar este expediente?"
+        titleId="confirmar-baja-expediente-titulo"
         maxWidthClass="max-w-md"
         footer={
           <>
-            <ButtonOutline className="w-full md:w-auto" disabled={saving} onClick={() => setConfirmarBaja(false)}>
+            <ButtonOutline type="button" disabled={saving} onClick={() => setConfirmarBaja(false)}>
               Cancelar
             </ButtonOutline>
-            <ButtonDanger className="w-full md:w-auto" disabled={saving} onClick={() => void quitarExpediente()}>
+            <ButtonDanger type="button" className="gap-2" disabled={saving} onClick={() => void quitarExpediente()}>
+              {saving ? null : <Trash2 className="h-4 w-4" aria-hidden />}
               {saving ? "Eliminando…" : "Eliminar expediente"}
             </ButtonDanger>
           </>
         }
       >
-        <div className="flex flex-col gap-3">
-          {error ? <Notice tone="danger">{error}</Notice> : null}
-          <p className="text-sm leading-relaxed text-text-secondary">
-            Deja de aparecer en la lista. Las demás causas de {ramaLabel(expediente.rama, expediente.ramaDetalle)} siguen igual.
+        <div className="flex flex-col gap-4 text-sm text-text-primary">
+          {error ? (
+            <p className="rounded-sm border border-danger bg-danger-bg px-3 py-2 text-danger" role="alert">
+              {error}
+            </p>
+          ) : null}
+          <p className="leading-relaxed text-text-secondary">
+            {titulo} deja de aparecer en la lista. Las demás causas de {ramaLabel(expediente.rama, expediente.ramaDetalle)} siguen igual. Esta acción no se puede deshacer.
           </p>
         </div>
       </Modal>

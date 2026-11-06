@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 
 const ClienteInmobiliariaTab = dynamic(
@@ -42,6 +42,7 @@ const EditarClienteModal = dynamic(
 );
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { ClienteResumenSection } from "@/components/clientes/ClienteResumenSection";
+import { PersonaFichaCard } from "@/components/clientes/PersonaFichaCard";
 import { PageHeaderSkeleton, Skeleton } from "@/components/ui/Skeleton";
 import { useAuth } from "@/context/auth-context";
 import { type ClienteRow } from "@/data/clientes";
@@ -56,7 +57,6 @@ import {
 } from "@/lib/api";
 import { useClientePrefetch } from "@/lib/use-cliente-prefetch";
 import type { ContratoListItem, PersonaRecord } from "@/lib/api/types";
-import { personaDisplayName } from "@/lib/format";
 import { canEditVisas } from "@/lib/visas/labels";
 import { pagePaddingClass } from "@/lib/layout";
 import { buildClientesContext, mapPersonaToClienteRow, vinculoBadgeClass } from "@/lib/mappers/clientes";
@@ -80,12 +80,6 @@ function SectionTitle({ children }: { children: string }) {
   return (
     <h3 className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">{children}</h3>
   );
-}
-
-function personaInitials(persona: PersonaRecord): string {
-  const first = persona.nombre?.trim().charAt(0) ?? "";
-  const last = persona.apellido?.trim().charAt(0) ?? "";
-  return `${first}${last}`.toUpperCase() || "?";
 }
 
 export function ClienteFichaView() {
@@ -196,16 +190,6 @@ export function ClienteFichaView() {
       })
       .finally(() => setLoading(false));
   }, [validId, token, logout, loadCore, loadInmobiliariaDetails]);
-
-  const metaLine = useMemo(() => {
-    if (!persona) return "";
-    const parts = [
-      persona.numeroDocumento ? `DNI ${persona.numeroDocumento}` : persona.cuit ? `CUIT ${persona.cuit}` : null,
-      persona.email,
-      persona.phone,
-    ].filter(Boolean);
-    return parts.join(" · ");
-  }, [persona]);
 
   if (!validId || (error && !persona && !loading)) {
     return (
@@ -353,39 +337,30 @@ export function ClienteFichaView() {
         Volver al listado
       </button>
 
-      <header className="flex flex-col gap-4 rounded-md border border-border bg-bg-card p-5 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex min-w-0 flex-1 gap-4">
-          <div
-            className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary-soft text-lg font-bold text-primary"
-            aria-hidden
-          >
-            {personaInitials(persona)}
-          </div>
-          <div className="flex flex-col gap-2">
-            <h1 className="min-w-0 text-[26px] font-normal tracking-tight text-text-primary">
-              {personaDisplayName(persona)}
-            </h1>
-            {metaLine ? <p className="text-sm text-text-secondary">{metaLine}</p> : null}
-            {clienteRow && clienteRow.vinculos.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {clienteRow.vinculos.map((vinculo) => (
-                  <span
-                    key={vinculo.id}
-                    className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${vinculoBadgeClass(vinculo.id)}`}
-                  >
-                    {vinculo.label}
-                  </span>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        </div>
-        {token ? (
-          <ButtonPrimary type="button" onClick={() => setEditOpen(true)}>
-            Editar datos
-          </ButtonPrimary>
-        ) : null}
-      </header>
+      <PersonaFichaCard
+        persona={persona}
+        badges={
+          clienteRow && clienteRow.vinculos.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {clienteRow.vinculos.map((vinculo) => (
+                <span
+                  key={vinculo.id}
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${vinculoBadgeClass(vinculo.id)}`}
+                >
+                  {vinculo.label}
+                </span>
+              ))}
+            </div>
+          ) : null
+        }
+        action={
+          token ? (
+            <ButtonPrimary type="button" onClick={() => setEditOpen(true)}>
+              Editar datos
+            </ButtonPrimary>
+          ) : null
+        }
+      />
 
       {editOpen && token && persona ? (
         <EditarClienteModal
