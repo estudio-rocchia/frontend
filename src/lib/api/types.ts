@@ -1559,6 +1559,13 @@ export interface OperacionCierre {
   ventasCerradas: number;
 }
 
+/** Snapshot complementario al cierre del período (no ingreso del estudio). */
+export interface PendientesCierre {
+  alquileresEnMora: MontosMoneda;
+  ventasPorCobrar: MontosMoneda;
+  total: MontosMoneda;
+}
+
 export interface CierreReporteResumen {
   periodo: { desde: string; hasta: string };
   ingresosEstudio: IngresosEstudio;
@@ -1567,7 +1574,7 @@ export interface CierreReporteResumen {
 }
 
 export interface CierreReporte extends CierreReporteResumen {
-  pendientes: MontosMoneda;
+  pendientes: PendientesCierre;
   formaPago: FormaPagoTotal[];
   porPropietario: PropietarioCierre[];
   liquidacionesMesAMes: LiquidacionesMesAMes;

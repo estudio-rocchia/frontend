@@ -1,11 +1,19 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type { LiquidacionesMesAMes, MontosMoneda } from "@/lib/api/types";
 import { formatMoney, formatMonthYear } from "@/lib/format";
 
-import { BalancePanel, BalanceSegmented, BalanceTruncatedLabel } from "./balance-ui";
+import {
+  BALANCE_TABLE_PAGE_SIZE,
+  BalanceHeatmapLegend,
+  BalanceMatrixSummaryBar,
+  BalancePanel,
+  BalanceSegmented,
+  BalanceTablePagination,
+  BalanceTruncatedLabel,
+} from "./balance-ui";
 
 type MatrixKind = "alquileres" | "honorarios";
 type CurrencyView = "ARS" | "USD";
@@ -26,21 +34,24 @@ function HeatmapCell({
   value,
   max,
   currency,
-  montos,
+  totalRow = false,
 }: {
   value: number;
   max: number;
   currency: CurrencyView;
-  montos: MontosMoneda;
+  totalRow?: boolean;
 }) {
   const intensity = max > 0 && value > 0 ? 0.1 + (value / max) * 0.5 : 0;
+  const heatRgb = currency === "USD" ? "138, 103, 64" : "16, 112, 119";
 
   return (
-    <td className="p-0.5 align-middle">
+    <td className={`p-0.5 align-middle ${totalRow ? "balance-matrix-total-row-cell" : ""}`}>
       <div
-        className="flex min-h-[2.5rem] flex-col items-end justify-center rounded-md px-2 py-1.5 text-right transition-colors duration-100"
+        className={`balance-heatmap-cell-inner flex min-h-[2.5rem] flex-col items-end justify-center rounded-md px-2 py-1.5 text-right ${
+          currency === "USD" ? "balance-heatmap-cell-usd" : "balance-heatmap-cell-ars"
+        }`}
         style={{
-          backgroundColor: intensity > 0 ? `rgba(16, 112, 119, ${intensity})` : undefined,
+          backgroundColor: intensity > 0 ? `rgba(${heatRgb}, ${intensity})` : undefined,
         }}
       >
         {value > 0 ? (
@@ -50,17 +61,53 @@ function HeatmapCell({
         ) : (
           <span className="text-[11px] text-text-secondary/45">—</span>
         )}
-        {currency === "ARS" && montos.USD > 0 ? (
-          <span className="text-[9px] tabular-nums text-text-secondary">{formatMoney(String(montos.USD), "USD")}</span>
-        ) : null}
       </div>
     </td>
   );
 }
 
-export function BalanceMesAMesSection({ data }: { data: LiquidacionesMesAMes }) {
+function MatrixPagination({
+  page,
+  pageCount,
+  total,
+  onPageChange,
+}: {
+  page: number;
+  pageCount: number;
+  total: number;
+  onPageChange: (page: number) => void;
+}) {
+  return (
+    <BalanceTablePagination
+      page={page}
+      pageCount={pageCount}
+      total={total}
+      pageSize={BALANCE_TABLE_PAGE_SIZE}
+      onPageChange={onPageChange}
+      itemLabel="propietarios"
+    />
+  );
+}
+
+export function BalanceMesAMesSection({
+  data,
+  enterDelayMs = 280,
+  sectionId = "balance-matriz",
+  currency: controlledCurrency,
+  onCurrencyChange,
+}: {
+  data: LiquidacionesMesAMes;
+  enterDelayMs?: number;
+  sectionId?: string;
+  currency?: CurrencyView;
+  onCurrencyChange?: (currency: CurrencyView) => void;
+}) {
   const [kind, setKind] = useState<MatrixKind>("alquileres");
-  const [currency, setCurrency] = useState<CurrencyView>("ARS");
+  const [internalCurrency, setInternalCurrency] = useState<CurrencyView>("ARS");
+  const currencyControlled = controlledCurrency !== undefined && onCurrencyChange !== undefined;
+  const currency = controlledCurrency ?? internalCurrency;
+  const setCurrency = onCurrencyChange ?? setInternalCurrency;
+  const [page, setPage] = useState(0);
 
   const { meses, filas, totalesPorMes, totalesGeneral, maxCell } = useMemo(() => {
     const totales = kind === "alquileres" ? data.totalesAlquileres : data.totalesHonorarios;
@@ -91,59 +138,80 @@ export function BalanceMesAMesSection({ data }: { data: LiquidacionesMesAMes }) 
     };
   }, [data, kind, currency]);
 
-  if (meses.length === 0) return null;
+  const pageCount = Math.max(1, Math.ceil(filas.length / BALANCE_TABLE_PAGE_SIZE));
+  const safePage = Math.min(page, pageCount - 1);
 
-  const empty = filas.length === 0;
+  useEffect(() => {
+    setPage(0);
+  }, [filas.length, kind, currency]);
+
+  const visibleFilas = filas.slice(safePage * BALANCE_TABLE_PAGE_SIZE, (safePage + 1) * BALANCE_TABLE_PAGE_SIZE);
+
+  const noMeses = meses.length === 0;
+  const empty = !noMeses && filas.length === 0;
+  const kindLabel = kind === "alquileres" ? "alquileres" : "honorarios";
 
   return (
     <BalancePanel
+      tone="ink"
+      enterDelayMs={enterDelayMs}
+      sectionId={sectionId}
       title="Matriz mes a mes"
-      description="Intensidad = monto liquidado en el mes · fila inferior = total"
-      action={
-        <div className="flex flex-wrap items-center gap-2">
-          <BalanceSegmented
-            name="matrix-kind"
-            size="sm"
-            options={[
-              { id: "alquileres" as const, label: "Alquileres" },
-              { id: "honorarios" as const, label: "Honorarios" },
-            ]}
-            value={kind}
-            onChange={setKind}
-          />
-          <BalanceSegmented
-            name="matrix-currency"
-            size="sm"
-            options={[
-              { id: "ARS" as const, label: "ARS" },
-              { id: "USD" as const, label: "USD" },
-            ]}
-            value={currency}
-            onChange={setCurrency}
-          />
-        </div>
+      description="Monto liquidado por mes · totales visibles arriba y en el pie del listado"
+      toolbar={
+        noMeses ? undefined : (
+          <>
+            <div className="flex flex-wrap items-center gap-2">
+              <BalanceSegmented
+                name="matrix-kind"
+                size="sm"
+                options={[
+                  { id: "alquileres" as const, label: "Alquileres" },
+                  { id: "honorarios" as const, label: "Honorarios" },
+                ]}
+                value={kind}
+                onChange={setKind}
+              />
+              {!currencyControlled ? (
+                <BalanceSegmented
+                  name="matrix-currency"
+                  size="sm"
+                  variant="currency"
+                  options={[
+                    { id: "ARS" as const, label: "ARS" },
+                    { id: "USD" as const, label: "USD" },
+                  ]}
+                  value={currency}
+                  onChange={setCurrency}
+                />
+              ) : null}
+            </div>
+            <BalanceHeatmapLegend className="min-w-0 sm:ml-auto" currency={currency} />
+          </>
+        )
       }
     >
-      {empty ? (
-        <p className="px-4 py-10 text-center text-[13px] text-text-secondary sm:px-5">
+      {noMeses ? (
+        <p className="px-4 py-10 text-center text-[13px] text-pretty text-text-secondary sm:px-5">
+          No hay meses liquidados en el período seleccionado.
+        </p>
+      ) : empty ? (
+        <p className="px-4 py-10 text-center text-[13px] text-pretty text-text-secondary sm:px-5">
           No hay liquidaciones emitidas en los meses del período.
         </p>
       ) : (
         <>
-          <div className="flex items-center gap-3 border-b border-border/60 px-4 py-2 sm:px-5">
-            <span className="text-[10px] font-medium uppercase tracking-wider text-text-secondary">Escala</span>
-            <div className="flex h-2 flex-1 max-w-[160px] overflow-hidden rounded-full ring-1 ring-border/50">
-              {[0.15, 0.3, 0.45, 0.6].map((op) => (
-                <span key={op} className="flex-1" style={{ backgroundColor: `rgba(16, 112, 119, ${op})` }} />
-              ))}
-            </div>
-            <span className="text-[10px] text-text-secondary">Bajo → alto</span>
-          </div>
-          <div className="balance-table-scroll overflow-x-auto p-2 sm:p-3">
-            <table className="w-full min-w-[640px] border-separate border-spacing-0 text-left">
-              <caption className="sr-only">
-                Matriz de liquidaciones por propietario y mes
-              </caption>
+          <BalanceMatrixSummaryBar
+            kindLabel={kindLabel}
+            currency={currency}
+            grandTotal={totalesGeneral[currency]}
+            propietarioCount={filas.length}
+            page={safePage}
+            pageCount={pageCount}
+          />
+          <div className="balance-table-scroll balance-table-viewport balance-matrix-viewport overflow-x-auto p-2 sm:p-3">
+            <table className="balance-matrix-table w-full min-w-[640px] border-separate border-spacing-0 text-left">
+              <caption className="sr-only">Matriz de liquidaciones por propietario y mes</caption>
               <thead>
                 <tr>
                   <th
@@ -163,14 +231,14 @@ export function BalanceMesAMesSection({ data }: { data: LiquidacionesMesAMes }) 
                   ))}
                   <th
                     scope="col"
-                    className="px-2 py-2 text-right text-[10px] font-semibold tracking-wide text-text-secondary uppercase"
+                    className="balance-matrix-total-col px-2 py-2 text-right text-[10px] font-bold tracking-wide text-text-primary uppercase"
                   >
                     Total
                   </th>
                 </tr>
               </thead>
               <tbody>
-                {filas.map((row) => (
+                {visibleFilas.map((row) => (
                   <tr key={row.personaId} className="transition-colors duration-100 hover:bg-primary/[0.02]">
                     <td className="balance-sticky-col max-w-[160px] px-3 py-1">
                       <BalanceTruncatedLabel
@@ -184,17 +252,18 @@ export function BalanceMesAMesSection({ data }: { data: LiquidacionesMesAMes }) 
                         value={montos[currency]}
                         max={maxCell}
                         currency={currency}
-                        montos={montos}
                       />
                     ))}
-                    <td className="px-2 py-1 text-right text-[12px] font-semibold tabular-nums text-text-primary">
+                    <td className="balance-matrix-total-col px-2 py-1 text-right text-[12px] font-semibold tabular-nums text-text-primary">
                       {row.total[currency] > 0 ? formatMoney(String(row.total[currency]), currency) : "—"}
                     </td>
                   </tr>
                 ))}
-                <tr className="border-t border-border/80">
-                  <td className="balance-sticky-col px-3 py-2 text-[11px] font-semibold text-text-primary">
-                    Total {kind === "alquileres" ? "alquileres" : "honorarios"}
+              </tbody>
+              <tfoot>
+                <tr className="balance-matrix-total-row">
+                  <td className="balance-sticky-col balance-matrix-total-label px-3 py-2 text-[11px] font-bold text-text-primary">
+                    Total {kindLabel}
                   </td>
                   {totalesPorMes.map((montos, index) => (
                     <HeatmapCell
@@ -202,18 +271,24 @@ export function BalanceMesAMesSection({ data }: { data: LiquidacionesMesAMes }) 
                       value={montos[currency]}
                       max={maxCell}
                       currency={currency}
-                      montos={montos}
+                      totalRow
                     />
                   ))}
-                  <td className="px-2 py-2 text-right text-[12px] font-bold tabular-nums text-primary-dark">
+                  <td className="balance-matrix-total-col balance-matrix-grand-total px-2 py-2 text-right text-[12px] font-bold tabular-nums text-primary-dark">
                     {totalesGeneral[currency] > 0
                       ? formatMoney(String(totalesGeneral[currency]), currency)
                       : "—"}
                   </td>
                 </tr>
-              </tbody>
+              </tfoot>
             </table>
           </div>
+          <MatrixPagination
+            page={safePage}
+            pageCount={pageCount}
+            total={filas.length}
+            onPageChange={setPage}
+          />
         </>
       )}
     </BalancePanel>

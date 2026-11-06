@@ -88,7 +88,7 @@ export function ClienteResumenSection({
           <div className={resumenFieldGridClass}>
             <ResumenField label="Tipo" value={tipoPersona} />
             <ResumenField label="Estado" value={estado.label} statusVariant={estadoVariant(estado)} />
-            <ResumenField label="Documento" value={displayValue(persona.numeroDocumento)} />
+            <ResumenField label="DNI" value={displayValue(persona.numeroDocumento)} />
             <ResumenField label="CUIT/CUIL" value={displayValue(persona.cuit)} />
             {persona.tipoPersona === "juridica" ? (
               <ResumenField label="Razón social" value={displayValue(persona.razonSocial)} span={2} />

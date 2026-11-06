@@ -20,7 +20,7 @@ export function exportCierreCsv(reporte: CierreReporte) {
   rows.push(["Ingresos del estudio", "ARS", "USD"]);
   const ing = reporte.ingresosEstudio;
   const ingresosRows: Array<[string, { ARS: number; USD: number }]> = [
-    ["Honorarios administración", ing.honorariosAdministracion],
+    ["Honorarios administración de alquileres", ing.honorariosAdministracion],
     ["Honorarios visas", ing.honorariosVisas],
     ["Honorarios jurídicos", ing.honorariosJuridicos],
     ["Cobros ventas", ing.cobrosVentas],
@@ -38,6 +38,17 @@ export function exportCierreCsv(reporte: CierreReporte) {
     ["Alquileres liquidados", mov.alquileresLiquidados],
     ["Aranceles consulares", mov.arancelesConsulares],
     ["Gastos jurídicos", mov.gastosJuridicos],
+  ] as const) {
+    rows.push([label, ...cellMontos(montos)]);
+  }
+  rows.push([]);
+
+  rows.push(["Pendiente a la fecha", "ARS", "USD"]);
+  const pen = reporte.pendientes;
+  for (const [label, montos] of [
+    ["Cuotas alquiler en mora", pen.alquileresEnMora],
+    ["Cuotas venta por cobrar", pen.ventasPorCobrar],
+    ["Total pendiente", pen.total],
   ] as const) {
     rows.push([label, ...cellMontos(montos)]);
   }
