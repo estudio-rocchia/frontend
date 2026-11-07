@@ -2,6 +2,7 @@
 
 import type { ContratoTableStats } from "@/lib/api/types";
 import { rentalSecondaryFilterChips, type RentalChipId } from "@/data/alquileres-rentals";
+import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 
 function chipCount(
   id: RentalChipId,
@@ -42,10 +43,10 @@ function FilterChip({
       type="button"
       onClick={() => onSelect(id)}
       aria-pressed={selected}
-      className={`rounded-full border border-border px-3.5 py-2 text-[13px] transition-colors ${
+      className={`rocchia-action rounded-lg border px-3 py-1.5 text-[13px] ${interactiveFocusClass} ${
         selected
-          ? "bg-primary-soft font-semibold text-primary"
-          : "bg-bg-card font-normal text-text-secondary hover:text-text-primary"
+          ? "border-primary bg-bg-card text-text-primary"
+          : "border-transparent text-text-secondary hover:text-text-primary"
       }`}
     >
       {label}
@@ -64,7 +65,7 @@ export function RentalFilterChips({
   onChange: (id: RentalChipId) => void;
 }) {
   return (
-    <div className="flex shrink-0 flex-wrap items-center gap-2">
+    <div className="flex max-w-full flex-wrap items-center gap-1 rounded-xl border border-border bg-bg-page p-1">
       {rentalSecondaryFilterChips.map(({ id, label }) => (
         <FilterChip
           key={id}

@@ -1,10 +1,10 @@
 import { AuthGate } from "@/components/auth/AuthGate";
-import { AppShell } from "@/components/layout/AppShell";
+import { AppLayout as AppFrame } from "@/components/layout/AppLayout";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthGate>
-      <AppShell>{children}</AppShell>
+      <AppFrame>{children}</AppFrame>
     </AuthGate>
   );
 }

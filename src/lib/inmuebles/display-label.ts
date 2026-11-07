@@ -82,6 +82,21 @@ export function inmueblePropiedadNombre(
   return title || code || "Inmueble";
 }
 
+/** Tipo y alias de publicación, sin código interno. */
+export function inmueblePropiedadSinCodigo(
+  inmueble: { title?: string | null },
+  tipoName?: string | null,
+): string {
+  const title = inmueble.title?.trim() || "";
+  const tipo = tipoName?.trim() || "";
+
+  if (tipo && title) {
+    if (title.toLowerCase().includes(tipo.toLowerCase())) return title;
+    return `${tipo} — ${title}`;
+  }
+  return title || tipo || "Inmueble";
+}
+
 /** Etiqueta de propiedad en listados de contratos (evita duplicar el código). */
 export function contractPropertyLabel(inmuebleCode: string, inmuebleTitle: string): string {
   const code = inmuebleCode.trim();
@@ -89,4 +104,23 @@ export function contractPropertyLabel(inmuebleCode: string, inmuebleTitle: strin
   if (!title) return code || "Inmueble";
   if (code && title.startsWith(`${code} ·`)) return title;
   return code ? `${code} · ${title}` : title;
+}
+
+/** Label de inmueble sin el código interno (ej. "DEP999 · Depto centro" → "Depto centro"). */
+export function inmuebleLabelSinCodigo(inmuebleCode: string, inmuebleTitle: string): string {
+  const title = inmuebleTitle.trim();
+  const code = inmuebleCode.trim();
+  if (!title) return "—";
+  if (!code) return title;
+
+  for (const sep of [" · ", " — ", " - "] as const) {
+    const prefix = `${code}${sep}`;
+    if (title.startsWith(prefix)) {
+      const rest = title.slice(prefix.length).trim();
+      if (rest) return rest;
+    }
+  }
+
+  if (title === code) return "—";
+  return title;
 }

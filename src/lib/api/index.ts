@@ -1,7 +1,20 @@
+import type {
+  EstadoExpediente,
+  EstadoTramiteRpi,
+  ExpedienteDetail,
+  ExpedienteListItem,
+  RecordatorioPlazo,
+  FichaPuntoLibre,
+  FichaSucesion,
+  JuridicoResumen,
+  RamaExpediente,
+  TramiteRpi,
+} from "../juridico/model";
 import { withCache } from "./cache";
-import { apiBlob, apiBlobWithFilename, apiRequest } from "./client";
+import { apiBlob, apiBlobWithFilename, apiRequest, apiUploadFile } from "./client";
 import type {
   CatalogoItem,
+  ClienteHistorialItem,
   ContratoDetail,
   ContratoListItem,
   ContratoRecord,
@@ -66,6 +79,16 @@ import type {
   CitaDetail,
   CreateCitaInput,
   UpdateCitaInput,
+  CotizacionVisa,
+  CreateTramiteVisaInput,
+  EstadoTramiteVisa,
+  ArchivoVisa,
+  TarifaVisa,
+  TramiteVisaDetail,
+  TramiteVisaListItem,
+  UpdateTramiteVisaInput,
+  VisasResumen,
+  CierreReporte,
 } from "./types";
 
 export { ApiError, NetworkError, getApiBaseUrl } from "./client";
@@ -166,14 +189,70 @@ export function unmarkDashboardAlertaLeida(token: string, alertId: string) {
 
 export function fetchContratos(
   token: string,
-  params?: { estado?: string; inquilinoId?: number; inmuebleId?: number; limit?: number },
+  params?: {
+    estado?: string;
+    inquilinoId?: number;
+    inmuebleId?: number;
+    limit?: number;
+    offset?: number;
+    q?: string;
+    activo?: boolean;
+  },
 ) {
   const query = new URLSearchParams();
   if (params?.estado) query.set("estado", params.estado);
   if (params?.inquilinoId) query.set("inquilinoId", String(params.inquilinoId));
   if (params?.inmuebleId) query.set("inmuebleId", String(params.inmuebleId));
+  if (params?.q?.trim()) query.set("q", params.q.trim());
+  if (params?.activo !== undefined) query.set("activo", String(params.activo));
   query.set("limit", String(params?.limit ?? 100));
+  if (params?.offset !== undefined) query.set("offset", String(params.offset));
   return apiRequest<{ items: ContratoListItem[] }>(`/contratos?${query}`, { token });
+}
+
+export type ContratoHistorialEstadoFilter = "all" | "finished" | "terminated";
+
+export function indexContratoRenewalSuccessors(
+  contracts: ContratoListItem[],
+): Map<number, ContratoListItem> {
+  const map = new Map<number, ContratoListItem>();
+  for (const contract of contracts) {
+    if (contract.renewalOfContratoId != null) {
+      map.set(contract.renewalOfContratoId, contract);
+    }
+  }
+  return map;
+}
+
+/** Contratos cerrados + sucesores activos (para enlazar renovaciones). */
+export async function fetchContratosHistorial(
+  token: string,
+  params?: { q?: string; estado?: ContratoHistorialEstadoFilter; limit?: number },
+): Promise<{ items: ContratoListItem[]; renewalSuccessors: ContratoListItem[] }> {
+  const base = {
+    q: params?.q?.trim() || undefined,
+    activo: true as const,
+    limit: params?.limit ?? 200,
+  };
+  const estado = params?.estado ?? "all";
+
+  let items: ContratoListItem[];
+  if (estado === "finished") {
+    items = (await fetchContratos(token, { ...base, estado: "finished" })).items;
+  } else if (estado === "terminated") {
+    items = (await fetchContratos(token, { ...base, estado: "terminated" })).items;
+  } else {
+    const [finished, terminated] = await Promise.all([
+      fetchContratos(token, { ...base, estado: "finished" }),
+      fetchContratos(token, { ...base, estado: "terminated" }),
+    ]);
+    items = [...finished.items, ...terminated.items];
+  }
+
+  const active = (await fetchContratos(token, { ...base, estado: "active" })).items;
+  const renewalSuccessors = active.filter((contract) => contract.renewalOfContratoId != null);
+
+  return { items, renewalSuccessors };
 }
 
 export function fetchContratosTableSummary(
@@ -471,7 +550,12 @@ export function updatePersona(
     cuit?: string | null;
     email?: string | null;
     phone?: string | null;
+    calle?: string | null;
+    numero?: string | null;
+    pisoDepto?: string | null;
+    codigoPostal?: string | null;
     address?: string | null;
+    localidadId?: number | null;
     notas?: string | null;
     activo?: boolean;
     porcentajeAdministracion?: number;
@@ -581,7 +665,12 @@ export function createPersona(
     cuit?: string | null;
     email?: string | null;
     phone?: string | null;
+    calle?: string | null;
+    numero?: string | null;
+    pisoDepto?: string | null;
+    codigoPostal?: string | null;
     address?: string | null;
+    localidadId?: number | null;
     notas?: string | null;
     activo?: boolean;
   },
@@ -595,6 +684,10 @@ export function createPersona(
 
 export function fetchPersona(token: string, id: number) {
   return apiRequest<PersonaRecord>(`/personas/${id}`, { token });
+}
+
+export function fetchPersonaHistorial(token: string, id: number) {
+  return apiRequest<{ items: ClienteHistorialItem[] }>(`/personas/${id}/historial`, { token });
 }
 
 export function createLocalidad(token: string, body: { name: string; province: string; country?: string }) {
@@ -733,6 +826,27 @@ export function previewFinalizarContrato(token: string, contratoId: number) {
   });
 }
 
+export function rescindirContrato(
+  token: string,
+  contratoId: number,
+  file: File,
+  fecha: string,
+  notas: string,
+) {
+  const query = new URLSearchParams({ fecha });
+  if (notas.trim()) query.set("notas", notas.trim());
+  return apiUploadFile<ContratoRecord>(
+    `/contratos/${contratoId}/rescision?${query}`,
+    token,
+    file,
+    "POST",
+  );
+}
+
+export function downloadRescisionContrato(token: string, contratoId: number) {
+  return apiBlobWithFilename(`/contratos/${contratoId}/rescision`, token);
+}
+
 export function finalizarContrato(token: string, contratoId: number) {
   return apiRequest<ContratoRecord>(`/contratos/${contratoId}/finalizar`, {
     method: "POST",
@@ -752,11 +866,13 @@ export function fetchIndiceValores(
   });
 }
 
-export function syncIndices(token: string) {
+export function syncIndices(token: string, code: IndiceCode) {
+  const timeoutMs = code === "CAC" ? 300_000 : 120_000;
   return apiRequest<SyncIndicesResponse>("/indices/sync", {
     method: "POST",
     token,
-    signal: AbortSignal.timeout(120_000),
+    body: JSON.stringify({ code }),
+    signal: AbortSignal.timeout(timeoutMs),
   });
 }
 
@@ -808,16 +924,34 @@ export function applyContratoAjuste(
   });
 }
 
+type FetchVentasParams = {
+  estado?: string;
+  inmuebleId?: number;
+  limit?: number;
+  offset?: number;
+  view?: "table";
+};
+
 export function fetchVentas(
   token: string,
-  params?: { estado?: string; inmuebleId?: number; limit?: number; offset?: number },
-) {
+  params?: FetchVentasParams & { view?: undefined },
+): Promise<{ items: VentaRecord[] }>;
+export function fetchVentas(
+  token: string,
+  params: FetchVentasParams & { view: "table" },
+): Promise<{ items: VentaDetail[] }>;
+export function fetchVentas(token: string, params?: FetchVentasParams) {
   const query = new URLSearchParams();
   if (params?.estado) query.set("estado", params.estado);
   if (params?.inmuebleId) query.set("inmuebleId", String(params.inmuebleId));
   query.set("limit", String(params?.limit ?? 100));
   if (params?.offset) query.set("offset", String(params.offset));
-  return apiRequest<{ items: VentaRecord[] }>(`/ventas?${query}`, { token });
+  if (params?.view) query.set("view", params.view);
+  const path = `/ventas?${query}`;
+  if (params?.view === "table") {
+    return apiRequest<{ items: VentaDetail[] }>(path, { token });
+  }
+  return apiRequest<{ items: VentaRecord[] }>(path, { token });
 }
 
 export function fetchVenta(token: string, id: number) {
@@ -958,8 +1092,10 @@ export function completarVenta(
   });
 }
 
-export function cancelVenta(token: string, id: number) {
-  return apiRequest<import("./types").VentaRecord>(`/ventas/${id}/cancelar`, {
+export function cancelVenta(token: string, id: number, fecha: string, notas: string) {
+  const query = new URLSearchParams({ fecha });
+  if (notas.trim()) query.set("notas", notas.trim());
+  return apiRequest<import("./types").VentaRecord>(`/ventas/${id}/cancelar?${query}`, {
     method: "POST",
     token,
     body: JSON.stringify({}),
@@ -1102,6 +1238,11 @@ export function fetchMediosPago(token: string) {
   return fetchCatalog<CatalogoItem>(token, "/catalogos/medios-pago");
 }
 
+export function fetchRecordatorios(token: string, params: { desde: string; hasta: string }) {
+  const query = new URLSearchParams({ desde: params.desde, hasta: params.hasta });
+  return apiRequest<{ items: RecordatorioPlazo[] }>(`/expedientes/recordatorios?${query}`, { token });
+}
+
 export function fetchCitas(
   token: string,
   params: { desde: string; hasta: string; incluirCanceladas?: boolean },
@@ -1141,4 +1282,362 @@ export function cancelCita(token: string, id: number) {
     method: "POST",
     token,
   });
+}
+
+export function fetchVisas(
+  token: string,
+  params?: { anio?: number; estado?: EstadoTramiteVisa; q?: string; personaId?: number },
+) {
+  const query = new URLSearchParams();
+  if (params?.anio !== undefined) query.set("anio", String(params.anio));
+  if (params?.estado) query.set("estado", params.estado);
+  if (params?.q) query.set("q", params.q);
+  if (params?.personaId !== undefined) query.set("personaId", String(params.personaId));
+  const suffix = query.toString();
+  return apiRequest<{ items: TramiteVisaListItem[] }>(`/visas${suffix ? `?${suffix}` : ""}`, { token });
+}
+
+export function fetchVisasResumen(token: string, anio?: number) {
+  const query = anio !== undefined ? `?anio=${anio}` : "";
+  return apiRequest<VisasResumen>(`/visas/resumen${query}`, { token });
+}
+
+export function fetchTarifaVisa(token: string) {
+  return apiRequest<TarifaVisa>("/visas/tarifa", { token });
+}
+
+export function updateTarifaVisa(token: string, body: TarifaVisa) {
+  return apiRequest<TarifaVisa>("/visas/tarifa", {
+    method: "PUT",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function fetchCotizacionVisa(token: string, personas: number, cambiosTurno = 0, grupoId?: number) {
+  const query = new URLSearchParams({
+    personas: String(personas),
+    cambiosTurno: String(cambiosTurno),
+  });
+  if (grupoId !== undefined) query.set("grupoId", String(grupoId));
+  return apiRequest<CotizacionVisa>(`/visas/cotizacion?${query}`, { token });
+}
+
+export function fetchTramiteVisa(token: string, id: number) {
+  return apiRequest<TramiteVisaDetail>(`/visas/${id}`, { token });
+}
+
+export function createTramiteVisa(token: string, body: CreateTramiteVisaInput) {
+  return apiRequest<TramiteVisaDetail>("/visas", {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function emitirReciboVisa(
+  token: string,
+  tramiteId: number,
+  body: { honorario: boolean; arancel: boolean; fecha: string },
+) {
+  return apiRequest<TramiteVisaDetail>(`/visas/${tramiteId}/recibos`, {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function anularReciboVisa(token: string, reciboId: number) {
+  return apiRequest<TramiteVisaDetail>(`/visas/recibos/${reciboId}/anular`, {
+    method: "POST",
+    token,
+  });
+}
+
+export function downloadReciboVisaPdf(token: string, reciboId: number) {
+  return apiBlobWithFilename(`/visas/recibos/${reciboId}/pdf`, token);
+}
+
+export function fetchPlantillaVisa(token: string) {
+  return apiRequest<{ items: ArchivoVisa[] }>("/visas/plantilla", { token });
+}
+
+export function uploadPlantillaVisa(token: string, file: File) {
+  return apiUploadFile<ArchivoVisa>("/visas/plantilla", token, file, "POST");
+}
+
+export function fetchArchivosVisa(token: string, tramiteId: number) {
+  return apiRequest<{ items: ArchivoVisa[] }>(`/visas/${tramiteId}/archivos`, { token });
+}
+
+export function uploadArchivoVisa(token: string, tramiteId: number, file: File) {
+  return apiUploadFile<ArchivoVisa>(`/visas/${tramiteId}/archivos`, token, file, "POST");
+}
+
+export function downloadArchivoVisa(token: string, archivoId: number) {
+  return apiBlobWithFilename(`/visas/archivos/${archivoId}`, token);
+}
+
+export function downloadFormularioVacioVisa(token: string, tramiteId: number, archivoId: number) {
+  return apiBlobWithFilename(`/visas/${tramiteId}/formularios/${archivoId}`, token);
+}
+
+export function deleteArchivoVisa(token: string, archivoId: number) {
+  return apiRequest<void>(`/visas/archivos/${archivoId}`, { method: "DELETE", token });
+}
+
+export function updateTramiteVisa(token: string, id: number, body: UpdateTramiteVisaInput) {
+  return apiRequest<TramiteVisaDetail>(`/visas/${id}`, {
+    method: "PATCH",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function updateGrupoVisa(
+  token: string,
+  tramiteId: number,
+  body: {
+    cambiosTurno?: number;
+    notas?: string | null;
+    honorarioPagadoEn?: string | null;
+    conceptosAplicados?: string[];
+  },
+) {
+  return apiRequest<TramiteVisaDetail>(`/visas/${tramiteId}/grupo`, {
+    method: "PATCH",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function addIntegranteVisa(token: string, tramiteId: number, personaId: number) {
+  return apiRequest<TramiteVisaDetail>(`/visas/${tramiteId}/integrantes`, {
+    method: "POST",
+    token,
+    body: JSON.stringify({ personaId }),
+  });
+}
+
+export function deleteTramiteVisa(token: string, id: number) {
+  return apiRequest<void>(`/visas/${id}`, { method: "DELETE", token });
+}
+
+export function fetchJuridicoResumen(token: string) {
+  return apiRequest<JuridicoResumen>("/expedientes/resumen", { token });
+}
+
+export function fetchPlantillas(token: string) {
+  return apiRequest<{ items: Array<{ rama: RamaExpediente; nombre: string | null; puntos: FichaPuntoLibre[] }> }>(
+    "/expedientes/plantillas",
+    { token },
+  );
+}
+
+export function deletePlantilla(token: string, rama: RamaExpediente, nombre?: string | null) {
+  const query = nombre?.trim() ? `?nombre=${encodeURIComponent(nombre.trim())}` : "";
+  return apiRequest<void>(`/expedientes/plantillas/${rama}${query}`, { method: "DELETE", token });
+}
+
+export function savePlantilla(
+  token: string,
+  rama: RamaExpediente,
+  puntos: FichaPuntoLibre[],
+  nombre?: string | null,
+) {
+  return apiRequest<{ rama: RamaExpediente; nombre: string | null; puntos: FichaPuntoLibre[] }>(
+    `/expedientes/plantillas/${rama}`,
+    {
+      method: "PUT",
+      token,
+      body: JSON.stringify({ puntos, nombre: nombre ?? null }),
+    },
+  );
+}
+
+export function fetchExpedientes(
+  token: string,
+  params?: { rama?: RamaExpediente; ramaDetalle?: string; estado?: EstadoExpediente; q?: string; personaId?: number },
+) {
+  const query = new URLSearchParams();
+  if (params?.rama) query.set("rama", params.rama);
+  if (params?.ramaDetalle) query.set("ramaDetalle", params.ramaDetalle);
+  if (params?.estado) query.set("estado", params.estado);
+  if (params?.q) query.set("q", params.q);
+  if (params?.personaId) query.set("personaId", String(params.personaId));
+  const suffix = query.toString();
+  return apiRequest<{ items: ExpedienteListItem[] }>(`/expedientes${suffix ? `?${suffix}` : ""}`, { token });
+}
+
+export function fetchExpediente(token: string, id: number) {
+  return apiRequest<ExpedienteDetail>(`/expedientes/${id}`, { token });
+}
+
+export function createExpediente(
+  token: string,
+  body: {
+    personaId: number;
+    rama: RamaExpediente;
+    ramaDetalle?: string | null;
+    numero?: string | null;
+    juzgado?: string | null;
+    caratula?: string | null;
+    estado?: EstadoExpediente;
+    abiertoEn?: string;
+    notas?: string | null;
+  },
+) {
+  return apiRequest<ExpedienteDetail>("/expedientes", {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function updateExpediente(
+  token: string,
+  id: number,
+  body: {
+    rama?: RamaExpediente;
+    ramaDetalle?: string | null;
+    numero?: string | null;
+    juzgado?: string | null;
+    caratula?: string | null;
+    estado?: EstadoExpediente;
+    abiertoEn?: string;
+    notas?: string | null;
+  },
+) {
+  return apiRequest<ExpedienteDetail>(`/expedientes/${id}`, {
+    method: "PATCH",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function saveFichaSucesion(token: string, id: number, ficha: FichaSucesion) {
+  return apiRequest<ExpedienteDetail>(`/expedientes/${id}/ficha-sucesion`, {
+    method: "PUT",
+    token,
+    body: JSON.stringify(ficha),
+  });
+}
+
+export function linkExpedienteInmueble(token: string, id: number, inmuebleId: number) {
+  return apiRequest<ExpedienteDetail>(`/expedientes/${id}/inmuebles`, {
+    method: "POST",
+    token,
+    body: JSON.stringify({ inmuebleId }),
+  });
+}
+
+export function deleteExpediente(token: string, id: number) {
+  return apiRequest<void>(`/expedientes/${id}`, { method: "DELETE", token });
+}
+
+export function unlinkExpedienteInmueble(token: string, id: number, inmuebleId: number) {
+  return apiRequest<ExpedienteDetail>(`/expedientes/${id}/inmuebles/${inmuebleId}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
+export function createHijoExpediente(
+  token: string,
+  id: number,
+  body: { nombre: string; dni?: string | null },
+) {
+  return apiRequest<ExpedienteDetail>(`/expedientes/${id}/hijos`, {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function deleteHijoExpediente(token: string, id: number, hijoId: number) {
+  return apiRequest<ExpedienteDetail>(`/expedientes/${id}/hijos/${hijoId}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
+export function createPlazoExpediente(
+  token: string,
+  id: number,
+  body: { descripcion: string; venceEn: string },
+) {
+  return apiRequest<ExpedienteDetail>(`/expedientes/${id}/plazos`, {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function updatePlazoExpediente(
+  token: string,
+  id: number,
+  plazoId: number,
+  body: { descripcion?: string; venceEn?: string; cumplido?: boolean },
+) {
+  return apiRequest<ExpedienteDetail>(`/expedientes/${id}/plazos/${plazoId}`, {
+    method: "PATCH",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function deletePlazoExpediente(token: string, id: number, plazoId: number) {
+  return apiRequest<ExpedienteDetail>(`/expedientes/${id}/plazos/${plazoId}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
+export function createTramiteRpi(
+  token: string,
+  body: {
+    inmuebleId: number;
+    expedienteId?: number | null;
+    numeroTramite?: string | null;
+    escribano?: string | null;
+    estado?: EstadoTramiteRpi;
+    pedidoEn?: string;
+    notas?: string | null;
+  },
+) {
+  return apiRequest<TramiteRpi>("/tramites-rpi", {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function updateTramiteRpi(
+  token: string,
+  id: number,
+  body: {
+    numeroTramite?: string | null;
+    escribano?: string | null;
+    estado?: EstadoTramiteRpi;
+    pedidoEn?: string;
+    notas?: string | null;
+    expedienteId?: number | null;
+  },
+) {
+  return apiRequest<TramiteRpi>(`/tramites-rpi/${id}`, {
+    method: "PATCH",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function fetchCierreReporte(
+  token: string,
+  params: { desde: string; hasta: string; compararAnioAnterior?: boolean },
+) {
+  const qs = new URLSearchParams({ desde: params.desde, hasta: params.hasta });
+  if (params.compararAnioAnterior === false) {
+    qs.set("compararAnioAnterior", "false");
+  }
+  return apiRequest<CierreReporte>(`/reportes/cierre?${qs.toString()}`, { token });
 }

@@ -3,8 +3,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { RefreshCw } from "lucide-react";
 
+import { Card } from "@/components/ui/Card";
 import { KpiCard } from "@/components/ui/KpiCard";
-import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
+import { ListProgressBar } from "@/components/ui/ListProgressBar";
+import { ListTableContent } from "@/components/ui/ListTableContent";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { RocchiaDateField } from "@/components/ui/RocchiaDateField";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { ButtonPrimary } from "@/components/ui/Button";
+import { useListRefreshTransition } from "@/lib/ui/use-list-refresh-transition";
+import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 import { useAuth } from "@/context/auth-context";
 import { ApiError, fetchIndiceValores, NetworkError, syncIndices } from "@/lib/api";
 import type { IndiceCode, SyncIndicesResponse, ValorIndiceRecord } from "@/lib/api/types";
@@ -40,12 +48,34 @@ function sortByPeriodoDesc(items: ValorIndiceRecord[]) {
   return [...items].sort((a, b) => b.periodo.localeCompare(a.periodo));
 }
 
+function IndicesTableSkeleton() {
+  return (
+    <div className="overflow-x-auto" aria-hidden>
+      <table className="w-full min-w-[640px] text-left text-[13px]">
+        <tbody>
+          {Array.from({ length: 8 }).map((_, index) => (
+            <tr key={index} className="border-b border-border">
+              {Array.from({ length: 5 }).map((__, cell) => (
+                <td key={cell} className="px-5 py-4">
+                  <Skeleton className="h-4 w-full max-w-[96px] ml-auto" />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function IndexSelector({
   value,
   onChange,
+  disabled,
 }: {
   value: IndiceCode;
   onChange: (code: IndiceCode) => void;
+  disabled?: boolean;
 }) {
   return (
     <div className="flex flex-wrap gap-2">
@@ -56,10 +86,11 @@ function IndexSelector({
             key={code}
             type="button"
             onClick={() => onChange(code)}
-            className={`rounded-full border border-border px-3.5 py-2 text-[13px] transition-colors ${
+            disabled={disabled}
+            className={`rocchia-action rounded-lg border px-3 py-1.5 text-[13px] disabled:opacity-60 ${
               selected
-                ? "bg-primary-soft font-semibold text-primary"
-                : "bg-bg-card font-normal text-text-secondary hover:text-text-primary"
+                ? "border-primary bg-bg-card font-medium text-text-primary"
+                : "border-transparent font-medium text-text-secondary hover:text-text-primary"
             }`}
           >
             {code}
@@ -72,6 +103,7 @@ function IndexSelector({
 
 export function IndicesView() {
   const { token, logout } = useAuth();
+  const { refreshing, listTransitionKey, isInitialLoad, start, finish } = useListRefreshTransition();
   const defaults = useMemo(() => defaultDateRange(), []);
   const [indice, setIndice] = useState<IndiceCode>("ICL");
   const [desde, setDesde] = useState(defaults.desde);
@@ -84,7 +116,9 @@ export function IndicesView() {
 
   const load = useCallback(async () => {
     if (!token) return;
-    setLoading(true);
+    const listKey = `${indice}-${desde}-${hasta}`;
+    const { startedAt, isInitial } = start();
+    if (isInitial) setLoading(true);
     setError(null);
     try {
       const desdeFetch = earlierIsoDate(desde, subtractMonthsFromDate(hasta, 14));
@@ -98,9 +132,10 @@ export function IndicesView() {
       setError(err instanceof ApiError ? err.message : "Error al cargar los índices");
       setAllRows([]);
     } finally {
+      await finish(listKey, startedAt);
       setLoading(false);
     }
-  }, [token, logout, indice, desde, hasta]);
+  }, [token, logout, indice, desde, hasta, start, finish]);
 
   useEffect(() => {
     void load();
@@ -112,21 +147,19 @@ export function IndicesView() {
     setSyncMessage(null);
     setError(null);
     try {
-      const result: SyncIndicesResponse = await syncIndices(token);
-      const cacNote = result.CAC.skipped
-        ? " CAC no se actualiza desde este botón (solo ICL e IPC)."
-        : ` CAC: ${result.CAC.upserted} actualizado(s).`;
+      const code = indice;
+      const result: SyncIndicesResponse = await syncIndices(token, code);
+      const stats = result[code];
+      const hadUpdates = stats.upserted > 0;
 
-      const hadUpdates = result.ICL.upserted > 0 || result.IPC.upserted > 0;
-
-      if (result.ICL.upToDate && result.IPC.upToDate) {
-        setSyncMessage(`ICL e IPC ya están actualizados según las fuentes oficiales.${cacNote}`);
+      if (stats.skipped && stats.warning) {
+        setError(`No se pudo actualizar ${code}. ${stats.warning}`);
+      } else if (stats.upToDate) {
+        setSyncMessage(`${code} ya está actualizado según la fuente oficial.`);
       } else if (!hadUpdates) {
-        setSyncMessage(`No había cambios nuevos en ICL ni IPC.${cacNote}`);
+        setSyncMessage(`No había cambios nuevos en ${code}.`);
       } else {
-        setSyncMessage(
-          `ICL e IPC actualizados (ICL: ${result.ICL.upserted}, IPC: ${result.IPC.upserted}).${cacNote}`,
-        );
+        setSyncMessage(`${code} actualizado (${stats.upserted}).`);
       }
 
       // Solo recargar la grilla si hubo filas nuevas; evita el titileo cuando ya estaba al día.
@@ -152,7 +185,7 @@ export function IndicesView() {
     } finally {
       setSyncing(false);
     }
-  }, [token, syncing, load, logout]);
+  }, [token, syncing, load, logout, indice]);
 
   const rows = useMemo(() => {
     const inRange = allRows.filter((row) => periodoInUserRange(row.periodo, desde, hasta));
@@ -169,88 +202,75 @@ export function IndicesView() {
 
   return (
     <div className={`flex flex-col gap-6 sm:gap-8 ${pagePaddingClass}`}>
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-[22px] font-bold text-text-primary">Índices de ajuste</h1>
-        </div>
-        <ButtonOutline
-          type="button"
-          onClick={() => void handleSync()}
-          disabled={syncing || loading}
-          className="shrink-0 gap-2 self-start"
-        >
-          <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
-          {syncing ? "Actualizando ICL e IPC…" : "Actualizar ICL e IPC"}
-        </ButtonOutline>
-      </header>
-
-      {syncMessage ? (
-        <p className="rounded-sm border border-primary/30 bg-primary-soft px-3 py-2 text-sm text-primary">
-          {syncMessage}
-        </p>
-      ) : null}
+      <PageHeader
+        title="Índices de ajuste"
+        description={`${INDEX_LABELS[indice]}${indice === "CAC" ? " CAMARCO puede tardar unos minutos." : ""}`}
+      />
 
       <section className="flex flex-col gap-3">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
-          Seleccionar índice
-        </p>
-        <IndexSelector value={indice} onChange={setIndice} />
-        <p className="text-sm text-text-secondary">{INDEX_LABELS[indice]}</p>
+        <div className="flex w-fit max-w-full flex-wrap items-center gap-2">
+          <div className="inline-flex rounded-xl border border-border bg-bg-page p-1">
+            <IndexSelector value={indice} onChange={setIndice} disabled={syncing} />
+          </div>
+          <button
+            type="button"
+            onClick={() => void handleSync()}
+            disabled={syncing || loading}
+            className={`rocchia-action inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-3.5 text-[13px] font-semibold text-text-on-primary hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50 ${interactiveFocusClass}`}
+          >
+            <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
+            {syncing ? `Actualizando ${indice}…` : `Actualizar ${indice}`}
+          </button>
+        </div>
+        {syncMessage ? (
+          <p className="rounded-sm border border-primary/30 bg-primary-soft px-3 py-2 text-sm text-primary">
+            {syncMessage}
+          </p>
+        ) : null}
       </section>
 
-      {!loading && !error && rows.length > 0 ? (
+      {!loading && !refreshing && !error && rows.length > 0 ? (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <KpiCard
             label={`Último valor · ${indice}`}
             value={latest ? formatIndexValue(latest.valor) : "—"}
             hint={latest ? formatPeriodoIndice(latest.periodo) : "Sin datos"}
+            tone={0}
           />
           <KpiCard
             label="Variación mensual"
             value={latestVariations.mensual ?? "—"}
             hint="Respecto al mes anterior"
+            tone={1}
           />
           <KpiCard
             label="Variación interanual"
             value={latestVariations.interanual ?? "—"}
             hint="Respecto al mismo mes del año anterior"
+            tone={3}
           />
           <KpiCard
             label="Variación acumulada"
             value={latestVariations.acumulada ?? "—"}
             hint="Desde diciembre del año anterior (criterio INDEC)"
+            tone={4}
           />
         </div>
       ) : null}
 
-      <section className="flex min-h-[360px] flex-1 flex-col overflow-hidden rounded-md border border-border bg-bg-card shadow-[var(--shadow-card)]">
+      <Card accent className="rocchia-panel--flat relative flex min-h-[360px] flex-1 flex-col overflow-hidden p-0">
+        <ListProgressBar active={refreshing} />
         <div className="flex flex-wrap items-end justify-between gap-4 border-b border-border px-5 py-4">
           <div className="flex flex-col gap-0.5">
             <h2 className="text-[15px] font-semibold text-text-primary">Histórico mensual</h2>
             <p className="text-xs text-text-secondary">
-              {loading ? "Cargando…" : `${rows.length} período${rows.length === 1 ? "" : "s"}`}
+              {loading || refreshing ? "Cargando…" : `${rows.length} período${rows.length === 1 ? "" : "s"}`}
             </p>
           </div>
 
           <div className="flex flex-wrap items-end gap-3">
-            <label className="flex flex-col gap-1">
-              <span className="text-[11px] font-semibold text-text-secondary">Desde</span>
-              <input
-                type="date"
-                value={desde}
-                onChange={(event) => setDesde(event.target.value)}
-                className="rounded-sm border border-border bg-bg-page px-3 py-2 text-[13px] outline-none focus:border-primary"
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-[11px] font-semibold text-text-secondary">Hasta</span>
-              <input
-                type="date"
-                value={hasta}
-                onChange={(event) => setHasta(event.target.value)}
-                className="rounded-sm border border-border bg-bg-page px-3 py-2 text-[13px] outline-none focus:border-primary"
-              />
-            </label>
+            <RocchiaDateField label="Desde" value={desde} onChange={setDesde} />
+            <RocchiaDateField label="Hasta" value={hasta} onChange={setHasta} />
           </div>
         </div>
 
@@ -267,67 +287,76 @@ export function IndicesView() {
               Reintentar
             </button>
           </div>
-        ) : loading ? (
-          <p className="px-5 py-12 text-sm text-text-secondary">Cargando valores…</p>
-        ) : rows.length === 0 ? (
-          <div className="flex flex-col items-start gap-3 px-5 py-12">
-            <p className="text-sm text-text-secondary">
-              No hay valores para el rango seleccionado.
-            </p>
-            <ButtonPrimary type="button" onClick={() => void load()}>
-              Volver a intentar
-            </ButtonPrimary>
-          </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-left text-[13px]">
-              <thead>
-                <tr className="h-11 bg-bg-cream text-xs font-semibold text-text-secondary">
-                  <th className="px-5">Período</th>
-                  <th className="px-5 text-right">Valor</th>
-                  <th className="px-5 text-right">Mensual</th>
-                  <th className="px-5 text-right">Interanual</th>
-                  <th className="px-5 text-right">Acumulada</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row, index) => {
-                  const variations = computeIndexVariations(valorMap, row.periodo);
-                  return (
-                  <tr
-                    key={row.periodo}
-                    className={`border-b border-border ${
-                      index === 0 ? "bg-primary-soft/40" : "hover:bg-bg-page/80"
-                    }`}
-                  >
-                    <td className="px-5 py-4 font-medium text-text-primary">
-                      {formatPeriodoIndice(row.periodo)}
-                      {index === 0 ? (
-                        <span className="ml-2 text-[11px] font-semibold text-primary">
-                          Último
-                        </span>
-                      ) : null}
-                    </td>
-                    <td className="px-5 py-4 text-right text-[15px] font-bold text-primary">
-                      {formatIndexValue(row.valor)}
-                    </td>
-                    <td className="px-5 py-4 text-right">
-                      <VariationValue value={variations.mensual} />
-                    </td>
-                    <td className="px-5 py-4 text-right">
-                      <VariationValue value={variations.interanual} />
-                    </td>
-                    <td className="px-5 py-4 text-right">
-                      <VariationValue value={variations.acumulada} />
-                    </td>
-                  </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <ListTableContent
+            isInitialLoad={isInitialLoad}
+            loading={loading}
+            refreshing={refreshing}
+            listTransitionKey={listTransitionKey}
+            initialSkeleton={<IndicesTableSkeleton />}
+            placeholderClassName="min-h-[280px]"
+          >
+            {rows.length === 0 ? (
+              <div className="flex flex-col items-start gap-3 px-5 py-12">
+                <p className="text-sm text-text-secondary">
+                  No hay valores para el rango seleccionado.
+                </p>
+                <ButtonPrimary type="button" onClick={() => void load()}>
+                  Volver a intentar
+                </ButtonPrimary>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[640px] text-left text-[13px]">
+                  <thead>
+                    <tr className="h-11 bg-bg-cream text-xs font-semibold text-text-secondary">
+                      <th className="px-5">Período</th>
+                      <th className="px-5 text-right">Valor</th>
+                      <th className="px-5 text-right">Mensual</th>
+                      <th className="px-5 text-right">Interanual</th>
+                      <th className="px-5 text-right">Acumulada</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((row, index) => {
+                      const variations = computeIndexVariations(valorMap, row.periodo);
+                      return (
+                        <tr
+                          key={row.periodo}
+                          className={`border-b border-border ${
+                            index === 0 ? "bg-primary-soft/40" : "hover:bg-bg-page/80"
+                          }`}
+                        >
+                          <td className="px-5 py-4 font-medium text-text-primary">
+                            {formatPeriodoIndice(row.periodo)}
+                            {index === 0 ? (
+                              <span className="ml-2 text-[11px] font-semibold text-primary">
+                                Último
+                              </span>
+                            ) : null}
+                          </td>
+                          <td className="px-5 py-4 text-right text-[15px] font-bold text-primary">
+                            {formatIndexValue(row.valor)}
+                          </td>
+                          <td className="px-5 py-4 text-right">
+                            <VariationValue value={variations.mensual} />
+                          </td>
+                          <td className="px-5 py-4 text-right">
+                            <VariationValue value={variations.interanual} />
+                          </td>
+                          <td className="px-5 py-4 text-right">
+                            <VariationValue value={variations.acumulada} />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </ListTableContent>
         )}
-      </section>
+      </Card>
     </div>
   );
 }

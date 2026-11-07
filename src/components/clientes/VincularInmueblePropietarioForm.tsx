@@ -9,6 +9,7 @@ import {
   type InmuebleAltaValue,
 } from "@/components/inmuebles/InmuebleAltaFields";
 import { ButtonPrimary } from "@/components/ui/Button";
+import { NumericSelect } from "@/components/ui/NumericSelect";
 import { useAuth } from "@/context/auth-context";
 import { ApiError, addInmueblePropietario, fetchCatalog } from "@/lib/api";
 import type { CatalogoItem, InmuebleRecord } from "@/lib/api/types";
@@ -176,26 +177,24 @@ export function VincularInmueblePropietarioForm({
       </div>
 
       {mode === "existente" ? (
-        <label className="flex flex-col gap-1.5">
-          <span className="text-[11px] font-semibold text-text-secondary">Inmueble</span>
-          <select
-            value={selectedInmuebleId}
-            onChange={(event) => setSelectedInmuebleId(event.target.value)}
-            className="rounded-sm border border-border bg-bg-card px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
-          >
-            <option value="">Seleccionar…</option>
-            {disponibles.map((inmueble) => (
-              <option key={inmueble.id} value={String(inmueble.id)}>
-                {inmuebleDisplayLabel(inmueble)}
-              </option>
-            ))}
-          </select>
+        <div className="flex flex-col gap-1.5">
+          <NumericSelect
+            label="Inmueble"
+            value={selectedInmuebleId ? Number(selectedInmuebleId) : null}
+            onChange={(id) => setSelectedInmuebleId(id != null ? String(id) : "")}
+            allowEmpty
+            emptyLabel="Seleccionar…"
+            options={disponibles.map((inmueble) => ({
+              value: inmueble.id,
+              label: inmuebleDisplayLabel(inmueble),
+            }))}
+          />
           {disponibles.length === 0 ? (
             <p className="text-[12px] text-text-secondary">
               No hay inmuebles disponibles para vincular. Usá alta nueva propiedad.
             </p>
           ) : null}
-        </label>
+        </div>
       ) : token ? (
         <InmuebleAltaFields
           token={token}

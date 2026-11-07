@@ -97,6 +97,18 @@ export function computeLatestVariations(rows: ValorIndiceRecord[]): IndexVariati
   return computeIndexVariations(map, sorted[0].periodo);
 }
 
+/** Cociente del nivel del mes contra el mes anterior. 1,021 es +2,1 %. */
+export function monthOverMonthRatio(
+  rows: { periodo: string; valor: string }[],
+  periodo: string,
+): number | null {
+  const map = buildValorMap(rows);
+  const current = map.get(normalizePeriodo(periodo));
+  const prev = map.get(previousMonthPeriodo(periodo));
+  if (current === undefined || prev === undefined) return null;
+  return current / prev;
+}
+
 export function monthOverMonthVariationPct(rows: ValorIndiceRecord[]): string | null {
   return computeLatestVariations(rows).mensual;
 }

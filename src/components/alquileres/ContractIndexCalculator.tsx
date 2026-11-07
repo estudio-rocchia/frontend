@@ -5,6 +5,7 @@ import type { AdjustmentIndex } from "@/data/alquileres-contract-details";
 import { ApiError, previewAjusteIndice } from "@/lib/api";
 import type { ContratoDetail, IndiceCode, PreviewAjusteResponse } from "@/lib/api/types";
 import { formatIndicePunto, formatMoney, rentalApiErrorMessage } from "@/lib/format";
+import { MesAnioPeriodSelect } from "@/components/ui/MesAnioPeriodSelect";
 import {
   ADJUSTMENT_INDICES,
   type MonthYear,
@@ -17,21 +18,6 @@ import {
   suggestedIndexMonthPeriod,
   toIsoMonthDate,
 } from "@/lib/rental-adjustment";
-
-const MONTHS = [
-  { value: 1, label: "Enero" },
-  { value: 2, label: "Febrero" },
-  { value: 3, label: "Marzo" },
-  { value: 4, label: "Abril" },
-  { value: 5, label: "Mayo" },
-  { value: 6, label: "Junio" },
-  { value: 7, label: "Julio" },
-  { value: 8, label: "Agosto" },
-  { value: 9, label: "Septiembre" },
-  { value: 10, label: "Octubre" },
-  { value: 11, label: "Noviembre" },
-  { value: 12, label: "Diciembre" },
-];
 
 export type IndexCalculatorState = {
   tipoIndice: AdjustmentIndex;
@@ -47,54 +33,6 @@ function formatIndexValue(value: string): string {
     return num.toLocaleString("es-AR", { maximumFractionDigits: 1 });
   }
   return num.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-function MonthYearSelect({
-  label,
-  hint,
-  value,
-  years,
-  onChange,
-}: {
-  label: string;
-  hint?: string;
-  value: MonthYear;
-  years: number[];
-  onChange: (value: MonthYear) => void;
-}) {
-  const selectClass =
-    "rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary";
-
-  return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-[11px] font-semibold text-text-secondary">{label}</span>
-      {hint ? <span className="text-[11px] text-text-secondary">{hint}</span> : null}
-      <div className="grid grid-cols-2 gap-2">
-        <select
-          value={value.mes}
-          onChange={(e) => onChange({ ...value, mes: Number(e.target.value) })}
-          className={selectClass}
-        >
-          {MONTHS.map((m) => (
-            <option key={m.value} value={m.value}>
-              {m.label}
-            </option>
-          ))}
-        </select>
-        <select
-          value={value.anio}
-          onChange={(e) => onChange({ ...value, anio: Number(e.target.value) })}
-          className={selectClass}
-        >
-          {years.map((y) => (
-            <option key={y} value={y}>
-              {y}
-            </option>
-          ))}
-        </select>
-      </div>
-    </div>
-  );
 }
 
 function ResultBox({
@@ -367,8 +305,8 @@ export function ContractIndexCalculator({
 
       {!isAdjust ? (
         <p className="text-[12px] leading-relaxed text-text-secondary">
-          {value.tipoIndice === "IPC"
-            ? `El coeficiente es el producto de los últimos ${value.frecuenciaAjusteMeses} IPC mensuales. Los porcentajes no se suman.`
+          {value.tipoIndice === "IPC" || value.tipoIndice === "CAC"
+            ? `El coeficiente es el producto de los últimos ${value.frecuenciaAjusteMeses} ${value.tipoIndice} mensuales. Los porcentajes no se suman.`
             : value.tipoIndice === "ICL"
               ? "El coeficiente es el ICL de la fecha final dividido el ICL de la fecha inicial."
               : `Elegí entre qué meses medir la suba del ${indiceLabel} (sugerimos los últimos ${value.frecuenciaAjusteMeses} meses).`}
@@ -376,15 +314,17 @@ export function ContractIndexCalculator({
       ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <MonthYearSelect
+        <MesAnioPeriodSelect
           label="Desde"
-          value={value.periodoDesde}
+          mes={value.periodoDesde.mes}
+          anio={value.periodoDesde.anio}
           years={years}
           onChange={(periodoDesde) => patch({ periodoDesde })}
         />
-        <MonthYearSelect
+        <MesAnioPeriodSelect
           label="Hasta"
-          value={value.periodoHasta}
+          mes={value.periodoHasta.mes}
+          anio={value.periodoHasta.anio}
           years={years}
           onChange={(periodoHasta) => patch({ periodoHasta })}
         />

@@ -19,6 +19,8 @@ import {
   showsDetalleFilterField,
   showsTerrainFilterField,
 } from "@/lib/ventas/detalle-por-tipo";
+import { EnumSelect } from "@/components/ui/EnumSelect";
+import { NumericSelect } from "@/components/ui/NumericSelect";
 import { formInputClass, interactiveFocusClass } from "@/lib/ui/interactive-focus";
 
 const fieldClass = `${formInputClass} py-2 text-[13px]`;
@@ -201,18 +203,15 @@ export function VentasCatalogFiltersPanel({
         <div className="flex flex-col gap-2 border-t border-border px-3 pb-2.5 pt-2">
           <div className="flex flex-wrap items-end gap-3">
             <Field label="Tipo" className="w-full min-w-[9.5rem] max-w-[11.5rem]">
-              <select
-                className={fieldClass}
+              <EnumSelect
                 value={filters.tipoInmuebleCode}
-                onChange={(e) => handleTipoChange(e.target.value)}
-              >
-                <option value="">Todos</option>
-                {tiposInmueble.map((tipo) => (
-                  <option key={tipo.id} value={tipo.code}>
-                    {tipo.name}
-                  </option>
-                ))}
-              </select>
+                onChange={handleTipoChange}
+                allowEmpty
+                emptyLabel="Todos"
+                placeholder="Todos"
+                size="sm"
+                options={tiposInmueble.map((tipo) => ({ value: tipo.code, label: tipo.name }))}
+              />
             </Field>
             <PrecioRangeField
               moneda={filters.codigoMoneda}
@@ -228,42 +227,32 @@ export function VentasCatalogFiltersPanel({
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
               {showBedrooms ? (
                 <Field label="Dorm.">
-                  <select
-                    className={fieldClass}
-                    value={filters.bedroomsMin ?? ""}
-                    onChange={(e) =>
-                      onChange({
-                        ...filters,
-                        bedroomsMin: e.target.value ? Number(e.target.value) : null,
-                      })
-                    }
-                  >
-                    {BEDROOM_FILTER_OPTIONS.map((option) => (
-                      <option key={option.label} value={option.value ?? ""}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                  <NumericSelect
+                    value={filters.bedroomsMin}
+                    onChange={(bedroomsMin) => onChange({ ...filters, bedroomsMin })}
+                    allowEmpty
+                    emptyLabel={BEDROOM_FILTER_OPTIONS[0]?.label ?? "Todos"}
+                    size="sm"
+                    options={BEDROOM_FILTER_OPTIONS.filter((o) => o.value != null).map((option) => ({
+                      value: option.value!,
+                      label: option.label,
+                    }))}
+                  />
                 </Field>
               ) : null}
               {showBathrooms ? (
                 <Field label="Baños">
-                  <select
-                    className={fieldClass}
-                    value={filters.bathroomsMin ?? ""}
-                    onChange={(e) =>
-                      onChange({
-                        ...filters,
-                        bathroomsMin: e.target.value ? Number(e.target.value) : null,
-                      })
-                    }
-                  >
-                    {BATHROOM_FILTER_OPTIONS.map((option) => (
-                      <option key={option.label} value={option.value ?? ""}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                  <NumericSelect
+                    value={filters.bathroomsMin}
+                    onChange={(bathroomsMin) => onChange({ ...filters, bathroomsMin })}
+                    allowEmpty
+                    emptyLabel={BATHROOM_FILTER_OPTIONS[0]?.label ?? "Todos"}
+                    size="sm"
+                    options={BATHROOM_FILTER_OPTIONS.filter((o) => o.value != null).map((option) => ({
+                      value: option.value!,
+                      label: option.label,
+                    }))}
+                  />
                 </Field>
               ) : null}
               {showCochera || showPileta ? (

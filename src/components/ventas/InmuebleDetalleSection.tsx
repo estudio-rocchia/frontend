@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { ClipboardList, Pencil, Save, X } from "lucide-react";
 
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
-import { FieldBlock } from "@/components/ui/FormLayout";
+import { resumenFieldGridClass, ResumenField, ResumenPanel } from "@/components/ui/ResumenFields";
 import { ApiError, upsertInmuebleDetalle } from "@/lib/api";
 import type { DetalleInmuebleRecord } from "@/lib/api/types";
 import { formatDetalleSummary } from "@/lib/ventas/detalle-labels";
@@ -14,10 +15,8 @@ import {
 import { VENTA_EMPTY_FIELD } from "@/lib/ventas/empty-field";
 import { formInputClass } from "@/lib/ui/interactive-focus";
 
-function SectionTitle({ children }: { children: string }) {
-  return (
-    <h3 className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">{children}</h3>
-  );
+function displayDetalleValue(value: string): string {
+  return value === VENTA_EMPTY_FIELD ? "—" : value;
 }
 
 function DetalleEditorForm({
@@ -205,10 +204,12 @@ function DetalleEditorForm({
       ) : null}
       {error ? <p className="text-sm text-danger">{error}</p> : null}
       <div className="flex justify-end gap-2">
-        <ButtonOutline type="button" disabled={saving} onClick={onCancel}>
+        <ButtonOutline type="button" className="gap-2" disabled={saving} onClick={onCancel}>
+          <X className="h-4 w-4" aria-hidden />
           Cancelar
         </ButtonOutline>
-        <ButtonPrimary type="button" disabled={saving} onClick={() => void handleSave()}>
+        <ButtonPrimary type="button" className="gap-2" disabled={saving} onClick={() => void handleSave()}>
+          <Save className="h-4 w-4" aria-hidden />
           {saving ? "Guardando…" : "Guardar detalle"}
         </ButtonPrimary>
       </div>
@@ -243,27 +244,31 @@ export function InmuebleDetalleSection({
     setEditing(true);
   }
 
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <SectionTitle>{profile.sectionTitle}</SectionTitle>
-        {canEdit && !editing ? (
-          <ButtonOutline type="button" onClick={startEditing}>
-            {detalle ? "Editar" : "Cargar detalle"}
-          </ButtonOutline>
-        ) : null}
-      </div>
-      {profile.sectionHint ? (
-        <p className="text-[12px] text-text-secondary">{profile.sectionHint}</p>
-      ) : null}
+  const headerAction =
+    canEdit && !editing ? (
+      <ButtonOutline type="button" className="gap-2" onClick={startEditing}>
+        {detalle ? (
+          <Pencil className="h-4 w-4" aria-hidden />
+        ) : (
+          <ClipboardList className="h-4 w-4" aria-hidden />
+        )}
+        {detalle ? "Editar" : "Cargar detalle"}
+      </ButtonOutline>
+    ) : undefined;
 
+  return (
+    <ResumenPanel
+      title={profile.sectionTitle}
+      description={profile.sectionHint}
+      headerAction={headerAction}
+    >
       {!editing ? (
-        <>
-          <FieldBlock label="Resumen" value={summary} />
+        <div className={resumenFieldGridClass}>
+          <ResumenField label="Resumen" value={displayDetalleValue(summary)} span={2} />
           {showsDetalleEditorField(tipoInmuebleCode, "observacion") ? (
-            <FieldBlock label="Observación" value={observacionDisplay} />
+            <ResumenField label="Observación" value={displayDetalleValue(observacionDisplay)} span={2} />
           ) : null}
-        </>
+        </div>
       ) : (
         <DetalleEditorForm
           key={editKey}
@@ -278,6 +283,6 @@ export function InmuebleDetalleSection({
           }}
         />
       )}
-    </div>
+    </ResumenPanel>
   );
 }

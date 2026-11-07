@@ -5,6 +5,8 @@ import type { ReactNode } from "react";
 import { CitaAssigneeDayAgenda } from "@/components/calendario/CitaAssigneeDayAgenda";
 import { CitaScheduleConflict } from "@/components/calendario/CitaScheduleConflict";
 import { CitaTimePicker } from "@/components/calendario/CitaTimePicker";
+import { NumericSelect } from "@/components/ui/NumericSelect";
+import { RocchiaDateField } from "@/components/ui/RocchiaDateField";
 import type { CitaDetail, CitaTipo, InmuebleRecord, UsuarioRecord } from "@/lib/api/types";
 import { citaDurationLabel } from "@/lib/calendar/labels";
 import { CITA_TIPOS, citaTipoLabel } from "@/lib/calendar/tipos";
@@ -124,15 +126,12 @@ export function CitaHorarioFields({
     <div className="flex flex-col gap-4">
       <div className={`grid gap-4 ${onDateKeyChange ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
         {onDateKeyChange ? (
-          <FieldLabel label="Fecha">
-            <input
-              type="date"
-              className={formInputClass}
-              value={dateKey}
-              onChange={(e) => onDateKeyChange(e.target.value)}
-              disabled={disabled}
-            />
-          </FieldLabel>
+          <RocchiaDateField
+            label="Fecha"
+            value={dateKey}
+            onChange={onDateKeyChange}
+            disabled={disabled}
+          />
         ) : null}
         <FieldLabel label="Hora de inicio">
           <CitaTimePicker value={time} onChange={onTimeChange} disabled={disabled} />
@@ -176,17 +175,14 @@ export function CitaResponsableSelect({
   usuarios: UsuarioRecord[];
   disabled?: boolean;
 }) {
+  const selectedId = Number(asignadoUsuarioId);
   return (
-    <select
-      className={formInputClass}
-      value={asignadoUsuarioId}
-      onChange={(e) => onChange(e.target.value)}
+    <NumericSelect
+      value={Number.isFinite(selectedId) && selectedId > 0 ? selectedId : null}
+      onChange={(id) => id != null && onChange(String(id))}
       disabled={disabled}
-    >
-      {usuarios.map((user) => (
-        <option key={user.id} value={user.id}>{user.username}</option>
-      ))}
-    </select>
+      options={usuarios.map((user) => ({ value: user.id, label: user.username }))}
+    />
   );
 }
 
@@ -201,21 +197,20 @@ export function CitaInmuebleSelect({
   inmuebles: InmuebleRecord[];
   disabled?: boolean;
 }) {
+  const selectedId = Number(inmuebleId);
   return (
-    <select
-      className={formInputClass}
-      value={inmuebleId}
-      onChange={(e) => onChange(e.target.value)}
+    <NumericSelect
+      value={Number.isFinite(selectedId) && selectedId > 0 ? selectedId : null}
+      onChange={(id) => onChange(id != null ? String(id) : "")}
       disabled={disabled}
-      required
-    >
-      <option value="">Seleccionar inmueble…</option>
-      {inmuebles.map((item) => (
-        <option key={item.id} value={item.id}>
-          {item.code}{item.title ? ` — ${item.title}` : ""}
-        </option>
-      ))}
-    </select>
+      allowEmpty
+      emptyLabel="Seleccionar inmueble…"
+      placeholder="Seleccionar inmueble…"
+      options={inmuebles.map((item) => ({
+        value: item.id,
+        label: `${item.code}${item.title ? ` — ${item.title}` : ""}`,
+      }))}
+    />
   );
 }
 

@@ -1,13 +1,16 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useState } from "react";
 
 import { useSyncScope } from "@/lib/sync/use-sync-scope";
 
 import { AlquileresKpiSection } from "@/components/alquileres/AlquileresKpiSection";
 import { AlquileresPageActions } from "@/components/alquileres/AlquileresPageActions";
+import { Card } from "@/components/ui/Card";
+import { ListProgressBar } from "@/components/ui/ListProgressBar";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { RentalsTable } from "@/components/alquileres/RentalsTable";
 import type { NewContractForm } from "@/components/alquileres/NewContractModal";
 import type { RenewContractForm } from "@/components/alquileres/RenewContractModal";
@@ -47,6 +50,9 @@ import type {
 import { nextContratoCode, nextInmuebleCode, prefixForTipoInmueble } from "@/lib/codes";
 import { rentalApiErrorMessage } from "@/lib/format";
 import { pagePaddingClass } from "@/lib/layout";
+import { useBreakUiMode, withBreakUiQuery } from "@/lib/alquileres/break-ui-mode";
+import { resolveBreakUiFichaBundle } from "@/data/alquileres-break-ui-fixtures";
+import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 import { resolveMoraPunitoriaPayload } from "@/lib/mora-punitoria";
 import {
   loadInmueblesSinAlquiler,
@@ -102,11 +108,16 @@ const RenewContractModal = dynamic(
 
 export function AlquileresWorkspace() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const breakUi = useBreakUiMode();
   const { token, logout } = useAuth();
   const { prefetch: prefetchContrato } = useContratoPrefetch(token);
   const {
     rows,
     loading,
+    refreshing,
+    listTransitionKey,
+    isInitialLoad,
     error,
     pageIndex,
     canGoPrev,
@@ -163,13 +174,18 @@ export function AlquileresWorkspace() {
 
   const openFicha = useCallback(
     (contratoId: string | number) => {
-      router.push(`/alquileres/${contratoId}`);
+      router.push(withBreakUiQuery(`/alquileres/${contratoId}`, searchParams));
     },
-    [router],
+    [router, searchParams],
   );
 
   async function handleRenewContract(form: RenewContractForm) {
     if (!token || !selectedContrato) return;
+    if (breakUi.active) {
+      setRenewModalOpen(false);
+      showToast("Renovación simulada (modo break-ui).");
+      return;
+    }
     if (selectedContrato.estado !== "active") {
       showToast("Solo se pueden renovar contratos activos.");
       return;
@@ -326,6 +342,16 @@ export function AlquileresWorkspace() {
       showToast("Este contrato no está por vencer.");
       return;
     }
+    const fixture = breakUi.active ? resolveBreakUiFichaBundle(breakUi.mode, Number(row.id)) : null;
+    if (fixture) {
+      if (fixture.contrato.estado !== "active") {
+        showToast("Solo se pueden renovar contratos activos.");
+        return;
+      }
+      setSelectedContrato(fixture.contrato);
+      setRenewModalOpen(true);
+      return;
+    }
     try {
       const detailRes = await fetchContrato(token, Number(row.id));
       if (detailRes.estado !== "active") {
@@ -349,6 +375,17 @@ export function AlquileresWorkspace() {
       showToast("Este contrato no tiene ajuste pendiente.");
       return;
     }
+    const fixture = breakUi.active ? resolveBreakUiFichaBundle(breakUi.mode, Number(row.id)) : null;
+    if (fixture) {
+      if (fixture.contrato.estado !== "active") {
+        showToast("Solo se pueden ajustar contratos activos.");
+        return;
+      }
+      setSelectedContrato(fixture.contrato);
+      setSelectedUltimoAjusteEn(row.ultimoAjusteEn);
+      setAdjustModalOpen(true);
+      return;
+    }
     try {
       const detailRes = await fetchContrato(token, Number(row.id));
       if (detailRes.estado !== "active") {
@@ -370,6 +407,11 @@ export function AlquileresWorkspace() {
     depositoPlan?: { crearPlan: boolean; cantidadCuotas: number };
   }) {
     if (!token || !selectedContrato) return;
+    if (breakUi.active) {
+      setAdjustModalOpen(false);
+      showToast("Ajuste simulado (modo break-ui).");
+      return;
+    }
     if (selectedContrato.estado !== "active") {
       showToast("Solo se pueden ajustar contratos activos.");
       return;
@@ -612,6 +654,7 @@ export function AlquileresWorkspace() {
             frecuenciaAjusteMeses: form.frecuenciaAjusteMeses,
             tipoIndiceId: indexItem.id,
             notasIndice,
+            notas: form.notas.trim() || null,
             tipoMoraId: moraPayload.tipoMoraId,
             tasaMora: moraPayload.tasaMora,
             montoMoraFijo: moraPayload.montoMoraFijo,
@@ -655,20 +698,30 @@ export function AlquileresWorkspace() {
 
   return (
     <>
-      <div className={`flex flex-col gap-6 sm:gap-8 ${pagePaddingClass}`}>
-        <header className="flex flex-col gap-4">
-          <div className="flex max-w-2xl flex-col gap-1">
-            <h1 className="text-[22px] font-bold text-text-primary">Gestión de alquileres</h1>
-            <p className="text-sm text-text-secondary">
-              Operá contratos activos, ajustes por índice y renovaciones.
-            </p>
-          </div>
-          <AlquileresPageActions
-            onNewContract={() => void openNewContractModal()}
-            onLiquidacion={() => setLiquidacionModalOpen(true)}
-            disabled={submitting}
-          />
-        </header>
+      <div className={`relative z-10 flex flex-col gap-6 sm:gap-8 ${pagePaddingClass}`}>
+        <PageHeader
+          title="Alquileres"
+          description={
+            tableStats === null
+              ? "Contratos, cobranzas y ajustes."
+              : stats.enMora > 0
+                ? stats.enMora === 1
+                  ? "Hay un contrato en mora."
+                  : `Hay ${stats.enMora} contratos en mora.`
+                : stats.aCobrar > 0
+                  ? stats.aCobrar === 1
+                    ? "Hay una cuota para cobrar este mes."
+                    : `Hay ${stats.aCobrar} cuotas para cobrar este mes.`
+                  : "Los contratos activos están al día."
+          }
+          actions={
+            <AlquileresPageActions
+              onNewContract={() => void openNewContractModal()}
+              onLiquidacion={() => setLiquidacionModalOpen(true)}
+              disabled={submitting}
+            />
+          }
+        />
 
         <AlquileresKpiSection
           loading={loading}
@@ -682,36 +735,46 @@ export function AlquileresWorkspace() {
         {error ? (
           <div>
             <p className="rounded-sm border border-danger bg-danger-bg px-3 py-2 text-sm text-danger">{error}</p>
-            <button type="button" onClick={() => void loadRows()} className="mt-3 text-sm font-semibold text-primary">
+            <button
+              type="button"
+              onClick={() => void loadRows()}
+              className={`dashboard-press mt-3 h-[34px] border border-border px-3 text-[13px] text-text-primary ${interactiveFocusClass}`}
+            >
               Reintentar
             </button>
           </div>
         ) : (
-          <RentalsTable
-            rows={rows}
-            loading={loading}
-            isSearchPending={isSearchPending}
-            serverMode
-            total={tableTotal}
-            page={pageIndex + 1}
-            pageSize={ALQUILERES_PAGE_SIZE}
-            canGoPrev={canGoPrev}
-            canGoNext={canGoNext}
-            onGoPrev={goPrev}
-            onGoNext={goNext}
-            stats={stats}
-            searchQuery={searchQuery}
-            activeChip={activeChip}
-            onSearchChange={setSearchQuery}
-            onChipChange={setActiveChip}
-            onClearFilters={clearFilters}
-            onPrefetch={(row) => prefetchContrato(Number(row.id))}
-            onViewFicha={(row) => openFicha(row.id)}
-            onCollect={(row) => void openCollectFromRow(row)}
-            onAdjust={(row) => void openAdjustFromRow(row)}
-            onRenew={(row) => void openRenewFromRow(row)}
-            onFinish={openFinishFromRow}
-          />
+          <Card accent className="rocchia-panel--flat relative flex min-w-0 flex-col overflow-hidden p-0">
+            <ListProgressBar active={refreshing} />
+            <RentalsTable
+              embedded
+              rows={rows}
+              loading={loading && isInitialLoad}
+              refreshing={refreshing}
+              listTransitionKey={listTransitionKey}
+              isSearchPending={isSearchPending}
+              serverMode
+              total={tableTotal}
+              page={pageIndex + 1}
+              pageSize={ALQUILERES_PAGE_SIZE}
+              canGoPrev={canGoPrev}
+              canGoNext={canGoNext}
+              onGoPrev={goPrev}
+              onGoNext={goNext}
+              stats={stats}
+              searchQuery={searchQuery}
+              activeChip={activeChip}
+              onSearchChange={setSearchQuery}
+              onChipChange={setActiveChip}
+              onClearFilters={clearFilters}
+              onPrefetch={(row) => prefetchContrato(Number(row.id))}
+              onViewFicha={(row) => openFicha(row.id)}
+              onCollect={(row) => void openCollectFromRow(row)}
+              onAdjust={(row) => void openAdjustFromRow(row)}
+              onRenew={(row) => void openRenewFromRow(row)}
+              onFinish={openFinishFromRow}
+            />
+          </Card>
         )}
       </div>
 
@@ -734,7 +797,9 @@ export function AlquileresWorkspace() {
           token={token}
           mediosPago={mediosPago}
           onSuccess={() => {
-            showToast("Cobro registrado.");
+            showToast(
+              breakUi.active ? "Cobro simulado (modo break-ui)." : "Cobro registrado.",
+            );
             void loadRows();
           }}
         />
@@ -795,7 +860,7 @@ export function AlquileresWorkspace() {
 
       {toast ? (
         <div
-          className="fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 rounded-sm border border-border bg-bg-card px-4 py-3 text-sm font-medium text-text-primary shadow-[var(--shadow-card)]"
+          className="fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 rounded-full border border-border bg-bg-card px-4 py-3 text-sm font-medium text-text-primary shadow-[var(--shadow-card)]"
           role="status"
         >
           {toast}

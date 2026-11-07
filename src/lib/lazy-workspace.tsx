@@ -13,12 +13,15 @@ function WorkspaceLoadingFallback() {
   );
 }
 
-export function lazyWorkspace<P extends object>(
-  loader: () => Promise<{ [key: string]: ComponentType<P> }>,
+export function lazyWorkspace(
+  loader: () => Promise<Record<string, unknown>>,
   exportName: string,
 ) {
   return dynamic(
-    () => loader().then((mod) => ({ default: mod[exportName] as ComponentType<P> })),
+    () =>
+      loader().then((mod) => ({
+        default: mod[exportName] as ComponentType,
+      })),
     { loading: () => <WorkspaceLoadingFallback /> },
   );
 }

@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 
 import { CapsLockHint, useCapsLock } from "@/components/auth/CapsLockHint";
 import { LoginErrorAlert } from "@/components/auth/LoginErrorAlert";
-import { LoginHeading, LoginLoadingScreen, LoginShell } from "@/components/auth/LoginShell";
+import { LoginLoadingScreen, LoginShell } from "@/components/auth/LoginShell";
 import { LoginSpinner } from "@/components/auth/LoginSpinner";
 import { useAuth } from "@/context/auth-context";
 import {
@@ -103,8 +103,6 @@ export default function LoginPage() {
 
   return (
     <LoginShell asForm onSubmit={handleSubmit} shakeSignal={shakeSignal}>
-      <LoginHeading title="Acceso" subtitle="Estudio Jurídico e Inmobiliario" />
-
       <div className="mt-7 flex flex-col gap-5">
         <label className="flex flex-col gap-2">
           <span className="text-sm font-semibold text-text-primary">Email o usuario</span>

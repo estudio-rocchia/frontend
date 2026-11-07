@@ -23,6 +23,7 @@ type AuthContextValue = {
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+const AuthTokenContext = createContext<{ token: string | null; loading: boolean } | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
@@ -65,13 +66,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [token, user, loading, login, logout],
   );
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  const tokenValue = useMemo(() => ({ token, loading }), [token, loading]);
+
+  return (
+    <AuthTokenContext.Provider value={tokenValue}>
+      <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+    </AuthTokenContext.Provider>
+  );
 }
 
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) {
     throw new Error("useAuth must be used within AuthProvider");
+  }
+  return ctx;
+}
+
+/** Solo token y loading: evita re-renders cuando cambia `user` sin cambiar sesión. */
+export function useAuthToken() {
+  const ctx = useContext(AuthTokenContext);
+  if (!ctx) {
+    throw new Error("useAuthToken must be used within AuthProvider");
   }
   return ctx;
 }

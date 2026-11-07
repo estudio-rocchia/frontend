@@ -8,7 +8,8 @@ import {
   isNewPersonaFieldValid,
   type PersonaFieldValue,
 } from "@/components/alquileres/PersonaSelectField";
-import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
+import { ButtonDanger, ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
+import { Modal } from "@/components/ui/Modal";
 import { ApiError, addContratoGarante, removeContratoGarante } from "@/lib/api";
 import type { ContratoDetail } from "@/lib/api/types";
 import { resolveTenantPersona } from "@/lib/alquileres/persona-resolve";
@@ -45,6 +46,7 @@ export function ContractGarantesSection({
   const [draft, setDraft] = useState<PersonaFieldValue>(emptyNewPersonaField());
   const [saving, setSaving] = useState(false);
   const [removingId, setRemovingId] = useState<number | null>(null);
+  const [removeTarget, setRemoveTarget] = useState<{ personaId: number; name: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const idsKey = contrato.garantes.map((garante) => garante.personaId).join(",");
@@ -118,14 +120,14 @@ export function ContractGarantesSection({
   }
 
   return (
-    <div className="flex flex-col gap-3 sm:col-span-2">
-      <div className="flex items-center justify-between gap-3">
+    <div className="flex min-w-0 flex-col gap-4">
+      <div className="flex items-center justify-between gap-4">
         <span className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">Garantes</span>
         {editable && !adding ? (
           <button
             type="button"
             onClick={startAdding}
-            className={`text-[13px] font-semibold text-primary ${interactiveFocusClass}`}
+            className={`rocchia-action shrink-0 text-[13px] font-semibold text-primary-dark underline underline-offset-2 ${interactiveFocusClass}`}
           >
             Agregar garante
           </button>
@@ -145,17 +147,22 @@ export function ContractGarantesSection({
                 key={garante.id}
                 className="flex items-center justify-between gap-3 rounded-sm border border-border bg-bg-page px-3 py-2"
               >
-                <span className="min-w-0 text-[13px] font-medium text-text-primary">
+                <span className="min-w-0 truncate text-[13px] font-medium text-text-primary">
                   {nombres[garante.personaId] ?? "Cargando…"}
                 </span>
                 {editable ? (
                   <button
                     type="button"
-                    onClick={() => void handleRemove(garante.personaId)}
+                    onClick={() =>
+                      setRemoveTarget({
+                        personaId: garante.personaId,
+                        name: nombres[garante.personaId] ?? "este garante",
+                      })
+                    }
                     disabled={removing || saving}
-                    className={`shrink-0 text-[12px] font-semibold text-danger disabled:opacity-50 ${interactiveFocusClass}`}
+                    className={`rocchia-action shrink-0 text-[12px] font-semibold text-danger disabled:opacity-50 ${interactiveFocusClass}`}
                   >
-                    {removing ? "Quitando…" : "Quitar"}
+                    Quitar
                   </button>
                 ) : null}
               </li>
@@ -165,7 +172,7 @@ export function ContractGarantesSection({
       )}
 
       {adding ? (
-        <div className="flex flex-col gap-3 rounded-sm border border-dashed border-primary/40 bg-primary-soft/20 p-3">
+        <div className="flex flex-col gap-3 rounded-[21px] border border-dashed border-primary/40 bg-primary-soft/20 p-3">
           <PersonaSelectField
             label="Garante"
             value={draft}
@@ -186,10 +193,50 @@ export function ContractGarantesSection({
       ) : null}
 
       {error ? (
-        <p className="text-sm text-danger" role="alert">
+        <p
+          className="rounded-sm border border-danger bg-danger-bg px-3 py-2 text-sm text-danger"
+          role="alert"
+        >
           {error}
         </p>
       ) : null}
+
+      <Modal
+        open={removeTarget !== null}
+        onClose={() => {
+          if (removingId === null) setRemoveTarget(null);
+        }}
+        title="¿Quitar este garante?"
+        titleId="quitar-garante-titulo"
+        maxWidthClass="max-w-md"
+        footer={
+          <>
+            <ButtonOutline
+              type="button"
+              onClick={() => setRemoveTarget(null)}
+              disabled={removingId !== null}
+            >
+              Cancelar
+            </ButtonOutline>
+            <ButtonDanger
+              type="button"
+              disabled={removingId !== null || removeTarget === null}
+              onClick={() => {
+                if (!removeTarget) return;
+                void handleRemove(removeTarget.personaId).then(() => setRemoveTarget(null));
+              }}
+            >
+              {removingId !== null ? "Quitando…" : "Quitar garante"}
+            </ButtonDanger>
+          </>
+        }
+      >
+        <p className="text-sm text-text-secondary">
+          {removeTarget
+            ? `${removeTarget.name} deja de figurar como garante de este contrato. Podés volver a agregarlo después.`
+            : ""}
+        </p>
+      </Modal>
     </div>
   );
 }

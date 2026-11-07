@@ -2,13 +2,34 @@
 
 import dynamic from "next/dynamic";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 
 const ClienteInmobiliariaTab = dynamic(
   () =>
     import("@/components/clientes/ClienteInmobiliariaTab").then((mod) => ({
       default: mod.ClienteInmobiliariaTab,
+    })),
+  { ssr: false },
+);
+const ClienteVisasTab = dynamic(
+  () =>
+    import("@/components/visas/ClienteVisasTab").then((mod) => ({
+      default: mod.ClienteVisasTab,
+    })),
+  { ssr: false },
+);
+const ClienteJuridicoTab = dynamic(
+  () =>
+    import("@/components/clientes/ClienteJuridicoTab").then((mod) => ({
+      default: mod.ClienteJuridicoTab,
+    })),
+  { ssr: false },
+);
+const ClienteHistorialTab = dynamic(
+  () =>
+    import("@/components/clientes/ClienteHistorialTab").then((mod) => ({
+      default: mod.ClienteHistorialTab,
     })),
   { ssr: false },
 );
@@ -20,10 +41,11 @@ const EditarClienteModal = dynamic(
   { ssr: false },
 );
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
-import { FieldBlock } from "@/components/ui/FormLayout";
+import { ClienteResumenSection } from "@/components/clientes/ClienteResumenSection";
+import { PersonaFichaCard } from "@/components/clientes/PersonaFichaCard";
 import { PageHeaderSkeleton, Skeleton } from "@/components/ui/Skeleton";
-import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useAuth } from "@/context/auth-context";
+import { personaDisplayName } from "@/lib/format";
 import { type ClienteRow } from "@/data/clientes";
 import {
   ApiError,
@@ -36,9 +58,10 @@ import {
 } from "@/lib/api";
 import { useClientePrefetch } from "@/lib/use-cliente-prefetch";
 import type { ContratoListItem, PersonaRecord } from "@/lib/api/types";
-import { personaDisplayName } from "@/lib/format";
+import { canEditVisas } from "@/lib/visas/labels";
 import { pagePaddingClass } from "@/lib/layout";
-import { buildClientesContext, mapPersonaToClienteRow, vinculoBadgeClass } from "@/lib/mappers/clientes";
+import { ClienteVinculoChip } from "@/components/clientes/ClienteVinculoChip";
+import { buildClientesContext, mapPersonaToClienteRow } from "@/lib/mappers/clientes";
 import {
   normalizeModoHonorariosAdministracion,
   type ModoHonorariosAdministracion,
@@ -61,26 +84,13 @@ function SectionTitle({ children }: { children: string }) {
   );
 }
 
-function formatPorcentaje(value: string | null | undefined): string {
-  if (!value) return "6%";
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return `${value}%`;
-  return `${numeric.toLocaleString("es-AR", { maximumFractionDigits: 2 })}%`;
-}
-
-function personaInitials(persona: PersonaRecord): string {
-  const first = persona.nombre?.trim().charAt(0) ?? "";
-  const last = persona.apellido?.trim().charAt(0) ?? "";
-  return `${first}${last}`.toUpperCase() || "?";
-}
-
 export function ClienteFichaView() {
   const router = useRouter();
   const params = useParams();
   const personaId = Number(params.id);
   const validId = Number.isInteger(personaId) && personaId > 0;
 
-  const { token, logout } = useAuth();
+  const { token, user, logout } = useAuth();
   const { consume: consumePrefetchedCliente } = useClientePrefetch(token);
   const [activeTab, setActiveTab] = useState<FichaTab>("resumen");
   const [persona, setPersona] = useState<PersonaRecord | null>(null);
@@ -100,7 +110,6 @@ export function ClienteFichaView() {
   const [success, setSuccess] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
 
-  const tienePropiedades = propiedades.length > 0;
   const modoHonorarios = normalizeModoHonorariosAdministracion(persona?.modoHonorariosAdministracion);
   const porcentajeCliente = persona?.porcentajeAdministracion ?? "6";
 
@@ -183,16 +192,6 @@ export function ClienteFichaView() {
       })
       .finally(() => setLoading(false));
   }, [validId, token, logout, loadCore, loadInmobiliariaDetails]);
-
-  const metaLine = useMemo(() => {
-    if (!persona) return "";
-    const parts = [
-      persona.numeroDocumento ? `DNI ${persona.numeroDocumento}` : persona.cuit ? `CUIT ${persona.cuit}` : null,
-      persona.email,
-      persona.phone,
-    ].filter(Boolean);
-    return parts.join(" · ");
-  }, [persona]);
 
   if (!validId || (error && !persona && !loading)) {
     return (
@@ -340,50 +339,25 @@ export function ClienteFichaView() {
         Volver al listado
       </button>
 
-      <div className="flex flex-wrap gap-2 border-b border-border pb-1">
-        <button
-          type="button"
-          onClick={() => router.push("/clientes")}
-          className="rounded-t-sm px-4 py-2.5 text-sm font-medium text-text-secondary hover:text-text-primary"
-        >
-          Listado
-        </button>
-        <span className="rounded-t-sm border-b-2 border-primary px-4 py-2.5 text-sm font-medium text-primary">
-          Perfil 360°
-        </span>
-      </div>
-
-      <header className="flex flex-col gap-4 rounded-md border border-border bg-bg-card p-5 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex min-w-0 flex-1 gap-4">
-          <div
-            className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary-soft text-lg font-bold text-primary"
-            aria-hidden
-          >
-            {personaInitials(persona)}
-          </div>
-          <div className="flex flex-col gap-2">
-            <h1 className="text-[26px] font-bold text-primary">{personaDisplayName(persona)}</h1>
-            {metaLine ? <p className="text-sm text-text-secondary">{metaLine}</p> : null}
-            {clienteRow && clienteRow.vinculos.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {clienteRow.vinculos.map((vinculo) => (
-                  <span
-                    key={vinculo.id}
-                    className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${vinculoBadgeClass(vinculo.id)}`}
-                  >
-                    {vinculo.label}
-                  </span>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        </div>
-        {token ? (
-          <ButtonPrimary type="button" onClick={() => setEditOpen(true)}>
-            Editar datos
-          </ButtonPrimary>
-        ) : null}
-      </header>
+      <PersonaFichaCard
+        persona={persona}
+        badges={
+          clienteRow && clienteRow.vinculos.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {clienteRow.vinculos.map((vinculo) => (
+                <ClienteVinculoChip key={vinculo.id} vinculo={vinculo} />
+              ))}
+            </div>
+          ) : null
+        }
+        action={
+          token ? (
+            <ButtonPrimary type="button" onClick={() => setEditOpen(true)}>
+              Editar datos
+            </ButtonPrimary>
+          ) : null
+        }
+      />
 
       {editOpen && token && persona ? (
         <EditarClienteModal
@@ -441,35 +415,14 @@ export function ClienteFichaView() {
         ) : null}
 
         {!loadingDetail && activeTab === "resumen" ? (
-          <div className="flex flex-col gap-5">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <FieldBlock label="Tipo" value={persona.tipoPersona === "juridica" ? "Jurídica" : "Natural"} />
-              <FieldBlock label="Estado" value={persona.activo === false ? "Inactivo" : "Activo"} />
-              <FieldBlock label="Documento" value={persona.numeroDocumento ?? "—"} />
-              <FieldBlock label="CUIT/CUIL" value={persona.cuit ?? "—"} />
-              <FieldBlock label="Correo" value={persona.email ?? "—"} />
-              <FieldBlock label="Teléfono" value={persona.phone ?? "—"} />
-              <FieldBlock label="Dirección" value={persona.address ?? "—"} />
-              {tienePropiedades ? (
-                <FieldBlock
-                  label="% administración"
-                  value={
-                    modoHonorarios === "por_cliente"
-                      ? formatPorcentaje(porcentajeCliente)
-                      : propiedades.length === 1
-                        ? formatPorcentaje(propiedades[0]?.porcentajeAdministracion)
-                        : "Varía por propiedad"
-                  }
-                />
-              ) : null}
-            </div>
-            {persona.notas ? (
-              <div className="flex flex-col gap-1">
-                <SectionTitle>Notas</SectionTitle>
-                <p className="text-[13px] text-text-primary">{persona.notas}</p>
-              </div>
-            ) : null}
-          </div>
+          <ClienteResumenSection
+            persona={persona}
+            clienteRow={clienteRow}
+            contratosActivos={contratosInquilino.length}
+            propiedades={propiedades}
+            modoHonorarios={modoHonorarios}
+            porcentajeCliente={porcentajeCliente}
+          />
         ) : null}
 
         {!loadingDetail && activeTab === "inmobiliaria" ? (
@@ -501,31 +454,25 @@ export function ClienteFichaView() {
           )
         ) : null}
 
-        {!loadingDetail && activeTab === "juridico" ? (
+        {!loadingDetail && activeTab === "juridico" && token ? (
           <div className="flex flex-col gap-3">
             <SectionTitle>Expedientes jurídicos</SectionTitle>
-            <p className="text-sm text-text-secondary">
-              Sin expedientes vinculados. El módulo jurídico estará disponible próximamente.
-            </p>
+            <ClienteJuridicoTab token={token} personaId={persona.id} />
           </div>
         ) : null}
 
-        {!loadingDetail && activeTab === "visas" ? (
-          <div className="flex flex-col gap-3">
-            <SectionTitle>Trámites de visa</SectionTitle>
-            <p className="text-sm text-text-secondary">
-              Sin trámites vinculados. El módulo de visas estará disponible próximamente.
-            </p>
-          </div>
+        {!loadingDetail && activeTab === "visas" && token && persona ? (
+          <ClienteVisasTab
+            token={token}
+            personaId={personaId}
+            personaNombre={personaDisplayName(persona)}
+            canEdit={canEditVisas(user?.roles)}
+            onAuthError={logout}
+          />
         ) : null}
 
-        {!loadingDetail && activeTab === "historial" ? (
-          <div className="flex flex-col gap-3">
-            <SectionTitle>Historial unificado</SectionTitle>
-            <p className="text-sm text-text-secondary">
-              El historial consolidado entre áreas se habilitará cuando estén activos los módulos jurídico y visas.
-            </p>
-          </div>
+        {!loadingDetail && activeTab === "historial" && token ? (
+          <ClienteHistorialTab token={token} personaId={personaId} onAuthError={logout} />
         ) : null}
         </div>
       </section>

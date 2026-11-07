@@ -1,9 +1,12 @@
 "use client";
 
-import { Building2, Handshake, type LucideIcon } from "lucide-react";
+import { Building2, Handshake } from "lucide-react";
 
 import type { VentasTabId } from "@/components/ventas/VentasFilterChips";
 import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
+
+const actionBase =
+  "rocchia-action flex min-w-[220px] max-w-sm flex-1 flex-col items-start gap-1 rounded-lg px-4 py-3 text-left disabled:cursor-not-allowed disabled:opacity-50";
 
 type VentasCreateActionsProps = {
   tab: VentasTabId;
@@ -11,56 +14,6 @@ type VentasCreateActionsProps = {
   onNuevaVenta: () => void;
   disabled?: boolean;
 };
-
-function CreateActionButton({
-  title,
-  hint,
-  icon: Icon,
-  emphasis,
-  onClick,
-  disabled,
-}: {
-  title: string;
-  hint: string;
-  icon: LucideIcon;
-  emphasis: "primary" | "secondary";
-  onClick: () => void;
-  disabled: boolean;
-}) {
-  const primary = emphasis === "primary";
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={`flex w-full items-center gap-3 rounded-md border px-3 py-2.5 text-left shadow-[var(--shadow-card)] transition-colors disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:min-w-[15.5rem] ${interactiveFocusClass} ${
-        primary
-          ? "border-primary bg-primary text-text-on-primary hover:bg-primary-dark"
-          : "border-border bg-bg-card text-text-primary hover:border-primary/40 hover:bg-primary-soft/60"
-      }`}
-    >
-      <span
-        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-sm ${
-          primary ? "bg-white/15 text-text-on-primary" : "bg-primary-soft text-primary"
-        }`}
-        aria-hidden
-      >
-        <Icon className="h-4 w-4" />
-      </span>
-      <span className="min-w-0">
-        <span className="block text-sm font-semibold leading-tight">{title}</span>
-        <span
-          className={`mt-0.5 block text-[11px] leading-snug ${
-            primary ? "text-white/80" : "text-text-secondary"
-          }`}
-        >
-          {hint}
-        </span>
-      </span>
-    </button>
-  );
-}
 
 export function VentasCreateActions({
   tab,
@@ -73,23 +26,36 @@ export function VentasCreateActions({
   }
 
   return (
-    <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-stretch">
-      <CreateActionButton
-        title="Nueva publicación"
-        hint="Sumar una propiedad al catálogo"
-        icon={Building2}
-        emphasis="primary"
+    <div className="flex flex-wrap gap-3">
+      <button
+        type="button"
         onClick={onPublicar}
         disabled={disabled}
-      />
-      <CreateActionButton
-        title="Nueva venta"
-        hint="Registrar una operación con comprador"
-        icon={Handshake}
-        emphasis="secondary"
+        className={`${actionBase} border border-primary/20 bg-primary text-text-on-primary hover:bg-primary-dark ${interactiveFocusClass}`}
+      >
+        <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold">
+          <Building2 className="h-4 w-4 shrink-0" aria-hidden />
+          Crear publicación
+        </span>
+        <span className="text-[11px] leading-snug text-text-on-primary/85">
+          Sumá un inmueble al catálogo con precio, vendedor y condiciones de venta.
+        </span>
+      </button>
+
+      <button
+        type="button"
         onClick={onNuevaVenta}
         disabled={disabled}
-      />
+        className={`${actionBase} border border-border bg-bg-card text-text-primary hover:bg-bg-page ${interactiveFocusClass}`}
+      >
+        <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold">
+          <Handshake className="h-4 w-4 shrink-0" aria-hidden />
+          Crear venta
+        </span>
+        <span className="text-[11px] leading-snug text-text-secondary">
+          Registrá una operación en curso sobre un inmueble ya publicado.
+        </span>
+      </button>
     </div>
   );
 }

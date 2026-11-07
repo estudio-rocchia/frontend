@@ -27,6 +27,7 @@ export function useContratoAdjustmentPreview({
   const [preview, setPreview] = useState<ContratoAjustePreviewResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [previewError, setPreviewError] = useState<AdjustmentPreviewError | null>(null);
+  const [previewUsesManualMonto, setPreviewUsesManualMonto] = useState(false);
   const requestId = useRef(0);
 
   const manualMontoReady =
@@ -41,21 +42,19 @@ export function useContratoAdjustmentPreview({
     setLoading(true);
     setPreviewError(null);
 
-    void previewContratoAjuste(
-      token,
-      contratoId,
-      fechaAjuste,
-      requiresManualMonto && montoNuevo !== undefined && montoNuevo !== null
-        ? montoNuevo
-        : undefined,
-    )
+    const manualMonto =
+      montoNuevo !== undefined && montoNuevo !== null && montoNuevo > 0 ? montoNuevo : undefined;
+
+    void previewContratoAjuste(token, contratoId, fechaAjuste, manualMonto)
       .then((result) => {
         if (id !== requestId.current) return;
         setPreview(result);
+        setPreviewUsesManualMonto(manualMonto !== undefined);
       })
       .catch((err) => {
         if (id !== requestId.current) return;
         setPreview(null);
+        setPreviewUsesManualMonto(false);
         if (err instanceof ApiError) {
           const unpaid = parseAdjustmentCycleUnpaidMessage(err.message);
           if (unpaid?.length) {
@@ -79,6 +78,7 @@ export function useContratoAdjustmentPreview({
     if (!open) {
       setPreview(null);
       setPreviewError(null);
+      setPreviewUsesManualMonto(false);
       return;
     }
     if (!canCalculate) {
@@ -107,5 +107,5 @@ export function useContratoAdjustmentPreview({
   const unpaidPeriods =
     previewError?.kind === "unpaid_cycle" ? previewError.periods : null;
 
-  return { preview, loading, error, unpaidPeriods, previewError };
+  return { preview, loading, error, unpaidPeriods, previewError, previewUsesManualMonto };
 }

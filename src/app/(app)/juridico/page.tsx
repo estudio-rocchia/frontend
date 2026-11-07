@@ -1,5 +1,10 @@
-import { PlaceholderPage } from "@/components/PlaceholderPage";
+import { lazyWorkspace } from "@/lib/lazy-workspace";
+
+const JuridicoView = lazyWorkspace(
+  () => import("@/components/juridico/JuridicoView"),
+  "JuridicoView",
+);
 
 export default function JuridicoPage() {
-  return <PlaceholderPage title="Área Jurídica" />;
+  return <JuridicoView />;
 }

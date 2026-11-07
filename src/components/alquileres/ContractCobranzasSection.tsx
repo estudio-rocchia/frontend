@@ -7,6 +7,7 @@ import { ButtonOutline } from "@/components/ui/Button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import type { CatalogoItem, ContratoDetail, CuotaDetail, PagoListItem } from "@/lib/api/types";
 import { formatDateDisplay, formatMoney, moneyClassName } from "@/lib/format";
+import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 import {
   buildCuotasCobranzasView,
   type CuotaCobranzasRow,
@@ -75,17 +76,19 @@ export function ContractCobranzasSection({
         />
       </div>
 
-      <div className="flex flex-wrap gap-2 border-b border-border">
+      <div role="tablist" aria-label="Cobranzas del contrato" className="flex flex-wrap gap-2 border-b border-border">
         {subTabs.map((tab) => (
           <button
             key={tab.id}
             type="button"
+            role="tab"
+            aria-selected={activePanel === tab.id}
             data-testid={`cobranzas-subtab-${tab.id}`}
             onClick={() => setActivePanel(tab.id)}
-            className={`rounded-t-sm px-3 py-2 text-sm font-medium transition-colors ${
+            className={`rounded-t-sm px-3 py-2 text-sm font-medium transition-colors ${interactiveFocusClass} ${
               activePanel === tab.id
                 ? "border-b-2 border-primary text-primary"
-                : "text-text-secondary hover:text-text-primary"
+                : "border-b-2 border-transparent text-text-secondary hover:text-text-primary"
             }`}
           >
             {tab.label}
@@ -98,7 +101,7 @@ export function ContractCobranzasSection({
         <div className="flex flex-col gap-3">
           <p className="text-[13px] text-text-secondary">
             Cada fila es un mes de alquiler: cuánto corresponde, cuánto se cobró y cuánto falta. Para registrar un
-            cobro, usá <strong className="font-medium text-text-primary">Cobrar</strong> arriba a la derecha.
+            cobro, usá <strong className="font-medium text-text-primary">Cobrar alquiler</strong> arriba a la derecha.
           </p>
 
           {loading ? (

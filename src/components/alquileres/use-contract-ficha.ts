@@ -8,6 +8,7 @@ import type { PeriodoFormValues } from "@/components/alquileres/PeriodoServicioM
 import type { ServicioFormValues } from "@/components/alquileres/ServicioFormModal";
 import type { RegistrarPagoServicioFormValues } from "@/components/alquileres/RegistrarPagoServicioModal";
 import type { ContractDetail } from "@/data/alquileres-contract-details";
+import { resolveBreakUiFichaBundle } from "@/data/alquileres-break-ui-fixtures";
 import {
   ApiError,
   createPeriodoServicio,
@@ -48,7 +49,17 @@ import { invalidateDashboardAlerts } from "@/lib/dashboard-alerts-events";
 import { downloadBlob, rentalApiErrorMessage } from "@/lib/format";
 import { resolveMoraPunitoriaPayload } from "@/lib/mora-punitoria";
 import { mapContratoDetailToFicha } from "@/lib/mappers/rentals";
+import { useBreakUiMode } from "@/lib/alquileres/break-ui-mode";
 import { useContratoPrefetch } from "@/lib/use-contrato-prefetch";
+
+function withRecovery(message: string): string {
+  if (/\b(intentá|actualizá|ingresá|cobrá|usá|volvé|ejecutá|restaurá)\b/i.test(message)) return message;
+  return `${message} Intentá de nuevo.`;
+}
+
+function reportFailure(err: unknown, fallback: string): string {
+  return withRecovery(rentalApiErrorMessage(err, fallback));
+}
 
 interface UseContractFichaOptions {
   contratoId: number;
@@ -58,6 +69,7 @@ interface UseContractFichaOptions {
 }
 
 export function useContractFicha({ contratoId, validId, token, logout }: UseContractFichaOptions) {
+  const breakUi = useBreakUiMode();
   const { consume: consumePrefetchedContrato } = useContratoPrefetch(token);
   const [detail, setDetail] = useState<ContractDetail | null>(null);
   const [contrato, setContrato] = useState<ContratoDetail | null>(null);
@@ -78,6 +90,18 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
   const loadServicios = useCallback(
     async (id: number) => {
       if (!token) return;
+      const fixture = breakUi.active ? resolveBreakUiFichaBundle(breakUi.mode, id) : null;
+      if (fixture) {
+        setServicios(fixture.servicios);
+        setPeriodos(fixture.periodos);
+        setPlanesDeposito(fixture.planesDeposito);
+        setCuotas(fixture.cuotas);
+        setPagos(fixture.pagos);
+        setTiposServicio(fixture.tiposServicio);
+        setMediosPago(fixture.mediosPago);
+        setServiciosLoading(false);
+        return;
+      }
       setServiciosLoading(true);
       try {
         const [serviciosRes, periodosRes, planesRes, cuotasRes, pagosRes, tiposRes, mediosRes] = await Promise.all([
@@ -101,16 +125,37 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
         if (!tiposServicio.length) setTiposServicio(tiposRes.items);
         if (!mediosPago.length) setMediosPago(mediosRes.items);
       } catch (err) {
-        setError(err instanceof ApiError ? err.message : "No se pudieron cargar los servicios");
+        setError(err instanceof ApiError ? withRecovery(err.message) : withRecovery("No se pudieron cargar los servicios"));
       } finally {
         setServiciosLoading(false);
       }
     },
-    [token, tiposServicio, mediosPago],
+    [token, tiposServicio, mediosPago, breakUi.active, breakUi.mode],
   );
 
   const loadCore = useCallback(async () => {
     if (!token || !validId) return;
+
+    const fixture = breakUi.active ? resolveBreakUiFichaBundle(breakUi.mode, contratoId) : null;
+    if (breakUi.active) {
+      if (!fixture) {
+        setContrato(null);
+        setDetail(null);
+        setError("Contrato no encontrado.");
+        return;
+      }
+      setContrato(fixture.contrato);
+      setDetail(mapContratoDetailToFicha(fixture.contrato, fixture.propietarios, fixture.inmuebleContext));
+      setServicios(fixture.servicios);
+      setPeriodos(fixture.periodos);
+      setPlanesDeposito(fixture.planesDeposito);
+      setCuotas(fixture.cuotas);
+      setPagos(fixture.pagos);
+      setTiposServicio(fixture.tiposServicio);
+      setMediosPago(fixture.mediosPago);
+      setServiciosLoading(false);
+      return;
+    }
 
     const cached = await consumePrefetchedContrato(contratoId);
     const detailRes = cached?.detail ?? await fetchContrato(token, contratoId);
@@ -132,7 +177,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
     }
     setDetail(mapContratoDetailToFicha(detailRes, propietarios, inmuebleContext ?? undefined));
     await loadServicios(contratoId);
-  }, [token, validId, contratoId, consumePrefetchedContrato, loadServicios]);
+  }, [token, validId, contratoId, consumePrefetchedContrato, loadServicios, breakUi.active, breakUi.mode]);
 
   useEffect(() => {
     if (!validId) {
@@ -156,7 +201,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
           setError("Contrato no encontrado.");
           return;
         }
-        setError(err instanceof ApiError ? err.message : "No se pudo cargar la ficha del contrato");
+        setError(err instanceof ApiError ? withRecovery(err.message) : withRecovery("No se pudo cargar la ficha del contrato"));
       })
       .finally(() => setLoading(false));
   }, [validId, token, logout, loadCore]);
@@ -233,7 +278,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
       );
       await loadServicios(contrato.id);
     } catch (err) {
-      setError(rentalApiErrorMessage(err, "No se pudo agregar el servicio"));
+      setError(reportFailure(err, "No se pudo agregar el servicio"));
     } finally {
       setSubmitting(false);
     }
@@ -278,7 +323,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
       );
       await loadServicios(contrato.id);
     } catch (err) {
-      setError(rentalApiErrorMessage(err, "No se pudo actualizar el servicio"));
+      setError(reportFailure(err, "No se pudo actualizar el servicio"));
     } finally {
       setSubmitting(false);
     }
@@ -294,7 +339,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
       setSuccess("Servicio desactivado.");
       await loadServicios(contrato.id);
     } catch (err) {
-      setError(rentalApiErrorMessage(err, "No se pudo desactivar el servicio"));
+      setError(reportFailure(err, "No se pudo desactivar el servicio"));
     } finally {
       setSubmitting(false);
     }
@@ -319,7 +364,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
       );
       await loadServicios(contrato.id);
     } catch (err) {
-      setError(rentalApiErrorMessage(err, "No se pudo consultar SAMEEP"));
+      setError(reportFailure(err, "No se pudo consultar SAMEEP"));
       throw err;
     } finally {
       setSubmitting(false);
@@ -348,7 +393,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
       }
       return result;
     } catch (err) {
-      setError(rentalApiErrorMessage(err, "No se pudo consultar el agua"));
+      setError(reportFailure(err, "No se pudo consultar el agua"));
       throw err;
     } finally {
       setSubmitting(false);
@@ -368,7 +413,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
       );
       await loadServicios(contrato.id);
     } catch (err) {
-      setError(rentalApiErrorMessage(err, "No se pudo consultar SECHEEP"));
+      setError(reportFailure(err, "No se pudo consultar SECHEEP"));
       throw err;
     } finally {
       setSubmitting(false);
@@ -387,7 +432,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
       );
       await loadServicios(contrato.id);
     } catch (err) {
-      setError(rentalApiErrorMessage(err, "No se pudo importar desde SECHEEP"));
+      setError(reportFailure(err, "No se pudo importar desde SECHEEP"));
       throw err;
     } finally {
       setSubmitting(false);
@@ -414,7 +459,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
       setSuccess("Período registrado.");
       await loadServicios(contrato.id);
     } catch (err) {
-      setError(rentalApiErrorMessage(err, "No se pudo registrar el período"));
+      setError(reportFailure(err, "No se pudo registrar el período"));
       throw err;
     } finally {
       setSubmitting(false);
@@ -455,7 +500,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
       setSuccess("Plan de actualización de depósito creado.");
       await loadServicios(contrato.id);
     } catch (err) {
-      setError(rentalApiErrorMessage(err, "No se pudo crear el plan de depósito"));
+      setError(reportFailure(err, "No se pudo crear el plan de depósito"));
       throw err;
     } finally {
       setSubmitting(false);
@@ -495,7 +540,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
           downloadBlob(blob, filename ?? `recibo-${recibo.reciboNumber}.pdf`);
           setSuccess(`Pago registrado. Recibo ${recibo.reciboNumber} descargado.`);
         } catch (reciboErr) {
-          setError(rentalApiErrorMessage(reciboErr, "Pago registrado, pero no se pudo emitir el recibo."));
+          setError(reportFailure(reciboErr, "Pago registrado, pero no se pudo emitir el recibo"));
         }
       } else {
         setSuccess("Pago de servicio registrado.");
@@ -504,7 +549,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
       invalidateDashboardAlerts();
       await loadServicios(contrato.id);
     } catch (err) {
-      setError(rentalApiErrorMessage(err, "No se pudo registrar el pago"));
+      setError(reportFailure(err, "No se pudo registrar el pago"));
     } finally {
       setSubmitting(false);
     }
@@ -517,9 +562,13 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
   }, [contrato, loadServicios]);
 
   const handleCobrarSuccess = useCallback(async () => {
+    if (breakUi.active) {
+      setSuccess("Cobro simulado (modo break-ui).");
+      return;
+    }
     setSuccess("Cobro registrado.");
     await refreshBilling();
-  }, [refreshBilling]);
+  }, [refreshBilling, breakUi.active]);
 
   async function handleUpdateContrato(form: EditContractForm): Promise<boolean> {
     if (!token || !contrato) return false;
@@ -531,6 +580,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
     setSubmitting(true);
     setError(null);
     setSuccess(null);
+    const started = Date.now();
     try {
       const amount = Number(form.amount.replace(/\D/g, ""));
       if (!Number.isFinite(amount) || amount <= 0) {
@@ -590,6 +640,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
         codigoMonedaDeposito: form.depositCurrency,
         tipoIndiceId: indexItem.id,
         notasIndice,
+        notas: form.notas.trim() || null,
         frecuenciaAjusteMeses: form.frecuenciaAjusteMeses,
         tipoMoraId: moraPayload.tipoMoraId,
         tasaMora: moraPayload.tasaMora,
@@ -599,14 +650,17 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
 
       await loadCore();
       invalidateDashboardAlerts();
-      setSuccess("Datos del contrato actualizados.");
+      const remaining = 900 - (Date.now() - started);
+      if (remaining > 0) {
+        await new Promise((resolve) => window.setTimeout(resolve, remaining));
+      }
       return true;
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         logout();
         return false;
       }
-      setError(rentalApiErrorMessage(err, "No se pudieron guardar los cambios"));
+      setError(reportFailure(err, "No se pudieron guardar los cambios"));
       return false;
     } finally {
       setSubmitting(false);
@@ -628,7 +682,7 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
       downloadBlob(blob, filename ?? `recibo-${recibo.reciboNumber}.pdf`);
       setSuccess(`Recibo ${recibo.reciboNumber} descargado.`);
     } catch (err) {
-      setError(rentalApiErrorMessage(err, "No se pudo obtener el recibo"));
+      setError(reportFailure(err, "No se pudo obtener el recibo"));
     } finally {
       setSubmitting(false);
     }

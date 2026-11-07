@@ -1,3 +1,4 @@
+import type { ChipColor } from "@/components/base/badges/chip";
 import type { ClienteFilterId, ClienteRow, ClienteVinculoBadge } from "@/data/clientes";
 import type { PersonaVinculoFilter } from "@/lib/api";
 import type { ClientesKpis, InquilinosContext, PersonaRecord, PersonaVinculos } from "@/lib/api/types";
@@ -181,6 +182,7 @@ export function filterClientes(rows: ClienteRow[], filter: ClienteFilterId): Cli
     case "morosos":
       return rows.filter((row) => row.enMora);
     case "juridico":
+      return rows;
     case "visas":
       return [];
     default:
@@ -198,17 +200,18 @@ export function searchClientes(rows: ClienteRow[], query: string): ClienteRow[] 
   });
 }
 
-export function vinculoBadgeClass(id: ClienteVinculoBadge["id"]): string {
+export function vinculoIdToChipColor(id: ClienteVinculoBadge["id"]): ChipColor {
   switch (id) {
     case "mora":
-      return "bg-danger-bg text-danger";
+      return "rose";
     case "propietario":
+      return "purple";
     case "alquiler":
-      return "bg-primary-soft text-primary";
+      return "cyan";
     case "juridico":
     case "visa":
-      return "bg-warning-bg text-warning";
+      return "yellow";
     default:
-      return "bg-bg-page text-text-secondary";
+      return "soft";
   }
 }

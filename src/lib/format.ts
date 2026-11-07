@@ -60,6 +60,32 @@ export function formatMoney(amount: string, currency: string | null | undefined 
 /** Evita que el símbolo y el monto se partan en dos líneas en tablas y tarjetas. */
 export const moneyClassName = "whitespace-nowrap tabular-nums";
 
+/** Escala tipografía de montos destacados según longitud formateada. */
+export function moneyDisplaySizeClass(formatted: string): string {
+  const len = formatted.replace(/\u00A0/g, " ").length;
+  if (len > 20) return "text-sm leading-tight sm:text-base";
+  if (len > 17) return "text-base leading-tight sm:text-lg";
+  if (len > 14) return "text-lg leading-tight sm:text-xl";
+  if (len > 11) return "text-xl leading-tight sm:text-2xl";
+  return "text-[26px] leading-none sm:text-[30px]";
+}
+
+/** Monto hero (header/modal): escala para entrar en una línea; la columna no debe comprimirse (shrink-0). */
+export function moneyHeroClass(formatted: string): string {
+  return `shrink-0 tabular-nums font-medium whitespace-nowrap ${moneyDisplaySizeClass(formatted)}`;
+}
+
+/** Montos en tablas y cards compactas: tipografía más chica si el valor formateado es largo. */
+export function moneyTableClass(formatted: string): string {
+  const len = formatted.replace(/\u00A0/g, " ").length;
+  const size = len > 16 ? "text-[11px] leading-tight" : len > 13 ? "text-xs" : "text-[14px]";
+  return `${moneyClassName} ${size}`;
+}
+
+export function formatGuarantorCount(count: number): string {
+  return count === 1 ? "1 garante" : `${count} garantes`;
+}
+
 export function formatDateDisplay(isoDate: string): string {
   const [year, month, day] = isoDate.split("-");
   if (!year || !month || !day) return isoDate;
@@ -116,6 +142,17 @@ export function formatMonthYear(anio: number, mes: number): string {
 }
 
 const E164_PHONE_REGEX = /^\+[1-9]\d{6,14}$/;
+const CUIT_DIGITS_REGEX = /^\d{11}$/;
+
+export function resolveCuitInput(raw: string): { cuit: string | null; error?: string } {
+  const trimmed = raw.trim();
+  if (!trimmed) return { cuit: null };
+
+  const digits = trimmed.replace(/\D/g, "");
+  if (CUIT_DIGITS_REGEX.test(digits)) return { cuit: digits };
+
+  return { cuit: null, error: "El CUIL no tiene un formato válido." };
+}
 
 export function parsePersonName(full: string): { nombre: string; apellido: string | null } {
   const trimmed = full.trim();
@@ -175,6 +212,10 @@ const RENTAL_ERROR_MESSAGES: Record<string, string> = {
     "El alquiler se cobra siempre por el total de la cuota.",
   "A liquidación already exists for this owner and period":
     "Ya hay una liquidación para ese propietario y período. Abrila desde el botón o cambiá mes/año.",
+  "Utility services require an active contract":
+    "Los servicios del contrato solo se pueden modificar mientras el contrato está activo.",
+  "Billing operations require an active contract":
+    "Las operaciones de cobranza solo están disponibles en contratos activos.",
 };
 
 const MORA_TARGET_MISSING_RE = /^Mora (\d+) does not exist$/;

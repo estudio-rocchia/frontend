@@ -3,7 +3,9 @@ import type { ButtonHTMLAttributes } from "react";
 import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 
 const base =
-  `inline-flex items-center justify-center rounded-sm px-[18px] py-2.5 text-sm font-medium transition-colors ${interactiveFocusClass}`;
+  `rocchia-action inline-flex h-9 items-center justify-center rounded-lg px-3.5 text-[13px] font-medium disabled:cursor-not-allowed disabled:opacity-50 ${interactiveFocusClass}`;
+
+export const buttonOutlineClass = `${base} border border-border bg-bg-card text-text-primary hover:bg-bg-page`;
 
 export function ButtonOutline({
   className = "",
@@ -12,7 +14,7 @@ export function ButtonOutline({
   return (
     <button
       type="button"
-      className={`${base} border border-border bg-bg-card text-text-primary ${className}`}
+      className={`${buttonOutlineClass} ${className}`}
       {...props}
     />
   );
@@ -27,7 +29,22 @@ export function ButtonPrimary({
     <button
       type="button"
       disabled={disabled}
-      className={`${base} bg-primary font-semibold text-text-on-primary hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+      className={`${base} bg-primary font-semibold text-text-on-primary hover:bg-primary-dark ${className}`}
+      {...props}
+    />
+  );
+}
+
+export function ButtonDanger({
+  className = "",
+  disabled,
+  ...props
+}: ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      className={`${base} bg-danger font-semibold text-text-on-primary hover:opacity-90 ${className}`}
       {...props}
     />
   );

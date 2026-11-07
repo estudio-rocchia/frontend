@@ -50,7 +50,7 @@ export function DrawerPanel({
         onClick={onClose}
       />
       <aside
-        className={`relative flex h-full max-h-[100dvh] w-full max-w-full flex-col overflow-hidden border-l border-border bg-bg-page shadow-[-4px_0_24px_#1a2b3228] ${widthClass}`}
+        className={`ui-draw-in relative flex h-full max-h-[100dvh] w-full max-w-full flex-col overflow-hidden border-l border-border bg-bg-page ${widthClass}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="drawer-title"

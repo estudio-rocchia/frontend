@@ -7,9 +7,5 @@ export function DashboardAnimatedCount({
   value: number;
   className?: string;
 }) {
-  return (
-    <span key={value} className={`dashboard-count-pop inline-block tabular-nums ${className}`}>
-      {value}
-    </span>
-  );
+  return <span className={`inline-block tabular-nums ${className}`}>{value}</span>;
 }

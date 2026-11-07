@@ -16,13 +16,14 @@ import type {
 import {
   daysUntilDate,
   formatDateDisplay,
+  formatGuarantorCount,
   formatMoney,
   formatMonthYear,
   personaDisplayName,
 } from "@/lib/format";
+import { moraResumenFromContrato } from "@/lib/mora-punitoria";
 import {
   adjustmentIndexFromCatalogCode,
-  adjustmentIndexLabel,
   contratoSupportsIndexAdjustment,
 } from "@/lib/rental-adjustment";
 import {
@@ -331,7 +332,7 @@ export function mapContratoDetailToFicha(
     adjustmentIndexFromCatalogCode(detail.tipoIndice?.code) ??
     (detail.tipoIndice?.code?.toUpperCase() as AdjustmentIndex | undefined) ??
     "ICL";
-  const moraPercent = detail.tasaMora ? `${(Number(detail.tasaMora) * 100).toFixed(1).replace(".", ",")}%` : "2,5%";
+  const moraResumen = moraResumenFromContrato(detail);
   const depositMonto = detail.deposito?.monto ?? detail.montoDeposito;
   const depositMoneda = detail.deposito?.codigoMoneda ?? detail.codigoMonedaDeposito;
   const depositAmount =
@@ -361,7 +362,7 @@ export function mapContratoDetailToFicha(
     propertyLocation,
     tenant,
     owner,
-    guarantors: detail.garantes.length ? `${detail.garantes.length} garante(s)` : "—",
+    guarantors: detail.garantes.length ? formatGuarantorCount(detail.garantes.length) : "—",
     adjustmentIndex: indexCode,
     adjustmentFrequency: ajusteMeses,
     paymentDueDay: `Día ${detail.diaVencimientoPago} de cada mes`,
@@ -369,9 +370,10 @@ export function mapContratoDetailToFicha(
     depositAmount,
     calculatedNewAmount: formatMoney(detail.montoAlquiler, detail.codigoMoneda),
     daysSince10: "—",
-    surchargePercent: moraPercent,
-    punitiveHint: detail.tipoIndice?.code
-      ? `Índice: ${adjustmentIndexLabel(indexCode)}`
-      : `Contrato ${estadoLabel}`,
+    moraTipo: moraResumen.tipoLabel,
+    moraRecargoLabel: moraResumen.recargoFieldLabel,
+    moraRecargoValue: moraResumen.recargoValue,
+    adjustmentNotes: detail.notasIndice?.trim() || null,
+    contractNotes: detail.notas?.trim() || null,
   };
 }

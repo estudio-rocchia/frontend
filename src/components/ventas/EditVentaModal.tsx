@@ -5,12 +5,10 @@ import { useEffect, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { ChipToggle, FormField, FormSection } from "@/components/ui/FormLayout";
+import { NumericSelect } from "@/components/ui/NumericSelect";
 import { ApiError, fetchFormasPago, updateVenta } from "@/lib/api";
 import type { CatalogoItem, VentaDetail, VentaEstado } from "@/lib/api/types";
 import { ventaEstadoLabel } from "@/lib/ventas/status-labels";
-
-const selectClassName =
-  "rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary";
 
 const ESTADOS: VentaEstado[] = ["boleto", "deeds_pending"];
 
@@ -132,22 +130,16 @@ export function EditVentaModal({ open, onClose, token, venta, onSaved }: EditVen
                 })}
               </div>
             </div>
+            <NumericSelect
+              className="sm:col-span-2"
+              label="Forma de pago"
+              value={formaPagoId ? Number(formaPagoId) : null}
+              onChange={(id) => setFormaPagoId(id != null ? String(id) : "")}
+              allowEmpty
+              emptyLabel="Sin especificar"
+              options={formasPago.map((item) => ({ value: item.id, label: item.name }))}
+            />
           </div>
-          <label className="flex flex-col gap-1.5 sm:col-span-2">
-            <span className="text-[11px] font-semibold text-text-secondary">Forma de pago</span>
-            <select
-              value={formaPagoId}
-              onChange={(event) => setFormaPagoId(event.target.value)}
-              className={selectClassName}
-            >
-              <option value="">Sin especificar</option>
-              {formasPago.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name}
-                </option>
-              ))}
-            </select>
-          </label>
           <FormField label="Condiciones de pago" value={condiciones} onChange={setCondiciones} />
           <FormField label="Notas" value={notas} onChange={setNotas} />
         </FormSection>

@@ -262,6 +262,17 @@ export interface PersonaVinculos {
   moroso: boolean;
 }
 
+export type ClienteHistorialModulo = "cliente" | "alquiler" | "venta" | "juridico" | "visa";
+
+export interface ClienteHistorialItem {
+  id: string;
+  modulo: ClienteHistorialModulo;
+  fecha: string;
+  titulo: string;
+  descripcion: string;
+  href: string | null;
+}
+
 export interface ClientesKpis {
   total: number;
   inquilinos: number;
@@ -283,7 +294,12 @@ export interface PersonaRecord {
   cuit: string | null;
   email: string | null;
   phone: string | null;
+  calle?: string | null;
+  numero?: string | null;
+  pisoDepto?: string | null;
+  codigoPostal?: string | null;
   address?: string | null;
+  localidadId?: number | null;
   notas?: string | null;
   porcentajeAdministracion?: string;
   modoHonorariosAdministracion?: string;
@@ -323,6 +339,11 @@ export interface ContratoRecord {
   montoDeposito: string | null;
   codigoMonedaDeposito: string | null;
   estado: "active" | "finished" | "terminated";
+  renewalOfContratoId?: number | null;
+  notas?: string | null;
+  rescisionDocumentoId?: number | null;
+  rescisionEn?: string | null;
+  rescisionNotas?: string | null;
 }
 
 export interface MovimientoDepositoRecord {
@@ -747,6 +768,7 @@ export interface DashboardResumen {
     ajustePendiente: { count: number };
     renovacionProxima: { count: number };
     citasProximas: { count: number };
+    plazosAviso?: { count: number };
   };
   cobrarEsteMes: Array<{
     contratoId: number;
@@ -801,6 +823,15 @@ export interface DashboardResumen {
     inmuebleTitle: string | null;
     personaNombre: string | null;
     asignadoUsername: string | null;
+  }>;
+  plazosAviso?: Array<{
+    plazoId: number;
+    expedienteId: number;
+    descripcion: string;
+    venceEn: string;
+    diasHasta: number;
+    titulo: string;
+    personaNombre: string;
   }>;
   ventas: {
     tarjetas: {
@@ -996,6 +1027,9 @@ export interface VentaRecord {
   tieneEscritura: boolean;
   estado: VentaEstado;
   notas: string | null;
+  cancelacionDocumentoId?: number | null;
+  cancelacionEn?: string | null;
+  cancelacionNotas?: string | null;
 }
 
 export interface FinanciacionResumen {
@@ -1261,4 +1295,297 @@ export interface UpdateCitaInput {
   duracionMinutos?: number;
   estado?: CitaEstado;
   notas?: string | null;
+}
+
+export type QuienAsignaTurno = "estudio" | "solicitante";
+
+export type EstadoTramiteVisa =
+  | "borrador"
+  | "formulario_completo"
+  | "ds160_cargado"
+  | "arancel_pagado"
+  | "turno_asignado"
+  | "entrevista"
+  | "aprobado"
+  | "rechazado"
+  | "procesamiento_administrativo";
+
+export interface PersonaVisaResumen {
+  id: number;
+  nombre: string | null;
+  apellido: string | null;
+  razonSocial: string | null;
+  tipoDocumento: string | null;
+  numeroDocumento: string | null;
+  email: string | null;
+  phone: string | null;
+}
+
+export type CategoriaConceptoTarifa = "honorario" | "otro";
+
+export type AlcanceConceptoTarifa = "persona" | "grupo";
+
+export type DestinoConceptoTarifa = "estudio" | "consulado";
+
+export type MonedaConceptoTarifa = "usd" | "ars";
+
+export interface ConceptoTarifaVisa {
+  id: string;
+  nombre: string;
+  categoria: CategoriaConceptoTarifa;
+  montoUsd: number;
+  montoArs?: number;
+  moneda?: MonedaConceptoTarifa;
+  alcance: AlcanceConceptoTarifa;
+  destino: DestinoConceptoTarifa;
+}
+
+export interface ConceptoCotizadoVisa extends ConceptoTarifaVisa {
+  cantidad: number;
+  totalUsd: number;
+  totalArs?: number;
+  aplicado: boolean;
+}
+
+export interface ArchivoVisa {
+  id: number;
+  tramiteId: number | null;
+  nombre: string;
+  tipoMime: string;
+  proveedor: string;
+  ruta: string;
+  subidoEn: string;
+}
+
+export interface TarifaVisa {
+  honorarioIndividualUsd: number;
+  honorarioGrupoChicoUsd: number;
+  honorarioGrupoGrandeUsd: number;
+  arancelConsularUsd: number;
+  cambioTurnoUsd: number;
+  preciosArs?: PreciosArsVisa;
+  monedas?: MonedasPrecioVisa;
+  conceptos: ConceptoTarifaVisa[];
+}
+
+export type ClavePrecioVisa =
+  | "honorarioIndividual"
+  | "honorarioGrupoChico"
+  | "honorarioGrupoGrande"
+  | "arancelConsular"
+  | "cambioTurno";
+
+export type PreciosArsVisa = Partial<Record<ClavePrecioVisa, number>>;
+
+export type MonedasPrecioVisa = Partial<Record<ClavePrecioVisa, "usd" | "ars">>;
+
+export interface CotizacionVisa {
+  personas: number;
+  honorarioMoneda?: "usd" | "ars";
+  honorarioUnitarioUsd: number;
+  honorarioUnitarioArs?: number;
+  honorarioTotalUsd: number;
+  honorarioTotalArs?: number;
+  arancelMoneda?: "usd" | "ars";
+  arancelUnitarioUsd: number;
+  arancelUnitarioArs?: number;
+  arancelTotalUsd: number;
+  arancelTotalArs?: number;
+  cambiosTurno: number;
+  cambioTurnoMoneda?: "usd" | "ars";
+  cambioTurnoUnitarioUsd: number;
+  cambioTurnoUnitarioArs?: number;
+  cambioTurnoTotalUsd: number;
+  cambioTurnoTotalArs?: number;
+  totalEstudioUsd: number;
+  totalEstudioArs?: number;
+  totalConsuladoUsd: number;
+  totalConsuladoArs?: number;
+  totalUsd: number;
+  totalArs?: number;
+  conceptos: ConceptoCotizadoVisa[];
+}
+
+export interface TramiteVisaListItem {
+  id: number;
+  grupoId: number;
+  personaId: number;
+  estado: EstadoTramiteVisa;
+  numeroDs160: string | null;
+  abiertoEn: string;
+  persona: PersonaVisaResumen;
+  integrantes: number;
+  miembros: IntegranteVisa[];
+  cotizacion: CotizacionVisa;
+}
+
+export interface IntegranteVisa {
+  id: number;
+  personaId: number;
+  estado: EstadoTramiteVisa;
+  arancelPagadoEn: string | null;
+  persona: PersonaVisaResumen;
+}
+
+export interface TramiteVisaDetail {
+  id: number;
+  grupoId: number;
+  personaId: number;
+  estado: EstadoTramiteVisa;
+  numeroDs160: string | null;
+  emailAis: string | null;
+  notas: string | null;
+  abiertoEn: string;
+  decisionEn: string | null;
+  turnoEn: string | null;
+  turnoAsignadoPor: QuienAsignaTurno | null;
+  entrevistaEn: string | null;
+  arancelPagadoEn: string | null;
+  creadoEn: string;
+  actualizadoEn: string;
+  persona: PersonaVisaResumen;
+  grupo: {
+    id: number;
+    cambiosTurno: number;
+    notas: string | null;
+    integrantes: number;
+    honorarioPagadoEn: string | null;
+  };
+  integrantes: IntegranteVisa[];
+  cotizacion: CotizacionVisa;
+  enlaces: { ds160: string; ais: string };
+  recibos: ReciboVisa[];
+}
+
+export interface ReciboVisa {
+  id: number;
+  reciboNumber: string;
+  tramiteId: number;
+  grupoId: number;
+  fechaPago: string;
+  montoTotal: number;
+  estado: "issued" | "cancelled";
+  conceptos: ("honorario" | "arancel")[];
+}
+
+export interface VisasResumen {
+  anio: number | null;
+  total: number;
+  solicitantes: number;
+  enCurso: number;
+  aprobados: number;
+  rechazados: number;
+  porEstado: Record<EstadoTramiteVisa, number>;
+}
+
+export interface CreateTramiteVisaInput {
+  personaId: number;
+  grupoId?: number | null;
+  numeroDs160?: string | null;
+  emailAis?: string | null;
+  notas?: string | null;
+  abiertoEn?: string;
+}
+
+export interface UpdateTramiteVisaInput {
+  estado?: EstadoTramiteVisa;
+  numeroDs160?: string | null;
+  emailAis?: string | null;
+  notas?: string | null;
+  abiertoEn?: string;
+  decisionEn?: string | null;
+  turnoEn?: string | null;
+  turnoAsignadoPor?: QuienAsignaTurno | null;
+  entrevistaEn?: string | null;
+  arancelPagadoEn?: string | null;
+}
+
+export interface MontosMoneda {
+  ARS: number;
+  USD: number;
+}
+
+export interface IngresosEstudio {
+  honorariosAdministracion: MontosMoneda;
+  honorariosVisas: MontosMoneda;
+  honorariosJuridicos: MontosMoneda;
+  cobrosVentas: MontosMoneda;
+  mora: MontosMoneda;
+  total: MontosMoneda;
+}
+
+export interface MovimientosAdministrados {
+  alquileresLiquidados: MontosMoneda;
+  arancelesConsulares: MontosMoneda;
+  gastosJuridicos: MontosMoneda;
+}
+
+export interface PropietarioCierre {
+  personaId: number;
+  nombre: string;
+  honorarios: MontosMoneda;
+  alquileresLiquidados: MontosMoneda;
+}
+
+export interface MesEnPeriodo {
+  anioPeriodo: number;
+  mesPeriodo: number;
+}
+
+export interface PropietarioMesAMes {
+  personaId: number;
+  nombre: string;
+  honorariosPorMes: MontosMoneda[];
+  alquileresPorMes: MontosMoneda[];
+}
+
+export interface LiquidacionesMesAMes {
+  meses: MesEnPeriodo[];
+  totalesHonorarios: MontosMoneda[];
+  totalesAlquileres: MontosMoneda[];
+  porPropietario: PropietarioMesAMes[];
+}
+
+export interface FormaPagoTotal {
+  medioPagoId: number;
+  code: string;
+  name: string;
+  montos: MontosMoneda;
+}
+
+export interface OperacionCierre {
+  contratosActivos: number;
+  liquidacionesEmitidas: number;
+  expedientesAbiertos: number;
+  expedientesCerrados: number;
+  tramitesVisa: number;
+  ventasCerradas: number;
+}
+
+/** Snapshot complementario al cierre del período (no ingreso del estudio). */
+export interface PendientesCierre {
+  alquileresEnMora: MontosMoneda;
+  ventasPorCobrar: MontosMoneda;
+  total: MontosMoneda;
+}
+
+export interface CierreReporteResumen {
+  periodo: { desde: string; hasta: string };
+  ingresosEstudio: IngresosEstudio;
+  movimientosAdministrados: MovimientosAdministrados;
+  operacion: OperacionCierre;
+}
+
+export interface CierreReporte extends CierreReporteResumen {
+  pendientes: PendientesCierre;
+  formaPago: FormaPagoTotal[];
+  porPropietario: PropietarioCierre[];
+  liquidacionesMesAMes: LiquidacionesMesAMes;
+  comparacionAnterior?: CierreReporteResumen;
+}
+
+export interface CierreQuery {
+  desde: string;
+  hasta: string;
+  compararAnioAnterior?: boolean;
 }

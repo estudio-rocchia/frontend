@@ -8,6 +8,7 @@ import type { AdjustmentIndex } from "@/data/alquileres-contract-details";
 import type { ContratoDetail } from "@/lib/api/types";
 import { previewActualizacionDeposito } from "@/lib/api";
 import { formatDateDisplay, formatMoney, moneyClassName, personaDisplayName } from "@/lib/format";
+import { useBreakUiMode } from "@/lib/alquileres/break-ui-mode";
 import { MoraPunitoriaFields } from "@/components/alquileres/MoraPunitoriaFields";
 import {
   DEFAULT_MORA_PUNITORIA,
@@ -108,6 +109,7 @@ export function RenewContractModal({
   onSubmit: (form: RenewContractForm) => void;
   submitting?: boolean;
 }) {
+  const breakUi = useBreakUiMode();
   const [form, setForm] = useState<RenewContractForm>(emptyForm);
   const [depositPreview, setDepositPreview] = useState<{
     montoAnterior: string;
@@ -130,7 +132,25 @@ export function RenewContractModal({
   }, [form.depositAmount]);
 
   useEffect(() => {
-    if (!open || !contrato || !token || !depositTarget) {
+    if (!open || !contrato || !depositTarget) {
+      setDepositPreview(null);
+      return;
+    }
+
+    if (breakUi.active) {
+      setDepositPreview({
+        montoAnterior: contrato.montoDeposito ?? "0",
+        montoNuevo: depositTarget,
+        diferencia: String(
+          Math.max(0, Number(depositTarget) - Number.parseFloat(contrato.montoDeposito || "0")),
+        ),
+        codigoMoneda: contrato.codigoMonedaDeposito ?? contrato.codigoMoneda,
+        requiereCobro: Number(depositTarget) > Number.parseFloat(contrato.montoDeposito || "0"),
+      });
+      return;
+    }
+
+    if (!token) {
       setDepositPreview(null);
       return;
     }
@@ -142,7 +162,7 @@ export function RenewContractModal({
     }, 300);
 
     return () => window.clearTimeout(timer);
-  }, [open, contrato, token, depositTarget]);
+  }, [open, contrato, token, depositTarget, breakUi.active]);
 
   function handleClose() {
     setForm(emptyForm);

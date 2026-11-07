@@ -6,6 +6,9 @@ import { Modal } from "@/components/ui/Modal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import type { ServicioContratoRecord } from "@/lib/api/types";
 import { servicioBillingSummary, servicioDisplayName } from "@/lib/mappers/servicios";
+import { EnumSelect } from "@/components/ui/EnumSelect";
+import { RocchiaDateField } from "@/components/ui/RocchiaDateField";
+import { formInputClass } from "@/lib/ui/interactive-focus";
 
 export type PeriodoFormValues = {
   inicioPeriodo: string;
@@ -45,6 +48,15 @@ function Field({
   onChange: (v: string) => void;
   type?: string;
 }) {
+  if (type === "date") {
+    return (
+      <div className="flex flex-col gap-1.5">
+        <RocchiaDateField label={label} value={value} onChange={onChange} />
+        {hint ? <FieldHint>{hint}</FieldHint> : null}
+      </div>
+    );
+  }
+
   return (
     <label className="flex flex-col gap-1.5">
       <span className="text-[11px] font-semibold text-text-secondary">{label}</span>
@@ -53,7 +65,7 @@ function Field({
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
+        className={formInputClass}
       />
     </label>
   );
@@ -156,23 +168,24 @@ export function PeriodoServicioModal({
               value={form.monto}
               onChange={(v) => setForm((prev) => ({ ...prev, monto: v }))}
             />
-            <label className="flex flex-col gap-1.5">
-              <span className="text-[11px] font-semibold text-text-secondary">Moneda</span>
-              <FieldHint>Moneda en la que se cobra este período.</FieldHint>
-              <select
+            <div className="flex flex-col gap-1.5">
+              <EnumSelect
+                label="Moneda"
                 value={form.codigoMoneda}
-                onChange={(e) =>
+                onChange={(codigo) =>
+                  codigo &&
                   setForm((prev) => ({
                     ...prev,
-                    codigoMoneda: e.target.value as "ARS" | "USD",
+                    codigoMoneda: codigo as "ARS" | "USD",
                   }))
                 }
-                className="rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
-              >
-                <option value="ARS">ARS</option>
-                <option value="USD">USD</option>
-              </select>
-            </label>
+                options={[
+                  { value: "ARS", label: "ARS" },
+                  { value: "USD", label: "USD" },
+                ]}
+              />
+              <FieldHint>Moneda en la que se cobra este período.</FieldHint>
+            </div>
           </div>
         ) : (
           <div className="flex flex-col gap-1.5">

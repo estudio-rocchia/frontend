@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Banknote, Ban, Pencil, ScrollText, Wallet } from "lucide-react";
 
 import {
   VENTA_FICHA_PANEL_ID,
@@ -22,10 +22,9 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useAuth } from "@/context/auth-context";
 import {
   ApiError,
-  cancelVenta,
   downloadVentaReciboPdf,
+  fetchInmuebleFicha,
   fetchMediosPago,
-  fetchPersona,
   fetchVenta,
   fetchVentaCuotas,
   fetchVentaPagos,
@@ -34,10 +33,13 @@ import {
 import type {
   CatalogoItem,
   CuotaFinanciacionRecord,
+  InmuebleFicha,
   PagoVentaRecord,
   VentaDetail,
   VentaReciboRecord,
 } from "@/lib/api/types";
+import { inmueblePropiedadSinCodigo, inmuebleUbicacionCompleta } from "@/lib/inmuebles/display-label";
+import { fetchParteNombres } from "@/lib/ventas/partes";
 import {
   entregaInicialPendiente,
   proximaCuotaPendiente,
@@ -46,7 +48,7 @@ import {
   ventaPuedeCobrar,
 } from "@/lib/ventas/cobranza";
 import { ventaEstadoLabel, ventaEstadoVariant } from "@/lib/ventas/status-labels";
-import { downloadBlob, formatMoney, moneyClassName, personaDisplayName } from "@/lib/format";
+import { downloadBlob, formatMoney, moneyClassName } from "@/lib/format";
 import { pagePaddingClass } from "@/lib/layout";
 import { parseRouteId } from "@/lib/parse-route-id";
 import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
@@ -88,6 +90,13 @@ const EmitirReciboVentaModal = dynamic(
     })),
   { ssr: false },
 );
+const CancelarVentaModal = dynamic(
+  () =>
+    import("@/components/ventas/CancelarVentaModal").then((mod) => ({
+      default: mod.CancelarVentaModal,
+    })),
+  { ssr: false },
+);
 
 function inmuebleInitials(code: string): string {
   const cleaned = code.trim();
@@ -121,6 +130,7 @@ export function VentaFichaView() {
   const [recibos, setRecibos] = useState<VentaReciboRecord[]>([]);
   const [mediosPago, setMediosPago] = useState<CatalogoItem[]>([]);
   const [parteNombres, setParteNombres] = useState<Record<number, string>>({});
+  const [inmuebleFicha, setInmuebleFicha] = useState<InmuebleFicha | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [reciboSubmitting, setReciboSubmitting] = useState(false);
@@ -130,7 +140,7 @@ export function VentaFichaView() {
   const [cobrarOpen, setCobrarOpen] = useState(false);
   const [cobrarMode, setCobrarMode] = useState<CobrarVentaMode>("auto");
   const [cobrarCuotaId, setCobrarCuotaId] = useState<number | undefined>();
-  const [cancelling, setCancelling] = useState(false);
+  const [cancelarVentaOpen, setCancelarVentaOpen] = useState(false);
   const [emitReciboOpen, setEmitReciboOpen] = useState(false);
   const [emitReciboPagoId, setEmitReciboPagoId] = useState<number | null>(null);
 
@@ -141,7 +151,10 @@ export function VentaFichaView() {
     try {
       const detail = await fetchVenta(token, ventaId);
       setVenta(detail);
-      const [cuotasRes, pagosRes, recibosRes, mediosRes] = await Promise.all([
+      const fichaPromise = detail.inmueble?.id
+        ? fetchInmuebleFicha(token, detail.inmueble.id).catch(() => null)
+        : Promise.resolve(null);
+      const [cuotasRes, pagosRes, recibosRes, mediosRes, ficha] = await Promise.all([
         detail.plan ? fetchVentaCuotas(token, ventaId) : Promise.resolve({ items: [] }),
         fetchVentaPagos(token, ventaId),
         fetchVentaRecibos(token, ventaId).catch((err) => {
@@ -151,22 +164,21 @@ export function VentaFichaView() {
           throw err;
         }),
         fetchMediosPago(token),
+        fichaPromise,
       ]);
+      setInmuebleFicha(ficha);
       setCuotas(cuotasRes.items);
       setPagos(pagosRes.items);
       setRecibos(recibosRes.items);
       setMediosPago(mediosRes.items);
-      const nombres: Record<number, string> = {};
-      await Promise.all(
-        detail.partes.map(async (parte) => {
-          try {
-            const persona = await fetchPersona(token, parte.personaId);
-            nombres[parte.personaId] = personaDisplayName(persona);
-          } catch {
-            nombres[parte.personaId] = `Persona #${parte.personaId}`;
-          }
-        }),
-      );
+      const personaIds = detail.partes.map((parte) => parte.personaId);
+      const nombres = await fetchParteNombres(token, personaIds).catch(() => {
+        const fallback: Record<number, string> = {};
+        for (const parte of detail.partes) {
+          fallback[parte.personaId] = `Persona #${parte.personaId}`;
+        }
+        return fallback;
+      });
       setParteNombres(nombres);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
@@ -181,6 +193,7 @@ export function VentaFichaView() {
           : "Error al cargar la venta",
       );
       setVenta(null);
+      setInmuebleFicha(null);
       setCuotas([]);
       setPagos([]);
       setRecibos([]);
@@ -208,12 +221,24 @@ export function VentaFichaView() {
   const inmuebleCode = venta?.inmueble?.code ?? `Venta #${venta?.id ?? ""}`;
   const inmuebleTitle = venta?.inmueble?.title ?? "Inmueble";
 
+  const inmuebleHeading = useMemo(() => {
+    if (inmuebleFicha?.inmueble) {
+      return inmueblePropiedadSinCodigo(inmuebleFicha.inmueble, inmuebleFicha.tipoInmueble?.name);
+    }
+    if (inmuebleTitle !== "Inmueble") return inmuebleTitle;
+    return "Inmueble";
+  }, [inmuebleFicha, inmuebleTitle]);
+
   const metaLine = useMemo(() => {
     if (!venta) return "";
     const comprador = parteNombre(venta, "buyer", parteNombres);
-    const parts = [comprador !== VENTA_EMPTY_FIELD ? comprador : null, inmuebleTitle].filter(Boolean);
+    const ubicacion =
+      inmuebleFicha?.inmueble &&
+      inmuebleUbicacionCompleta(inmuebleFicha.inmueble, inmuebleFicha.localidad);
+    const ubicacionLine = ubicacion && ubicacion !== "—" ? ubicacion : null;
+    const parts = [ubicacionLine, comprador !== VENTA_EMPTY_FIELD ? comprador : null].filter(Boolean);
     return parts.join(" · ");
-  }, [venta, parteNombres, inmuebleTitle]);
+  }, [venta, parteNombres, inmuebleFicha]);
 
   const fichaKpis = useMemo(() => {
     if (!venta?.financiacionResumen) return [];
@@ -290,19 +315,6 @@ export function VentaFichaView() {
   );
 
 
-  async function handleCancelVenta() {
-    if (!token || !venta || !window.confirm("¿Cancelar esta venta? La operación quedará archivada.")) return;
-    setCancelling(true);
-    try {
-      await cancelVenta(token, venta.id);
-      router.push("/ventas");
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo cancelar la venta.");
-    } finally {
-      setCancelling(false);
-    }
-  }
-
   if (ventaId === null || (error && !venta && !loading)) {
     return (
       <div className={`flex flex-col gap-4 ${pagePaddingClass}`}>
@@ -364,7 +376,7 @@ export function VentaFichaView() {
             {inmuebleInitials(inmuebleCode)}
           </div>
           <div className="flex flex-col gap-2">
-            <h1 className="text-[26px] font-bold text-primary">{inmuebleCode}</h1>
+            <h1 className="text-[26px] font-bold text-primary">{inmuebleHeading}</h1>
             {metaLine ? <p className="text-sm text-text-secondary">{metaLine}</p> : null}
             <div className="flex flex-wrap items-center gap-2">
               <StatusBadge label={ventaEstadoLabel(venta.estado)} variant={ventaEstadoVariant(venta.estado)} />
@@ -391,36 +403,36 @@ export function VentaFichaView() {
           </div>
           <div className="flex flex-wrap justify-end gap-2">
             {editable && puedeCobrar && hayCobroPendiente ? (
-              <ButtonPrimary type="button" onClick={() => openCobrar("auto")}>
+              <ButtonPrimary type="button" className="gap-2" onClick={() => openCobrar("auto")}>
+                <Banknote className="h-4 w-4" aria-hidden />
                 Cobrar
               </ButtonPrimary>
             ) : null}
             {editable ? (
-              venta.estado === "deeds_pending" && !(puedeCobrar && hayCobroPendiente) ? (
-                <ButtonPrimary type="button" onClick={() => setEscrituraOpen(true)}>
-                  Registrar escritura
-                </ButtonPrimary>
-              ) : (
-                <ButtonOutline type="button" onClick={() => setEscrituraOpen(true)}>
-                  Registrar escritura
-                </ButtonOutline>
-              )
+              <ButtonPrimary type="button" className="gap-2" onClick={() => setEscrituraOpen(true)}>
+                <ScrollText className="h-4 w-4" aria-hidden />
+                Registrar escritura
+              </ButtonPrimary>
             ) : null}
             {editable ? (
               <>
                 {ventaNecesitaFinanciacion(venta) ? (
-                  <ButtonOutline type="button" onClick={() => setFinanciacionOpen(true)}>
+                  <ButtonOutline type="button" className="gap-2" onClick={() => setFinanciacionOpen(true)}>
+                    <Wallet className="h-4 w-4" aria-hidden />
                     Configurar forma de pago
                   </ButtonOutline>
                 ) : null}
-                <ButtonOutline type="button" onClick={() => setEditOpen(true)}>Editar</ButtonOutline>
+                <ButtonOutline type="button" className="gap-2" onClick={() => setEditOpen(true)}>
+                  <Pencil className="h-4 w-4" aria-hidden />
+                  Editar
+                </ButtonOutline>
                 <ButtonOutline
                   type="button"
-                  className="border-danger/40 text-danger hover:bg-danger-bg"
-                  onClick={() => void handleCancelVenta()}
-                  disabled={cancelling}
+                  className="gap-2 border-danger/40 text-danger hover:bg-danger-bg"
+                  onClick={() => setCancelarVentaOpen(true)}
                 >
-                  {cancelling ? "Cancelando..." : "Cancelar venta"}
+                  <Ban className="h-4 w-4" aria-hidden />
+                  Cancelar venta
                 </ButtonOutline>
               </>
             ) : null}
@@ -560,6 +572,20 @@ export function VentaFichaView() {
           onSuccess={() => {
             setCobrarOpen(false);
             void load({ silent: true });
+          }}
+        />
+      ) : null}
+
+      {cancelarVentaOpen ? (
+        <CancelarVentaModal
+          open
+          venta={venta}
+          subtitle={`${inmuebleCode} · ${formatMoney(venta.montoPrecioVenta, venta.codigoMoneda)}`}
+          token={token}
+          onClose={() => setCancelarVentaOpen(false)}
+          onCancelled={() => {
+            setCancelarVentaOpen(false);
+            router.push("/ventas");
           }}
         />
       ) : null}

@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 
-import { useAuth } from "@/context/auth-context";
+import { useAuthToken } from "@/context/auth-context";
 import { invalidateDashboardAlerts } from "@/lib/dashboard-alerts-events";
 import { fetchSyncStatus } from "@/lib/sync/api";
 import { notifySyncScope } from "@/lib/sync/events";
@@ -25,7 +25,7 @@ type SyncContextValue = {
 const SyncContext = createContext<SyncContextValue | null>(null);
 
 export function SyncProvider({ children }: { children: ReactNode }) {
-  const { token } = useAuth();
+  const { token } = useAuthToken();
   const versionsRef = useRef<Partial<Record<SyncScope, number>>>({});
 
   const applyVersions = useCallback((next: Partial<Record<SyncScope, number>>) => {

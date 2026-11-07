@@ -1,96 +1,126 @@
 "use client";
 
-import { useAdjustmentIndicesReference } from "@/components/alquileres/useAdjustmentIndicesReference";
+import {
+  type IndexReferenceSnapshot,
+} from "@/components/alquileres/useAdjustmentIndicesReference";
 import { VariationValue } from "@/components/indices/VariationValue";
 import type { IndiceCode } from "@/lib/api/types";
-import { formatIndexValue, formatPeriodoIndice } from "@/lib/format";
-import { ADJUSTMENT_INDICES } from "@/lib/rental-adjustment";
+import { formatPeriodoIndice } from "@/lib/format";
+import type { IndexVariations } from "@/lib/indices/variations";
+
+const COLUMNS = [
+  { key: "mensual", label: "Mensual" },
+  { key: "interanual", label: "Interanual" },
+  { key: "acumulada", label: "Acumulada" },
+] as const satisfies readonly { key: keyof IndexVariations; label: string }[];
+
+function PercentCell({
+  value,
+  prominent = false,
+}: {
+  value: string | null;
+  prominent?: boolean;
+}) {
+  return (
+    <div className={`text-center whitespace-nowrap ${prominent ? "text-lg" : "text-[13px]"}`}>
+      <VariationValue value={value} />
+    </div>
+  );
+}
 
 export function AdjustmentIndicesReference({
-  open,
-  token,
-  highlightCode,
+  codes,
+  items,
+  loading,
+  error,
 }: {
-  open: boolean;
-  token: string | null;
-  highlightCode?: IndiceCode | null;
+  codes: readonly IndiceCode[];
+  items: IndexReferenceSnapshot[];
+  loading: boolean;
+  error: boolean;
 }) {
-  const { items, loading, error } = useAdjustmentIndicesReference(open, token);
   const byCode = new Map(items.map((item) => [item.code, item]));
+  const single = codes.length === 1;
+  const singleSnapshot = single ? byCode.get(codes[0]) : undefined;
 
   return (
-    <div className="rounded-md border border-border bg-bg-page px-4 py-3">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
-        Índices de referencia
-      </p>
-      <p className="mt-0.5 text-[12px] text-text-secondary">
-        Último valor publicado (solo consulta).
-      </p>
+    <div className="overflow-hidden rounded-md border border-border bg-bg-card">
+      <div className="flex items-baseline justify-between gap-3 px-4 py-2.5">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
+          {single ? `Referencia ${codes[0]}` : "Índices de referencia"}
+        </p>
+        {single && singleSnapshot ? (
+          <p className="text-[12px] text-text-secondary">
+            {formatPeriodoIndice(singleSnapshot.periodo)}
+          </p>
+        ) : null}
+      </div>
 
       {loading ? (
-        <p className="mt-3 text-[13px] text-text-secondary">Cargando índices…</p>
+        <p className="border-t border-border px-4 py-3 text-[13px] text-text-secondary">
+          Cargando índices…
+        </p>
       ) : error ? (
-        <p className="mt-3 text-[13px] text-text-secondary">
+        <p className="border-t border-border px-4 py-3 text-[13px] text-text-secondary">
           No se pudieron cargar los índices. Podés verlos en la sección Índices.
         </p>
+      ) : single ? (
+        <div className="grid grid-cols-3 border-t border-border">
+          {COLUMNS.map((column, index) => (
+            <div
+              key={column.key}
+              className={`px-2 py-3 ${index > 0 ? "border-l border-border" : ""}`}
+            >
+              <p className="text-center text-[11px] font-medium text-text-secondary">
+                {column.label}
+              </p>
+              <div className="mt-1.5">
+                <PercentCell
+                  prominent
+                  value={singleSnapshot ? singleSnapshot.variations[column.key] : null}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
       ) : (
-        <ul className="mt-3 grid gap-2 sm:grid-cols-3">
-          {ADJUSTMENT_INDICES.map((code) => {
-            const snapshot = byCode.get(code);
-            const highlighted = highlightCode === code;
-            return (
-              <li
-                key={code}
-                className={`rounded-sm border px-3 py-2.5 ${
-                  highlighted
-                    ? "border-primary bg-primary-soft"
-                    : "border-border bg-bg-card"
-                }`}
+        <div className="border-t border-border">
+          <div className="grid grid-cols-[4.5rem_repeat(3,minmax(0,1fr))] bg-bg-page px-3 py-1.5">
+            <span />
+            {COLUMNS.map((column) => (
+              <span
+                key={column.key}
+                className="text-center text-[11px] font-medium text-text-secondary"
               >
-                <span
-                  className={`text-[13px] font-semibold ${
-                    highlighted ? "text-primary" : "text-text-primary"
-                  }`}
+                {column.label}
+              </span>
+            ))}
+          </div>
+          <ul>
+            {codes.map((code) => {
+              const snapshot = byCode.get(code);
+              return (
+                <li
+                  key={code}
+                  className="grid grid-cols-[4.5rem_repeat(3,minmax(0,1fr))] items-center border-t border-border px-3 py-2.5"
                 >
-                  {code}
-                </span>
-
-                {snapshot ? (
-                  <>
-                    <p className="mt-1 text-[15px] font-semibold tabular-nums text-text-primary">
-                      {formatIndexValue(snapshot.valor)}
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-semibold text-text-primary">{code}</p>
+                    <p className="text-[10px] leading-tight text-text-secondary">
+                      {snapshot ? formatPeriodoIndice(snapshot.periodo) : "Sin dato"}
                     </p>
-                    <p className="mt-0.5 text-[11px] text-text-secondary">
-                      {formatPeriodoIndice(snapshot.periodo)}
-                    </p>
-                    <dl className="mt-2 grid grid-cols-3 gap-1">
-                      <div>
-                        <dt className="text-[10px] text-text-secondary">Mens.</dt>
-                        <dd className="mt-0.5 text-[11px]">
-                          <VariationValue value={snapshot.variations.mensual} />
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-[10px] text-text-secondary">Inter.</dt>
-                        <dd className="mt-0.5 text-[11px]">
-                          <VariationValue value={snapshot.variations.interanual} />
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-[10px] text-text-secondary">Acum.</dt>
-                        <dd className="mt-0.5 text-[11px]">
-                          <VariationValue value={snapshot.variations.acumulada} />
-                        </dd>
-                      </div>
-                    </dl>
-                  </>
-                ) : (
-                  <p className="mt-1 text-[12px] text-text-secondary">Sin dato publicado</p>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+                  </div>
+                  {COLUMNS.map((column) => (
+                    <PercentCell
+                      key={column.key}
+                      value={snapshot ? snapshot.variations[column.key] : null}
+                    />
+                  ))}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       )}
     </div>
   );

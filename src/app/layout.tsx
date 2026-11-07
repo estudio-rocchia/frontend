@@ -1,17 +1,19 @@
 import type { Metadata } from "next";
-import { DM_Sans } from "next/font/google";
+import localFont from "next/font/local";
 
+import { DirectionProvider } from "@/components/foundations/direction/direction";
 import { WebVitalsReporter } from "@/components/observability/WebVitalsReporter";
 import { AuthProvider } from "@/context/auth-context";
 import "./globals.css";
 
-const dmSans = DM_Sans({
+// Archivo local: next/font/google se rompe en Turbopack cuando Google responde
+// con URLs /l/font?kit=...&skey=... (el query deja de tener una sola entrada).
+const dmSans = localFont({
+  src: "../fonts/dm-sans-latin.woff2",
   variable: "--font-dm-sans",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: "100 1000",
   display: "swap",
-  preload: true,
-  adjustFontFallback: true,
+  adjustFontFallback: "Arial",
 });
 
 export const metadata: Metadata = {
@@ -27,10 +29,12 @@ export default function RootLayout({
   return (
     <html lang="es" className={`${dmSans.variable} h-full antialiased`}>
       <body className="min-h-full">
-        <AuthProvider>
-          <WebVitalsReporter />
-          {children}
-        </AuthProvider>
+        <DirectionProvider locale="es-AR">
+          <AuthProvider>
+            <WebVitalsReporter />
+            {children}
+          </AuthProvider>
+        </DirectionProvider>
       </body>
     </html>
   );

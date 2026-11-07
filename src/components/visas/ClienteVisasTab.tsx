@@ -1,0 +1,138 @@
+"use client";
+
+import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Plus } from "lucide-react";
+
+import { EnlacesOficiales } from "@/components/visas/EnlacesOficiales";
+import { NuevoTramiteModal } from "@/components/visas/NuevoTramiteModal";
+import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
+import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { ApiError, fetchVisas } from "@/lib/api";
+import type { TramiteVisaListItem } from "@/lib/api/types";
+import { formatDateDisplay } from "@/lib/format";
+import { ESTADO_VISA_LABEL, estadoVisaVariant, formatUsd } from "@/lib/visas/labels";
+
+export function ClienteVisasTab({
+  token,
+  personaId,
+  personaNombre,
+  canEdit,
+  onAuthError,
+}: {
+  token: string;
+  personaId: number;
+  personaNombre: string;
+  canEdit: boolean;
+  onAuthError: () => void;
+}) {
+  const router = useRouter();
+  const [items, setItems] = useState<TramiteVisaListItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetchVisas(token, { personaId });
+      setItems(response.items);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        onAuthError();
+        return;
+      }
+      setError(err instanceof ApiError ? err.message : "No se pudieron cargar los trámites");
+    } finally {
+      setLoading(false);
+    }
+  }, [token, personaId, onAuthError]);
+
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      void load();
+    }, 0);
+    return () => window.clearTimeout(handle);
+  }, [load]);
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
+          Trámites de visa
+        </h3>
+        {canEdit ? (
+          <ButtonPrimary onClick={() => setCreateOpen(true)} className="px-3 py-2 text-[13px]">
+            <Plus className="mr-1.5 h-4 w-4" aria-hidden />
+            Crear trámite
+          </ButtonPrimary>
+        ) : null}
+      </div>
+
+      <EnlacesOficiales compact />
+
+      {error ? (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center gap-3 rounded-sm bg-danger-bg px-3 py-2"
+        >
+          <p className="text-sm text-danger">{error} Reintentá o volvé más tarde.</p>
+          <button
+            type="button"
+            onClick={() => void load()}
+            disabled={loading}
+            className={`text-sm font-semibold text-primary hover:underline disabled:opacity-50 ${interactiveFocusClass}`}
+          >
+            Reintentar
+          </button>
+        </div>
+      ) : null}
+
+      {loading ? (
+        <p className="text-sm text-text-secondary">Cargando trámites…</p>
+      ) : items.length === 0 ? (
+        <div className="rounded-md border border-dashed border-border bg-bg-card px-4 py-6">
+          <p className="text-sm font-semibold text-text-primary">Todavía no tiene un trámite de visa.</p>
+          <p className="mt-1 text-sm text-text-secondary">
+            Si viaja con otras personas, abrilo a su nombre y después sumá al grupo.
+          </p>
+        </div>
+      ) : (
+        <ul className="flex flex-col overflow-hidden rounded-md border border-border bg-bg-card">
+          {items.map((item) => (
+            <li key={item.id} className="border-t border-border first:border-t-0">
+              <Link href={`/visas/${item.id}`} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+                <span className="flex flex-col gap-1">
+                  <span className="text-sm font-medium text-text-primary">
+                    {formatDateDisplay(item.abiertoEn)}
+                    {item.numeroDs160 ? ` · ${item.numeroDs160}` : ""}
+                  </span>
+                  <span className="text-xs text-text-secondary">
+                    {item.integrantes === 1 ? "Individual" : `Grupo de ${item.integrantes}`}
+                    {" · "}
+                    {formatUsd(item.cotizacion.totalUsd)}
+                  </span>
+                </span>
+                <StatusBadge label={ESTADO_VISA_LABEL[item.estado]} variant={estadoVisaVariant(item.estado)} />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <NuevoTramiteModal
+        open={createOpen}
+        token={token}
+        personaFija={{ id: personaId, nombre: personaNombre }}
+        onClose={() => setCreateOpen(false)}
+        onCreated={(id) => {
+          setCreateOpen(false);
+          router.push(`/visas/${id}`);
+        }}
+      />
+    </div>
+  );
+}

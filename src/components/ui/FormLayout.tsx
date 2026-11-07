@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { RocchiaDateField } from "@/components/ui/RocchiaDateField";
 import { formInputClass, interactiveFocusClass } from "@/lib/ui/interactive-focus";
 import { VENTA_EMPTY_FIELD } from "@/lib/ventas/empty-field";
 
@@ -57,23 +58,59 @@ export function FormField({
   onChange,
   placeholder,
   type = "text",
+  id,
+  invalid = false,
+  error,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   type?: string;
+  id?: string;
+  invalid?: boolean;
+  error?: string;
 }) {
+  const errorId = id && invalid && error ? `${id}-error` : undefined;
+
+  if (type === "date") {
+    return (
+      <div className="flex flex-col gap-1.5">
+        <RocchiaDateField
+          id={id}
+          label={label}
+          value={value}
+          onChange={onChange}
+          invalid={invalid}
+          error={error}
+        />
+        {errorId ? (
+          <span id={errorId} className="text-sm text-danger">
+            {error}
+          </span>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <label className="flex flex-col gap-1.5">
       <span className="text-[11px] font-semibold text-text-secondary">{label}</span>
       <input
+        id={id}
         type={type}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
+        aria-invalid={invalid || undefined}
+        aria-describedby={errorId}
         className={formInputClass}
       />
+      {errorId ? (
+        <span id={errorId} className="text-sm text-danger">
+          {error}
+        </span>
+      ) : null}
     </label>
   );
 }

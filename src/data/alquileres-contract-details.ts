@@ -20,6 +20,13 @@ export type ContractDetail = {
   depositAmount: string;
   calculatedNewAmount: string;
   daysSince10: string;
-  surchargePercent: string;
-  punitiveHint: string;
+  /** Etiqueta del tipo de mora (catálogo). */
+  moraTipo: string;
+  /** Etiqueta del campo de recargo según tipo (porcentaje o monto fijo). */
+  moraRecargoLabel: string;
+  moraRecargoValue: string;
+  /** Notas del índice cuando el ajuste no es un índice publicado estándar. */
+  adjustmentNotes: string | null;
+  /** Notas generales del contrato (`contrato.notas`). */
+  contractNotes: string | null;
 };

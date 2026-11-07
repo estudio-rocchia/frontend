@@ -98,6 +98,43 @@ function parseContentDispositionFilename(header: string | null): string | null {
   return plainMatch?.[1]?.trim() ?? null;
 }
 
+export async function apiUploadFile<T>(
+  path: string,
+  token: string,
+  file: File,
+  method: "POST" | "PUT",
+): Promise<T> {
+  const url = `${getApiBaseUrl()}${path.startsWith("/") ? path : `/${path}`}`;
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/octet-stream",
+        "X-Filename": encodeURIComponent(file.name),
+      },
+      body: file,
+    });
+  } catch (error) {
+    throw new NetworkError(url, error);
+  }
+
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!response.ok) {
+    if (contentType.includes("application/json")) {
+      const body = (await response.json()) as ApiErrorBody;
+      throw new ApiError(response.status, body);
+    }
+    throw new Error(`API error ${response.status}`);
+  }
+
+  if (!contentType.includes("application/json")) {
+    throw new Error(`API error ${response.status}`);
+  }
+  return (await response.json()) as T;
+}
+
 export async function apiBlob(path: string, token: string): Promise<Blob> {
   const { blob } = await apiBlobWithFilename(path, token);
   return blob;

@@ -4,8 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 
 import { Modal } from "@/components/ui/Modal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
+import { EnumSelect } from "@/components/ui/EnumSelect";
+import { NumericSelect } from "@/components/ui/NumericSelect";
 import type { CatalogoItem, ModoFacturacion, ServicioContratoRecord } from "@/lib/api/types";
 import { defaultModoForTipo, filterAddableTiposServicio } from "@/lib/mappers/servicios";
+import { formInputClass, interactiveFocusClass } from "@/lib/ui/interactive-focus";
 
 export type ServicioFormValues = {
   tipoServicioId: number;
@@ -64,7 +67,7 @@ function Field({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
+        className={formInputClass}
       />
       {hint ? <span className="text-[11px] text-text-secondary">{hint}</span> : null}
     </label>
@@ -105,8 +108,9 @@ function ModoFacturacionToggle({
             <button
               key={option.id}
               type="button"
+              aria-pressed={selected}
               onClick={() => onChange(option.id)}
-              className={`rounded-sm border px-3 py-2.5 text-left transition-colors ${
+              className={`rounded-sm border px-3 py-2.5 text-left transition-colors ${interactiveFocusClass} ${
                 selected
                   ? "border-primary bg-primary/10"
                   : "border-border bg-bg-page hover:border-primary/40"
@@ -288,24 +292,14 @@ export function ServicioFormModal({
     >
       <div className="flex flex-col gap-4">
         {!editing && !lockTipoSelect ? (
-          <label className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-semibold text-text-secondary">Tipo de servicio</span>
-            <select
-              value={form.tipoServicioId || ""}
-              onChange={(e) => handleTipoChange(Number(e.target.value))}
-              className="rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
-            >
-              {availableTipos.length === 0 ? (
-                <option value="">Sin tipos disponibles</option>
-              ) : (
-                availableTipos.map((tipo) => (
-                  <option key={tipo.id} value={tipo.id}>
-                    {tipo.name}
-                  </option>
-                ))
-              )}
-            </select>
-          </label>
+          <NumericSelect
+            label="Tipo de servicio"
+            value={form.tipoServicioId > 0 ? form.tipoServicioId : null}
+            onChange={(id) => id != null && handleTipoChange(id)}
+            disabled={availableTipos.length === 0}
+            placeholder={availableTipos.length === 0 ? "Sin tipos disponibles" : "Seleccionar…"}
+            options={availableTipos.map((tipo) => ({ value: tipo.id, label: tipo.name }))}
+          />
         ) : null}
 
         {isOther ? (
@@ -335,22 +329,20 @@ export function ServicioFormModal({
             />
             {!isFixed ? (
               <>
-                <label className="flex flex-col gap-1.5">
-                  <span className="text-[11px] font-semibold text-text-secondary">Prestador</span>
-                  <select
-                    value={form.proveedorAgua}
-                    onChange={(e) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        proveedorAgua: e.target.value === "sameep" ? "sameep" : "cooperativa",
-                      }))
-                    }
-                    className="rounded-sm border border-border bg-bg-card px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
-                  >
-                    <option value="cooperativa">Cooperativa Las Breñas</option>
-                    <option value="sameep">SAMEEP</option>
-                  </select>
-                </label>
+                <EnumSelect
+                  label="Prestador"
+                  value={form.proveedorAgua}
+                  onChange={(next) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      proveedorAgua: next === "sameep" ? "sameep" : "cooperativa",
+                    }))
+                  }
+                  options={[
+                    { value: "cooperativa", label: "Cooperativa Las Breñas" },
+                    { value: "sameep", label: "SAMEEP" },
+                  ]}
+                />
                 {form.proveedorAgua === "sameep" ? (
                   <div className="grid gap-3 sm:grid-cols-2">
                     <Field
@@ -430,22 +422,17 @@ export function ServicioFormModal({
             isWater
           />
         ) : (
-          <label className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-semibold text-text-secondary">Modo de facturación</span>
-            <select
-              value={form.modoFacturacion}
-              onChange={(e) =>
-                setForm((prev) => ({
-                  ...prev,
-                  modoFacturacion: e.target.value as ModoFacturacion,
-                }))
-              }
-              className="rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
-            >
-              <option value="fixed">Monto fijo mensual</option>
-              <option value="variable">Por boleta / período</option>
-            </select>
-          </label>
+          <EnumSelect<ModoFacturacion>
+            label="Modo de facturación"
+            value={form.modoFacturacion}
+            onChange={(modoFacturacion) => {
+              if (modoFacturacion) setForm((prev) => ({ ...prev, modoFacturacion }));
+            }}
+            options={[
+              { value: "fixed", label: "Monto fijo mensual" },
+              { value: "variable", label: "Por boleta / período" },
+            ]}
+          />
         )}
 
         {isWater && isFixed ? (
@@ -464,22 +451,17 @@ export function ServicioFormModal({
               placeholder="10000"
               type="number"
             />
-            <label className="flex flex-col gap-1.5">
-              <span className="text-[11px] font-semibold text-text-secondary">Moneda</span>
-              <select
-                value={form.codigoMoneda}
-                onChange={(e) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    codigoMoneda: e.target.value as "ARS" | "USD",
-                  }))
-                }
-                className="rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
-              >
-                <option value="ARS">ARS</option>
-                <option value="USD">USD</option>
-              </select>
-            </label>
+            <EnumSelect<"ARS" | "USD">
+              label="Moneda"
+              value={form.codigoMoneda}
+              onChange={(codigoMoneda) => {
+                if (codigoMoneda) setForm((prev) => ({ ...prev, codigoMoneda }));
+              }}
+              options={[
+                { value: "ARS", label: "ARS" },
+                { value: "USD", label: "USD" },
+              ]}
+            />
           </div>
         ) : !isWater ? (
           <p className="rounded-sm bg-bg-page px-3 py-2.5 text-[12px] text-text-secondary">

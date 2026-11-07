@@ -34,7 +34,7 @@ export function ventasEmptyHint(tab: VentasTabId): string {
     return "Las operaciones aparecen acá cuando iniciás una venta desde una propiedad a la venta.";
   }
   if (tab === "a_la_venta") {
-    return "Usá «Nueva publicación» arriba para sumar propiedades al catálogo.";
+    return "Usá «Crear publicación» arriba para sumar propiedades al catálogo.";
   }
   if (tab === "fuera_mercado") {
     return "Los inmuebles que saques de venta se listan en esta pestaña.";

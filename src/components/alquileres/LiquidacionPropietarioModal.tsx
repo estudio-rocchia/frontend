@@ -15,6 +15,9 @@ import {
 } from "@/lib/api";
 import type { LiquidacionRecord, PropietarioAdministracionSummary } from "@/lib/api/types";
 import { downloadBlob, formatMoney, normalizeCurrency, rentalApiErrorMessage } from "@/lib/format";
+import { MesAnioPeriodSelect } from "@/components/ui/MesAnioPeriodSelect";
+import { NumericSelect } from "@/components/ui/NumericSelect";
+import { formInputClass } from "@/lib/ui/interactive-focus";
 
 function currentPeriod() {
   const now = new Date();
@@ -213,54 +216,42 @@ export function LiquidacionPropietarioModal({
       }
     >
       <div className="flex flex-col gap-4 p-1">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="text-text-secondary">Año</span>
-            <input
-              type="number"
-              className="rounded border border-border px-2 py-1.5"
-              value={anio}
-              onChange={(e) => setPeriod({ anio: Number(e.target.value), mes })}
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="text-text-secondary">Mes</span>
-            <input
-              type="number"
-              min={1}
-              max={12}
-              className="rounded border border-border px-2 py-1.5"
-              value={mes}
-              onChange={(e) => setPeriod({ anio, mes: Number(e.target.value) })}
-            />
-          </label>
-        </div>
+        <MesAnioPeriodSelect
+          label="Período a liquidar"
+          mes={mes}
+          anio={anio}
+          onChange={setPeriod}
+          disabled={submitting}
+        />
 
         {loading ? <p className="text-sm text-text-secondary">Cargando propietarios…</p> : null}
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        {error ? (
+          <p className="rounded-sm border border-danger bg-danger-bg px-3 py-2 text-sm text-danger" role="alert">
+            {error}
+          </p>
+        ) : null}
 
         {!liquidacion ? (
           <>
-            <label className="flex flex-col gap-1 text-sm">
-              <span className="text-text-secondary">Propietario</span>
-              <select
-                className="rounded border border-border px-2 py-1.5"
-                value={selectedOwnerId ?? ""}
-                onChange={(e) => setSelectedOwnerId(Number(e.target.value))}
-              >
-                {owners.length === 0 ? (
-                  <option value="">Sin alquileres cobrados en este período</option>
-                ) : null}
-                {owners.map((owner) => (
-                  <option key={owner.personaId} value={owner.personaId}>
-                    {owner.displayName} — {owner.porcentajeAdministracion}% —{" "}
-                    {formatMoney(owner.alquileresCobradosMes, normalizeCurrency(owner.codigoMoneda))} en
-                    alquileres cobrados (
-                    {formatInmueblesConCobro(owner.inmueblesConCobroMes, owner.inmueblesEnAdministracion)})
-                  </option>
-                ))}
-              </select>
-            </label>
+            <NumericSelect
+              label="Propietario"
+              value={selectedOwnerId}
+              onChange={(id) => id != null && setSelectedOwnerId(id)}
+              disabled={owners.length === 0}
+              placeholder={
+                owners.length === 0 ? "Sin alquileres cobrados en este período" : undefined
+              }
+              options={owners.map((owner) => ({
+                value: owner.personaId,
+                label: `${owner.displayName} — ${owner.porcentajeAdministracion}% — ${formatMoney(
+                  owner.alquileresCobradosMes,
+                  normalizeCurrency(owner.codigoMoneda),
+                )} en alquileres cobrados (${formatInmueblesConCobro(
+                  owner.inmueblesConCobroMes,
+                  owner.inmueblesEnAdministracion,
+                )})`,
+              }))}
+            />
             {selectedOwner ? (
               <p className="text-sm text-text-secondary">
                 {formatInmueblesConCobro(
@@ -304,7 +295,7 @@ export function LiquidacionPropietarioModal({
             <label className="flex flex-col gap-1 text-sm">
               <span className="font-medium text-text-primary">Aclaraciones</span>
               <textarea
-                className="min-h-[180px] rounded border border-border px-2 py-1.5 font-mono text-xs leading-relaxed disabled:opacity-70"
+                className={`min-h-[180px] font-mono text-xs leading-relaxed disabled:opacity-70 ${formInputClass}`}
                 value={aclaraciones}
                 onChange={(e) => setAclaraciones(e.target.value)}
                 readOnly={!isDraftLiquidacion}

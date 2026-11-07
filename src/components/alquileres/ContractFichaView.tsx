@@ -1,28 +1,45 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import Link from "next/link";
+import { useParams, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowLeft, Archive, Banknote, FileX2, Pencil } from "lucide-react";
 
 import { ContractCobranzasSection } from "@/components/alquileres/ContractCobranzasSection";
-import { ContractGarantesSection } from "@/components/alquileres/ContractGarantesSection";
 import { ContractDepositoPlanSection } from "@/components/alquileres/ContractDepositoPlanSection";
 import { ContractServiciosSection } from "@/components/alquileres/ContractServiciosSection";
+import { ContractResumenSection } from "@/components/alquileres/ContractResumenSection";
 import { useContractFicha } from "@/components/alquileres/use-contract-ficha";
-import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
-import { FieldBlock } from "@/components/ui/FormLayout";
+import { ButtonPrimary, buttonOutlineClass } from "@/components/ui/Button";
 import { PageHeaderSkeleton, Skeleton } from "@/components/ui/Skeleton";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useAuth } from "@/context/auth-context";
-import { daysUntilDate, moneyClassName } from "@/lib/format";
+import { downloadRescisionContrato } from "@/lib/api";
+import { daysUntilDate, downloadBlob, moneyHeroClass, rentalApiErrorMessage } from "@/lib/format";
 import { pagePaddingClass } from "@/lib/layout";
+import {
+  alquileresContratoFichaPath,
+  alquileresListPath,
+  cameFromContratosHistorial,
+  withBreakUiQuery,
+} from "@/lib/alquileres/break-ui-mode";
+import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
+import { contratoCodeDisplay } from "@/components/alquileres/ContratosHistorialView";
 import { canCollectRentFromCuotas } from "@/lib/mappers/cuotas";
 
 const CobrarAlquilerModal = dynamic(
   () =>
     import("@/components/alquileres/CobrarAlquilerModal").then((mod) => ({
       default: mod.CobrarAlquilerModal,
+    })),
+  { ssr: false },
+);
+
+const RescindirContratoModal = dynamic(
+  () =>
+    import("@/components/alquileres/RescindirContratoModal").then((mod) => ({
+      default: mod.RescindirContratoModal,
     })),
   { ssr: false },
 );
@@ -52,16 +69,6 @@ const tabs: { id: FichaTab; label: string }[] = [
   { id: "servicios", label: "Servicios" },
 ];
 
-function SectionTitle({ children }: { children: string }) {
-  return (
-    <h3 className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">{children}</h3>
-  );
-}
-
-function contractInitials(code: string): string {
-  const cleaned = code.replace(/^ALQ-/i, "").trim();
-  return cleaned.slice(0, 2).toUpperCase() || "?";
-}
 
 function estadoVariant(estado: string): "success" | "warning" | "danger" {
   if (estado === "Activo") return "success";
@@ -77,7 +84,6 @@ function tabFromQuery(value: string | null): FichaTab | null {
 }
 
 export function ContractFichaView() {
-  const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
   const contratoId = Number(params.id);
@@ -88,6 +94,11 @@ export function ContractFichaView() {
   const [cobrarModalOpen, setCobrarModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [finishModalOpen, setFinishModalOpen] = useState(false);
+  const [rescindirModalOpen, setRescindirModalOpen] = useState(false);
+  const [rescisionError, setRescisionError] = useState<string | null>(null);
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const actionsRef = useRef<HTMLDetailsElement>(null);
+  const announcedId = useRef<number | null>(null);
 
   useEffect(() => {
     const tab = tabFromQuery(searchParams.get("tab"));
@@ -132,9 +143,8 @@ export function ContractFichaView() {
     if (!detail) return "";
     return [
       detail.tenant,
-      detail.property,
-      detail.propertyLocation !== "—" ? detail.propertyLocation : null,
       detail.contractStart !== "—" ? `desde ${detail.contractStart}` : null,
+      detail.contractEnd !== "—" ? `hasta ${detail.contractEnd}` : null,
     ]
       .filter(Boolean)
       .join(" · ");
@@ -144,14 +154,42 @@ export function ContractFichaView() {
   const canFinish = Boolean(canEdit && contrato && daysUntilDate(contrato.fechaFin) <= 30);
   const canCollect = canEdit && contrato && canCollectRentFromCuotas(cuotas, contrato);
   const cobrarSubtitle = detail ? `${detail.tenant} · ${detail.property}` : undefined;
+  const fromHistorial = cameFromContratosHistorial(searchParams);
+  const backToHistorial = fromHistorial || !canEdit;
+  const backHref = alquileresListPath(backToHistorial ? "historial" : "activos", searchParams);
+  const backLabel = backToHistorial ? "Volver al historial de contratos" : "Volver al listado";
+
+  useEffect(() => {
+    if (!detail || loading) return;
+    const previousTitle = document.title;
+    document.title = `${contratoCode} — Rocchia`;
+    let frame = 0;
+    if (announcedId.current !== contratoId) {
+      frame = window.requestAnimationFrame(() => {
+        if (!titleRef.current) return;
+        titleRef.current.focus();
+        announcedId.current = contratoId;
+      });
+    }
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.title = previousTitle;
+    };
+  }, [detail, loading, contratoCode, contratoId]);
+
+  function closeActions() {
+    if (actionsRef.current) actionsRef.current.open = false;
+  }
 
   if (!validId || (error && !detail && !loading)) {
     return (
       <div className={`flex flex-col gap-4 ${pagePaddingClass}`}>
-        <p className="rounded-sm border border-danger bg-danger-bg px-3 py-2 text-sm text-danger">
-          {error ?? "Contrato no encontrado."}
+        <p className="rounded-sm border border-danger bg-danger-bg px-3 py-2 text-sm text-danger" role="alert">
+          {error ?? "Contrato no encontrado. Volvé al listado."}
         </p>
-        <ButtonOutline onClick={() => router.push("/alquileres")}>Volver al listado</ButtonOutline>
+        <Link href={backHref} className={buttonOutlineClass}>
+          {backLabel}
+        </Link>
       </div>
     );
   }
@@ -177,88 +215,181 @@ export function ContractFichaView() {
 
   return (
     <div className={`flex flex-col gap-6 ${pagePaddingClass}`}>
-      <button
-        type="button"
-        onClick={() => router.push("/alquileres")}
-        className="flex w-fit items-center gap-2 text-sm font-medium text-text-secondary transition-colors hover:text-primary"
+      <Link
+        href={backHref}
+        className={`flex w-fit items-center gap-2 text-sm font-medium text-text-secondary hover:text-primary ${interactiveFocusClass}`}
       >
         <ArrowLeft className="h-4 w-4" aria-hidden />
-        Volver al listado
-      </button>
+        {backLabel}
+      </Link>
 
-      <header className="flex flex-col gap-4 rounded-md border border-border bg-bg-card p-5 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex gap-4">
-          <div
-            className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary-soft text-lg font-bold text-primary"
-            aria-hidden
-          >
-            {contractInitials(contratoCode)}
-          </div>
-          <div className="flex flex-col gap-2">
-            <h1 className="text-[26px] font-bold text-primary">{contratoCode}</h1>
-            {metaLine ? <p className="text-sm text-text-secondary">{metaLine}</p> : null}
-            <div className="flex flex-wrap items-center gap-2">
-              <StatusBadge label={detail.estado} variant={estadoVariant(detail.estado)} />
-              <span className="rounded-full bg-bg-page px-2.5 py-1 text-[11px] font-semibold text-text-secondary">
-                {detail.adjustmentIndex}
+      <header className="flex flex-col gap-4 rounded-md border border-border bg-bg-card p-5">
+        <div className="flex flex-col gap-3">
+          <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-[minmax(0,1fr)_auto] min-[480px]:items-end min-[480px]:gap-x-6">
+            <h1
+              ref={titleRef}
+              tabIndex={-1}
+              className="min-w-0 text-[26px] font-normal tracking-tight text-text-primary outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            >
+              {contratoCode}
+            </h1>
+            <div className="flex shrink-0 flex-col gap-0.5 min-[480px]:text-right">
+              <span className="text-[13px] text-text-secondary">Alquiler mensual</span>
+              <span className={`text-text-primary ${moneyHeroClass(detail.previousAmount)}`}>
+                {detail.previousAmount}
               </span>
             </div>
           </div>
-        </div>
-        <div className="flex flex-col items-start gap-3 sm:items-end">
-          <div className="flex flex-col gap-1 sm:text-right">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
-              Alquiler mensual
-            </span>
-            <span className={`text-[26px] font-bold leading-none text-primary ${moneyClassName}`}>
-              {detail.previousAmount}
+          {metaLine ? (
+            <p
+              className="line-clamp-2 min-w-0 break-words text-sm text-text-secondary"
+              title={metaLine}
+            >
+              {metaLine}
+            </p>
+          ) : null}
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusBadge label={detail.estado} variant={estadoVariant(detail.estado)} />
+            <span className="rounded-full bg-bg-page px-2.5 py-1 text-[11px] font-semibold text-text-secondary">
+              {detail.adjustmentIndex}
             </span>
           </div>
+        </div>
           {canEdit ? (
             <div className="flex flex-wrap gap-2">
-              <ButtonOutline
-                type="button"
-                onClick={() => setEditModalOpen(true)}
-                disabled={submitting}
-              >
-                Editar datos
-              </ButtonOutline>
               {canCollect ? (
                 <ButtonPrimary
                   type="button"
+                  className="gap-2"
                   onClick={() => setCobrarModalOpen(true)}
                   disabled={serviciosLoading || submitting}
                 >
-                  Cobrar
+                  <Banknote className="h-4 w-4" aria-hidden />
+                  Cobrar alquiler
                 </ButtonPrimary>
               ) : null}
-              {canFinish ? (
-                <ButtonOutline
-                  type="button"
-                  data-testid="ficha-finalizar"
-                  onClick={() => setFinishModalOpen(true)}
-                  disabled={submitting}
-                >
-                  Finalizar
-                </ButtonOutline>
-              ) : null}
+              <details ref={actionsRef} className="relative">
+                <summary className={`${buttonOutlineClass} cursor-pointer list-none [&::-webkit-details-marker]:hidden ${interactiveFocusClass}`}>
+                  Más acciones
+                </summary>
+                <div className="absolute left-0 z-20 mt-1 flex min-w-52 flex-col rounded-md border border-border bg-bg-card p-1 shadow-[var(--shadow-card)]">
+                  <button
+                    type="button"
+                    className={`flex items-center gap-2 rounded-sm px-3 py-2 text-left text-[13px] font-medium text-text-primary hover:bg-bg-page disabled:opacity-50 ${interactiveFocusClass}`}
+                    onClick={() => {
+                      closeActions();
+                      setEditModalOpen(true);
+                    }}
+                    disabled={submitting}
+                  >
+                    <Pencil className="h-4 w-4" aria-hidden />
+                    Editar datos
+                  </button>
+                  {canFinish ? (
+                    <button
+                      type="button"
+                      data-testid="ficha-finalizar"
+                      className={`rounded-sm px-3 py-2 text-left text-[13px] font-medium text-text-primary hover:bg-bg-page disabled:opacity-50 ${interactiveFocusClass}`}
+                      onClick={() => {
+                        closeActions();
+                        setFinishModalOpen(true);
+                      }}
+                      disabled={submitting}
+                    >
+                      Finalizar
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    data-testid="ficha-rescindir"
+                    className={`flex items-center gap-2 rounded-sm px-3 py-2 text-left text-[13px] font-medium text-danger hover:bg-danger-bg disabled:opacity-50 ${interactiveFocusClass}`}
+                    onClick={() => {
+                      closeActions();
+                      setRescindirModalOpen(true);
+                    }}
+                    disabled={submitting}
+                  >
+                    <FileX2 className="h-4 w-4" aria-hidden />
+                    Rescindir contrato
+                  </button>
+                </div>
+              </details>
             </div>
           ) : null}
-        </div>
       </header>
 
+      {!canEdit && contrato && detail ? (
+        <div
+          role="status"
+          className={`rounded-md border px-4 py-4 shadow-[var(--shadow-card)] ${
+            detail.estado === "Rescindido"
+              ? "border-danger/40 bg-danger-bg/60"
+              : "border-warning/35 bg-warning-bg/60"
+          }`}
+        >
+          <div className="flex items-start gap-3">
+            <span
+              className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
+                detail.estado === "Rescindido"
+                  ? "bg-danger/15 text-danger"
+                  : "bg-warning/15 text-warning"
+              }`}
+              aria-hidden
+            >
+              <Archive className="h-5 w-5" />
+            </span>
+            <div className="flex min-w-0 flex-col gap-2">
+              <p className="text-[15px] font-semibold text-text-primary">
+                {detail.estado === "Rescindido"
+                  ? "Este contrato está rescindido"
+                  : "Este contrato está cerrado"}
+              </p>
+              <p className="text-[13px] leading-relaxed text-text-secondary">
+                Podés consultar cobranzas, servicios y depósito, pero no modificarlo.{" "}
+                <Link
+                  href={withBreakUiQuery("/alquileres/historial", searchParams)}
+                  className={`font-semibold text-primary hover:underline ${interactiveFocusClass}`}
+                >
+                  Ver historial de contratos
+                </Link>
+              </p>
+              {contrato.renewalOfContratoId ? (
+                <p className="text-[13px] leading-relaxed text-text-secondary">
+                  Renueva el contrato{" "}
+                  <Link
+                    href={alquileresContratoFichaPath(contrato.renewalOfContratoId, searchParams, {
+                      fromHistorial,
+                    })}
+                    className={`font-semibold text-primary hover:underline ${interactiveFocusClass}`}
+                  >
+                    {contratoCodeDisplay({ id: contrato.renewalOfContratoId, contratoCode: null })}
+                  </Link>
+                  .
+                </p>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <section className="rounded-md border border-border bg-bg-card">
-        <div className="flex flex-wrap gap-2 border-b border-border px-5 pt-4">
+        <div
+          role="tablist"
+          aria-label="Secciones del contrato"
+          className="flex flex-wrap items-center gap-2 border-b border-border px-5 pt-4"
+        >
           {tabs.map((tab) => (
             <button
               key={tab.id}
               type="button"
+              role="tab"
+              aria-selected={activeTab === tab.id}
               data-testid={`ficha-tab-${tab.id}`}
               onClick={() => setActiveTab(tab.id)}
-              className={`rounded-t-sm px-3 py-2 text-sm font-medium transition-colors ${
+              className={`dashboard-press px-3 py-2 text-[13px] ${interactiveFocusClass} ${
                 activeTab === tab.id
                   ? "border-b-2 border-primary text-primary"
-                  : "text-text-secondary hover:text-text-primary"
+                  : "border-b-2 border-transparent text-text-secondary hover:text-text-primary"
               }`}
             >
               {tab.label}
@@ -266,63 +397,48 @@ export function ContractFichaView() {
           ))}
         </div>
 
-        <div className="flex flex-col gap-6 p-5">
-          {error ? (
-            <p className="rounded-sm border border-danger bg-danger-bg px-3 py-2 text-sm text-danger">{error}</p>
-          ) : null}
-          {success ? (
-            <p className="rounded-sm border border-success bg-success-bg px-3 py-2 text-sm text-success">{success}</p>
-          ) : null}
+        <div role="tabpanel" className="flex flex-col gap-6 p-5">
+          <p
+            role="alert"
+            className={
+              error
+                ? "rounded-sm border border-danger bg-danger-bg px-3 py-2 text-sm text-danger"
+                : "sr-only"
+            }
+          >
+            {error ?? ""}
+          </p>
+          <p
+            role="status"
+            className={
+              success
+                ? "rounded-sm border border-success bg-success-bg px-3 py-2 text-sm text-success"
+                : "sr-only"
+            }
+          >
+            {success ?? ""}
+          </p>
 
           {activeTab === "resumen" ? (
-            <div className="flex flex-col gap-6">
-              <div className="flex flex-col gap-4">
-                <SectionTitle>Identificación</SectionTitle>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <FieldBlock label="Código de propiedad" value={detail.propertyCode} />
-                  <FieldBlock label="Propiedad" value={detail.property} />
-                  <div className="sm:col-span-2">
-                    <FieldBlock label="Ubicación" value={detail.propertyLocation} />
-                  </div>
-                  <FieldBlock label="Inicio" value={detail.contractStart} />
-                  <FieldBlock label="Fin" value={detail.contractEnd} />
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-4">
-                <SectionTitle>Partes</SectionTitle>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <FieldBlock label="Inquilino" value={detail.tenant} />
-                  <FieldBlock label="Propietario" value={detail.owner} />
-                  {contrato && token ? (
-                    <ContractGarantesSection
-                      contrato={contrato}
-                      editable={canEdit}
-                      token={token}
-                      onChanged={() => void reloadFicha()}
-                    />
-                  ) : null}
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-4">
-                <SectionTitle>Condiciones económicas</SectionTitle>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <FieldBlock label="Depósito de garantía" value={detail.depositAmount} />
-                  <FieldBlock label="Índice de ajuste" value={detail.adjustmentIndex} />
-                  <FieldBlock label="Frecuencia de ajuste" value={detail.adjustmentFrequency} />
-                  <FieldBlock label="Día de vencimiento" value={detail.paymentDueDay} />
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-4">
-                <SectionTitle>Mora</SectionTitle>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <FieldBlock label="Recargo (%)" value={detail.surchargePercent} />
-                  <FieldBlock label="Observaciones" value={detail.punitiveHint} />
-                </div>
-              </div>
-            </div>
+            <ContractResumenSection
+              detail={detail}
+              contrato={contrato}
+              token={token}
+              canEdit={canEdit}
+              rescisionError={rescisionError}
+              onDownloadRescision={() => {
+                if (!token || !contrato) return;
+                setRescisionError(null);
+                void downloadRescisionContrato(token, contrato.id)
+                  .then(({ blob, filename }) => downloadBlob(blob, filename ?? "rescision"))
+                  .catch((err) => {
+                    setRescisionError(
+                      rentalApiErrorMessage(err, "No se pudo abrir el documento. Intentá de nuevo."),
+                    );
+                  });
+              }}
+              onGarantesChanged={() => void reloadFicha()}
+            />
           ) : null}
 
           {activeTab === "cobranzas" ? (
@@ -386,6 +502,20 @@ export function ContractFichaView() {
           subtitle={cobrarSubtitle}
           mediosPago={mediosPago}
           onSuccess={() => void handleCobrarSuccess()}
+        />
+      ) : null}
+      {rescindirModalOpen && contrato ? (
+        <RescindirContratoModal
+          open
+          contratoId={contrato.id}
+          subtitle={`${detail.tenant} · ${detail.property}`}
+          fechaInicio={contrato.fechaInicio}
+          token={token}
+          onClose={() => setRescindirModalOpen(false)}
+          onRescinded={() => {
+            setRescindirModalOpen(false);
+            void reloadFicha("Contrato rescindido.");
+          }}
         />
       ) : null}
       {finishModalOpen && contrato ? (

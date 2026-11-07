@@ -15,6 +15,9 @@ import {
   type SecheepManualFacturaRow,
 } from "@/lib/mappers/secheep";
 import { formatMoney } from "@/lib/format";
+import { EnumSelect } from "@/components/ui/EnumSelect";
+import { RocchiaDateField } from "@/components/ui/RocchiaDateField";
+import { formInputClass } from "@/lib/ui/interactive-focus";
 
 const SECHEEP_SITE_KEY = "6Lffpb4UAAAAAEbWyPCimLJe__edYU23bNFKJ1OA";
 
@@ -272,7 +275,7 @@ export function SecheepImportModal({
               onChange={(e) => setPasteFallback(e.target.value)}
               rows={4}
               placeholder="Pegá acá lo que copiaste de SECHEEP…"
-              className="rounded-sm border border-border bg-bg-page px-3 py-2 text-[11px] outline-none focus:border-primary"
+              className={formInputClass}
             />
             <ButtonOutline type="button" onClick={handlePasteFallback}>
               Interpretar texto pegado
@@ -325,33 +328,29 @@ export function SecheepImportModal({
                     value={row.periodo}
                     onChange={(e) => updateRow(row.id, { periodo: e.target.value })}
                     placeholder="AGO 2026"
-                    className="rounded-sm border border-border bg-bg-page px-2.5 py-2 text-[13px] outline-none focus:border-primary"
+                    className={formInputClass}
                   />
                 </label>
-                <label className="flex flex-col gap-1">
-                  <span className="text-[10px] font-semibold text-text-secondary">Estado</span>
-                  <select
-                    value={row.estado}
-                    onChange={(e) =>
-                      updateRow(row.id, {
-                        estado: e.target.value as SecheepManualFacturaRow["estado"],
-                      })
-                    }
-                    className="rounded-sm border border-border bg-bg-page px-2.5 py-2 text-[13px] outline-none focus:border-primary"
-                  >
-                    <option value="Vencida">Vencida (impaga)</option>
-                    <option value="Pendiente">Pendiente (sin vencer)</option>
-                  </select>
-                </label>
-                <label className="flex flex-col gap-1">
-                  <span className="text-[10px] font-semibold text-text-secondary">Vencimiento</span>
-                  <input
-                    type="date"
-                    value={row.vencimiento}
-                    onChange={(e) => updateRow(row.id, { vencimiento: e.target.value })}
-                    className="rounded-sm border border-border bg-bg-page px-2.5 py-2 text-[13px] outline-none focus:border-primary"
-                  />
-                </label>
+                <EnumSelect
+                  label="Estado"
+                  size="sm"
+                  value={row.estado}
+                  onChange={(estado) =>
+                    estado &&
+                    updateRow(row.id, {
+                      estado: estado as SecheepManualFacturaRow["estado"],
+                    })
+                  }
+                  options={[
+                    { value: "Vencida", label: "Vencida (impaga)" },
+                    { value: "Pendiente", label: "Pendiente (sin vencer)" },
+                  ]}
+                />
+                <RocchiaDateField
+                  label="Vencimiento"
+                  value={row.vencimiento}
+                  onChange={(vencimiento) => updateRow(row.id, { vencimiento })}
+                />
                 <label className="flex flex-col gap-1">
                   <span className="text-[10px] font-semibold text-text-secondary">Importe ($)</span>
                   <input
@@ -360,7 +359,7 @@ export function SecheepImportModal({
                     step="0.01"
                     value={row.importe}
                     onChange={(e) => updateRow(row.id, { importe: e.target.value })}
-                    className="rounded-sm border border-border bg-bg-page px-2.5 py-2 text-[13px] outline-none focus:border-primary"
+                    className={formInputClass}
                   />
                 </label>
                 {index === 0 && rows.length === 0 ? (

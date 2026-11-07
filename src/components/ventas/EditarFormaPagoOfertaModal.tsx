@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { Modal } from "@/components/ui/Modal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
+import { NumericSelect } from "@/components/ui/NumericSelect";
 import { FormField } from "@/components/ui/FormLayout";
 import { ApiError, fetchFormasPago, updateOferta } from "@/lib/api";
 import type { CatalogoItem, OfertaRecord } from "@/lib/api/types";
@@ -15,9 +16,6 @@ type EditarFormaPagoOfertaModalProps = {
   oferta: OfertaRecord | null;
   onSaved: () => void;
 };
-
-const selectClassName =
-  "rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary";
 
 export function EditarFormaPagoOfertaModal({
   open,
@@ -85,22 +83,15 @@ export function EditarFormaPagoOfertaModal({
       }
     >
       <div className="flex flex-col gap-4">
-        <label className="flex flex-col gap-1.5">
-          <span className="text-[11px] font-semibold text-text-secondary">Forma de pago</span>
-          <select
-            value={formaPagoId}
-            onChange={(event) => setFormaPagoId(event.target.value)}
-            className={selectClassName}
-            disabled={loadingCatalog}
-          >
-            <option value="">Sin especificar</option>
-            {formasPago.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <NumericSelect
+          label="Forma de pago"
+          value={formaPagoId ? Number(formaPagoId) : null}
+          onChange={(id) => setFormaPagoId(id != null ? String(id) : "")}
+          disabled={loadingCatalog}
+          allowEmpty
+          emptyLabel="Sin especificar"
+          options={formasPago.map((item) => ({ value: item.id, label: item.name }))}
+        />
         <FormField
           label="Condiciones de financiación"
           value={condicionesFinanciacion}

@@ -1,31 +1,39 @@
+import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
+import { kpiTone, type KpiTone } from "@/lib/ui/kpi-tones";
+
 export function KpiCard({
   label,
   value,
   hint,
   selected = false,
+  tone = 0,
+  palette,
   onClick,
 }: {
   label: string;
   value: string;
   hint: string;
   selected?: boolean;
+  tone?: number;
+  palette?: KpiTone;
   onClick?: () => void;
 }) {
-  const className = `flex min-w-0 flex-1 flex-col gap-2 rounded-md border p-5 text-left shadow-[var(--shadow-card)] transition-colors ${
-    selected
-      ? "border-primary bg-primary-soft"
-      : "border-border bg-bg-card"
-  } ${onClick ? "cursor-pointer hover:border-primary/40" : ""}`;
+  const colors = palette ?? kpiTone(tone);
+  const className = `flex min-w-0 flex-col items-start gap-2 rounded-xl border px-4 py-4 text-left ${colors.wash} ${
+    selected ? "border-primary" : colors.edge
+  } ${onClick ? `rocchia-action cursor-pointer ${interactiveFocusClass}` : ""}`;
 
   const content = (
     <>
-      <p className={`text-[13px] ${selected ? "font-medium text-primary" : "text-text-secondary"}`}>
+      <p className="flex items-center gap-2 text-[13px] text-text-primary">
+        <span className={`h-1.5 w-1.5 rounded-full ${colors.dot}`} aria-hidden />
         {label}
       </p>
-      <p className="whitespace-nowrap text-[28px] font-bold leading-none text-primary tabular-nums">
-        {value}
-      </p>
-      <p className="text-xs text-text-secondary">{hint}</p>
+      <p className="text-[22px] font-normal leading-none text-text-primary tabular-nums">{value}</p>
+      <p className="text-[12px] text-text-secondary">{hint}</p>
+      <span className="mt-1 h-1 w-full overflow-hidden rounded-full bg-white/70" aria-hidden>
+        <span className={`block h-full w-full rounded-full ${colors.bar}`} />
+      </span>
     </>
   );
 

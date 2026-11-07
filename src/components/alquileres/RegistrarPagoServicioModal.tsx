@@ -8,6 +8,9 @@ import type { CatalogoItem, PeriodoServicioRecord } from "@/lib/api/types";
 import { formatMoney } from "@/lib/format";
 import { defaultMedioPagoParaCobro, mediosPagoParaCobro } from "@/lib/mappers/medios-pago";
 import { periodoRangeLabel } from "@/lib/mappers/servicios";
+import { NumericSelect } from "@/components/ui/NumericSelect";
+import { RocchiaDateField } from "@/components/ui/RocchiaDateField";
+import { formInputClass } from "@/lib/ui/interactive-focus";
 
 export type RegistrarPagoServicioFormValues = {
   fechaPago: string;
@@ -35,6 +38,10 @@ function Field({
   type?: string;
   placeholder?: string;
 }) {
+  if (type === "date") {
+    return <RocchiaDateField label={label} value={value} onChange={onChange} />;
+  }
+
   return (
     <label className="flex flex-col gap-1.5">
       <span className="text-[11px] font-semibold text-text-secondary">{label}</span>
@@ -43,7 +50,7 @@ function Field({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
+        className={formInputClass}
       />
     </label>
   );
@@ -120,7 +127,7 @@ export function RegistrarPagoServicioModal({
       <div className="flex flex-col gap-4">
         <p className="rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[12px] leading-relaxed text-text-secondary">
           Para unificar alquiler, mora, depósito y servicios en un solo recibo, usá el botón{" "}
-          <strong className="font-medium text-text-primary">Cobrar</strong> en la ficha del contrato.
+          <strong className="font-medium text-text-primary">Cobrar alquiler</strong> en la ficha del contrato.
           Este formulario sirve para cobrar solo este servicio.
         </p>
         <div className="rounded-sm bg-bg-page px-3 py-2.5 text-[12px] text-text-secondary">
@@ -147,24 +154,18 @@ export function RegistrarPagoServicioModal({
           <p className="text-[12px] text-danger">El monto no puede superar el saldo pendiente.</p>
         ) : null}
 
-        <label className="flex flex-col gap-1.5">
-          <span className="text-[11px] font-semibold text-text-secondary">Medio de pago</span>
-          <select
-            value={form.medioPagoId || ""}
-            onChange={(e) => setForm((prev) => ({ ...prev, medioPagoId: Number(e.target.value) }))}
-            className="rounded-sm border border-border bg-bg-page px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
-          >
-            {mediosPagoOpciones.length === 0 ? (
-              <option value="">Sin medios disponibles</option>
-            ) : (
-              mediosPagoOpciones.map((medio) => (
-                <option key={medio.id} value={medio.id}>
-                  {medio.name}
-                </option>
-              ))
-            )}
-          </select>
-        </label>
+        <NumericSelect
+          label="Medio de pago"
+          value={form.medioPagoId > 0 ? form.medioPagoId : null}
+          onChange={(medioPagoId) =>
+            medioPagoId != null && setForm((prev) => ({ ...prev, medioPagoId }))
+          }
+          disabled={mediosPagoOpciones.length === 0}
+          placeholder={
+            mediosPagoOpciones.length === 0 ? "Sin medios disponibles" : "Seleccionar…"
+          }
+          options={mediosPagoOpciones.map((medio) => ({ value: medio.id, label: medio.name }))}
+        />
 
         <Field
           label="Referencia (opcional)"

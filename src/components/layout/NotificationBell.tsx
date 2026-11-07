@@ -14,7 +14,7 @@ import { countAlertsByTier, filterUnreadAlerts } from "@/lib/mappers/dashboard";
 
 const PANEL_LIMIT = 8;
 
-export const NotificationBell = memo(function NotificationBell() {
+export const NotificationBell = memo(function NotificationBell({ tone = "default" }: { tone?: "default" | "light" }) {
   const { rows: allAlerts, loading, loaded } = useDashboardAlertsState();
   const { activate, refresh } = useDashboardAlertsActions();
   const { readIds, markRead, ensureLoaded } = useDashboardReadAlerts();
@@ -78,14 +78,18 @@ export const NotificationBell = memo(function NotificationBell() {
       <button
         type="button"
         onClick={handleToggle}
-        className="relative rounded-sm p-1.5 text-text-secondary hover:bg-bg-page hover:text-text-primary"
+        className={`relative rounded-sm p-1.5 ${
+          tone === "light"
+            ? "text-white/80 hover:bg-white/10 hover:text-white"
+            : "text-text-secondary hover:bg-bg-cream hover:text-text-primary"
+        }`}
         aria-label="Notificaciones"
         aria-expanded={open}
         aria-haspopup="dialog"
       >
         <Bell className="h-5 w-5" />
         {urgentCount > 0 ? (
-          <span className="absolute top-0.5 right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold leading-none text-text-on-primary">
+          <span className="absolute top-0.5 right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#FBC7FB] px-1 text-[10px] font-semibold leading-none text-[#010400]">
             {urgentCount > 9 ? "9+" : urgentCount}
           </span>
         ) : null}
