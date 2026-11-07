@@ -1,24 +1,39 @@
 import type { ReactNode } from "react";
 
-import { statusToneClass, type StatusTone } from "@/lib/ui/status-tones";
+import { Chip } from "@/components/base/badges/chip";
+import { StatusDot } from "@/components/base/badges/status-dot";
+import {
+  statusToneToChipColor,
+  statusToneToDotColor,
+  type StatusTone,
+} from "@/lib/ui/status-tones";
+import { cx } from "@/utils/cx";
 
 export function StatusChip({
   children,
   tone = "neutral",
-  className = "",
+  className,
   title,
+  dot = false,
+  variant = "caption",
 }: {
   children: ReactNode;
   tone?: StatusTone;
   className?: string;
   title?: string;
+  /** Compact table indicator beside the label. */
+  dot?: boolean;
+  variant?: "bold" | "subtle" | "caption";
 }) {
   return (
-    <span
-      className={`inline-flex min-w-0 items-center truncate rounded-md px-1.5 py-0.5 text-[11px] ${statusToneClass(tone)} ${className}`}
+    <Chip
+      variant={variant}
+      color={statusToneToChipColor(tone)}
       title={title}
+      className={cx("min-w-0 max-w-full", dot && "gap-1.5", className)}
     >
-      {children}
-    </span>
+      {dot ? <StatusDot color={statusToneToDotColor(tone)} /> : null}
+      <span className="min-w-0 truncate">{children}</span>
+    </Chip>
   );
 }
