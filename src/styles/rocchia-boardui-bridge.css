@@ -1,0 +1,39 @@
+/* Map BoardUI semantic tokens → Rocchia palette so both systems coexist. */
+
+@theme {
+  --color-accent-50: #e6f3f2;
+  --color-accent-100: #d5ebe9;
+  --color-accent-200: #b7d9d6;
+  --color-accent-300: #7ec4bf;
+  --color-accent-400: #45b3a6;
+  --color-accent-500: #107077;
+  --color-accent-600: #0b555a;
+  --color-accent-700: #094548;
+  --color-accent-800: #073538;
+  --color-accent-900: #052628;
+  --color-accent-950: #031a1b;
+
+  --font-sans: var(--font-dm-sans), system-ui, sans-serif;
+}
+
+:root {
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: color-mix(in srgb, var(--text-secondary) 72%, white);
+  --color-text-placeholder: color-mix(in srgb, var(--text-secondary) 65%, white);
+
+  --color-background-full: var(--bg-page);
+  --color-background-primary-default: var(--bg-card);
+  --color-background-primary-hover: var(--bg-page);
+  --color-background-primary-active: var(--bg-cream);
+  --color-background-primary-disabled: var(--bg-cream);
+  --color-background-secondary-default: var(--bg-cream);
+  --color-background-secondary-hover: color-mix(in srgb, var(--bg-cream) 85%, var(--border));
+
+  --color-border-button-default: var(--border);
+  --color-border-button-hover: color-mix(in srgb, var(--primary) 22%, var(--border));
+  --color-border-button-active: color-mix(in srgb, var(--primary) 35%, var(--border));
+  --color-separator-border: var(--border);
+  --color-border-focus-ring: var(--primary);
+  --color-border-table: var(--border);
+}

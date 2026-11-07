@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Notice, useTimedNotice } from "@/components/juridico/juridico-ui";
 import { ButtonDanger, ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
+import { EnumSelect } from "@/components/ui/EnumSelect";
 import { Modal } from "@/components/ui/Modal";
 import { useAuth } from "@/context/auth-context";
 import { ApiError, deletePlantilla, fetchPlantillas, savePlantilla } from "@/lib/api";
@@ -470,35 +471,31 @@ export function FormulariosView() {
                                 className={`${campoClass} text-sm`}
                               />
                             </label>
-                            <label className="flex flex-col gap-1">
-                              <span className="text-[11px] font-medium text-text-secondary">Tipo</span>
-                              <select
-                                value={pregunta.tipo ?? "texto"}
-                                aria-label={`Tipo de la pregunta ${preguntaIndex + 1}`}
-                                onChange={(event) => {
-                                  const tipo = event.target.value as FichaPreguntaTipo;
-                                  setPuntos(
-                                    puntos.map((item) =>
-                                      item.id === punto.id
-                                        ? {
-                                            ...item,
-                                            preguntas: item.preguntas.map((actual) =>
-                                              actual.id === pregunta.id ? { ...actual, tipo, respuesta: null } : actual,
-                                            ),
-                                          }
-                                        : item,
-                                    ),
-                                  );
-                                }}
-                                className={`${campoClass} text-sm`}
-                              >
-                                {tipos.map((tipo) => (
-                                  <option key={tipo.id} value={tipo.id}>
-                                    {tipo.label}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
+                            <EnumSelect
+                              label="Tipo"
+                              size="sm"
+                              className="text-sm"
+                              value={pregunta.tipo ?? "texto"}
+                              onChange={(value) => {
+                                if (!value) return;
+                                const tipo = value as FichaPreguntaTipo;
+                                setPuntos(
+                                  puntos.map((item) =>
+                                    item.id === punto.id
+                                      ? {
+                                          ...item,
+                                          preguntas: item.preguntas.map((actual) =>
+                                            actual.id === pregunta.id
+                                              ? { ...actual, tipo, respuesta: null }
+                                              : actual,
+                                          ),
+                                        }
+                                      : item,
+                                  ),
+                                );
+                              }}
+                              options={tipos.map((tipo) => ({ value: tipo.id, label: tipo.label }))}
+                            />
                             <button
                               type="button"
                               onClick={() =>

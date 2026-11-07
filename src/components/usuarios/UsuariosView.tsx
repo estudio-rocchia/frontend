@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Lock, Search } from "lucide-react";
+import { Lock } from "lucide-react";
 
 const UsuarioFichaDrawer = dynamic(
   () =>
@@ -13,7 +13,11 @@ const UsuarioFichaDrawer = dynamic(
   { ssr: false },
 );
 import { ButtonPrimary } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
 import { KpiCard } from "@/components/ui/KpiCard";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { SearchField } from "@/components/ui/SearchField";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useAuth } from "@/context/auth-context";
 import { type PermissionValue, type UserStatus } from "@/data/usuarios";
@@ -157,17 +161,15 @@ export function UsuariosView() {
           </p>
         ) : null}
 
-        <header className="flex flex-col gap-4">
-          <div className="flex max-w-2xl flex-col gap-1">
-            <h1 className="text-[26px] font-normal tracking-tight text-text-primary">Usuarios y roles</h1>
-            <p className="text-[13px] text-text-secondary">
-              Control de accesos, permisos y protección de datos sensibles
-            </p>
-          </div>
-          <ButtonPrimary className="w-fit" onClick={() => router.push("/usuarios/nuevo")}>
-            Crear usuario
-          </ButtonPrimary>
-        </header>
+        <PageHeader
+          title="Usuarios y roles"
+          description="Control de accesos, permisos y protección de datos sensibles"
+          actions={
+            <ButtonPrimary className="w-fit" onClick={() => router.push("/usuarios/nuevo")}>
+              Crear usuario
+            </ButtonPrimary>
+          }
+        />
 
         <div className="flex items-center gap-3.5 rounded-md border border-primary bg-primary-soft p-4">
           <Lock className="h-5 w-5 shrink-0 text-primary" aria-hidden />
@@ -186,7 +188,7 @@ export function UsuariosView() {
           ))}
         </div>
 
-        <section className="overflow-hidden rounded-xl border border-border bg-bg-card shadow-[var(--shadow-card)]">
+        <Card accent className="rocchia-panel--flat">
           <div className="flex flex-col gap-5 border-b border-border px-5 py-5">
             <div className="flex flex-col gap-1">
               <h2 className="text-[15px] font-semibold tracking-tight text-text-primary">Matriz de permisos por rol</h2>
@@ -194,45 +196,27 @@ export function UsuariosView() {
             </div>
 
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <div className="flex min-w-0 flex-1 flex-col gap-2 lg:max-w-md">
-                <label className="flex items-center gap-2.5 rounded-xl border border-border bg-bg-page px-3 py-2 focus-within:border-primary">
-                  <Search className="h-4 w-4 shrink-0 text-text-secondary" aria-hidden />
-                  <input
-                    type="search"
-                    value={searchQuery}
-                    onChange={(event) => setSearchQuery(event.target.value)}
-                    placeholder="Usuario, correo o rol…"
-                    aria-label="Buscar usuarios por nombre, correo o rol"
-                    className="min-w-0 flex-1 bg-transparent text-sm text-text-primary outline-none placeholder:text-text-secondary"
-                  />
-                </label>
-              </div>
+              <SearchField
+                className="min-w-0 flex-1 lg:max-w-md"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Usuario, correo o rol…"
+                aria-label="Buscar usuarios por nombre, correo o rol"
+              />
 
-              <div className="flex flex-col gap-2">
-                <div className="inline-flex flex-wrap items-center gap-1 rounded-xl border border-border bg-bg-page p-1">
-                  {activityFilters.map(({ id, label }) => {
-                    const selected = activityFilter === id;
-                    return (
-                      <button
-                        key={id}
-                        type="button"
-                        onClick={() => setActivityFilter(id)}
-                        className={`rocchia-action rounded-lg border px-3 py-1.5 text-[13px] ${
-                          selected
-                            ? "border-primary bg-bg-card font-medium text-text-primary"
-                            : "border-transparent font-normal text-text-secondary hover:text-text-primary"
-                        }`}
-                      >
-                        {label} ({activityCounts[id]})
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+              <SegmentedControl
+                options={activityFilters.map(({ id, label }) => ({
+                  id,
+                  label,
+                  count: activityCounts[id],
+                }))}
+                value={activityFilter}
+                onChange={setActivityFilter}
+              />
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="rocchia-table-shell max-h-[min(32rem,62vh)] overflow-auto overscroll-contain">
             <table className="w-full min-w-[760px] border-collapse text-left">
               <thead>
                 <tr className="bg-bg-cream">
@@ -292,7 +276,7 @@ export function UsuariosView() {
               </tbody>
             </table>
           </div>
-        </section>
+        </Card>
       </div>
 
       <UsuarioFichaDrawer

@@ -8,6 +8,7 @@ import {
   type InmuebleDireccionValue,
 } from "@/components/inmuebles/InmuebleDireccionFields";
 import { FormField } from "@/components/ui/FormLayout";
+import { EnumSelect } from "@/components/ui/EnumSelect";
 import { fetchLocalidades } from "@/lib/api";
 import type { CatalogoItem } from "@/lib/api/types";
 import { isInmuebleDireccionValid } from "@/lib/inmuebles/direccion";
@@ -127,21 +128,14 @@ export function InmuebleAltaFields({
     <div className="flex flex-col gap-4">
       {intro ? <p className="text-[12px] leading-snug text-text-secondary">{intro}</p> : null}
 
-      <div className="flex flex-col gap-1.5">
-        <span className="text-[11px] font-semibold text-text-secondary">Tipo de inmueble</span>
-        <select
+      <div onFocusCapture={onLoadTipos}>
+        <EnumSelect
+          label="Tipo de inmueble"
           value={value.tipoInmuebleCode}
-          onChange={(event) => onChange({ ...value, tipoInmuebleCode: event.target.value })}
-          onFocus={onLoadTipos}
+          onChange={(code) => code && onChange({ ...value, tipoInmuebleCode: code })}
           disabled={loadingTipos}
-          className="rounded-sm border border-border bg-bg-card px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary disabled:opacity-60"
-        >
-          {tipos.map((tipo) => (
-            <option key={tipo.code} value={tipo.code}>
-              {tipo.name}
-            </option>
-          ))}
-        </select>
+          options={tipos.map((tipo) => ({ value: tipo.code, label: tipo.name }))}
+        />
       </div>
 
       {showCodePreview ? (

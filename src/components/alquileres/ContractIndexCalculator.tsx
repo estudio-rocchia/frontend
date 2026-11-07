@@ -5,7 +5,7 @@ import type { AdjustmentIndex } from "@/data/alquileres-contract-details";
 import { ApiError, previewAjusteIndice } from "@/lib/api";
 import type { ContratoDetail, IndiceCode, PreviewAjusteResponse } from "@/lib/api/types";
 import { formatIndicePunto, formatMoney, rentalApiErrorMessage } from "@/lib/format";
-import { formInputClass } from "@/lib/ui/interactive-focus";
+import { NumericSelect } from "@/components/ui/NumericSelect";
 import {
   ADJUSTMENT_INDICES,
   type MonthYear,
@@ -68,28 +68,16 @@ function MonthYearSelect({
       <span className="text-[11px] font-semibold text-text-secondary">{label}</span>
       {hint ? <span className="text-[11px] text-text-secondary">{hint}</span> : null}
       <div className="grid grid-cols-2 gap-2">
-        <select
+        <NumericSelect
           value={value.mes}
-          onChange={(e) => onChange({ ...value, mes: Number(e.target.value) })}
-          className={formInputClass}
-        >
-          {MONTHS.map((m) => (
-            <option key={m.value} value={m.value}>
-              {m.label}
-            </option>
-          ))}
-        </select>
-        <select
+          onChange={(mes) => mes != null && onChange({ ...value, mes })}
+          options={MONTHS.map((m) => ({ value: m.value, label: m.label }))}
+        />
+        <NumericSelect
           value={value.anio}
-          onChange={(e) => onChange({ ...value, anio: Number(e.target.value) })}
-          className={formInputClass}
-        >
-          {years.map((y) => (
-            <option key={y} value={y}>
-              {y}
-            </option>
-          ))}
-        </select>
+          onChange={(anio) => anio != null && onChange({ ...value, anio })}
+          options={years.map((y) => ({ value: y, label: String(y) }))}
+        />
       </div>
     </div>
   );

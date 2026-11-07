@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { MapPin, Plus, Search, X } from "lucide-react";
 
+import { ComboBox, ComboBoxItem } from "@/components/base/combobox/combobox";
+import { EnumSelect } from "@/components/ui/EnumSelect";
 import { createLocalidad } from "@/lib/api";
 import { PROVINCIAS_ARGENTINA } from "@/data/provincias";
+import { formInputClass, interactiveFocusClass } from "@/lib/ui/interactive-focus";
 
 export type LocalidadOption = { id: number; name: string; province: string };
 
@@ -57,7 +60,6 @@ export function LocalidadSelectField({
   const [newProvince, setNewProvince] = useState<string>("Chaco");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   const selected = useMemo(() => {
     const id = Number(value);
@@ -67,13 +69,6 @@ export function LocalidadSelectField({
 
   const results = useMemo(() => filterLocalidades(localidades, query), [localidades, query]);
   const queryTooShort = query.trim().length < MIN_SEARCH_LEN;
-  const showResults = !adding && !queryTooShort;
-
-  useEffect(() => {
-    if (editing && !adding) {
-      inputRef.current?.focus();
-    }
-  }, [editing, adding]);
 
   const startEditing = () => {
     setEditing(true);
@@ -138,6 +133,14 @@ export function LocalidadSelectField({
     }
   };
 
+  const emptyMessage = loading
+    ? "Buscando localidades…"
+    : queryTooShort
+      ? `Escribí al menos ${MIN_SEARCH_LEN} caracteres`
+      : query.trim().length > 0
+        ? `Sin resultados para "${query.trim()}"`
+        : "Sin resultados";
+
   if (!editing) {
     return (
       <div className="flex flex-col gap-1.5">
@@ -145,7 +148,7 @@ export function LocalidadSelectField({
         <button
           type="button"
           onClick={startEditing}
-          className="flex items-center justify-between gap-2 rounded-sm border border-border bg-bg-card px-3 py-2.5 text-left hover:border-primary"
+          className={`flex items-center justify-between gap-2 rounded-sm border border-border bg-bg-card px-3 py-2.5 text-left hover:border-primary ${interactiveFocusClass}`}
         >
           <span
             className={`text-[13px] ${selected ? "font-medium text-text-primary" : "text-text-secondary"}`}
@@ -165,7 +168,7 @@ export function LocalidadSelectField({
         <button
           type="button"
           onClick={stopEditing}
-          className="text-text-secondary hover:text-text-primary"
+          className={`text-text-secondary hover:text-text-primary ${interactiveFocusClass}`}
           aria-label="Cerrar selector de localidad"
         >
           <X className="h-4 w-4" />
@@ -174,49 +177,37 @@ export function LocalidadSelectField({
 
       {!adding ? (
         <>
-          <label className="flex items-center gap-2 rounded-sm border border-border bg-bg-page px-3 py-2.5 focus-within:border-primary">
-            <Search className="h-4 w-4 shrink-0 text-text-secondary" aria-hidden />
-            <input
-              ref={inputRef}
-              type="text"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Buscar localidad o provincia…"
-              disabled={loading}
-              autoComplete="off"
-              autoCorrect="off"
-              autoCapitalize="off"
-              spellCheck={false}
-              className="min-w-0 flex-1 bg-transparent text-[13px] text-text-primary outline-none placeholder:text-text-secondary disabled:opacity-60"
-            />
-          </label>
-
-          {showResults ? (
-            <div className="max-h-44 overflow-y-auto rounded-sm border border-border">
-              {loading ? (
-                <p className="px-3 py-3 text-[12px] text-text-secondary">Buscando localidades…</p>
-              ) : results.length === 0 ? (
-                <p className="px-3 py-3 text-[12px] text-text-secondary">
-                  Sin resultados para &quot;{query.trim()}&quot;.
-                </p>
-              ) : (
-                <ul className="flex flex-col gap-1 p-1" role="listbox" aria-label="Localidades">
-                  {results.map((item) => (
-                    <li key={item.id} role="option">
-                      <button
-                        type="button"
-                        onClick={() => selectLocalidad(item)}
-                        className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left hover:bg-bg-page"
-                      >
-                        <MapPin className="h-3.5 w-3.5 shrink-0 text-text-secondary" aria-hidden />
-                        <span className="text-[13px] text-text-primary">{localidadLabel(item)}</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          ) : null}
+          <ComboBox
+            label="Buscar localidad"
+            inputValue={query}
+            onInputChange={setQuery}
+            items={queryTooShort ? [] : results}
+            selectedKey={null}
+            onSelectionChange={(key) => {
+              const item = results.find((row) => String(row.id) === String(key));
+              if (item) selectLocalidad(item);
+            }}
+            defaultFilter={() => true}
+            menuTrigger="focus"
+            allowsEmptyCollection
+            isDisabled={loading}
+            placeholder="Buscar localidad o provincia…"
+            leadingIcon={Search}
+            emptyMessage={emptyMessage}
+          >
+            {(item) => (
+              <ComboBoxItem
+                key={item.id}
+                id={String(item.id)}
+                textValue={localidadLabel(item)}
+              >
+                <span className="flex min-w-0 items-center gap-2">
+                  <MapPin className="h-3.5 w-3.5 shrink-0 text-text-secondary" aria-hidden />
+                  <span className="text-[13px] text-text-primary">{localidadLabel(item)}</span>
+                </span>
+              </ComboBoxItem>
+            )}
+          </ComboBox>
 
           {!queryTooShort ? (
             <button
@@ -226,7 +217,7 @@ export function LocalidadSelectField({
                 setNewName(query.trim());
                 setError(null);
               }}
-              className="flex items-center gap-2 text-[12px] font-semibold text-primary hover:underline"
+              className={`flex items-center gap-2 text-[12px] font-semibold text-primary hover:underline ${interactiveFocusClass}`}
             >
               <Plus className="h-3.5 w-3.5" aria-hidden />
               Agregar localidad nueva
@@ -241,20 +232,12 @@ export function LocalidadSelectField({
             onChange={setNewName}
             placeholder="Ej. Las Breñas"
           />
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-semibold text-text-secondary">Provincia</span>
-            <select
-              value={newProvince}
-              onChange={(event) => setNewProvince(event.target.value)}
-              className="rounded-sm border border-border bg-bg-card px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
-            >
-              {PROVINCIAS_ARGENTINA.map((province) => (
-                <option key={province} value={province}>
-                  {province}
-                </option>
-              ))}
-            </select>
-          </div>
+          <EnumSelect
+            label="Provincia"
+            value={newProvince}
+            onChange={setNewProvince}
+            options={PROVINCIAS_ARGENTINA.map((province) => ({ value: province, label: province }))}
+          />
           {error ? <p className="text-[12px] text-danger">{error}</p> : null}
           <div className="flex flex-wrap gap-2">
             <button
@@ -301,7 +284,7 @@ function FormFieldInline({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
-        className="rounded-sm border border-border bg-bg-card px-3 py-2.5 text-[13px] text-text-primary outline-none focus:border-primary"
+        className={formInputClass}
       />
     </div>
   );

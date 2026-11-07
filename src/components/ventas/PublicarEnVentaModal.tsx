@@ -22,7 +22,7 @@ import { WizardStepIndicator } from "@/components/ui/WizardStepIndicator";
 import { Modal } from "@/components/ui/Modal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { ChipToggle, FormField, FormSection } from "@/components/ui/FormLayout";
-import { formInputClass } from "@/lib/ui/interactive-focus";
+import { NumericSelect } from "@/components/ui/NumericSelect";
 import { ApiError, fetchCatalog, fetchFormasPago, fetchLocalidades } from "@/lib/api";
 import { fetchAllInmuebleCodes } from "@/lib/inmuebles/inmueble-codes";
 import type { CatalogoItem } from "@/lib/api/types";
@@ -37,8 +37,6 @@ import {
 
 const emptyPersona: PersonaFieldValue = emptyNewPersonaField();
 const STEP_TITLES = ["Propiedad", "Propietario", "Oferta"] as const;
-const selectClassName = formInputClass;
-
 type PublicarEnVentaModalProps = {
   open: boolean;
   onClose: () => void;
@@ -393,22 +391,17 @@ export function PublicarEnVentaModal({
                 <span className="text-[11px] font-semibold text-text-secondary">Moneda</span>
                 <ChipToggle options={["USD", "ARS"]} value={moneda} onChange={setMoneda} />
               </div>
-              <label className="flex flex-col gap-1.5 sm:col-span-2">
-                <span className="text-[11px] font-semibold text-text-secondary">Forma de pago</span>
-                <select
-                  value={formaPagoId}
-                  onChange={(event) => setFormaPagoId(event.target.value)}
-                  className={selectClassName}
+              <div className="sm:col-span-2">
+                <NumericSelect
+                  label="Forma de pago"
+                  value={formaPagoId ? Number(formaPagoId) : null}
+                  onChange={(id) => setFormaPagoId(id != null ? String(id) : "")}
                   disabled={loadingCatalog}
-                >
-                  <option value="">Sin especificar</option>
-                  {formasPago.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  allowEmpty
+                  emptyLabel="Sin especificar"
+                  options={formasPago.map((item) => ({ value: item.id, label: item.name }))}
+                />
+              </div>
               <FormField
                 label="Condiciones de financiación"
                 value={condicionesFinanciacion}

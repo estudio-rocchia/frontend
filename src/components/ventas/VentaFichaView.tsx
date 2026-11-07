@@ -25,7 +25,6 @@ import {
   cancelVenta,
   downloadVentaReciboPdf,
   fetchMediosPago,
-  fetchPersona,
   fetchVenta,
   fetchVentaCuotas,
   fetchVentaPagos,
@@ -38,6 +37,7 @@ import type {
   VentaDetail,
   VentaReciboRecord,
 } from "@/lib/api/types";
+import { fetchParteNombres } from "@/lib/ventas/partes";
 import {
   entregaInicialPendiente,
   proximaCuotaPendiente,
@@ -46,7 +46,7 @@ import {
   ventaPuedeCobrar,
 } from "@/lib/ventas/cobranza";
 import { ventaEstadoLabel, ventaEstadoVariant } from "@/lib/ventas/status-labels";
-import { downloadBlob, formatMoney, moneyClassName, personaDisplayName } from "@/lib/format";
+import { downloadBlob, formatMoney, moneyClassName } from "@/lib/format";
 import { pagePaddingClass } from "@/lib/layout";
 import { parseRouteId } from "@/lib/parse-route-id";
 import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
@@ -156,17 +156,14 @@ export function VentaFichaView() {
       setPagos(pagosRes.items);
       setRecibos(recibosRes.items);
       setMediosPago(mediosRes.items);
-      const nombres: Record<number, string> = {};
-      await Promise.all(
-        detail.partes.map(async (parte) => {
-          try {
-            const persona = await fetchPersona(token, parte.personaId);
-            nombres[parte.personaId] = personaDisplayName(persona);
-          } catch {
-            nombres[parte.personaId] = `Persona #${parte.personaId}`;
-          }
-        }),
-      );
+      const personaIds = detail.partes.map((parte) => parte.personaId);
+      const nombres = await fetchParteNombres(token, personaIds).catch(() => {
+        const fallback: Record<number, string> = {};
+        for (const parte of detail.partes) {
+          fallback[parte.personaId] = `Persona #${parte.personaId}`;
+        }
+        return fallback;
+      });
       setParteNombres(nombres);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {

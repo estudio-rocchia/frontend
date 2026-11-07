@@ -15,6 +15,7 @@ import {
 } from "@/lib/api";
 import type { LiquidacionRecord, PropietarioAdministracionSummary } from "@/lib/api/types";
 import { downloadBlob, formatMoney, normalizeCurrency, rentalApiErrorMessage } from "@/lib/format";
+import { NumericSelect } from "@/components/ui/NumericSelect";
 import { formInputClass } from "@/lib/ui/interactive-focus";
 
 function currentPeriod() {
@@ -246,26 +247,25 @@ export function LiquidacionPropietarioModal({
 
         {!liquidacion ? (
           <>
-            <label className="flex flex-col gap-1 text-sm">
-              <span className="text-text-secondary">Propietario</span>
-              <select
-                className={formInputClass}
-                value={selectedOwnerId ?? ""}
-                onChange={(e) => setSelectedOwnerId(Number(e.target.value))}
-              >
-                {owners.length === 0 ? (
-                  <option value="">Sin alquileres cobrados en este período</option>
-                ) : null}
-                {owners.map((owner) => (
-                  <option key={owner.personaId} value={owner.personaId}>
-                    {owner.displayName} — {owner.porcentajeAdministracion}% —{" "}
-                    {formatMoney(owner.alquileresCobradosMes, normalizeCurrency(owner.codigoMoneda))} en
-                    alquileres cobrados (
-                    {formatInmueblesConCobro(owner.inmueblesConCobroMes, owner.inmueblesEnAdministracion)})
-                  </option>
-                ))}
-              </select>
-            </label>
+            <NumericSelect
+              label="Propietario"
+              value={selectedOwnerId}
+              onChange={(id) => id != null && setSelectedOwnerId(id)}
+              disabled={owners.length === 0}
+              placeholder={
+                owners.length === 0 ? "Sin alquileres cobrados en este período" : undefined
+              }
+              options={owners.map((owner) => ({
+                value: owner.personaId,
+                label: `${owner.displayName} — ${owner.porcentajeAdministracion}% — ${formatMoney(
+                  owner.alquileresCobradosMes,
+                  normalizeCurrency(owner.codigoMoneda),
+                )} en alquileres cobrados (${formatInmueblesConCobro(
+                  owner.inmueblesConCobroMes,
+                  owner.inmueblesEnAdministracion,
+                )})`,
+              }))}
+            />
             {selectedOwner ? (
               <p className="text-sm text-text-secondary">
                 {formatInmueblesConCobro(

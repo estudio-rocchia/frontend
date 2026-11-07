@@ -39,6 +39,10 @@ import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 import { ofertaEstadoLabel, ofertaEstadoVariant, ventaEstadoLabel, ventaEstadoVariant } from "@/lib/ventas/status-labels";
 import type { VentasTabId } from "@/components/ventas/VentasFilterChips";
 
+function SectionTitle({ children }: { children: string }) {
+  return <h2 className="text-[15px] font-semibold tracking-tight text-text-primary">{children}</h2>;
+}
+
 function tabFromQuery(value: string | null): CatalogInmuebleFichaTabId | null {
   if (value === "resumen" || value === "precio") return value;
   return null;

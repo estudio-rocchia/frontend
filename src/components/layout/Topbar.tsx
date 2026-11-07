@@ -24,7 +24,7 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
   const crumb = sectionCrumb(pathname);
 
   return (
-    <header className="flex shrink-0 items-center gap-3 bg-bg-page px-4 py-3 sm:px-5 xl:px-7">
+    <header className="flex shrink-0 items-center gap-3 border-b border-border/80 bg-bg-card/90 px-4 py-3 backdrop-blur-sm sm:px-5 xl:px-7">
       <button
         type="button"
         onClick={onMenuClick}

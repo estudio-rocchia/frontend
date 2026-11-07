@@ -1,13 +1,20 @@
 "use client";
 
-import { FilePlus, FolderPlus, Search } from "lucide-react";
+import { FilePlus, FolderPlus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { EmptyState, EstadoBadge, Notice, OfficialLink, plazoRelativo, ramaLabel } from "@/components/juridico/juridico-ui";
 import { ButtonOutline, ButtonPrimary, buttonOutlineClass } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { EnumSelect } from "@/components/ui/EnumSelect";
+import { ListProgressBar } from "@/components/ui/ListProgressBar";
+import { ListTableContent } from "@/components/ui/ListTableContent";
 import { Modal } from "@/components/ui/Modal";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { SearchField } from "@/components/ui/SearchField";
+import { useListRefreshTransition } from "@/lib/ui/use-list-refresh-transition";
 import { useAuth } from "@/context/auth-context";
 import { ApiError, createExpediente, fetchExpedientes, fetchJuridicoResumen, fetchPersonas, fetchPlantillas } from "@/lib/api";
 import type { PersonaRecord } from "@/lib/api/types";
@@ -39,6 +46,7 @@ function claveRama(nombre: string) {
 export function JuridicoView() {
   const router = useRouter();
   const { token, logout } = useAuth();
+  const { refreshing, listTransitionKey, isInitialLoad, start, finish } = useListRefreshTransition();
   const [items, setItems] = useState<ExpedienteListItem[]>([]);
   const [resumen, setResumen] = useState<JuridicoResumen | null>(null);
   const [loading, setLoading] = useState(true);
@@ -63,7 +71,9 @@ export function JuridicoView() {
 
   const load = useCallback(async () => {
     if (!token) return;
-    setLoading(true);
+    const listKey = `${ramaFilter}-${ramaDetalleFilter ?? ""}-${estadoFilter}-${debouncedQuery}`;
+    const { startedAt, isInitial } = start();
+    if (isInitial) setLoading(true);
     setError(null);
     try {
       const [list, summary] = await Promise.all([
@@ -84,9 +94,10 @@ export function JuridicoView() {
       }
       setError(err instanceof ApiError ? err.message : "No se pudieron cargar los expedientes");
     } finally {
+      await finish(listKey, startedAt);
       setLoading(false);
     }
-  }, [token, logout, debouncedQuery, ramaFilter, ramaDetalleFilter, estadoFilter]);
+  }, [token, logout, debouncedQuery, ramaFilter, ramaDetalleFilter, estadoFilter, start, finish]);
 
   useSyncScope("clientes", () => void load(), Boolean(token));
 
@@ -158,6 +169,15 @@ export function JuridicoView() {
 
   const valorRama =
     rama === "sucesion" || rama === "familia" ? rama : ramaLibre ? "otra" : `creada:${ramaDetalle}`;
+
+  const ramaFormOptions = useMemo(
+    () => [
+      ...ramasFijas.map((option) => ({ value: option, label: RAMA_LABEL[option] })),
+      ...ramasCreadas.map((nombre) => ({ value: `creada:${nombre}`, label: nombre })),
+      { value: "otra" as const, label: "Otra" },
+    ],
+    [ramasCreadas],
+  );
 
   function elegirRama(value: string) {
     if (value === "sucesion" || value === "familia") {
@@ -237,15 +257,18 @@ export function JuridicoView() {
 
   return (
     <div className={`flex flex-col gap-6 ${pagePaddingClass}`}>
-      <header className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-[26px] font-normal tracking-tight text-text-primary">Área jurídica</h1>
-          <p className="text-[13px] text-text-secondary">Causas en trámite y sus plazos.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-x-4">
-          <OfficialLink href={resumen?.enlaces.justiciaChaco ?? ENLACE_JUSTICIA_CHACO}>Justicia Chaco</OfficialLink>
-          <OfficialLink href={resumen?.enlaces.rpi ?? ENLACE_RPI}>Registro de la Propiedad</OfficialLink>
-        </div>
+      <PageHeader
+        title="Área jurídica"
+        description="Causas en trámite y sus plazos."
+        actions={
+          <div className="flex flex-wrap items-center gap-x-4">
+            <OfficialLink href={resumen?.enlaces.justiciaChaco ?? ENLACE_JUSTICIA_CHACO}>Justicia Chaco</OfficialLink>
+            <OfficialLink href={resumen?.enlaces.rpi ?? ENLACE_RPI}>Registro de la Propiedad</OfficialLink>
+          </div>
+        }
+      />
+
+      <div className="flex flex-col gap-4">
         <div className="rocchia-scroll -mx-1 overflow-x-auto px-1">
           <div role="tablist" aria-label="Filtrar expedientes" className="flex w-max min-w-full flex-nowrap items-center gap-2">
             {filtros.map((item, index) => {
@@ -275,7 +298,7 @@ export function JuridicoView() {
             })}
           </div>
         </div>
-      </header>
+      </div>
 
       {error ? (
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -301,34 +324,28 @@ export function JuridicoView() {
           </Link>
         </div>
 
-      <section className="overflow-hidden rounded-md border border-border bg-bg-card shadow-[var(--shadow-card)]" aria-busy={loading}>
+      <Card accent className="rocchia-panel--flat relative overflow-hidden" aria-busy={loading || refreshing}>
+        <ListProgressBar active={refreshing} />
         <div className="flex flex-col gap-3 border-b border-border px-4 py-4 md:flex-row md:items-end md:px-5">
-            <label className="flex min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-sm border border-border bg-bg-page px-3 focus-within:border-primary focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-primary md:max-w-md">
-              <Search className="h-4 w-4 shrink-0 text-text-secondary" aria-hidden />
-              <input
-                type="search"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Cliente, causante o juzgado"
-                aria-label="Buscar expedientes"
-                className="min-w-0 flex-1 bg-transparent py-2.5 text-sm text-text-primary outline-none placeholder:text-text-secondary"
-              />
-            </label>
-            <label className="flex w-full min-w-0 flex-col gap-1.5 md:w-52">
-              <span className="text-[11px] font-semibold text-text-secondary">Estado</span>
-              <select
-                value={estadoFilter}
-                onChange={(event) => setEstadoFilter(event.target.value as EstadoExpediente | "")}
-                className={formInputClass}
-              >
-                <option value="">Todos</option>
-                {estadosExpediente.map((estado) => (
-                  <option key={estado} value={estado}>
-                    {ESTADO_LABEL[estado]}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <SearchField
+              className="min-h-11 min-w-0 flex-1 md:max-w-md"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Cliente, causante o juzgado"
+              aria-label="Buscar expedientes"
+            />
+            <EnumSelect<EstadoExpediente | "">
+              label="Estado"
+              className="w-full md:w-52"
+              value={estadoFilter}
+              onChange={setEstadoFilter}
+              allowEmpty
+              emptyLabel="Todos"
+              options={estadosExpediente.map((estado) => ({
+                value: estado,
+                label: ESTADO_LABEL[estado],
+              }))}
+            />
             {filtersActive ? (
               <button
                 type="button"
@@ -340,9 +357,14 @@ export function JuridicoView() {
             ) : null}
         </div>
 
-        {loading ? (
-          <ExpedienteListSkeleton />
-        ) : items.length === 0 ? (
+        <ListTableContent
+          isInitialLoad={isInitialLoad}
+          loading={loading}
+          refreshing={refreshing}
+          listTransitionKey={listTransitionKey}
+          initialSkeleton={<ExpedienteListSkeleton />}
+        >
+        {items.length === 0 ? (
           <EmptyState
             title={emptyCopy}
             description={filtersActive || hasSearch ? "Probá con otro dato o limpiá el filtro." : undefined}
@@ -422,7 +444,8 @@ export function JuridicoView() {
             </div>
           </>
         )}
-      </section>
+        </ListTableContent>
+      </Card>
       </div>
 
       <Modal
@@ -505,26 +528,12 @@ export function JuridicoView() {
             </p>
           ) : null}
 
-          <label className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-semibold text-text-secondary">Rama</span>
-            <select
-              value={valorRama}
-              onChange={(event) => elegirRama(event.target.value)}
-              className={`${formInputClass} w-full`}
-            >
-              {ramasFijas.map((option) => (
-                <option key={option} value={option}>
-                  {RAMA_LABEL[option]}
-                </option>
-              ))}
-              {ramasCreadas.map((nombre) => (
-                <option key={claveRama(nombre)} value={`creada:${nombre}`}>
-                  {nombre}
-                </option>
-              ))}
-              <option value="otra">Otra</option>
-            </select>
-          </label>
+          <EnumSelect
+            label="Rama"
+            value={valorRama}
+            onChange={(value) => value && elegirRama(value)}
+            options={ramaFormOptions}
+          />
           {rama === "otra" && ramaLibre ? (
             <label className="flex flex-col gap-1.5">
               <span className="text-[11px] font-semibold text-text-secondary">¿De qué rama se trata?</span>

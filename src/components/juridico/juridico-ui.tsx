@@ -3,7 +3,8 @@
 import { ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 
-import { StatusBadge } from "@/components/ui/StatusBadge";
+import { StatusChip } from "@/components/ui/StatusChip";
+import { expedienteEstadoTone, type StatusTone } from "@/lib/ui/status-tones";
 import { daysUntilDate } from "@/lib/format";
 import {
   ESTADO_LABEL,
@@ -104,14 +105,18 @@ export function ramaLabel(rama: RamaExpediente, detalle: string | null): string 
   return RAMA_LABEL[rama];
 }
 
+function rpiEstadoTone(estado: EstadoTramiteRpi): StatusTone {
+  if (estado === "inscripto") return "ok";
+  if (estado === "observado") return "mora";
+  return "ajuste";
+}
+
 export function EstadoBadge({ estado }: { estado: EstadoExpediente }) {
-  const variant = estado === "cerrado" ? "success" : estado === "para_presentar" ? "danger" : "warning";
-  return <StatusBadge label={ESTADO_LABEL[estado]} variant={variant} />;
+  return <StatusChip tone={expedienteEstadoTone(estado)}>{ESTADO_LABEL[estado]}</StatusChip>;
 }
 
 export function RpiBadge({ estado }: { estado: EstadoTramiteRpi }) {
-  const variant = estado === "inscripto" ? "success" : estado === "observado" ? "danger" : "warning";
-  return <StatusBadge label={RPI_LABEL[estado]} variant={variant} />;
+  return <StatusChip tone={rpiEstadoTone(estado)}>{RPI_LABEL[estado]}</StatusChip>;
 }
 
 export function plazoRelativo(isoDate: string): { text: string; tone: "overdue" | "today" | "soon" | "ok" } {

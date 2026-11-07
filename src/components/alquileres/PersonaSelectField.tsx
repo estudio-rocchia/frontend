@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
-import { Search, UserPlus, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Search as SearchIcon, UserPlus, X } from "lucide-react";
+
+import { ComboBox, ComboBoxItem } from "@/components/base/combobox/combobox";
 
 import { fetchPersonas } from "@/lib/api";
 import type { PersonaRecord } from "@/lib/api/types";
@@ -144,7 +146,6 @@ export function PersonaSelectField({
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [remoteResults, setRemoteResults] = useState<PersonaRecord[]>([]);
   const [searching, setSearching] = useState(false);
-  const [activeOptionIndex, setActiveOptionIndex] = useState(-1);
   const [creatingNew, setCreatingNew] = useState(
     value.mode === "new" && (value.nombre.trim().length > 0 || value.apellido.trim().length > 0),
   );
@@ -195,14 +196,8 @@ export function PersonaSelectField({
   );
 
   const results = token ? remoteResults : localResults;
-  const inputName = searchId ?? `persona-search-${label.toLowerCase().replace(/\s+/g, "-")}`;
-  const listboxId = `${inputName}-listbox`;
   const queryTooShort = query.trim().length < MIN_SEARCH_LEN;
-  const listOpen = !creatingNew && !queryTooShort;
-
-  useEffect(() => {
-    setActiveOptionIndex(-1);
-  }, [results, debouncedQuery, creatingNew]);
+  void searchId;
 
   function selectPersona(persona: PersonaRecord) {
     const name = personaDisplayName(persona);
@@ -211,36 +206,15 @@ export function PersonaSelectField({
     setQuery("");
     setDebouncedQuery("");
     setRemoteResults([]);
-    setActiveOptionIndex(-1);
   }
 
-  function handleSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      setQuery("");
-      setActiveOptionIndex(-1);
-      return;
-    }
-
-    if (!listOpen || results.length === 0 || searching) return;
-
-    if (event.key === "ArrowDown") {
-      event.preventDefault();
-      setActiveOptionIndex((index) => (index + 1) % results.length);
-      return;
-    }
-
-    if (event.key === "ArrowUp") {
-      event.preventDefault();
-      setActiveOptionIndex((index) => (index <= 0 ? results.length - 1 : index - 1));
-      return;
-    }
-
-    if (event.key === "Enter" && activeOptionIndex >= 0) {
-      event.preventDefault();
-      selectPersona(results[activeOptionIndex]);
-    }
-  }
+  const emptyMessage = searching
+    ? "Buscando clientes…"
+    : queryTooShort
+      ? `Escribí al menos ${MIN_SEARCH_LEN} caracteres`
+      : query.trim().length > 0
+        ? `Sin clientes para "${query.trim()}"`
+        : "Sin resultados";
 
   if (value.mode === "existing" && !creatingNew) {
     return (
@@ -267,80 +241,42 @@ export function PersonaSelectField({
     );
   }
 
-  const activeDescendantId =
-    activeOptionIndex >= 0 && results[activeOptionIndex]
-      ? `${listboxId}-option-${results[activeOptionIndex].id}`
-      : undefined;
-
   return (
     <div className="flex flex-col gap-2">
       {!creatingNew ? (
         <>
-          <label className="flex flex-col gap-2">
-            <span className="text-[11px] font-semibold text-text-secondary">{label}</span>
-            <span className="flex items-center gap-2 rounded-sm border border-border bg-bg-page px-3 py-2.5 focus-within:border-primary">
-              <Search className="h-4 w-4 shrink-0 text-text-secondary" aria-hidden />
-              <input
-                type="text"
-                name={inputName}
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                onKeyDown={handleSearchKeyDown}
-                placeholder={placeholder}
-                autoComplete="off"
-                autoCorrect="off"
-                autoCapitalize="off"
-                spellCheck={false}
-                data-lpignore="true"
-                data-1p-ignore="true"
-                role="combobox"
-                aria-autocomplete="list"
-                aria-expanded={listOpen && results.length > 0}
-                aria-controls={listboxId}
-                aria-activedescendant={activeDescendantId}
-                className={`min-w-0 flex-1 bg-transparent text-base text-text-primary outline-none placeholder:text-text-secondary sm:text-sm ${interactiveFocusClass}`}
-              />
-            </span>
-          </label>
-          {listOpen ? (
-            <div className="rounded-[13px] border border-border">
-              {searching ? (
-                <p className="px-3 py-3 text-[12px] text-text-secondary">Buscando clientes…</p>
-              ) : results.length === 0 ? (
-                <p className="px-3 py-3 text-[12px] text-text-secondary">
-                  Sin clientes para &quot;{query.trim()}&quot;.
-                </p>
-              ) : (
-                <ul className="flex flex-col gap-1 p-1" id={listboxId} role="listbox" aria-label={`Resultados de ${label}`}>
-                  {results.map((persona, index) => {
-                    const name = personaDisplayName(persona);
-                    const meta = personaSearchMeta(persona);
-                    const selected = activeOptionIndex === index;
-                    return (
-                      <li key={persona.id} role="presentation">
-                        <button
-                          id={`${listboxId}-option-${persona.id}`}
-                          type="button"
-                          role="option"
-                          aria-selected={selected}
-                          onMouseEnter={() => setActiveOptionIndex(index)}
-                          onClick={() => selectPersona(persona)}
-                          className={`flex w-full flex-col gap-0.5 rounded-sm px-3 py-2 text-left hover:bg-bg-page ${interactiveFocusClass} ${
-                            selected ? "bg-bg-page" : ""
-                          }`}
-                        >
-                          <span className="text-[13px] font-medium text-text-primary">{name}</span>
-                          {meta ? (
-                            <span className="break-all text-[11px] text-text-secondary">{meta}</span>
-                          ) : null}
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </div>
-          ) : null}
+          <ComboBox
+            label={label}
+            inputValue={query}
+            onInputChange={setQuery}
+            items={queryTooShort ? [] : results}
+            selectedKey={null}
+            onSelectionChange={(key) => {
+              const persona = results.find((row) => String(row.id) === String(key));
+              if (persona) selectPersona(persona);
+            }}
+            defaultFilter={() => true}
+            menuTrigger="focus"
+            allowsEmptyCollection
+            placeholder={placeholder}
+            leadingIcon={SearchIcon}
+            emptyMessage={emptyMessage}
+          >
+            {(persona) => {
+              const name = personaDisplayName(persona);
+              const meta = personaSearchMeta(persona);
+              return (
+                <ComboBoxItem key={persona.id} id={String(persona.id)} textValue={name}>
+                  <span className="flex min-w-0 flex-col gap-0.5">
+                    <span className="text-[13px] font-medium text-text-primary">{name}</span>
+                    {meta ? (
+                      <span className="break-all text-[11px] text-text-secondary">{meta}</span>
+                    ) : null}
+                  </span>
+                </ComboBoxItem>
+              );
+            }}
+          </ComboBox>
           <button
             type="button"
             onClick={() => {

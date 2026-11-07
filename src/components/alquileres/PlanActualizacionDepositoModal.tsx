@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { Modal } from "@/components/ui/Modal";
+import { RocchiaDateField } from "@/components/ui/RocchiaDateField";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import type { ContratoDetail } from "@/lib/api/types";
 import { formatMoney, rentalApiErrorMessage } from "@/lib/format";
@@ -136,15 +137,11 @@ export function PlanActualizacionDepositoModal({
           </label>
         </div>
 
-        <label className="flex flex-col gap-1.5">
-          <span className="text-[11px] font-semibold text-text-secondary">Vencimiento cuota 1</span>
-          <input
-            type="date"
-            value={form.fechaPrimeraCuota}
-            onChange={(e) => setForm({ ...form, fechaPrimeraCuota: e.target.value })}
-            className={formInputClass}
-          />
-        </label>
+        <RocchiaDateField
+          label="Vencimiento cuota 1"
+          value={form.fechaPrimeraCuota}
+          onChange={(fechaPrimeraCuota) => setForm({ ...form, fechaPrimeraCuota })}
+        />
 
         <label className="flex flex-col gap-1.5">
           <span className="text-[11px] font-semibold text-text-secondary">Notas (opcional)</span>

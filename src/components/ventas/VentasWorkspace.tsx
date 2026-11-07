@@ -25,6 +25,11 @@ import {
   ventasTabDomId,
   type VentasTabId,
 } from "@/components/ventas/VentasFilterChips";
+import { Card } from "@/components/ui/Card";
+import { ListProgressBar } from "@/components/ui/ListProgressBar";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { useListRefreshTransition } from "@/lib/ui/use-list-refresh-transition";
+import { withCache } from "@/lib/api/cache";
 import { VentasKpiStrip } from "@/components/ventas/VentasKpiStrip";
 import { VentasTable, type VentasTableRow } from "@/components/ventas/VentasTable";
 import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
@@ -35,10 +40,12 @@ import {
   fetchEstadosOferta,
   fetchTiposOperacion,
   fetchVentas,
-  fetchVenta,
   searchCatalogo,
 } from "@/lib/api";
-import { buyerSearchText, fetchParteNombres } from "@/lib/ventas/partes";
+import { buyerSearchText } from "@/lib/ventas/partes";
+import { fetchVentasEnOperacion } from "@/lib/ventas/en-operacion-load";
+import { invalidateVentasCaches } from "@/lib/ventas/invalidate-caches";
+import { fetchVentasTabCounts } from "@/lib/ventas/tab-counts";
 import type { CatalogSearchItem, CatalogoItem, VentaDetail } from "@/lib/api/types";
 import { pagePaddingClass } from "@/lib/layout";
 import {
@@ -68,6 +75,7 @@ export function VentasWorkspace() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { token, logout } = useAuth();
+  const { refreshing, listTransitionKey, isInitialLoad, start, finish } = useListRefreshTransition();
   const [tab, setTab] = useState<VentasTabId>("en_operacion");
   const [urlTabReady, setUrlTabReady] = useState(false);
   const [search, setSearch] = useState("");
@@ -130,39 +138,8 @@ export function VentasWorkspace() {
   const loadTabCounts = useCallback(async () => {
     if (!token || !tipoVentaId || Object.keys(estadoIds).length === 0) return;
     try {
-      const [ventasRes, availableRes, offMarketRes, soldRes] = await Promise.all([
-        fetchVentas(token, { limit: 100 }),
-        estadoIds.available
-          ? searchCatalogo(token, {
-              estadoOfertaId: estadoIds.available,
-              tipoOperacionId: tipoVentaId,
-              limit: 200,
-            })
-          : Promise.resolve({ items: [] }),
-        estadoIds.off_market
-          ? searchCatalogo(token, {
-              estadoOfertaId: estadoIds.off_market,
-              tipoOperacionId: tipoVentaId,
-              limit: 200,
-            })
-          : Promise.resolve({ items: [] }),
-        estadoIds.sold
-          ? searchCatalogo(token, {
-              estadoOfertaId: estadoIds.sold,
-              tipoOperacionId: tipoVentaId,
-              limit: 200,
-            })
-          : Promise.resolve({ items: [] }),
-      ]);
-      const activas = ventasRes.items.filter(
-        (v) => v.estado !== "completed" && v.estado !== "cancelled",
-      );
-      setTabCounts({
-        en_operacion: activas.length,
-        a_la_venta: availableRes.items.length,
-        fuera_mercado: offMarketRes.items.length,
-        vendidos: soldRes.items.length,
-      });
+      const counts = await fetchVentasTabCounts(token, estadoIds, tipoVentaId);
+      setTabCounts(counts);
     } catch {
       // counts are optional UX enhancement
     }
@@ -177,19 +154,18 @@ export function VentasWorkspace() {
     const generation = ++loadGenerationRef.current;
     const stillCurrent = () => generation === loadGenerationRef.current;
     const silent = options?.silent ?? false;
-    if (!silent) {
+    const listKey =
+      tab === "en_operacion"
+        ? tab
+        : `${tab}-${JSON.stringify(characteristicFiltersRef.current)}`;
+    const { startedAt, isInitial } = start(silent);
+    if (!silent && isInitial) {
       setLoading(true);
     }
     setError(null);
     try {
       if (tab === "en_operacion") {
-        const res = await fetchVentas(token, { limit: 100 });
-        const activas = res.items.filter((v) => v.estado !== "completed" && v.estado !== "cancelled");
-        const details = await Promise.all(activas.map((v) => fetchVenta(token, v.id)));
-        const buyerIds = details.flatMap((venta) =>
-          venta.partes.filter((parte) => parte.rol === "buyer").map((parte) => parte.personaId),
-        );
-        const nombres = await fetchParteNombres(token, buyerIds).catch(() => ({}));
+        const { details, parteNombres: nombres } = await fetchVentasEnOperacion(token);
         if (!stillCurrent()) return;
         setParteNombres(nombres);
         setVentaRows(details);
@@ -206,12 +182,19 @@ export function VentasWorkspace() {
           setError("Catálogo de estados no disponible. Recargá la página.");
           return;
         }
-        const res = await searchCatalogo(token, {
-          estadoOfertaId,
-          tipoOperacionId: tipoVentaId,
-          ...characteristicFiltersSearchParams(characteristicFiltersRef.current, tipoInmuebleIds),
-          limit: 200,
-        });
+        const filters = characteristicFiltersSearchParams(characteristicFiltersRef.current, tipoInmuebleIds);
+        const catalogCacheKey = `ventas-catalog:${token}:${tab}:${JSON.stringify(filters)}`;
+        const res = await withCache(
+          catalogCacheKey,
+          () =>
+            searchCatalogo(token, {
+              estadoOfertaId,
+              tipoOperacionId: tipoVentaId,
+              ...filters,
+              limit: 200,
+            }),
+          { ttlMs: 25_000 },
+        );
         if (!stillCurrent()) return;
         setCatalogRows(res.items);
         setVentaRows([]);
@@ -227,12 +210,20 @@ export function VentasWorkspace() {
       setCatalogRows([]);
     } finally {
       if (stillCurrent() && !silent) {
+        await finish(listKey, startedAt);
         setLoading(false);
       }
     }
-  }, [token, tab, estadoIds, tipoInmuebleIds, tipoVentaId, logout]);
+  }, [token, tab, estadoIds, tipoInmuebleIds, tipoVentaId, logout, start, finish]);
 
-  useSyncScope("ventas", () => void load({ silent: true }), Boolean(token));
+  useSyncScope(
+    "ventas",
+    () => {
+      if (token) invalidateVentasCaches(token);
+      void load({ silent: true });
+    },
+    Boolean(token),
+  );
 
   useEffect(() => {
     if (!urlTabReady) return;
@@ -248,7 +239,7 @@ export function VentasWorkspace() {
       return;
     }
     const timer = window.setTimeout(() => {
-      void load({ silent: true });
+      void load();
     }, 350);
     return () => window.clearTimeout(timer);
   }, [characteristicFilters, load, tab, estadoIds]);
@@ -348,17 +339,17 @@ export function VentasWorkspace() {
 
   return (
     <div className={`flex flex-col gap-6 sm:gap-8 ${pagePaddingClass}`}>
-      <header className="flex flex-col gap-4">
-        <div className="flex max-w-2xl flex-col gap-1">
-          <h1 className="text-[26px] font-normal tracking-tight text-text-primary">Ventas</h1>
-          <p className="text-[13px] text-text-secondary">{tabCopy.description}</p>
-        </div>
-        <VentasCreateActions
-          tab={tab}
-          onPublicar={() => setPublicarOpen(true)}
-          onNuevaVenta={() => openNewVenta()}
-        />
-      </header>
+      <PageHeader
+        title="Ventas"
+        description={tabCopy.description}
+        actions={
+          <VentasCreateActions
+            tab={tab}
+            onPublicar={() => setPublicarOpen(true)}
+            onNuevaVenta={() => openNewVenta()}
+          />
+        }
+      />
 
       <VentasFilterChips active={tab} onChange={changeTab} counts={tabCounts} />
 
@@ -382,7 +373,7 @@ export function VentasWorkspace() {
         aria-labelledby={ventasTabDomId(tab)}
         className="flex flex-col gap-6"
       >
-        <VentasKpiStrip kpis={kpis} loading={loading} />
+        <VentasKpiStrip kpis={kpis} loading={loading && isInitialLoad} />
 
         {error ? (
           <div className="flex flex-col gap-2">
@@ -398,17 +389,24 @@ export function VentasWorkspace() {
             </button>
           </div>
         ) : (
-          <VentasTable
-            tab={tab}
-            rows={tableRows}
-            loading={loading && tableRows.length === 0}
-            search={search}
-            searchPlaceholder={tabCopy.searchPlaceholder}
-            emptyHint={emptyHint}
-            parteNombres={parteNombres}
-            onSearchChange={setSearch}
-            onOpenRow={handleOpenRow}
-          />
+          <Card accent className="rocchia-panel--flat relative overflow-hidden">
+            <ListProgressBar active={refreshing} />
+            <VentasTable
+              tab={tab}
+              rows={tableRows}
+              loading={loading && isInitialLoad}
+              refreshing={refreshing}
+              listTransitionKey={listTransitionKey}
+              isInitialLoad={isInitialLoad}
+              search={search}
+              searchPlaceholder={tabCopy.searchPlaceholder}
+              emptyHint={emptyHint}
+              parteNombres={parteNombres}
+              onSearchChange={setSearch}
+              onOpenRow={handleOpenRow}
+              embedded
+            />
+          </Card>
         )}
       </div>
 

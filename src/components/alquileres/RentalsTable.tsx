@@ -5,7 +5,10 @@ import { Loader2, Search, X } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { RentalFilterChips } from "@/components/alquileres/RentalFilterChips";
 import { ButtonOutline } from "@/components/ui/Button";
+import { ListTablePlaceholder } from "@/components/ui/ListTableContent";
+import { ListTransitionShell } from "@/components/ui/ListTransitionShell";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { StatusChip } from "@/components/ui/StatusChip";
 import {
   canCollectRent,
   filterRentals,
@@ -19,20 +22,21 @@ import type { ContratoTableStats } from "@/lib/api/types";
 import { contractEndHint, moneyTableClass } from "@/lib/format";
 import { rentCollectionWindowHint } from "@/lib/rental-collection";
 import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
+import type { StatusTone } from "@/lib/ui/status-tones";
 
 const riseEase = [0.16, 1, 0.3, 1] as const;
 
-function contractTone(row: RentalRow): string {
-  if (row.filterStatus === "en_mora" || row.daysOverdue > 0) return "bg-[var(--orchid)] text-text-primary";
-  if (row.filterStatus === "ajuste_pendiente" || row.needsAdjustment) return "bg-[#e5fafb] text-text-primary";
-  if (row.filterStatus === "al_dia" || row.status.variant === "success") return "bg-[#dff5f1] text-text-primary";
-  return "bg-bg-cream text-text-primary";
+function contractStatusTone(row: RentalRow): StatusTone {
+  if (row.filterStatus === "en_mora" || row.daysOverdue > 0) return "mora";
+  if (row.filterStatus === "ajuste_pendiente" || row.needsAdjustment) return "ajuste";
+  if (row.filterStatus === "al_dia" || row.status.variant === "success") return "ok";
+  return "neutral";
 }
 
-function serviceTone(variant: RentalRow["servicios"]["status"]["variant"]): string {
-  if (variant === "danger") return "bg-[var(--orchid)] text-text-primary";
-  if (variant === "success") return "bg-[#dff5f1] text-text-primary";
-  return "bg-bg-cream text-text-primary";
+function serviceStatusTone(variant: RentalRow["servicios"]["status"]["variant"]): StatusTone {
+  if (variant === "danger") return "mora";
+  if (variant === "success") return "ok";
+  return "neutral";
 }
 
 function ServiceMarks({ servicios }: { servicios: RentalRow["servicios"] }) {
@@ -41,12 +45,9 @@ function ServiceMarks({ servicios }: { servicios: RentalRow["servicios"] }) {
     .join(" — ");
 
   return (
-    <span
-      className={`block w-full min-w-0 truncate rounded-md px-1.5 py-0.5 text-[11px] ${serviceTone(servicios.status.variant)}`}
-      title={tooltip}
-    >
+    <StatusChip tone={serviceStatusTone(servicios.status.variant)} className="block w-full text-[11px]" title={tooltip}>
       {servicios.status.label}
-    </span>
+    </StatusChip>
   );
 }
 
@@ -127,12 +128,13 @@ function RentalMobileCard({
         <div className="min-w-0 flex-1">
           <PropertyCell label={row.contractProperty} />
         </div>
-        <span
-          className={`max-w-[40%] shrink-0 truncate whitespace-nowrap rounded-md px-2 py-0.5 text-[12px] ${contractTone(row)}`}
+        <StatusChip
+          tone={contractStatusTone(row)}
+          className="max-w-[40%] shrink-0 text-[12px]"
           title={row.status.label}
         >
           {row.status.label}
-        </span>
+        </StatusChip>
       </button>
       <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-[13px]">
         <div>
@@ -230,6 +232,8 @@ type RentalsTableProps = {
   onPrefetch?: (row: RentalRow) => void;
   serverMode?: boolean;
   loading?: boolean;
+  refreshing?: boolean;
+  listTransitionKey?: string;
   isSearchPending?: boolean;
   total?: number;
   page?: number;
@@ -245,6 +249,7 @@ type RentalsTableProps = {
   onChipChange?: (chip: RentalChipId) => void;
   onClearFilters?: () => void;
   onPageChange?: (page: number) => void;
+  embedded?: boolean;
 };
 
 export function RentalsTable({
@@ -257,6 +262,8 @@ export function RentalsTable({
   onPrefetch,
   serverMode = false,
   loading = false,
+  refreshing = false,
+  listTransitionKey,
   isSearchPending = false,
   total = 0,
   page = 1,
@@ -272,6 +279,7 @@ export function RentalsTable({
   onChipChange,
   onClearFilters,
   onPageChange,
+  embedded = false,
 }: RentalsTableProps) {
   const operationalCounts = serverMode && stats
     ? {
@@ -304,12 +312,18 @@ export function RentalsTable({
   const useCursorPagination = serverMode && onGoNext !== undefined && onGoPrev !== undefined;
   const reduceMotion = useReducedMotion();
   const listEntered = useRef(false);
+  const transitionKey = listTransitionKey ?? `${activeChip}-${searchQuery}-${currentPage}`;
+  const listBusy = loading || refreshing;
   useEffect(() => {
     listEntered.current = true;
   }, []);
 
+  const shellClass = embedded
+    ? "flex min-h-[400px] flex-1 flex-col overflow-hidden"
+    : "flex min-h-[400px] flex-1 flex-col overflow-hidden rounded-xl border border-border bg-bg-card shadow-[var(--shadow-card)]";
+
   return (
-    <section className="flex min-h-[400px] flex-1 flex-col overflow-hidden rounded-xl border border-border bg-bg-card shadow-[var(--shadow-card)]">
+    <section className={shellClass}>
       <div className="flex flex-col gap-4 px-4 py-4 sm:px-5">
         <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <h2 className="text-[15px] font-semibold tracking-tight text-text-primary">Listado de contratos</h2>
@@ -391,7 +405,7 @@ export function RentalsTable({
         ) : null}
       </div>
 
-      <div className="border-t border-border md:hidden">
+      <div className="border-t border-border md:hidden" aria-busy={listBusy}>
         {loading ? (
           Array.from({ length: 4 }).map((_, index) => (
             <div key={index} className="flex flex-col gap-2 border-t border-border px-4 py-4 first:border-t-0">
@@ -400,25 +414,31 @@ export function RentalsTable({
               <Skeleton className="h-4 w-32" />
             </div>
           ))
-        ) : paginated.length === 0 ? (
-          <div className="px-4 py-10 text-center">
-            <p className="text-sm font-medium text-text-primary">
-              {hasActiveFilters ? "No hay contratos con estos criterios" : "No hay contratos para mostrar"}
-            </p>
-          </div>
+        ) : refreshing ? (
+          <ListTablePlaceholder className="min-h-[min(24rem,50vh)]" />
         ) : (
-          paginated.map((row) => (
-            <RentalMobileCard
-              key={row.id}
-              row={row}
-              onOpen={() => onViewFicha(row)}
-              onPrefetch={() => onPrefetch?.(row)}
-              onCollect={() => onCollect(row)}
-              onAdjust={() => onAdjust(row)}
-              onRenew={() => onRenew(row)}
-              onFinish={() => onFinish(row)}
-            />
-          ))
+          <ListTransitionShell transitionKey={transitionKey}>
+            {paginated.length === 0 ? (
+              <div className="px-4 py-10 text-center">
+                <p className="text-sm font-medium text-text-primary">
+                  {hasActiveFilters ? "No hay contratos con estos criterios" : "No hay contratos para mostrar"}
+                </p>
+              </div>
+            ) : (
+              paginated.map((row) => (
+                <RentalMobileCard
+                  key={row.id}
+                  row={row}
+                  onOpen={() => onViewFicha(row)}
+                  onPrefetch={() => onPrefetch?.(row)}
+                  onCollect={() => onCollect(row)}
+                  onAdjust={() => onAdjust(row)}
+                  onRenew={() => onRenew(row)}
+                  onFinish={() => onFinish(row)}
+                />
+              ))
+            )}
+          </ListTransitionShell>
         )}
       </div>
 
@@ -445,10 +465,11 @@ export function RentalsTable({
               </tr>
             </thead>
             <motion.tbody
-              key={`${activeChip}-${searchQuery}-${currentPage}`}
+              key={transitionKey}
               initial={!listEntered.current || reduceMotion ? false : { opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.15, ease: riseEase }}
+              aria-busy={listBusy}
             >
               {loading ? (
                 Array.from({ length: 6 }).map((_, index) => (
@@ -460,6 +481,12 @@ export function RentalsTable({
                     ))}
                   </tr>
                 ))
+              ) : refreshing ? (
+                <tr>
+                  <td colSpan={10} className="p-0">
+                    <ListTablePlaceholder className="min-h-[min(24rem,50vh)]" />
+                  </td>
+                </tr>
               ) : paginated.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="px-4 py-14">
@@ -525,7 +552,7 @@ export function RentalsTable({
                         <span
                           className={`tabular-nums ${
                             row.daysOverdue > 0
-                              ? "rounded-md bg-[var(--orchid)] px-1.5 py-0.5 font-medium text-text-primary"
+                              ? "rounded-md bg-status-mora px-1.5 py-0.5 font-medium text-text-primary"
                               : "text-text-secondary"
                           }`}
                         >
@@ -533,9 +560,9 @@ export function RentalsTable({
                         </span>
                       </td>
                       <td className={`text-center ${bodyCell}`}>
-                        <span className={`inline-flex rounded-md px-2 py-0.5 text-[12px] ${contractTone(row)}`}>
+                        <StatusChip tone={contractStatusTone(row)} className="text-[12px]">
                           {row.status.label}
-                        </span>
+                        </StatusChip>
                       </td>
                       <td className={`hidden whitespace-nowrap text-right tabular-nums text-text-secondary xl:table-cell ${bodyCell}`}>
                         {row.contractStart}
@@ -583,7 +610,7 @@ export function RentalsTable({
           <div className="flex items-center gap-2">
             <ButtonOutline
               type="button"
-              disabled={(useCursorPagination ? !canGoPrev : currentPage <= 1) || loading}
+              disabled={(useCursorPagination ? !canGoPrev : currentPage <= 1) || listBusy}
               onClick={() => (useCursorPagination ? onGoPrev?.() : onPageChange?.(currentPage - 1))}
             >
               Anterior
@@ -593,7 +620,7 @@ export function RentalsTable({
             </span>
             <ButtonOutline
               type="button"
-              disabled={(useCursorPagination ? !canGoNext : currentPage >= totalPages) || loading}
+              disabled={(useCursorPagination ? !canGoNext : currentPage >= totalPages) || listBusy}
               onClick={() => (useCursorPagination ? onGoNext?.() : onPageChange?.(currentPage + 1))}
             >
               Siguiente

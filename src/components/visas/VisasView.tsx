@@ -3,14 +3,21 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronDown, ChevronRight, ChevronsUpDown, ChevronUp, CircleDollarSign, Plus, Search } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronsUpDown, ChevronUp, CircleDollarSign, Plus } from "lucide-react";
 
 import { EnlacesOficiales } from "@/components/visas/EnlacesOficiales";
 import { NuevoTramiteModal } from "@/components/visas/NuevoTramiteModal";
 import { PreciosVisaModal } from "@/components/visas/PreciosVisaModal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { EnumSelect } from "@/components/ui/EnumSelect";
 import { KpiCard } from "@/components/ui/KpiCard";
+import { ListProgressBar } from "@/components/ui/ListProgressBar";
+import { ListTableContent } from "@/components/ui/ListTableContent";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { SearchField } from "@/components/ui/SearchField";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { useListRefreshTransition } from "@/lib/ui/use-list-refresh-transition";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useAuth } from "@/context/auth-context";
 import { ApiError, fetchVisas, fetchVisasResumen } from "@/lib/api";
@@ -156,9 +163,41 @@ function VisaMobileCard({ item, onOpen }: { item: TramiteVisaListItem; onOpen: (
   );
 }
 
+function VisaListSkeleton() {
+  return (
+    <>
+      <div className="border-b border-border md:hidden">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <div key={index} className="flex flex-col gap-2 border-t border-border px-4 py-4 first:border-t-0">
+            <Skeleton className="h-4 w-40" />
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-4 w-32" />
+          </div>
+        ))}
+      </div>
+      <div className="hidden overflow-x-auto md:block">
+        <table className="w-full min-w-[880px] border-separate border-spacing-0 text-left text-[13px]">
+          <tbody>
+            {Array.from({ length: 6 }).map((_, index) => (
+              <tr key={index}>
+                {Array.from({ length: 6 }).map((__, cell) => (
+                  <td key={cell} className={bodyCell}>
+                    <Skeleton className="h-4 w-full max-w-[120px]" />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
+
 export function VisasView() {
   const router = useRouter();
   const { token, user, logout } = useAuth();
+  const { refreshing, listTransitionKey, isInitialLoad, start, finish } = useListRefreshTransition();
   const currentYear = new Date().getFullYear();
   const [anio, setAnio] = useState<number | "todos">(currentYear);
   const [estado, setEstado] = useState<EstadoTramiteVisa | "">("");
@@ -184,7 +223,9 @@ export function VisasView() {
 
   const load = useCallback(async () => {
     if (!token) return;
-    setLoading(true);
+    const listKey = `${anio}-${estado}-${debouncedSearch}`;
+    const { startedAt, isInitial } = start();
+    if (isInitial) setLoading(true);
     setError(null);
     const year = anio === "todos" ? undefined : anio;
     try {
@@ -206,9 +247,10 @@ export function VisasView() {
       setError(err instanceof ApiError ? err.message : "No se pudieron cargar los trámites");
       setItems([]);
     } finally {
+      await finish(listKey, startedAt);
       setLoading(false);
     }
-  }, [token, logout, anio, estado, debouncedSearch]);
+  }, [token, logout, anio, estado, debouncedSearch, start, finish]);
 
   useEffect(() => {
     const handle = window.setTimeout(() => {
@@ -252,14 +294,24 @@ export function VisasView() {
 
   return (
     <div className={`flex flex-col gap-6 ${pagePaddingClass}`}>
-      <div className="flex flex-col gap-4">
-        <div className="flex max-w-2xl flex-col gap-1">
-          <h1 className="text-[26px] font-normal tracking-tight text-text-primary">Visas</h1>
-          <div className="mt-2">
-            <EnlacesOficiales compact />
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title="Visas"
+        description={<EnlacesOficiales compact />}
+        actions={
+          canEdit ? (
+            <>
+              <ButtonOutline onClick={() => setPreciosOpen(true)}>
+                <CircleDollarSign className="mr-1.5 h-4 w-4" aria-hidden />
+                Actualizar precios
+              </ButtonOutline>
+              <ButtonPrimary onClick={() => setCreateOpen(true)}>
+                <Plus className="mr-1.5 h-4 w-4" aria-hidden />
+                Crear trámite
+              </ButtonPrimary>
+            </>
+          ) : undefined
+        }
+      />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
@@ -290,62 +342,34 @@ export function VisasView() {
       </div>
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
-        <label className="flex min-w-0 flex-1 items-center gap-2.5 rounded-sm border border-border bg-bg-page px-3 py-2.5 focus-within:border-primary lg:max-w-md">
-          <Search className="h-4 w-4 shrink-0 text-text-secondary" aria-hidden />
-          <input
-            type="search"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Nombre, documento o DS-160"
-            aria-label="Buscar trámites"
-            className="min-w-0 flex-1 bg-transparent text-sm text-text-primary outline-none placeholder:text-text-secondary"
-          />
-        </label>
-        <label className="flex flex-col gap-1.5">
-          <span className="text-[11px] font-semibold text-text-secondary">Año</span>
-          <select
-            value={String(anio)}
-            onChange={(event) => {
-              const value = event.target.value;
-              setAnio(value === "todos" ? "todos" : Number(value));
-            }}
-            className={formInputClass}
-          >
-            <option value="todos">Todos</option>
-            {years.map((year) => (
-              <option key={year} value={year}>
-                {year}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1.5">
-          <span className="text-[11px] font-semibold text-text-secondary">Estado</span>
-          <select
-            value={estado}
-            onChange={(event) => setEstado(event.target.value as EstadoTramiteVisa | "")}
-            className={formInputClass}
-          >
-            <option value="">Todos</option>
-            {ESTADOS_TRAMITE_VISA.map((value) => (
-              <option key={value} value={value}>
-                {ESTADO_VISA_LABEL[value]}
-              </option>
-            ))}
-          </select>
-        </label>
-        {canEdit ? (
-          <div className="flex flex-wrap gap-2 lg:ml-auto">
-            <ButtonOutline onClick={() => setPreciosOpen(true)}>
-              <CircleDollarSign className="mr-1.5 h-4 w-4" aria-hidden />
-              Actualizar precios
-            </ButtonOutline>
-            <ButtonPrimary onClick={() => setCreateOpen(true)}>
-              <Plus className="mr-1.5 h-4 w-4" aria-hidden />
-              Crear trámite
-            </ButtonPrimary>
-          </div>
-        ) : null}
+        <SearchField
+          className="min-w-0 flex-1 lg:max-w-md"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Nombre, documento o DS-160"
+          aria-label="Buscar trámites"
+        />
+        <EnumSelect
+          label="Año"
+          className="w-full sm:w-36"
+          value={anio === "todos" ? "" : String(anio)}
+          onChange={(value) => setAnio(value === "" ? "todos" : Number(value))}
+          allowEmpty
+          emptyLabel="Todos"
+          options={years.map((year) => ({ value: String(year), label: String(year) }))}
+        />
+        <EnumSelect<EstadoTramiteVisa | "">
+          label="Estado"
+          className="w-full sm:w-44"
+          value={estado}
+          onChange={setEstado}
+          allowEmpty
+          emptyLabel="Todos"
+          options={ESTADOS_TRAMITE_VISA.map((value) => ({
+            value,
+            label: ESTADO_VISA_LABEL[value],
+          }))}
+        />
       </div>
 
       {error ? (
@@ -365,7 +389,7 @@ export function VisasView() {
         </div>
       ) : null}
 
-      {!loading && items.length === 0 ? (
+      {!loading && !refreshing && items.length === 0 ? (
         <div className="flex flex-col items-start gap-3 rounded-md border border-dashed border-border bg-bg-card px-6 py-10">
           <p className="text-sm font-semibold text-text-primary">
             {estado || debouncedSearch.trim() ? "Ningún trámite coincide con el filtro." : "Todavía no hay trámites de visa."}
@@ -383,19 +407,19 @@ export function VisasView() {
           ) : null}
         </div>
       ) : (
-      <section className="overflow-hidden rounded-md border border-border bg-bg-card shadow-[var(--shadow-card)]">
+      <Card accent className="rocchia-panel--flat relative overflow-hidden">
+        <ListProgressBar active={refreshing} />
+        <ListTableContent
+          isInitialLoad={isInitialLoad}
+          loading={loading}
+          refreshing={refreshing}
+          listTransitionKey={listTransitionKey}
+          initialSkeleton={<VisaListSkeleton />}
+        >
         <div className="border-b border-border md:hidden">
-          {loading
-            ? Array.from({ length: 4 }).map((_, index) => (
-                <div key={index} className="flex flex-col gap-2 border-t border-border px-4 py-4 first:border-t-0">
-                  <Skeleton className="h-4 w-40" />
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="h-4 w-32" />
-                </div>
-              ))
-            : paginated.map((item) => (
-                <VisaMobileCard key={item.id} item={item} onOpen={() => router.push(`/visas/${item.id}`)} />
-              ))}
+          {paginated.map((item) => (
+            <VisaMobileCard key={item.id} item={item} onOpen={() => router.push(`/visas/${item.id}`)} />
+          ))}
         </div>
 
         <div className="hidden overflow-x-auto md:block">
@@ -432,17 +456,7 @@ export function VisasView() {
               </tr>
             </thead>
             <tbody>
-              {loading
-                ? Array.from({ length: 6 }).map((_, index) => (
-                    <tr key={index}>
-                      {Array.from({ length: 6 }).map((__, cell) => (
-                        <td key={cell} className={bodyCell}>
-                          <Skeleton className="h-4 w-full max-w-[120px]" />
-                        </td>
-                      ))}
-                    </tr>
-                  ))
-                : paginated.map((item) => {
+              {paginated.map((item) => {
                     const miembros = visaMembers(item);
                     const estados = estadosDeFila(item);
                     return (
@@ -514,6 +528,7 @@ export function VisasView() {
             </tbody>
           </table>
         </div>
+        </ListTableContent>
 
         <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">
           <p className="text-[12px] text-text-secondary">
@@ -522,7 +537,7 @@ export function VisasView() {
               : `Mostrando ${rangeStart}–${rangeEnd} de ${sortedItems.length} trámites`}
           </p>
           <div className="flex items-center gap-2">
-            <ButtonOutline type="button" disabled={currentPage <= 1 || loading} onClick={() => setPage(currentPage - 1)}>
+            <ButtonOutline type="button" disabled={currentPage <= 1 || loading || refreshing} onClick={() => setPage(currentPage - 1)}>
               Anterior
             </ButtonOutline>
             <span className="min-w-[88px] text-center text-[12px] font-semibold text-text-secondary">
@@ -530,14 +545,14 @@ export function VisasView() {
             </span>
             <ButtonOutline
               type="button"
-              disabled={currentPage >= totalPages || loading}
+              disabled={currentPage >= totalPages || loading || refreshing}
               onClick={() => setPage(currentPage + 1)}
             >
               Siguiente
             </ButtonOutline>
           </div>
         </footer>
-      </section>
+      </Card>
       )}
 
       {token && canEdit ? (

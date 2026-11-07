@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 
+import { DirectionProvider } from "@/components/foundations/direction/direction";
 import { WebVitalsReporter } from "@/components/observability/WebVitalsReporter";
 import { AuthProvider } from "@/context/auth-context";
 import "./globals.css";
@@ -28,10 +29,12 @@ export default function RootLayout({
   return (
     <html lang="es" className={`${dmSans.variable} h-full antialiased`}>
       <body className="min-h-full">
-        <AuthProvider>
-          <WebVitalsReporter />
-          {children}
-        </AuthProvider>
+        <DirectionProvider locale="es-AR">
+          <AuthProvider>
+            <WebVitalsReporter />
+            {children}
+          </AuthProvider>
+        </DirectionProvider>
       </body>
     </html>
   );

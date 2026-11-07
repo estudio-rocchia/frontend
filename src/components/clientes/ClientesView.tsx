@@ -4,20 +4,28 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useSyncScope } from "@/lib/sync/use-sync-scope";
-import { Download, Search, UserPlus } from "lucide-react";
+import { Download, UserPlus } from "lucide-react";
 
+import { Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from "@/components/base/table/table";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
 import { CrearClienteModal } from "@/components/clientes/CrearClienteModal";
 import { KpiCard } from "@/components/ui/KpiCard";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { SearchField } from "@/components/ui/SearchField";
+import { ListProgressBar } from "@/components/ui/ListProgressBar";
+import { ListTableContent } from "@/components/ui/ListTableContent";
+import { useListRefreshTransition } from "@/lib/ui/use-list-refresh-transition";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useAuth } from "@/context/auth-context";
 import { clienteFilters, type ClienteFilterId, type ClienteRow } from "@/data/clientes";
-import { ApiError, fetchClientesKpis, fetchExpedientes, fetchJuridicoResumen, fetchPersonas, fetchVisas, fetchVisasResumen } from "@/lib/api";
+import { fetchClientesFilterCounts, invalidateClientesFilterCounts } from "@/lib/api/clientes-filter-counts";
+import { ApiError, fetchClientesKpis, fetchExpedientes, fetchPersonas, fetchVisas } from "@/lib/api";
 import { prefetchClientesList } from "@/lib/api/clientes-list";
 import type { ClientesKpis } from "@/lib/api/types";
 import { useCursorPagination } from "@/lib/hooks/use-cursor-pagination";
 import { pagePaddingClass } from "@/lib/layout";
-import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 import { useClientePrefetch } from "@/lib/use-cliente-prefetch";
 import { personaDisplayName } from "@/lib/format";
 import {
@@ -32,11 +40,42 @@ import { exportClientesListado, fetchAllClienteRowsForExport } from "@/lib/clien
 const PAGE_SIZE = 20;
 const tableHeaders = ["Cliente", "Documento", "Vínculos", "Contacto", "Estado"];
 
+function ClientesTableSkeleton({ rows = 6 }: { rows?: number }) {
+  return (
+    <table className="w-full min-w-[920px] border-collapse text-left" aria-hidden>
+      <thead>
+        <tr>
+          {tableHeaders.map((header) => (
+            <th
+              key={header}
+              className="h-11 border-b border-border bg-bg-cream px-5 text-[12px] font-medium text-text-primary"
+            >
+              {header}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {Array.from({ length: rows }).map((_, index) => (
+          <tr key={index} className="border-t border-border">
+            {tableHeaders.map((header) => (
+              <td key={header} className="h-[52px] px-5">
+                <div className="h-4 animate-pulse rounded-sm bg-border/70" />
+              </td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 export function ClientesView() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { token, logout } = useAuth();
   const { prefetch: prefetchCliente } = useClientePrefetch(token);
+  const { refreshing, listTransitionKey, isInitialLoad, start, finish } = useListRefreshTransition();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -64,24 +103,14 @@ export function ClientesView() {
   const load = useCallback(async (options?: { silent?: boolean }) => {
     if (!token) return;
     const silent = options?.silent ?? false;
-    if (!silent) {
+    const listKey = `${activeFilter}-${debouncedSearch}-${currentCursor ?? "start"}`;
+    const { startedAt, isInitial } = start(silent);
+    if (!silent && isInitial) {
       setLoading(true);
     }
     setError(null);
 
     try {
-      const [visaResumen, juridicoResumen] = await Promise.all([
-        fetchVisasResumen(token).catch((err: unknown) => {
-          if (err instanceof ApiError && err.status === 401) throw err;
-          return null;
-        }),
-        fetchJuridicoResumen(token)
-          .then((resumen) => resumen.clientes)
-          .catch(() => 0),
-      ]);
-      setVisaSolicitantes(visaResumen?.solicitantes ?? 0);
-      setJuridicoCount(juridicoResumen);
-
       if (activeFilter === "visas") {
         const [counts, visas] = await Promise.all([
           fetchClientesKpis(token),
@@ -157,12 +186,47 @@ export function ClientesView() {
       setError(err instanceof ApiError ? err.message : "No se pudieron cargar los clientes");
     } finally {
       if (!silent) {
+        await finish(listKey, startedAt);
         setLoading(false);
       }
     }
-  }, [token, logout, currentCursor, debouncedSearch, activeFilter, applyResponse]);
+  }, [token, logout, currentCursor, debouncedSearch, activeFilter, applyResponse, start, finish]);
 
-  useSyncScope("clientes", () => void load({ silent: true }), Boolean(token));
+  useEffect(() => {
+    if (!token) {
+      setVisaSolicitantes(0);
+      setJuridicoCount(0);
+      return;
+    }
+    let active = true;
+    void fetchClientesFilterCounts(token)
+      .then((counts) => {
+        if (!active) return;
+        setVisaSolicitantes(counts.visaSolicitantes);
+        setJuridicoCount(counts.juridicoClientes);
+      })
+      .catch(() => {
+        if (!active) return;
+      });
+    return () => {
+      active = false;
+    };
+  }, [token]);
+
+  useSyncScope(
+    "clientes",
+    () => {
+      const authToken = token;
+      if (!authToken) return;
+      invalidateClientesFilterCounts(authToken);
+      void load({ silent: true });
+      void fetchClientesFilterCounts(authToken).then((counts) => {
+        setVisaSolicitantes(counts.visaSolicitantes);
+        setJuridicoCount(counts.juridicoClientes);
+      });
+    },
+    Boolean(token),
+  );
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(searchQuery), 300);
@@ -284,14 +348,10 @@ export function ClientesView() {
           <p className="rounded-sm border border-danger bg-danger-bg px-3 py-2 text-sm text-danger">{error}</p>
         ) : null}
 
-        <header className="flex flex-col gap-4">
-          <div className="flex max-w-2xl flex-col gap-1">
-            <h1 className="text-[26px] font-normal tracking-tight text-text-primary">Clientes</h1>
-            <p className="text-[13px] text-text-secondary">
-              Base centralizada con vínculos a inmobiliaria, causas jurídicas y trámites de visas
-            </p>
-          </div>
-        </header>
+        <PageHeader
+          title="Clientes"
+          description="Base centralizada con vínculos a inmobiliaria, causas jurídicas y trámites de visas"
+        />
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {loading && !kpis
@@ -301,7 +361,8 @@ export function ClientesView() {
             : kpiCards.map((kpi, index) => <KpiCard key={kpi.label} {...kpi} tone={index} />)}
         </div>
 
-        <section className="overflow-hidden rounded-xl border border-border bg-bg-card shadow-[var(--shadow-card)]">
+        <Card accent className="rocchia-panel--flat relative overflow-hidden">
+          <ListProgressBar active={refreshing} />
           <div className="flex flex-col gap-5 border-b border-border px-5 py-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-col gap-1">
@@ -313,144 +374,119 @@ export function ClientesView() {
                   <UserPlus className="mr-1.5 h-4 w-4" aria-hidden />
                   Crear Cliente
                 </ButtonPrimary>
-                <button
+                <ButtonOutline
                   type="button"
                   disabled={exporting || loading || !token}
                   onClick={() => void handleExportListado()}
-                  className="inline-flex w-fit items-center rounded-sm border border-border bg-bg-card px-[18px] py-2.5 text-sm font-medium text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                  className="w-fit"
                 >
                   <Download className="mr-1.5 h-4 w-4" aria-hidden />
                   {exporting ? "Exportando…" : "Exportar listado"}
-                </button>
+                </ButtonOutline>
               </div>
             </div>
 
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <label className="flex min-w-0 flex-1 items-center gap-2.5 rounded-xl border border-border bg-bg-page px-3 py-2 focus-within:border-primary lg:max-w-md">
-                <Search className="h-4 w-4 shrink-0 text-text-secondary" aria-hidden />
-                <input
-                  type="search"
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="Nombre, documento o correo…"
-                  aria-label="Buscar clientes"
-                  className="min-w-0 flex-1 bg-transparent text-sm text-text-primary outline-none placeholder:text-text-secondary"
-                />
-              </label>
+              <SearchField
+                className="min-w-0 flex-1"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Nombre, documento o correo…"
+                aria-label="Buscar clientes"
+              />
 
-                <div className="inline-flex flex-wrap items-center gap-1 rounded-xl border border-border bg-bg-page p-1">
-                {clienteFilters.map(({ id, label }) => {
-                  const selected = activeFilter === id;
-                  const count = filterCounts[id];
-                  const disabled = false;
-                  return (
-                    <button
-                      key={id}
-                      type="button"
-                      disabled={disabled}
-                      onClick={() => setActiveFilter(id)}
-                      className={`rocchia-action rounded-lg border px-3 py-1.5 text-[13px] disabled:cursor-not-allowed disabled:opacity-50 ${
-                        selected
-                          ? "border-primary bg-bg-card font-medium text-text-primary"
-                          : "border-transparent font-normal text-text-secondary hover:text-text-primary"
-                      }`}
-                    >
-                      {label} ({count})
-                    </button>
-                  );
-                })}
-              </div>
+              <SegmentedControl
+                options={clienteFilters.map(({ id, label }) => ({
+                  id,
+                  label,
+                  count: filterCounts[id],
+                }))}
+                value={activeFilter}
+                onChange={setActiveFilter}
+              />
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[920px] border-collapse text-left">
-              <thead>
-                <tr>
-                  {tableHeaders.map((header) => (
-                    <th key={header} className="h-11 border-b border-border bg-bg-cream px-5 text-[12px] font-medium text-text-primary">
-                      {header}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  Array.from({ length: 6 }).map((_, index) => (
-                    <tr key={index} className="border-t border-border">
-                      {tableHeaders.map((header) => (
-                        <td key={header} className="h-[52px] px-5">
-                          <div className="h-4 animate-pulse rounded-sm bg-border/70" />
-                        </td>
-                      ))}
-                    </tr>
-                  ))
-                ) : filteredRows.length === 0 ? (
-                  <tr>
-                    <td colSpan={tableHeaders.length} className="px-5 py-8 text-sm text-text-secondary">
-                      {activeFilter === "visas"
-                        ? "No hay clientes con un trámite de visa."
-                        : activeFilter === "juridico"
-                          ? "No hay clientes con expedientes."
-                          : hasSearch
+          <div
+            className="rocchia-table-shell max-h-[min(32rem,62vh)] overflow-auto overscroll-contain"
+            aria-busy={loading || refreshing}
+          >
+            <ListTableContent
+              isInitialLoad={isInitialLoad}
+              loading={loading}
+              refreshing={refreshing}
+              listTransitionKey={listTransitionKey}
+              initialSkeleton={<ClientesTableSkeleton />}
+            >
+                {filteredRows.length === 0 ? (
+                  <p className="px-5 py-8 text-sm text-text-secondary">
+                    {activeFilter === "visas"
+                      ? "No hay clientes con un trámite de visa."
+                      : activeFilter === "juridico"
+                        ? "No hay clientes con expedientes."
+                        : hasSearch
                           ? "No hay clientes que coincidan con la búsqueda."
                           : "No hay clientes para este filtro."}
-                    </td>
-                  </tr>
+                  </p>
                 ) : (
-                  filteredRows.map((row) => (
-                    <tr
-                      key={row.id}
-                      tabIndex={0}
-                      aria-label={`Abrir ficha de ${row.nombre}`}
-                      className={`cursor-pointer border-t border-border transition-colors hover:bg-bg-page ${interactiveFocusClass} ${
-                        !row.activo ? "opacity-70" : ""
-                      }`}
-                      onClick={() => router.push(`/clientes/${row.id}`)}
-                      onKeyDown={(event) => {
-                        if (event.target !== event.currentTarget) return;
-                        if (event.key !== "Enter" && event.key !== " ") return;
-                        event.preventDefault();
-                        router.push(`/clientes/${row.id}`);
-                      }}
-                      onMouseEnter={() => prefetchCliente(row.id)}
-                    >
-                      <td className="h-[52px] px-5">
-                        <span className="text-[13px] font-semibold text-text-primary">{row.nombre}</span>
-                      </td>
-                      <td className="h-[52px] px-5 text-[13px] text-text-primary">{row.documento}</td>
-                      <td className="h-[52px] px-5">
-                        <div className="flex flex-wrap gap-1.5">
-                          {row.vinculos.length > 0 ? (
-                            row.vinculos.map((vinculo) => (
-                              <span
-                                key={`${row.id}-${vinculo.id}`}
-                                className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${vinculoBadgeClass(vinculo.id)}`}
-                              >
-                                {vinculo.label}
-                              </span>
-                            ))
-                          ) : (
-                            <span className="text-[13px] text-text-secondary">—</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="h-[52px] px-5">
-                        <div className="flex flex-col gap-0.5">
-                          <span className="text-[13px] text-text-primary">{row.email}</span>
-                          {row.telefono !== "—" ? (
-                            <span className="text-[12px] text-text-secondary">{row.telefono}</span>
-                          ) : null}
-                        </div>
-                      </td>
-                      <td className="h-[52px] px-5">
-                        <StatusBadge label={row.estado.label} variant={row.estado.variant} />
-                      </td>
-                    </tr>
-                  ))
+                  <Table
+                    aria-label="Listado de clientes"
+                    onRowAction={(key) => router.push(`/clientes/${key}`)}
+                    containerClassName="min-w-[920px]"
+                  >
+                    <TableHeader>
+                      {tableHeaders.map((header, index) => (
+                        <TableColumn key={header} isRowHeader={index === 0}>
+                          {header}
+                        </TableColumn>
+                      ))}
+                    </TableHeader>
+                    <TableBody items={filteredRows}>
+                      {(row) => (
+                        <TableRow
+                          id={row.id}
+                          className={!row.activo ? "opacity-70" : undefined}
+                          onMouseEnter={() => prefetchCliente(row.id)}
+                        >
+                          <TableCell>
+                            <span className="text-[13px] font-semibold text-text-primary">{row.nombre}</span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-[13px] text-text-primary">{row.documento}</span>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-1.5">
+                              {row.vinculos.length > 0 ? (
+                                row.vinculos.map((vinculo) => (
+                                  <span
+                                    key={`${row.id}-${vinculo.id}`}
+                                    className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${vinculoBadgeClass(vinculo.id)}`}
+                                  >
+                                    {vinculo.label}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-[13px] text-text-secondary">—</span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-[13px] text-text-primary">{row.email}</span>
+                              {row.telefono !== "—" ? (
+                                <span className="text-[12px] text-text-secondary">{row.telefono}</span>
+                              ) : null}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <StatusBadge label={row.estado.label} variant={row.estado.variant} />
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
                 )}
-              </tbody>
-            </table>
+            </ListTableContent>
           </div>
 
           <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3">
@@ -479,7 +515,7 @@ export function ClientesView() {
               </ButtonOutline>
             </div>
           </footer>
-        </section>
+        </Card>
       </div>
 
       {token ? (

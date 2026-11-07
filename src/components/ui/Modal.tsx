@@ -61,7 +61,7 @@ export function Modal({
         if (event.target === event.currentTarget) onCloseRef.current();
       }}
     >
-      <div className="ui-pop-in flex max-h-[90vh] flex-col overflow-hidden rounded-md border border-border bg-bg-card shadow-[var(--shadow-card)]">
+      <div className="ui-pop-in flex max-h-[90vh] flex-col overflow-hidden rounded-xl border border-border bg-bg-card shadow-[var(--shadow-card)]">
         <header className="flex shrink-0 items-start justify-between gap-3 border-b border-border px-4 py-4 sm:px-6 sm:py-5">
           <div className="flex flex-col gap-1">
             <h2 id={titleId} className="text-lg font-bold text-text-primary">

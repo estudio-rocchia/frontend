@@ -15,6 +15,8 @@ const CitaModal = dynamic(
   { ssr: false },
 );
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useAuth } from "@/context/auth-context";
 import { fetchCitas, fetchRecordatorios } from "@/lib/api/index";
@@ -181,23 +183,21 @@ export function CalendarioView() {
 
   return (
     <div className={`flex flex-col gap-6 ${pagePaddingClass}`}>
-      <header className="flex flex-col gap-4">
-        <div className="flex max-w-2xl flex-col gap-1">
-          <h1 className="text-[26px] font-normal tracking-tight text-text-primary">Calendario interno</h1>
-          <p className="text-[13px] text-text-secondary">
-            Visitas a inmuebles, visas, reuniones y trámites del equipo.
-          </p>
-        </div>
-        <ButtonPrimary className="w-fit" onClick={openCreate}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nueva cita
-        </ButtonPrimary>
-      </header>
+      <PageHeader
+        title="Calendario interno"
+        description="Visitas a inmuebles, visas, reuniones y trámites del equipo."
+        actions={
+          <ButtonPrimary className="w-fit" onClick={openCreate}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nueva cita
+          </ButtonPrimary>
+        }
+      />
 
       <CalendarioKpiStrip kpis={kpis} loading={loading} />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.85fr)]">
-        <section className="overflow-hidden rounded-xl border border-border bg-bg-card shadow-[var(--shadow-card)]">
+        <Card accent className="rocchia-panel--flat">
           <div className="flex flex-wrap items-center justify-between gap-3 px-4 pt-4 pb-2 sm:px-5">
             <div className="flex items-center gap-1">
               <button
@@ -322,7 +322,7 @@ export function CalendarioView() {
             </span>
             <span className="text-xs text-text-secondary">Doble clic en un día para agendar</span>
           </footer>
-        </section>
+        </Card>
 
         <CalendarioDayPanel
           dateKey={selectedDateKey}

@@ -5,6 +5,7 @@ import { FileX2 } from "lucide-react";
 
 import { ButtonDanger, ButtonOutline } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
+import { RocchiaDateField } from "@/components/ui/RocchiaDateField";
 import { ApiError, rescindirContrato } from "@/lib/api";
 import { rentalApiErrorMessage } from "@/lib/format";
 import { formInputClass } from "@/lib/ui/interactive-focus";
@@ -40,7 +41,7 @@ export function RescindirContratoModal({
   const [confirmar, setConfirmar] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [invalidField, setInvalidField] = useState<"fecha" | "archivo" | null>(null);
-  const fechaRef = useRef<HTMLInputElement>(null);
+  const fechaRef = useRef<HTMLDivElement>(null);
   const archivoRef = useRef<HTMLInputElement>(null);
   const hoy = fechaLocalHoy();
 
@@ -83,7 +84,13 @@ export function RescindirContratoModal({
               if (!fecha) {
                 setInvalidField("fecha");
                 setError("Ingresá la fecha de rescisión.");
-                fechaRef.current?.focus();
+                fechaRef.current?.querySelector("button")?.focus();
+                return;
+              }
+              if (fecha < fechaInicio || fecha > hoy) {
+                setInvalidField("fecha");
+                setError(`La fecha debe estar entre ${fechaInicio} y hoy.`);
+                fechaRef.current?.querySelector("button")?.focus();
                 return;
               }
               if (!archivo) {
@@ -112,20 +119,15 @@ export function RescindirContratoModal({
             {error}
           </p>
         ) : null}
-        <label className="flex flex-col gap-1.5">
-          <span className="text-[11px] font-semibold text-text-secondary">Fecha de rescisión</span>
-          <input
-            ref={fechaRef}
-            type="date"
-            value={fecha}
-            min={fechaInicio}
-            max={hoy}
-            aria-invalid={invalidField === "fecha" || undefined}
-            aria-describedby={invalidField === "fecha" ? "rescindir-error" : undefined}
-            onChange={(event) => setFecha(event.target.value)}
-            className={formInputClass}
-          />
-        </label>
+        <RocchiaDateField
+          ref={fechaRef}
+          id="rescindir-fecha"
+          label="Fecha de rescisión"
+          value={fecha}
+          onChange={setFecha}
+          invalid={invalidField === "fecha"}
+          error={invalidField === "fecha" ? error ?? undefined : undefined}
+        />
         <label className="flex flex-col gap-1.5">
           <span className="text-[11px] font-semibold text-text-secondary">Documento</span>
           <input

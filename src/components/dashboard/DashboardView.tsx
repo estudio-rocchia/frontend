@@ -10,6 +10,7 @@ import { useDashboardAlertsActions, useDashboardAlertsState } from "@/context/da
 import { useDashboardReadAlerts } from "@/context/dashboard-read-alerts-context";
 import type { DashboardAlertRow, DashboardAlertTier } from "@/data/dashboard-contracts";
 import { countAlertsByTier } from "@/lib/mappers/dashboard";
+import { pagePaddingClass } from "@/lib/layout";
 import { kpiTone } from "@/lib/ui/kpi-tones";
 
 type AlertFilter = "todos" | "urgente" | "proximo" | "admin" | "alquiler" | "venta" | "calendario" | "juridico";
@@ -80,7 +81,7 @@ export function DashboardView() {
 
   if (showSkeleton) {
     return (
-      <div className="flex flex-col gap-6 px-4 py-6 sm:px-6 xl:px-8 xl:py-8">
+      <div className={`flex flex-col gap-6 ${pagePaddingClass}`}>
         <PageHeaderSkeleton />
         <Skeleton className="h-24 w-full" />
         <Skeleton className="h-8 w-64" />
@@ -95,7 +96,7 @@ export function DashboardView() {
 
   if (error && rows.length === 0) {
     return (
-      <div className="px-4 py-6 sm:px-6 xl:px-8 xl:py-8">
+      <div className={pagePaddingClass}>
         <h1 className="text-[26px] font-normal tracking-tight text-text-primary">Para atender</h1>
         <p className="mt-4 max-w-lg border border-danger/40 bg-danger-bg px-4 py-3 text-[13px] text-danger">
           No se pudo cargar la bandeja. {error}
@@ -112,7 +113,7 @@ export function DashboardView() {
   }
 
   return (
-    <div className="flex flex-col gap-6 px-4 py-6 sm:px-6 xl:px-8 xl:py-8">
+    <div className={`flex flex-col gap-6 ${pagePaddingClass}`}>
       <header className="dashboard-animate-in">
         <h1 className="text-[26px] font-normal tracking-tight text-text-primary">Para atender</h1>
         <p className="mt-1 max-w-xl text-[13px] text-text-secondary">{headerHint}</p>

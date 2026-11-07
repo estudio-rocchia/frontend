@@ -1,5 +1,6 @@
 "use client";
 
+import { NumericSelect } from "@/components/ui/NumericSelect";
 import {
   CITA_MINUTE_STEPS,
   buildCitaHourOptions,
@@ -8,7 +9,6 @@ import {
   formatTimeValue,
   parseTimeValue,
 } from "@/lib/calendar/time-slots";
-import { formInputClass } from "@/lib/ui/interactive-focus";
 
 export function CitaTimePicker({
   value,
@@ -32,33 +32,28 @@ export function CitaTimePicker({
 
   return (
     <div className="flex items-center gap-2">
-      <select
-        className={`${formInputClass} min-w-0 flex-1`}
+      <NumericSelect
         value={hour}
-        onChange={(e) => updateHour(Number(e.target.value))}
+        onChange={(next) => next != null && updateHour(next)}
         disabled={disabled}
-        aria-label="Hora"
-      >
-        {hours.map((option) => (
-          <option key={option} value={option}>
-            {formatHourLabel(option)}
-          </option>
-        ))}
-      </select>
-      <span className="text-sm font-semibold text-text-secondary" aria-hidden>:</span>
-      <select
-        className={`${formInputClass} min-w-0 flex-1`}
+        size="sm"
+        className="min-w-0 flex-1"
+        options={hours.map((option) => ({ value: option, label: formatHourLabel(option) }))}
+      />
+      <span className="text-sm font-semibold text-text-secondary" aria-hidden>
+        :
+      </span>
+      <NumericSelect
         value={minute}
-        onChange={(e) => updateMinute(Number(e.target.value))}
+        onChange={(next) => next != null && updateMinute(next)}
         disabled={disabled}
-        aria-label="Minutos"
-      >
-        {CITA_MINUTE_STEPS.map((option) => (
-          <option key={option} value={option}>
-            {formatMinuteLabel(option)}
-          </option>
-        ))}
-      </select>
+        size="sm"
+        className="min-w-0 flex-1"
+        options={CITA_MINUTE_STEPS.map((option) => ({
+          value: option,
+          label: formatMinuteLabel(option),
+        }))}
+      />
     </div>
   );
 }

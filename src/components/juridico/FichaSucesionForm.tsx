@@ -5,6 +5,7 @@ import { useState, type ReactNode } from "react";
 
 import { editSurfaceClass } from "@/components/juridico/juridico-ui";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
+import { RocchiaDateField } from "@/components/ui/RocchiaDateField";
 import {
   FICHA_SECTIONS,
   type FichaExtras,
@@ -258,11 +259,12 @@ export function FichaSucesionForm({
                     label={field.label}
                     className="w-full"
                   >
-                    <input
-                      type="date"
+                    <RocchiaDateField
+                      hideLabel
+                      label={field.label}
                       value={ficha[field.key] ?? ""}
-                      onChange={(event) => onChange({ ...ficha, [field.key]: event.target.value || null })}
-                      className={campoClass}
+                      onChange={(next) => onChange({ ...ficha, [field.key]: next || null })}
+                      className="w-full"
                     />
                   </Campo>
                 );

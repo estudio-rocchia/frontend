@@ -139,12 +139,12 @@ export function RenewContractModal({
 
     if (breakUi.active) {
       setDepositPreview({
-        montoAnterior: contrato.montoDeposito,
+        montoAnterior: contrato.montoDeposito ?? "0",
         montoNuevo: depositTarget,
         diferencia: String(
           Math.max(0, Number(depositTarget) - Number.parseFloat(contrato.montoDeposito || "0")),
         ),
-        codigoMoneda: contrato.codigoMonedaDeposito,
+        codigoMoneda: contrato.codigoMonedaDeposito ?? contrato.codigoMoneda,
         requiereCobro: Number(depositTarget) > Number.parseFloat(contrato.montoDeposito || "0"),
       });
       return;

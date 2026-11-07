@@ -8,6 +8,9 @@ import { PersonaFichaCard } from "@/components/clientes/PersonaFichaCard";
 import { FichaSucesionForm } from "@/components/juridico/FichaSucesionForm";
 import { EstadoBadge, Field, Notice, OfficialLink, RpiBadge, editSurfaceClass, plazoRelativo, ramaLabel, useTimedNotice } from "@/components/juridico/juridico-ui";
 import { ButtonDanger, ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
+import { EnumSelect } from "@/components/ui/EnumSelect";
+import { NumericSelect } from "@/components/ui/NumericSelect";
+import { RocchiaDateField } from "@/components/ui/RocchiaDateField";
 import { Modal } from "@/components/ui/Modal";
 import { useAuth } from "@/context/auth-context";
 import {
@@ -601,26 +604,17 @@ function CaratulaForm({
               />
             </Field>
             <Field label="Estado interno" hint="Cómo lo lleva el estudio. No se importa del portal.">
-              <select
+              <EnumSelect
                 value={draft.estado}
-                onChange={(event) => setDraft({ ...draft, estado: event.target.value as EstadoExpediente })}
-                className={formInputClass}
-              >
-                {estados.map((estado) => (
-                  <option key={estado} value={estado}>
-                    {ESTADO_LABEL[estado]}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Inicio">
-              <input
-                type="date"
-                value={draft.abiertoEn}
-                onChange={(event) => setDraft({ ...draft, abiertoEn: event.target.value })}
-                className={formInputClass}
+                onChange={(estado) => estado && setDraft({ ...draft, estado: estado as EstadoExpediente })}
+                options={estados.map((estado) => ({ value: estado, label: ESTADO_LABEL[estado] }))}
               />
             </Field>
+            <RocchiaDateField
+              label="Inicio"
+              value={draft.abiertoEn}
+              onChange={(abiertoEn) => setDraft({ ...draft, abiertoEn })}
+            />
             <Field label="Notas">
               <textarea
                 value={draft.notas ?? ""}
@@ -762,9 +756,12 @@ function PlazosPanel({
                   className={`${formInputClass} w-full`}
                 />
               </Field>
-              <Field label="Vencimiento">
-                <input type="date" value={fecha} onChange={(event) => onFecha(event.target.value)} className={`${formInputClass} w-full`} />
-              </Field>
+              <RocchiaDateField
+                className="w-full"
+                label="Vencimiento"
+                value={fecha}
+                onChange={onFecha}
+              />
               <ButtonPrimary className="w-full md:w-auto" disabled={saving || !descripcion.trim() || !fecha} onClick={onCreate}>
                 Agregar plazo
               </ButtonPrimary>
@@ -1061,18 +1058,12 @@ function RegistroPanel({
                 </p>
               </div>
               {editando ? (
-              <select
-                value={tramite.estado}
-                aria-label={`Estado del trámite de ${tramite.inmueble.code}`}
-                className={`${formInputClass} w-full md:w-auto`}
-                onChange={(event) => onEstado(tramite.id, event.target.value as EstadoTramiteRpi)}
-              >
-                {estadosRpi.map((estado) => (
-                  <option key={estado} value={estado}>
-                    {RPI_LABEL[estado]}
-                  </option>
-                ))}
-              </select>
+                <EnumSelect
+                  className="w-full md:w-auto"
+                  value={tramite.estado}
+                  onChange={(estado) => estado && onEstado(tramite.id, estado as EstadoTramiteRpi)}
+                  options={estadosRpi.map((estado) => ({ value: estado, label: RPI_LABEL[estado] }))}
+                />
               ) : null}
             </li>
           ))}
@@ -1087,18 +1078,16 @@ function RegistroPanel({
           <h2 className="text-sm font-semibold text-text-primary">Nueva inscripción</h2>
           <div className="grid gap-3 md:grid-cols-2">
             <Field label="Inmueble">
-              <select
-                value={inmuebleId}
-                onChange={(event) => onInmueble(event.target.value ? Number(event.target.value) : "")}
-                className={`${formInputClass} w-full`}
-              >
-                <option value="">Elegir</option>
-                {expediente.inmuebles.map((inmueble) => (
-                  <option key={inmueble.id} value={inmueble.id}>
-                    {inmueble.code} · {inmueble.displayLabel}
-                  </option>
-                ))}
-              </select>
+              <NumericSelect
+                value={typeof inmuebleId === "number" ? inmuebleId : null}
+                onChange={(id) => onInmueble(id ?? "")}
+                allowEmpty
+                emptyLabel="Elegir"
+                options={expediente.inmuebles.map((inmueble) => ({
+                  value: inmueble.id,
+                  label: `${inmueble.code} · ${inmueble.displayLabel}`,
+                }))}
+              />
             </Field>
             <Field label="Número de trámite">
               <input value={numeroTramite} onChange={(event) => onNumero(event.target.value)} className={`${formInputClass} w-full`} />

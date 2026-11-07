@@ -924,16 +924,34 @@ export function applyContratoAjuste(
   });
 }
 
+type FetchVentasParams = {
+  estado?: string;
+  inmuebleId?: number;
+  limit?: number;
+  offset?: number;
+  view?: "table";
+};
+
 export function fetchVentas(
   token: string,
-  params?: { estado?: string; inmuebleId?: number; limit?: number; offset?: number },
-) {
+  params?: FetchVentasParams & { view?: undefined },
+): Promise<{ items: VentaRecord[] }>;
+export function fetchVentas(
+  token: string,
+  params: FetchVentasParams & { view: "table" },
+): Promise<{ items: VentaDetail[] }>;
+export function fetchVentas(token: string, params?: FetchVentasParams) {
   const query = new URLSearchParams();
   if (params?.estado) query.set("estado", params.estado);
   if (params?.inmuebleId) query.set("inmuebleId", String(params.inmuebleId));
   query.set("limit", String(params?.limit ?? 100));
   if (params?.offset) query.set("offset", String(params.offset));
-  return apiRequest<{ items: VentaRecord[] }>(`/ventas?${query}`, { token });
+  if (params?.view) query.set("view", params.view);
+  const path = `/ventas?${query}`;
+  if (params?.view === "table") {
+    return apiRequest<{ items: VentaDetail[] }>(path, { token });
+  }
+  return apiRequest<{ items: VentaRecord[] }>(path, { token });
 }
 
 export function fetchVenta(token: string, id: number) {

@@ -4,6 +4,10 @@ import { Copy } from "lucide-react";
 
 import { EstadoVisaStepper } from "@/components/visas/EstadoVisaStepper";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
+import { EnumSelect } from "@/components/ui/EnumSelect";
+import { RocchiaDateField } from "@/components/ui/RocchiaDateField";
+import { RocchiaDateTimeField } from "@/components/ui/RocchiaDateTimeField";
+import { toDateTimeLocal } from "@/lib/dates/datetime-local";
 import type { EstadoTramiteVisa, QuienAsignaTurno } from "@/lib/api/types";
 import { formatDateDisplay } from "@/lib/format";
 import { formInputClass, interactiveFocusClass } from "@/lib/ui/interactive-focus";
@@ -21,20 +25,22 @@ const ESTADOS_CON_TURNO = new Set<EstadoTramiteVisa>([
   "procesamiento_administrativo",
 ]);
 
-function toDateTimeLocal(value: string): string {
-  if (!value) return "";
-  if (DATETIME_PATTERN.test(value)) return value;
-  if (DATE_PATTERN.test(value)) return `${value}T00:00`;
-  return value.slice(0, 16);
-}
-
 function focusFirstField(ids: string[]) {
   for (const id of ids) {
     const element = document.getElementById(id);
-    if (element instanceof HTMLElement && element.getAttribute("aria-invalid") === "true") {
-      element.focus();
-      return;
-    }
+    if (!element) continue;
+    const isInvalid =
+      element.getAttribute("aria-invalid") === "true" ||
+      element.querySelector('[aria-invalid="true"]') != null;
+    if (!isInvalid) continue;
+    const focusTarget =
+      element instanceof HTMLInputElement ||
+      element instanceof HTMLButtonElement ||
+      element instanceof HTMLTextAreaElement
+        ? element
+        : (element.querySelector("button,input,textarea,select") as HTMLElement | null);
+    focusTarget?.focus();
+    return;
   }
 }
 
@@ -259,44 +265,30 @@ export function ExpedienteCard({
         ) : null}
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-1.5">
-            <label htmlFor="fecha-turno" className="text-[11px] font-semibold text-text-secondary">
-              Turno CAS
-            </label>
-            <input
+            <RocchiaDateTimeField
               id="fecha-turno"
-              type="datetime-local"
+              label="Turno CAS"
               value={turnoLocal}
               disabled={turnosBloqueados}
-              aria-invalid={Boolean(turnoError)}
-              aria-describedby={
-                !turnosHabilitados
-                  ? "turnos-bloqueo"
-                  : turnoError
-                    ? "fecha-turno-ayuda"
-                    : !turnoLocal && !turnoAsignadoPor
-                      ? "fecha-turno-vacio"
-                      : undefined
-              }
-              onChange={(event) => onTurnoEn(event.target.value.slice(0, 16))}
-              className={`${formInputClass} w-full disabled:opacity-60`}
+              invalid={Boolean(turnoError)}
+              error={turnoError ?? undefined}
+              onChange={onTurnoEn}
+              className="w-full"
             />
-            <label htmlFor="turno-quien" className="sr-only">
-              Quién asignó el turno CAS
-            </label>
-            <select
-              id="turno-quien"
+            <EnumSelect
+              label="Quién asignó el turno CAS"
+              className="[&_label]:sr-only"
               value={turnoAsignadoPor}
               disabled={turnosBloqueados}
-              aria-invalid={Boolean(quienError)}
-              aria-describedby={quienError ? "turno-quien-ayuda" : !turnosHabilitados ? "turnos-bloqueo" : undefined}
-              onChange={(event) => onTurnoAsignadoPor(event.target.value as QuienAsignaTurno | "")}
-              className={`${formInputClass} w-full disabled:opacity-60`}
-            >
-              <option value="">Quién lo asignó</option>
-              <option value="estudio">El estudio, en AIS</option>
-              <option value="solicitante">El solicitante, en AIS</option>
-            </select>
-            {fieldError("fecha-turno-ayuda", turnoError)}
+              invalid={Boolean(quienError)}
+              allowEmpty
+              emptyLabel="Quién lo asignó"
+              onChange={(value) => onTurnoAsignadoPor((value || "") as QuienAsignaTurno | "")}
+              options={[
+                { value: "estudio", label: "El estudio, en AIS" },
+                { value: "solicitante", label: "El solicitante, en AIS" },
+              ]}
+            />
             {fieldError("turno-quien-ayuda", quienError)}
             {turnosHabilitados && !turnoLocal && !turnoAsignadoPor ? (
               <p id="fecha-turno-vacio" className="text-xs text-text-secondary">
@@ -306,22 +298,16 @@ export function ExpedienteCard({
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label htmlFor="fecha-entrevista" className="text-[11px] font-semibold text-text-secondary">
-              Turno Consulado
-            </label>
-            <input
+            <RocchiaDateTimeField
               id="fecha-entrevista"
-              type="datetime-local"
+              label="Turno Consulado"
               value={entrevistaLocal}
               disabled={turnosBloqueados}
-              aria-invalid={Boolean(entrevistaError)}
-              aria-describedby={
-                !turnosHabilitados ? "turnos-bloqueo" : entrevistaError ? "fecha-entrevista-ayuda" : undefined
-              }
-              onChange={(event) => onEntrevistaEn(event.target.value.slice(0, 16))}
-              className={`${formInputClass} w-full disabled:opacity-60`}
+              invalid={Boolean(entrevistaError)}
+              error={entrevistaError ?? undefined}
+              onChange={onEntrevistaEn}
+              className="w-full"
             />
-            {fieldError("fecha-entrevista-ayuda", entrevistaError)}
             {turnosHabilitados && !entrevistaLocal && !entrevistaError ? (
               <p className="text-xs text-text-secondary">Sin turno consulado.</p>
             ) : null}
@@ -380,35 +366,27 @@ export function ExpedienteCard({
           {fieldError("email-ais-ayuda", emailError)}
         </label>
 
-        <label className="flex flex-col gap-1.5" htmlFor="fecha-apertura">
-          <span className="text-[11px] font-semibold text-text-secondary">Apertura</span>
-          <input
-            id="fecha-apertura"
-            type="date"
-            value={abiertoEn}
-            disabled={!canEdit || saving}
-            aria-invalid={Boolean(abiertoError)}
-            aria-describedby={abiertoError ? "fecha-apertura-ayuda" : undefined}
-            onChange={(event) => onAbiertoEn(event.target.value)}
-            className={`${formInputClass} w-full disabled:opacity-60`}
-          />
-          {fieldError("fecha-apertura-ayuda", abiertoError)}
-        </label>
+        <RocchiaDateField
+          id="fecha-apertura"
+          label="Apertura"
+          value={abiertoEn}
+          disabled={!canEdit || saving}
+          invalid={Boolean(abiertoError)}
+          error={abiertoError ?? undefined}
+          onChange={onAbiertoEn}
+          className="w-full"
+        />
 
-        <label className="flex flex-col gap-1.5" htmlFor="fecha-resolucion">
-          <span className="text-[11px] font-semibold text-text-secondary">Resolución</span>
-          <input
-            id="fecha-resolucion"
-            type="date"
-            value={decisionEn}
-            disabled={!canEdit || saving}
-            aria-invalid={Boolean(decisionError)}
-            aria-describedby={decisionError ? "fecha-resolucion-ayuda" : undefined}
-            onChange={(event) => onDecisionEn(event.target.value)}
-            className={`${formInputClass} w-full disabled:opacity-60`}
-          />
-          {fieldError("fecha-resolucion-ayuda", decisionError)}
-        </label>
+        <RocchiaDateField
+          id="fecha-resolucion"
+          label="Resolución"
+          value={decisionEn}
+          disabled={!canEdit || saving}
+          invalid={Boolean(decisionError)}
+          error={decisionError ?? undefined}
+          onChange={onDecisionEn}
+          className="w-full"
+        />
       </div>
 
       <label className="flex flex-col gap-1.5" htmlFor="notas-expediente">

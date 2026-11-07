@@ -1,12 +1,15 @@
 "use client";
 
-import { ChevronRight, Search, X } from "lucide-react";
-import type { ReactNode } from "react";
+import { ChevronRight } from "lucide-react";
+import { memo, type ReactNode } from "react";
 
 import { VentasEmptyState } from "@/components/ventas/VentasEmptyState";
 import type { VentasTabId } from "@/components/ventas/VentasFilterChips";
+import { ListTableContent } from "@/components/ui/ListTableContent";
+import { SearchField } from "@/components/ui/SearchField";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { StatusBadge } from "@/components/ui/StatusBadge";
+import { StatusChip } from "@/components/ui/StatusChip";
+import { ofertaEstadoTone, ventaEstadoTone } from "@/lib/ui/status-tones";
 import type { CatalogSearchItem, VentaDetail } from "@/lib/api/types";
 import { formatMoney, moneyClassName } from "@/lib/format";
 import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
@@ -15,9 +18,7 @@ import { parteNombre } from "@/lib/ventas/partes";
 import { formatDetalleSummary } from "@/lib/ventas/detalle-labels";
 import {
   ofertaEstadoLabel,
-  ofertaEstadoVariant,
   ventaEstadoLabel,
-  ventaEstadoVariant,
 } from "@/lib/ventas/status-labels";
 
 export type VentasTableRow =
@@ -28,6 +29,9 @@ type VentasTableProps = {
   tab: VentasTabId;
   rows: VentasTableRow[];
   loading?: boolean;
+  refreshing?: boolean;
+  listTransitionKey?: string;
+  isInitialLoad?: boolean;
   search: string;
   searchPlaceholder?: string;
   emptyHint?: string;
@@ -35,6 +39,7 @@ type VentasTableProps = {
   parteNombres?: Record<number, string>;
   onSearchChange: (value: string) => void;
   onOpenRow: (row: VentasTableRow) => void;
+  embedded?: boolean;
 };
 
 const rowFocusClass = `${interactiveFocusClass} cursor-pointer`;
@@ -50,7 +55,7 @@ function emptyVariant(tab: VentasTabId): "default" | "catalog" | "operation" {
   return "catalog";
 }
 
-function VentaMobileCard({
+const VentaMobileCard = memo(function VentaMobileCard({
   row,
   tab,
   parteNombres,
@@ -86,10 +91,7 @@ function VentaMobileCard({
             <span className="text-xs text-text-secondary">{financiacionHint(venta)}</span>
           </div>
           <div className="mt-2">
-            <StatusBadge
-              label={ventaEstadoLabel(venta.estado)}
-              variant={ventaEstadoVariant(venta.estado)}
-            />
+            <StatusChip tone={ventaEstadoTone(venta.estado)}>{ventaEstadoLabel(venta.estado)}</StatusChip>
           </div>
         </div>
         <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-text-secondary" aria-hidden />
@@ -127,21 +129,50 @@ function VentaMobileCard({
           </span>
         </div>
         <div className="mt-2">
-          <StatusBadge
-            label={ofertaEstadoLabel(estadoCode)}
-            variant={ofertaEstadoVariant(estadoCode)}
-          />
+          <StatusChip tone={ofertaEstadoTone(estadoCode)}>{ofertaEstadoLabel(estadoCode)}</StatusChip>
         </div>
       </div>
       <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-text-secondary" aria-hidden />
     </button>
   );
+});
+
+function VentasTableSkeleton({ colSpan }: { colSpan: number }) {
+  return (
+    <>
+      <div className="flex flex-col gap-2 md:hidden">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="rounded-xl border border-border bg-bg-card p-4">
+            <Skeleton className="mb-2 h-4 w-3/4" />
+            <Skeleton className="mb-3 h-3 w-1/3" />
+            <Skeleton className="h-5 w-1/2" />
+          </div>
+        ))}
+      </div>
+      <div className="hidden overflow-x-auto md:block rocchia-table-shell">
+        <table className="w-full min-w-[720px] text-left text-[13px]">
+          <tbody>
+            {Array.from({ length: 6 }).map((_, i) => (
+              <tr key={i} className="border-b border-border last:border-0">
+                <td className="px-4 py-3" colSpan={colSpan + 1}>
+                  <Skeleton className="h-5 w-full" />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
 }
 
-export function VentasTable({
+export const VentasTable = memo(function VentasTable({
   tab,
   rows,
-  loading,
+  loading = false,
+  refreshing = false,
+  listTransitionKey = "init",
+  isInitialLoad = true,
   search,
   searchPlaceholder = "Código, calle, alias u observación del detalle…",
   onSearchChange,
@@ -149,71 +180,41 @@ export function VentasTable({
   emptyActions,
   parteNombres = {},
   onOpenRow,
+  embedded = false,
 }: VentasTableProps) {
   const isCatalogTab = tab !== "en_operacion";
   const colSpan = isCatalogTab ? (tab === "fuera_mercado" ? 4 : 3) : 5;
+  const panelClass = embedded
+    ? ""
+    : "overflow-hidden rounded-xl border border-border bg-bg-card shadow-[var(--shadow-card)]";
+  const shellPadding = embedded ? "px-5 py-5" : "";
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative max-w-md flex-1">
-          <Search
-            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary"
-            aria-hidden
-          />
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => onSearchChange(e.target.value)}
-            placeholder={searchPlaceholder}
-            className={`w-full rounded-sm border border-border bg-bg-page py-2.5 pl-9 pr-9 text-[13px] text-text-primary focus:border-primary ${interactiveFocusClass}`}
-            aria-label="Buscar en ventas"
-          />
-          {search ? (
-            <button
-              type="button"
-              onClick={() => onSearchChange("")}
-              className={`absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-sm text-text-secondary hover:bg-bg-cream hover:text-text-primary ${interactiveFocusClass}`}
-              aria-label="Limpiar búsqueda"
-            >
-              <X className="h-4 w-4" aria-hidden />
-            </button>
-          ) : null}
-        </div>
-        {!loading ? (
+    <div className={`flex flex-col gap-3 ${shellPadding}`}>
+      <div className="flex flex-col gap-3 border-b border-border pb-5 sm:flex-row sm:items-center sm:justify-between">
+        <SearchField
+          className="max-w-md flex-1"
+          value={search}
+          onChange={(e) => onSearchChange(e.target.value)}
+          placeholder={searchPlaceholder}
+          aria-label="Buscar en ventas"
+        />
+        {!loading && !refreshing ? (
           <p className="text-[13px] text-text-secondary" aria-live="polite" aria-atomic="true">
             {rows.length === 1 ? "1 resultado" : `${rows.length} resultados`}
           </p>
         ) : null}
       </div>
 
-      {loading ? (
-        <>
-          <div className="flex flex-col gap-2 md:hidden">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="rounded-xl border border-border bg-bg-card p-4">
-                <Skeleton className="mb-2 h-4 w-3/4" />
-                <Skeleton className="mb-3 h-3 w-1/3" />
-                <Skeleton className="h-5 w-1/2" />
-              </div>
-            ))}
-          </div>
-          <div className="hidden overflow-x-auto rounded-xl border border-border bg-bg-card md:block">
-            <table className="w-full min-w-[720px] text-left text-[13px]">
-              <tbody>
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <tr key={i} className="border-b border-border last:border-0">
-                    <td className="px-4 py-3" colSpan={colSpan + 1}>
-                      <Skeleton className="h-5 w-full" />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
-      ) : rows.length === 0 ? (
-        <div className="overflow-hidden rounded-xl border border-border bg-bg-card">
+      <ListTableContent
+        isInitialLoad={isInitialLoad}
+        loading={loading}
+        refreshing={refreshing}
+        listTransitionKey={listTransitionKey}
+        initialSkeleton={<VentasTableSkeleton colSpan={colSpan} />}
+      >
+      {rows.length === 0 ? (
+        <div className={panelClass || "overflow-hidden"}>
           <VentasEmptyState
             variant={emptyVariant(tab)}
             description={emptyHint ?? "No hay registros en esta vista."}
@@ -240,7 +241,7 @@ export function VentasTable({
             })}
           </div>
 
-          <div className="hidden overflow-x-auto rounded-xl border border-border bg-bg-card md:block">
+          <div className={`hidden overflow-x-auto md:block ${panelClass} rocchia-table-shell`}>
             <table className="w-full min-w-[720px] text-left text-[13px]">
               <thead className="border-b border-border bg-bg-page text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
                 <tr>
@@ -296,10 +297,9 @@ export function VentasTable({
                         </td>
                         <td className="px-4 py-3 text-text-secondary">{financiacionHint(venta)}</td>
                         <td className="px-4 py-3">
-                          <StatusBadge
-                            label={ventaEstadoLabel(venta.estado)}
-                            variant={ventaEstadoVariant(venta.estado)}
-                          />
+                          <StatusChip tone={ventaEstadoTone(venta.estado)}>
+                            {ventaEstadoLabel(venta.estado)}
+                          </StatusChip>
                         </td>
                         <td className="px-2 py-3 text-text-secondary">
                           <ChevronRight
@@ -354,10 +354,9 @@ export function VentasTable({
                         {precio ? formatMoney(precio, moneda) : "Sin precio"}
                       </td>
                       <td className="px-4 py-3">
-                        <StatusBadge
-                          label={ofertaEstadoLabel(estadoCode)}
-                          variant={ofertaEstadoVariant(estadoCode)}
-                        />
+                        <StatusChip tone={ofertaEstadoTone(estadoCode)}>
+                          {ofertaEstadoLabel(estadoCode)}
+                        </StatusChip>
                       </td>
                       <td className="px-2 py-3 text-text-secondary">
                         <ChevronRight
@@ -373,6 +372,7 @@ export function VentasTable({
           </div>
         </>
       )}
+      </ListTableContent>
     </div>
   );
-}
+});

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Download, Search } from "lucide-react";
 
 import { ButtonOutline } from "@/components/ui/Button";
+import { NumericSelect } from "@/components/ui/NumericSelect";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { resolveBreakUiLiquidaciones } from "@/data/alquileres-break-ui-fixtures";
 import { useAuth } from "@/context/auth-context";
@@ -260,21 +261,17 @@ export function LiquidacionesHistorialView() {
               onChange={(e) => setAnio(Number(e.target.value))}
             />
           </label>
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="text-text-secondary">Mes</span>
-            <select
-              className={formInputClass}
-              value={mes}
-              onChange={(e) => setMes(e.target.value === "" ? "" : Number(e.target.value))}
-            >
-              <option value="">Todos los meses</option>
-              {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                <option key={m} value={m}>
-                  {formatMonthYear(anio, m)}
-                </option>
-              ))}
-            </select>
-          </label>
+          <NumericSelect
+            label="Mes"
+            value={mes === "" ? null : mes}
+            onChange={(id) => setMes(id ?? "")}
+            allowEmpty
+            emptyLabel="Todos los meses"
+            options={Array.from({ length: 12 }, (_, i) => ({
+              value: i + 1,
+              label: formatMonthYear(anio, i + 1),
+            }))}
+          />
           <label className="flex flex-col gap-1 text-sm sm:col-span-2">
             <span className="text-text-secondary">Buscar propietario o Nº</span>
             <div className="relative">

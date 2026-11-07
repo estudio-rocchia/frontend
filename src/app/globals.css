@@ -1,4 +1,8 @@
 @import "tailwindcss";
+@import "../styles/theme.css";
+@import "../styles/typography.css";
+@import "../styles/rocchia-boardui-bridge.css";
+@import "../styles/boardui-primitives.css";
 
 /* Rocchia 2026 — mineral canvas, stormy teal, black ink */
 :root {
@@ -31,6 +35,29 @@
   --orchid: #fbc7fb;
   --logo-mark: #ffffff22;
   --shadow-card: 0 1px 2px rgba(1, 4, 0, 0.04);
+  --status-mora: var(--orchid);
+  --status-ajuste: #e5fafb;
+  --status-ok: #dff5f1;
+  --kpi-wash-0: #e6f3f2;
+  --kpi-edge-0: #b7d9d6;
+  --kpi-bar-0: var(--primary);
+  --kpi-dot-0: var(--primary);
+  --kpi-wash-1: #dff6f2;
+  --kpi-edge-1: #9ed9cf;
+  --kpi-bar-1: var(--mint);
+  --kpi-dot-1: var(--mint);
+  --kpi-wash-2: #fde4fd;
+  --kpi-edge-2: #f0b0f0;
+  --kpi-bar-2: #e07edf;
+  --kpi-dot-2: #e07edf;
+  --kpi-wash-3: #dff7f8;
+  --kpi-edge-3: #8ee4ea;
+  --kpi-bar-3: var(--index);
+  --kpi-dot-3: var(--index);
+  --kpi-wash-4: #e4f1ef;
+  --kpi-edge-4: #9ec9c4;
+  --kpi-bar-4: var(--primary-dark);
+  --kpi-dot-4: var(--primary-dark);
   --radius-sm: 8px;
   --radius-md: 12px;
   --login-accent: #c4a574;
@@ -65,6 +92,9 @@
   --color-nav-muted: var(--nav-muted);
   --color-login-accent: var(--login-accent);
   --color-login-accent-hover: var(--login-accent-hover);
+  --color-status-mora: var(--status-mora);
+  --color-status-ajuste: var(--status-ajuste);
+  --color-status-ok: var(--status-ok);
   --font-sans: var(--font-dm-sans);
   --radius-sm: var(--radius-sm);
   --radius-md: var(--radius-md);
@@ -118,6 +148,90 @@ body {
 }
 
 /* Next modals and drawers: spring stiffness 400, damping 30, no overshoot. */
+.rocchia-panel {
+  position: relative;
+  border-radius: var(--radius-md);
+  border: 1px solid color-mix(in srgb, var(--border) 90%, transparent);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-card);
+  transition:
+    transform 200ms cubic-bezier(0.23, 1, 0.32, 1),
+    box-shadow 200ms cubic-bezier(0.23, 1, 0.32, 1),
+    border-color 200ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .rocchia-panel:hover {
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--primary) 20%, var(--border));
+    box-shadow:
+      0 1px 2px rgba(1, 4, 0, 0.04),
+      0 10px 28px rgba(16, 112, 119, 0.09);
+  }
+
+  .rocchia-panel--flat:hover {
+    transform: none;
+    box-shadow: var(--shadow-card);
+    border-color: color-mix(in srgb, var(--border) 90%, transparent);
+  }
+}
+
+.rocchia-panel-accent {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--primary) 0%, var(--mint) 55%, transparent 100%);
+  opacity: 0.85;
+}
+
+@keyframes rocchia-list-progress {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
+.rocchia-list-progress-indeterminate {
+  animation: rocchia-list-progress 1.15s ease-in-out infinite;
+}
+
+.rocchia-table-shell {
+  overflow-x: auto;
+}
+
+.rocchia-table-shell thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.rocchia-table-shell .bui-table th {
+  background-color: var(--bg-cream);
+  border-color: var(--border);
+  padding-inline: 1.25rem;
+  height: 2.75rem;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.rocchia-table-shell .bui-table td {
+  padding-inline: 1.25rem;
+  height: 3.25rem;
+}
+
+.rocchia-table-shell .bui-table tbody tr {
+  cursor: pointer;
+}
+
+.rocchia-table-shell .bui-table tbody tr:hover {
+  background-color: var(--bg-page);
+}
+
 .dashboard-animate-in {
   animation: dashboard-rise-in 160ms cubic-bezier(0.23, 1, 0.32, 1) both;
 }

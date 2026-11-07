@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 
 import { Modal } from "@/components/ui/Modal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
+import { NumericSelect } from "@/components/ui/NumericSelect";
+import { RocchiaDateField } from "@/components/ui/RocchiaDateField";
 import { buildCobrarModalSubtitle, type RentalRow } from "@/data/alquileres-rentals";
 import { invalidateDashboardAlerts } from "@/lib/dashboard-alerts-events";
 import {
@@ -571,29 +573,17 @@ export function CobrarAlquilerModal({
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className="flex flex-col gap-1.5">
-              <span className="text-[11px] font-semibold text-text-secondary">Fecha de pago</span>
-              <input
-                type="date"
-                value={fechaPago}
-                onChange={(e) => setFechaPago(e.target.value)}
-                className={formInputClass}
-              />
-            </label>
-            <label className="flex flex-col gap-1.5">
-              <span className="text-[11px] font-semibold text-text-secondary">Medio de pago</span>
-              <select
-                value={medioPagoId || ""}
-                onChange={(e) => setMedioPagoId(Number(e.target.value))}
-                className={formInputClass}
-              >
-                {mediosPagoOpciones.map((medio) => (
-                  <option key={medio.id} value={medio.id}>
-                    {medio.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <RocchiaDateField
+              label="Fecha de pago"
+              value={fechaPago}
+              onChange={setFechaPago}
+            />
+            <NumericSelect
+              label="Medio de pago"
+              value={medioPagoId > 0 ? medioPagoId : null}
+              onChange={(id) => id != null && setMedioPagoId(id)}
+              options={mediosPagoOpciones.map((medio) => ({ value: medio.id, label: medio.name }))}
+            />
           </div>
 
           <label className="flex items-center gap-2 text-[13px] text-text-primary">

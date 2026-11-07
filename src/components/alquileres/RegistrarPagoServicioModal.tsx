@@ -8,6 +8,8 @@ import type { CatalogoItem, PeriodoServicioRecord } from "@/lib/api/types";
 import { formatMoney } from "@/lib/format";
 import { defaultMedioPagoParaCobro, mediosPagoParaCobro } from "@/lib/mappers/medios-pago";
 import { periodoRangeLabel } from "@/lib/mappers/servicios";
+import { NumericSelect } from "@/components/ui/NumericSelect";
+import { RocchiaDateField } from "@/components/ui/RocchiaDateField";
 import { formInputClass } from "@/lib/ui/interactive-focus";
 
 export type RegistrarPagoServicioFormValues = {
@@ -36,6 +38,10 @@ function Field({
   type?: string;
   placeholder?: string;
 }) {
+  if (type === "date") {
+    return <RocchiaDateField label={label} value={value} onChange={onChange} />;
+  }
+
   return (
     <label className="flex flex-col gap-1.5">
       <span className="text-[11px] font-semibold text-text-secondary">{label}</span>
@@ -148,24 +154,18 @@ export function RegistrarPagoServicioModal({
           <p className="text-[12px] text-danger">El monto no puede superar el saldo pendiente.</p>
         ) : null}
 
-        <label className="flex flex-col gap-1.5">
-          <span className="text-[11px] font-semibold text-text-secondary">Medio de pago</span>
-          <select
-            value={form.medioPagoId || ""}
-            onChange={(e) => setForm((prev) => ({ ...prev, medioPagoId: Number(e.target.value) }))}
-            className={formInputClass}
-          >
-            {mediosPagoOpciones.length === 0 ? (
-              <option value="">Sin medios disponibles</option>
-            ) : (
-              mediosPagoOpciones.map((medio) => (
-                <option key={medio.id} value={medio.id}>
-                  {medio.name}
-                </option>
-              ))
-            )}
-          </select>
-        </label>
+        <NumericSelect
+          label="Medio de pago"
+          value={form.medioPagoId > 0 ? form.medioPagoId : null}
+          onChange={(medioPagoId) =>
+            medioPagoId != null && setForm((prev) => ({ ...prev, medioPagoId }))
+          }
+          disabled={mediosPagoOpciones.length === 0}
+          placeholder={
+            mediosPagoOpciones.length === 0 ? "Sin medios disponibles" : "Seleccionar…"
+          }
+          options={mediosPagoOpciones.map((medio) => ({ value: medio.id, label: medio.name }))}
+        />
 
         <Field
           label="Referencia (opcional)"

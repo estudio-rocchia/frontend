@@ -19,6 +19,7 @@ import {
   type BalanceCurrencyView,
 } from "@/components/reportes/balance-ui";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
+import { RocchiaDateField } from "@/components/ui/RocchiaDateField";
 import { PageHeaderSkeleton, Skeleton } from "@/components/ui/Skeleton";
 import { useAuth } from "@/context/auth-context";
 import { ApiError, fetchCierreReporte, NetworkError } from "@/lib/api";
@@ -414,32 +415,24 @@ export function CierreBalanceView() {
             </label>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_auto]">
-            <label className="flex flex-col gap-1.5 text-[11px] font-medium uppercase tracking-wide text-text-secondary">
-              Desde
-              <input
-                type="date"
-                value={desde}
-                disabled={toolbarBusy}
-                onChange={(e) => {
-                  setPreset("custom");
-                  setDesde(e.target.value);
-                }}
-                className={`${formInputClass} balance-date-input disabled:cursor-not-allowed disabled:opacity-60`}
-              />
-            </label>
-            <label className="flex flex-col gap-1.5 text-[11px] font-medium uppercase tracking-wide text-text-secondary">
-              Hasta
-              <input
-                type="date"
-                value={hasta}
-                disabled={toolbarBusy}
-                onChange={(e) => {
-                  setPreset("custom");
-                  setHasta(e.target.value);
-                }}
-                className={`${formInputClass} balance-date-input disabled:cursor-not-allowed disabled:opacity-60`}
-              />
-            </label>
+            <RocchiaDateField
+              label="Desde"
+              value={desde}
+              disabled={toolbarBusy}
+              onChange={(next) => {
+                setPreset("custom");
+                setDesde(next);
+              }}
+            />
+            <RocchiaDateField
+              label="Hasta"
+              value={hasta}
+              disabled={toolbarBusy}
+              onChange={(next) => {
+                setPreset("custom");
+                setHasta(next);
+              }}
+            />
             <div className="flex flex-col items-stretch gap-1.5 sm:items-end">
               <div className="flex flex-wrap items-end gap-2">
                 {hasPendingPeriod ? (

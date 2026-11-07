@@ -8,6 +8,9 @@ import { useSyncScope } from "@/lib/sync/use-sync-scope";
 
 import { AlquileresKpiSection } from "@/components/alquileres/AlquileresKpiSection";
 import { AlquileresPageActions } from "@/components/alquileres/AlquileresPageActions";
+import { Card } from "@/components/ui/Card";
+import { ListProgressBar } from "@/components/ui/ListProgressBar";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { RentalsTable } from "@/components/alquileres/RentalsTable";
 import type { NewContractForm } from "@/components/alquileres/NewContractModal";
 import type { RenewContractForm } from "@/components/alquileres/RenewContractModal";
@@ -112,6 +115,9 @@ export function AlquileresWorkspace() {
   const {
     rows,
     loading,
+    refreshing,
+    listTransitionKey,
+    isInitialLoad,
     error,
     pageIndex,
     canGoPrev,
@@ -693,29 +699,29 @@ export function AlquileresWorkspace() {
   return (
     <>
       <div className={`relative z-10 flex flex-col gap-6 sm:gap-8 ${pagePaddingClass}`}>
-        <header className="flex flex-col gap-4">
-          <div className="flex max-w-2xl flex-col gap-1">
-            <h1 className="text-[26px] font-normal tracking-tight text-text-primary">Alquileres</h1>
-            <p className="text-[13px] text-text-secondary">
-              {tableStats === null
-                ? "Contratos, cobranzas y ajustes."
-                : stats.enMora > 0
-                  ? stats.enMora === 1
-                    ? "Hay un contrato en mora."
-                    : `Hay ${stats.enMora} contratos en mora.`
-                  : stats.aCobrar > 0
-                    ? stats.aCobrar === 1
-                      ? "Hay una cuota para cobrar este mes."
-                      : `Hay ${stats.aCobrar} cuotas para cobrar este mes.`
-                    : "Los contratos activos están al día."}
-            </p>
-          </div>
-          <AlquileresPageActions
-            onNewContract={() => void openNewContractModal()}
-            onLiquidacion={() => setLiquidacionModalOpen(true)}
-            disabled={submitting}
-          />
-        </header>
+        <PageHeader
+          title="Alquileres"
+          description={
+            tableStats === null
+              ? "Contratos, cobranzas y ajustes."
+              : stats.enMora > 0
+                ? stats.enMora === 1
+                  ? "Hay un contrato en mora."
+                  : `Hay ${stats.enMora} contratos en mora.`
+                : stats.aCobrar > 0
+                  ? stats.aCobrar === 1
+                    ? "Hay una cuota para cobrar este mes."
+                    : `Hay ${stats.aCobrar} cuotas para cobrar este mes.`
+                  : "Los contratos activos están al día."
+          }
+          actions={
+            <AlquileresPageActions
+              onNewContract={() => void openNewContractModal()}
+              onLiquidacion={() => setLiquidacionModalOpen(true)}
+              disabled={submitting}
+            />
+          }
+        />
 
         <AlquileresKpiSection
           loading={loading}
@@ -738,9 +744,14 @@ export function AlquileresWorkspace() {
             </button>
           </div>
         ) : (
-          <RentalsTable
+          <Card accent className="rocchia-panel--flat relative overflow-hidden p-0">
+            <ListProgressBar active={refreshing} />
+            <RentalsTable
+              embedded
               rows={rows}
-              loading={loading}
+              loading={loading && isInitialLoad}
+              refreshing={refreshing}
+              listTransitionKey={listTransitionKey}
               isSearchPending={isSearchPending}
               serverMode
               total={tableTotal}
@@ -763,7 +774,8 @@ export function AlquileresWorkspace() {
               onRenew={(row) => void openRenewFromRow(row)}
               onFinish={openFinishFromRow}
             />
-          )}
+          </Card>
+        )}
       </div>
 
       {liquidacionModalOpen ? (

@@ -3,8 +3,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { RefreshCw } from "lucide-react";
 
+import { Card } from "@/components/ui/Card";
 import { KpiCard } from "@/components/ui/KpiCard";
+import { ListProgressBar } from "@/components/ui/ListProgressBar";
+import { ListTableContent } from "@/components/ui/ListTableContent";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { RocchiaDateField } from "@/components/ui/RocchiaDateField";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { ButtonPrimary } from "@/components/ui/Button";
+import { useListRefreshTransition } from "@/lib/ui/use-list-refresh-transition";
 import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 import { useAuth } from "@/context/auth-context";
 import { ApiError, fetchIndiceValores, NetworkError, syncIndices } from "@/lib/api";
@@ -39,6 +46,26 @@ function defaultDateRange() {
 
 function sortByPeriodoDesc(items: ValorIndiceRecord[]) {
   return [...items].sort((a, b) => b.periodo.localeCompare(a.periodo));
+}
+
+function IndicesTableSkeleton() {
+  return (
+    <div className="overflow-x-auto" aria-hidden>
+      <table className="w-full min-w-[640px] text-left text-[13px]">
+        <tbody>
+          {Array.from({ length: 8 }).map((_, index) => (
+            <tr key={index} className="border-b border-border">
+              {Array.from({ length: 5 }).map((__, cell) => (
+                <td key={cell} className="px-5 py-4">
+                  <Skeleton className="h-4 w-full max-w-[96px] ml-auto" />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 function IndexSelector({
@@ -76,6 +103,7 @@ function IndexSelector({
 
 export function IndicesView() {
   const { token, logout } = useAuth();
+  const { refreshing, listTransitionKey, isInitialLoad, start, finish } = useListRefreshTransition();
   const defaults = useMemo(() => defaultDateRange(), []);
   const [indice, setIndice] = useState<IndiceCode>("ICL");
   const [desde, setDesde] = useState(defaults.desde);
@@ -88,7 +116,9 @@ export function IndicesView() {
 
   const load = useCallback(async () => {
     if (!token) return;
-    setLoading(true);
+    const listKey = `${indice}-${desde}-${hasta}`;
+    const { startedAt, isInitial } = start();
+    if (isInitial) setLoading(true);
     setError(null);
     try {
       const desdeFetch = earlierIsoDate(desde, subtractMonthsFromDate(hasta, 14));
@@ -102,9 +132,10 @@ export function IndicesView() {
       setError(err instanceof ApiError ? err.message : "Error al cargar los índices");
       setAllRows([]);
     } finally {
+      await finish(listKey, startedAt);
       setLoading(false);
     }
-  }, [token, logout, indice, desde, hasta]);
+  }, [token, logout, indice, desde, hasta, start, finish]);
 
   useEffect(() => {
     void load();
@@ -171,15 +202,10 @@ export function IndicesView() {
 
   return (
     <div className={`flex flex-col gap-6 sm:gap-8 ${pagePaddingClass}`}>
-      <header className="flex flex-col gap-4">
-        <div className="flex max-w-2xl flex-col gap-1">
-          <h1 className="text-[26px] font-normal tracking-tight text-text-primary">Índices de ajuste</h1>
-          <p className="text-[13px] text-text-secondary">
-            {INDEX_LABELS[indice]}
-            {indice === "CAC" ? " CAMARCO puede tardar unos minutos." : ""}
-          </p>
-        </div>
-      </header>
+      <PageHeader
+        title="Índices de ajuste"
+        description={`${INDEX_LABELS[indice]}${indice === "CAC" ? " CAMARCO puede tardar unos minutos." : ""}`}
+      />
 
       <section className="flex flex-col gap-3">
         <div className="flex w-fit max-w-full flex-wrap items-center gap-2">
@@ -203,7 +229,7 @@ export function IndicesView() {
         ) : null}
       </section>
 
-      {!loading && !error && rows.length > 0 ? (
+      {!loading && !refreshing && !error && rows.length > 0 ? (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <KpiCard
             label={`Último valor · ${indice}`}
@@ -232,34 +258,19 @@ export function IndicesView() {
         </div>
       ) : null}
 
-      <section className="flex min-h-[360px] flex-1 flex-col overflow-hidden rounded-md border border-border bg-bg-card shadow-[var(--shadow-card)]">
+      <Card accent className="rocchia-panel--flat relative flex min-h-[360px] flex-1 flex-col overflow-hidden p-0">
+        <ListProgressBar active={refreshing} />
         <div className="flex flex-wrap items-end justify-between gap-4 border-b border-border px-5 py-4">
           <div className="flex flex-col gap-0.5">
             <h2 className="text-[15px] font-semibold text-text-primary">Histórico mensual</h2>
             <p className="text-xs text-text-secondary">
-              {loading ? "Cargando…" : `${rows.length} período${rows.length === 1 ? "" : "s"}`}
+              {loading || refreshing ? "Cargando…" : `${rows.length} período${rows.length === 1 ? "" : "s"}`}
             </p>
           </div>
 
           <div className="flex flex-wrap items-end gap-3">
-            <label className="flex flex-col gap-1">
-              <span className="text-[11px] font-semibold text-text-secondary">Desde</span>
-              <input
-                type="date"
-                value={desde}
-                onChange={(event) => setDesde(event.target.value)}
-                className="rounded-sm border border-border bg-bg-page px-3 py-2 text-[13px] outline-none focus:border-primary"
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-[11px] font-semibold text-text-secondary">Hasta</span>
-              <input
-                type="date"
-                value={hasta}
-                onChange={(event) => setHasta(event.target.value)}
-                className="rounded-sm border border-border bg-bg-page px-3 py-2 text-[13px] outline-none focus:border-primary"
-              />
-            </label>
+            <RocchiaDateField label="Desde" value={desde} onChange={setDesde} />
+            <RocchiaDateField label="Hasta" value={hasta} onChange={setHasta} />
           </div>
         </div>
 
@@ -276,67 +287,76 @@ export function IndicesView() {
               Reintentar
             </button>
           </div>
-        ) : loading ? (
-          <p className="px-5 py-12 text-sm text-text-secondary">Cargando valores…</p>
-        ) : rows.length === 0 ? (
-          <div className="flex flex-col items-start gap-3 px-5 py-12">
-            <p className="text-sm text-text-secondary">
-              No hay valores para el rango seleccionado.
-            </p>
-            <ButtonPrimary type="button" onClick={() => void load()}>
-              Volver a intentar
-            </ButtonPrimary>
-          </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-left text-[13px]">
-              <thead>
-                <tr className="h-11 bg-bg-cream text-xs font-semibold text-text-secondary">
-                  <th className="px-5">Período</th>
-                  <th className="px-5 text-right">Valor</th>
-                  <th className="px-5 text-right">Mensual</th>
-                  <th className="px-5 text-right">Interanual</th>
-                  <th className="px-5 text-right">Acumulada</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row, index) => {
-                  const variations = computeIndexVariations(valorMap, row.periodo);
-                  return (
-                  <tr
-                    key={row.periodo}
-                    className={`border-b border-border ${
-                      index === 0 ? "bg-primary-soft/40" : "hover:bg-bg-page/80"
-                    }`}
-                  >
-                    <td className="px-5 py-4 font-medium text-text-primary">
-                      {formatPeriodoIndice(row.periodo)}
-                      {index === 0 ? (
-                        <span className="ml-2 text-[11px] font-semibold text-primary">
-                          Último
-                        </span>
-                      ) : null}
-                    </td>
-                    <td className="px-5 py-4 text-right text-[15px] font-bold text-primary">
-                      {formatIndexValue(row.valor)}
-                    </td>
-                    <td className="px-5 py-4 text-right">
-                      <VariationValue value={variations.mensual} />
-                    </td>
-                    <td className="px-5 py-4 text-right">
-                      <VariationValue value={variations.interanual} />
-                    </td>
-                    <td className="px-5 py-4 text-right">
-                      <VariationValue value={variations.acumulada} />
-                    </td>
-                  </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <ListTableContent
+            isInitialLoad={isInitialLoad}
+            loading={loading}
+            refreshing={refreshing}
+            listTransitionKey={listTransitionKey}
+            initialSkeleton={<IndicesTableSkeleton />}
+            placeholderClassName="min-h-[280px]"
+          >
+            {rows.length === 0 ? (
+              <div className="flex flex-col items-start gap-3 px-5 py-12">
+                <p className="text-sm text-text-secondary">
+                  No hay valores para el rango seleccionado.
+                </p>
+                <ButtonPrimary type="button" onClick={() => void load()}>
+                  Volver a intentar
+                </ButtonPrimary>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[640px] text-left text-[13px]">
+                  <thead>
+                    <tr className="h-11 bg-bg-cream text-xs font-semibold text-text-secondary">
+                      <th className="px-5">Período</th>
+                      <th className="px-5 text-right">Valor</th>
+                      <th className="px-5 text-right">Mensual</th>
+                      <th className="px-5 text-right">Interanual</th>
+                      <th className="px-5 text-right">Acumulada</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((row, index) => {
+                      const variations = computeIndexVariations(valorMap, row.periodo);
+                      return (
+                        <tr
+                          key={row.periodo}
+                          className={`border-b border-border ${
+                            index === 0 ? "bg-primary-soft/40" : "hover:bg-bg-page/80"
+                          }`}
+                        >
+                          <td className="px-5 py-4 font-medium text-text-primary">
+                            {formatPeriodoIndice(row.periodo)}
+                            {index === 0 ? (
+                              <span className="ml-2 text-[11px] font-semibold text-primary">
+                                Último
+                              </span>
+                            ) : null}
+                          </td>
+                          <td className="px-5 py-4 text-right text-[15px] font-bold text-primary">
+                            {formatIndexValue(row.valor)}
+                          </td>
+                          <td className="px-5 py-4 text-right">
+                            <VariationValue value={variations.mensual} />
+                          </td>
+                          <td className="px-5 py-4 text-right">
+                            <VariationValue value={variations.interanual} />
+                          </td>
+                          <td className="px-5 py-4 text-right">
+                            <VariationValue value={variations.acumulada} />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </ListTableContent>
         )}
-      </section>
+      </Card>
     </div>
   );
 }

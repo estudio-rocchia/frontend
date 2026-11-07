@@ -45,6 +45,7 @@ import { ClienteResumenSection } from "@/components/clientes/ClienteResumenSecti
 import { PersonaFichaCard } from "@/components/clientes/PersonaFichaCard";
 import { PageHeaderSkeleton, Skeleton } from "@/components/ui/Skeleton";
 import { useAuth } from "@/context/auth-context";
+import { personaDisplayName } from "@/lib/format";
 import { type ClienteRow } from "@/data/clientes";
 import {
   ApiError,

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
+import { RocchiaDateField } from "@/components/ui/RocchiaDateField";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import type { ConceptoCotizadoVisa, CotizacionVisa, IntegranteVisa, ReciboVisa } from "@/lib/api/types";
 import { formatDateDisplay, personaDisplayName } from "@/lib/format";
@@ -591,25 +592,16 @@ export function CotizacionCard({
                 </p>
               )}
 
-              <label className="flex flex-col gap-1.5" htmlFor="fecha-cobro">
-                <span className="text-[11px] font-semibold text-text-secondary">Fecha</span>
-                <input
-                  id="fecha-cobro"
-                  type="date"
-                  value={fecha}
-                  min={abiertoEn || undefined}
-                  disabled={saving}
-                  aria-invalid={Boolean(fechaError)}
-                  aria-describedby={fechaError ? "fecha-cobro-ayuda" : undefined}
-                  onChange={(event) => setFecha(event.target.value)}
-                  className={`${formInputClass} w-full disabled:opacity-60`}
-                />
-                {fechaError ? (
-                  <span id="fecha-cobro-ayuda" className="text-xs text-danger">
-                    {fechaError}
-                  </span>
-                ) : null}
-              </label>
+              <RocchiaDateField
+                id="fecha-cobro"
+                label="Fecha"
+                value={fecha}
+                disabled={saving}
+                invalid={Boolean(fechaError)}
+                error={fechaError ?? undefined}
+                onChange={setFecha}
+                className="w-full"
+              />
 
               <div className="flex items-center gap-2">
                 <ButtonPrimary type="submit" disabled={saving} className="min-w-0 flex-1">

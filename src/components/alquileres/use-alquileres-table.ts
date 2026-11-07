@@ -10,11 +10,13 @@ import type { ContratoOperativaFilter, ContratoTableStats } from "@/lib/api/type
 import { useBreakUiMode } from "@/lib/alquileres/break-ui-mode";
 import { useCursorPagination } from "@/lib/hooks/use-cursor-pagination";
 import { mapContratoTableItemToRentalRow } from "@/lib/mappers/rentals";
+import { useListRefreshTransition } from "@/lib/ui/use-list-refresh-transition";
 
 export const ALQUILERES_PAGE_SIZE = 15;
 
 export function useAlquileresTable(token: string | null, logout: () => void) {
   const breakUi = useBreakUiMode();
+  const { refreshing, listTransitionKey, isInitialLoad, start, finish } = useListRefreshTransition();
   const [rows, setRows] = useState<RentalRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +39,9 @@ export function useAlquileresTable(token: string | null, logout: () => void) {
   const loadRows = useCallback(async (options?: { silent?: boolean }) => {
     if (!token) return;
     const silent = options?.silent ?? false;
-    if (!silent) {
+    const listKey = `${activeChip}-${debouncedSearch}-${currentCursor ?? "start"}`;
+    const { startedAt, isInitial } = start(silent);
+    if (!silent && isInitial) {
       setLoading(true);
     }
     setError(null);
@@ -78,10 +82,22 @@ export function useAlquileresTable(token: string | null, logout: () => void) {
       setError(err instanceof ApiError ? err.message : "Error al cargar alquileres");
     } finally {
       if (!silent) {
+        await finish(listKey, startedAt);
         setLoading(false);
       }
     }
-  }, [token, logout, currentCursor, debouncedSearch, activeChip, applyResponse, breakUi.active, breakUi.mode]);
+  }, [
+    token,
+    logout,
+    currentCursor,
+    debouncedSearch,
+    activeChip,
+    applyResponse,
+    breakUi.active,
+    breakUi.mode,
+    start,
+    finish,
+  ]);
 
   const isSearchPending = searchQuery !== debouncedSearch;
 
@@ -114,6 +130,9 @@ export function useAlquileresTable(token: string | null, logout: () => void) {
   return {
     rows,
     loading,
+    refreshing,
+    listTransitionKey,
+    isInitialLoad,
     error,
     pageIndex,
     canGoPrev,

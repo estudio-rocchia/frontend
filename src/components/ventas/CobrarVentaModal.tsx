@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { FormField, FormSection } from "@/components/ui/FormLayout";
-import { formInputClass } from "@/lib/ui/interactive-focus";
+import { NumericSelect } from "@/components/ui/NumericSelect";
 import {
   ApiError,
   downloadVentaReciboPdf,
@@ -264,19 +264,12 @@ export function CobrarVentaModal({
 
           <FormField label="Fecha de pago" value={fechaPago} onChange={setFechaPago} type="date" />
           <FormField label="Monto" value={monto} onChange={setMonto} type="number" />
-          <label className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-semibold text-text-secondary">Medio de pago</span>
-            <select
-              value={medioPagoId || ""}
-              onChange={(e) => setMedioPagoId(Number(e.target.value))}
-              className={formInputClass}
-            >
-              <option value="">Seleccionar...</option>
-              {mediosPago.map((medio) => (
-                <option key={medio.id} value={medio.id}>{medio.name}</option>
-              ))}
-            </select>
-          </label>
+          <NumericSelect
+            label="Medio de pago"
+            value={medioPagoId > 0 ? medioPagoId : null}
+            onChange={(id) => id != null && setMedioPagoId(id)}
+            options={mediosPago.map((medio) => ({ value: medio.id, label: medio.name }))}
+          />
           <FormField label="Nota (opcional)" value={nota} onChange={setNota} />
           <label className="flex items-center gap-2 text-[13px] text-text-primary">
             <input
