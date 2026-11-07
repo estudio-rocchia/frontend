@@ -15,9 +15,12 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { SearchField } from "@/components/ui/SearchField";
 import { ListProgressBar } from "@/components/ui/ListProgressBar";
 import { ListTableContent } from "@/components/ui/ListTableContent";
+import { clientesMorosoKpiTone } from "@/lib/ui/kpi-tones";
+import { semanticVariantToStatusTone } from "@/lib/ui/status-tones";
 import { useListRefreshTransition } from "@/lib/ui/use-list-refresh-transition";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
-import { StatusBadge } from "@/components/ui/StatusBadge";
+import { ClienteVinculoChip } from "@/components/clientes/ClienteVinculoChip";
+import { StatusChip } from "@/components/ui/StatusChip";
 import { useAuth } from "@/context/auth-context";
 import { clienteFilters, type ClienteFilterId, type ClienteRow } from "@/data/clientes";
 import { fetchClientesFilterCounts, invalidateClientesFilterCounts } from "@/lib/api/clientes-filter-counts";
@@ -33,7 +36,6 @@ import {
   filterClientes,
   mapClientesKpisFromCounts,
   mapPersonaToClienteRow,
-  vinculoBadgeClass,
 } from "@/lib/mappers/clientes";
 import { exportClientesListado, fetchAllClienteRowsForExport } from "@/lib/clientes/export-listado";
 
@@ -358,7 +360,14 @@ export function ClientesView() {
             ? Array.from({ length: 4 }).map((_, index) => (
                 <div key={index} className="h-[88px] animate-pulse rounded-md border border-border bg-bg-card" />
               ))
-            : kpiCards.map((kpi, index) => <KpiCard key={kpi.label} {...kpi} tone={index} />)}
+            : kpiCards.map((kpi, index) => (
+               <KpiCard
+                 key={kpi.label}
+                 {...kpi}
+                 tone={index}
+                 palette={kpi.label === "En mora" ? clientesMorosoKpiTone : undefined}
+               />
+             ))}
         </div>
 
         <Card accent className="rocchia-panel--flat relative overflow-hidden">
@@ -458,12 +467,7 @@ export function ClientesView() {
                             <div className="flex flex-wrap gap-1.5">
                               {row.vinculos.length > 0 ? (
                                 row.vinculos.map((vinculo) => (
-                                  <span
-                                    key={`${row.id}-${vinculo.id}`}
-                                    className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${vinculoBadgeClass(vinculo.id)}`}
-                                  >
-                                    {vinculo.label}
-                                  </span>
+                                  <ClienteVinculoChip key={`${row.id}-${vinculo.id}`} vinculo={vinculo} />
                                 ))
                               ) : (
                                 <span className="text-[13px] text-text-secondary">—</span>
@@ -479,7 +483,12 @@ export function ClientesView() {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <StatusBadge label={row.estado.label} variant={row.estado.variant} />
+                            <StatusChip
+                              tone={semanticVariantToStatusTone(row.estado.variant)}
+                              title={row.estado.label}
+                            >
+                              {row.estado.label}
+                            </StatusChip>
                           </TableCell>
                         </TableRow>
                       )}

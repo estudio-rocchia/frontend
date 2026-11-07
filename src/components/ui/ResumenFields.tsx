@@ -9,21 +9,28 @@ export const resumenFieldGridClass = "grid min-w-0 gap-4 sm:grid-cols-[repeat(2,
 export function ResumenPanel({
   title,
   description,
+  headerAction,
   children,
 }: {
   title: string;
   description?: string;
+  headerAction?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <section className="flex min-w-0 flex-col overflow-hidden rounded-md border border-border bg-bg-card shadow-[var(--shadow-card)]">
       <header className="bg-bg-cream px-4 py-3">
-        <h3 className="text-[13px] font-semibold text-text-primary">{title}</h3>
-        {description ? (
-          <p className="mt-1 text-[12px] leading-snug text-text-secondary">{description}</p>
-        ) : null}
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <h3 className="text-[13px] font-semibold text-text-primary">{title}</h3>
+            {description ? (
+              <p className="mt-1 text-[12px] leading-snug text-text-secondary">{description}</p>
+            ) : null}
+          </div>
+          {headerAction ? <div className="shrink-0">{headerAction}</div> : null}
+        </div>
       </header>
-      <div className="flex min-w-0 flex-col gap-8 p-4">{children}</div>
+      <div className="flex min-w-0 flex-col gap-4 p-4 pt-3">{children}</div>
     </section>
   );
 }

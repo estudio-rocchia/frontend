@@ -16,6 +16,7 @@ import {
   popoverClassName,
   triggerButtonClassName,
 } from "@/components/base/date-picker/shared";
+import { useOverlayPortalContainer } from "@/lib/ui/overlay-portal";
 import { cx } from "@/utils/cx";
 import { useDismissOnOutsidePress } from "@/utils/use-dismiss-on-outside-press";
 
@@ -75,6 +76,7 @@ export function DatePicker({
   const triggerRef = externalTriggerRef ?? ownTriggerRef;
   const isExternal = externalTriggerRef !== undefined;
   const popoverRef = useRef<HTMLElement>(null);
+  const overlayPortal = useOverlayPortalContainer();
 
   const [internalOpen, setInternalOpen] = useState(false);
   const isOpen = isExternal ? (controlledIsOpen ?? false) : internalOpen;
@@ -142,6 +144,7 @@ export function DatePicker({
         offset={4}
         placement="bottom end"
         isNonModal
+        UNSTABLE_portalContainer={overlayPortal}
         className={popoverClassName}
       >
         <Dialog aria-label={ariaLabel} className="outline-none">

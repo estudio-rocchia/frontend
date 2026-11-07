@@ -6,6 +6,7 @@ import { KpiSkeletonRow } from "@/components/ui/Skeleton";
 import type { RentalChipId } from "@/data/alquileres-rentals";
 import type { ContratoTableStats } from "@/lib/api/types";
 import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
+import { ajusteKpiTone, moraKpiTone } from "@/lib/ui/kpi-tones";
 
 const ease = [0.16, 1, 0.3, 1] as const;
 
@@ -44,20 +45,20 @@ const KPI_FILTERS: Array<{
     label: "En mora",
     hint: "Con atraso",
     statKey: "enMora",
-    wash: "bg-[#fde4fd]",
-    edge: "border-[#f0b0f0]",
-    bar: "bg-[#e07edf]",
-    dot: "bg-[#e07edf]",
+    wash: moraKpiTone.wash,
+    edge: moraKpiTone.edge,
+    bar: moraKpiTone.bar,
+    dot: moraKpiTone.dot,
   },
   {
     chip: "ajuste_pendiente",
     label: "Ajuste",
     hint: "Pendiente de índice",
     statKey: "ajustePendiente",
-    wash: "bg-status-yellow-background",
-    edge: "border-yellow-300",
-    bar: "bg-yellow-500",
-    dot: "bg-yellow-500",
+    wash: ajusteKpiTone.wash,
+    edge: ajusteKpiTone.edge,
+    bar: ajusteKpiTone.bar,
+    dot: ajusteKpiTone.dot,
   },
   {
     chip: "renovacion_proxima",

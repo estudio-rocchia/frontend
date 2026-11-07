@@ -5,7 +5,7 @@ import type { AdjustmentIndex } from "@/data/alquileres-contract-details";
 import { ApiError, previewAjusteIndice } from "@/lib/api";
 import type { ContratoDetail, IndiceCode, PreviewAjusteResponse } from "@/lib/api/types";
 import { formatIndicePunto, formatMoney, rentalApiErrorMessage } from "@/lib/format";
-import { NumericSelect } from "@/components/ui/NumericSelect";
+import { MesAnioPeriodSelect } from "@/components/ui/MesAnioPeriodSelect";
 import {
   ADJUSTMENT_INDICES,
   type MonthYear,
@@ -18,21 +18,6 @@ import {
   suggestedIndexMonthPeriod,
   toIsoMonthDate,
 } from "@/lib/rental-adjustment";
-
-const MONTHS = [
-  { value: 1, label: "Enero" },
-  { value: 2, label: "Febrero" },
-  { value: 3, label: "Marzo" },
-  { value: 4, label: "Abril" },
-  { value: 5, label: "Mayo" },
-  { value: 6, label: "Junio" },
-  { value: 7, label: "Julio" },
-  { value: 8, label: "Agosto" },
-  { value: 9, label: "Septiembre" },
-  { value: 10, label: "Octubre" },
-  { value: 11, label: "Noviembre" },
-  { value: 12, label: "Diciembre" },
-];
 
 export type IndexCalculatorState = {
   tipoIndice: AdjustmentIndex;
@@ -48,39 +33,6 @@ function formatIndexValue(value: string): string {
     return num.toLocaleString("es-AR", { maximumFractionDigits: 1 });
   }
   return num.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-function MonthYearSelect({
-  label,
-  hint,
-  value,
-  years,
-  onChange,
-}: {
-  label: string;
-  hint?: string;
-  value: MonthYear;
-  years: number[];
-  onChange: (value: MonthYear) => void;
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-[11px] font-semibold text-text-secondary">{label}</span>
-      {hint ? <span className="text-[11px] text-text-secondary">{hint}</span> : null}
-      <div className="grid grid-cols-2 gap-2">
-        <NumericSelect
-          value={value.mes}
-          onChange={(mes) => mes != null && onChange({ ...value, mes })}
-          options={MONTHS.map((m) => ({ value: m.value, label: m.label }))}
-        />
-        <NumericSelect
-          value={value.anio}
-          onChange={(anio) => anio != null && onChange({ ...value, anio })}
-          options={years.map((y) => ({ value: y, label: String(y) }))}
-        />
-      </div>
-    </div>
-  );
 }
 
 function ResultBox({
@@ -362,15 +314,17 @@ export function ContractIndexCalculator({
       ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <MonthYearSelect
+        <MesAnioPeriodSelect
           label="Desde"
-          value={value.periodoDesde}
+          mes={value.periodoDesde.mes}
+          anio={value.periodoDesde.anio}
           years={years}
           onChange={(periodoDesde) => patch({ periodoDesde })}
         />
-        <MonthYearSelect
+        <MesAnioPeriodSelect
           label="Hasta"
-          value={value.periodoHasta}
+          mes={value.periodoHasta.mes}
+          anio={value.periodoHasta.anio}
           years={years}
           onChange={(periodoHasta) => patch({ periodoHasta })}
         />

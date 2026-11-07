@@ -418,6 +418,7 @@ export function CobrarAlquilerModal({
       onClose={onClose}
       title="Cobrar alquiler"
       subtitle={modalSubtitle}
+      maxWidthClass="max-w-2xl"
       footer={
         <>
           <ButtonOutline type="button" onClick={onClose} disabled={submitting}>

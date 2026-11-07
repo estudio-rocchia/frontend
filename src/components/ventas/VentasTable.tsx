@@ -13,7 +13,12 @@ import { ofertaEstadoTone, ventaEstadoTone } from "@/lib/ui/status-tones";
 import type { CatalogSearchItem, VentaDetail } from "@/lib/api/types";
 import { formatMoney, moneyClassName } from "@/lib/format";
 import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
-import { catalogMotivo, saleOferta } from "@/lib/ventas/catalog-helpers";
+import {
+  catalogInmuebleHeading,
+  catalogInmuebleUbicacion,
+  catalogMotivo,
+  saleOferta,
+} from "@/lib/ventas/catalog-helpers";
 import { parteNombre } from "@/lib/ventas/partes";
 import { formatDetalleSummary } from "@/lib/ventas/detalle-labels";
 import {
@@ -104,7 +109,8 @@ const VentaMobileCard = memo(function VentaMobileCard({
   const precio = oferta?.montoPrecio ?? null;
   const moneda = oferta?.codigoMoneda ?? "ARS";
   const estadoCode = oferta?.estadoCode ?? "";
-  const title = item.inmueble.displayLabel ?? item.inmueble.title ?? item.inmueble.code;
+  const title = catalogInmuebleHeading(item);
+  const ubicacion = catalogInmuebleUbicacion(item);
   const detalleSummary = formatDetalleSummary(item.detalle, item.tipoInmueble.code);
 
   return (
@@ -116,7 +122,11 @@ const VentaMobileCard = memo(function VentaMobileCard({
     >
       <div className="min-w-0 flex-1">
         <div className="font-semibold text-text-primary">{title}</div>
-        <div className="mt-0.5 text-[11px] text-text-secondary">{item.inmueble.code}</div>
+        {ubicacion ? (
+          <div className="mt-0.5 text-[11px] text-text-secondary">{ubicacion}</div>
+        ) : (
+          <div className="mt-0.5 text-[11px] text-text-secondary">{item.inmueble.code}</div>
+        )}
         {detalleSummary ? (
           <p className="mt-1 text-[11px] text-text-secondary">{detalleSummary}</p>
         ) : null}
@@ -316,6 +326,7 @@ export const VentasTable = memo(function VentasTable({
                   const precio = oferta?.montoPrecio ?? null;
                   const moneda = oferta?.codigoMoneda ?? "ARS";
                   const estadoCode = oferta?.estadoCode ?? "";
+                  const ubicacion = catalogInmuebleUbicacion(item);
                   const detalleSummary = formatDetalleSummary(item.detalle, item.tipoInmueble.code);
 
                   return (
@@ -333,11 +344,13 @@ export const VentasTable = memo(function VentasTable({
                       role="link"
                       aria-label={`Abrir ficha ${item.inmueble.code}`}
                     >
-                      <td className="px-4 py-3">
-                        <div className="font-semibold text-text-primary">
-                          {item.inmueble.displayLabel ?? item.inmueble.title ?? item.inmueble.code}
-                        </div>
-                        <div className="text-[11px] text-text-secondary">{item.inmueble.code}</div>
+                        <td className="px-4 py-3">
+                          <div className="font-semibold text-text-primary">{catalogInmuebleHeading(item)}</div>
+                          {ubicacion ? (
+                            <div className="text-[11px] text-text-secondary">{ubicacion}</div>
+                          ) : (
+                            <div className="text-[11px] text-text-secondary">{item.inmueble.code}</div>
+                          )}
                         {detalleSummary ? (
                           <div className="mt-0.5 text-[11px] text-text-secondary">{detalleSummary}</div>
                         ) : null}

@@ -744,7 +744,7 @@ export function AlquileresWorkspace() {
             </button>
           </div>
         ) : (
-          <Card accent className="rocchia-panel--flat relative min-w-0 overflow-hidden p-0">
+          <Card accent className="rocchia-panel--flat relative flex min-w-0 flex-col overflow-hidden p-0">
             <ListProgressBar active={refreshing} />
             <RentalsTable
               embedded

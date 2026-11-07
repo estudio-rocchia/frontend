@@ -1,9 +1,10 @@
 "use client";
 
 import { X } from "lucide-react";
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
+import { OverlayPortalProvider } from "@/lib/ui/overlay-portal";
 import { useScrollLock } from "@/lib/use-scroll-lock";
 
 export function Modal({
@@ -26,6 +27,7 @@ export function Modal({
   titleId?: string;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const [portalRoot, setPortalRoot] = useState<HTMLDialogElement | null>(null);
   const onCloseRef = useRef(onClose);
   const ignoreClose = useRef(false);
   onCloseRef.current = onClose;
@@ -45,9 +47,14 @@ export function Modal({
 
   if (!open) return null;
 
+  const setDialogRef = (node: HTMLDialogElement | null) => {
+    dialogRef.current = node;
+    setPortalRoot(node);
+  };
+
   return (
     <dialog
-      ref={dialogRef}
+      ref={setDialogRef}
       aria-labelledby={titleId}
       className={`rocchia-dialog ${maxWidthClass}`}
       onClose={() => {
@@ -61,6 +68,7 @@ export function Modal({
         if (event.target === event.currentTarget) onCloseRef.current();
       }}
     >
+      <OverlayPortalProvider container={portalRoot}>
       <div className="ui-pop-in flex max-h-[90vh] flex-col overflow-hidden rounded-xl border border-border bg-bg-card shadow-[var(--shadow-card)]">
         <header className="flex shrink-0 items-start justify-between gap-3 border-b border-border px-4 py-4 sm:px-6 sm:py-5">
           <div className="flex flex-col gap-1">
@@ -89,6 +97,7 @@ export function Modal({
           </footer>
         ) : null}
       </div>
+      </OverlayPortalProvider>
     </dialog>
   );
 }

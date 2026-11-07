@@ -15,6 +15,7 @@ import {
 } from "@/lib/api";
 import type { LiquidacionRecord, PropietarioAdministracionSummary } from "@/lib/api/types";
 import { downloadBlob, formatMoney, normalizeCurrency, rentalApiErrorMessage } from "@/lib/format";
+import { MesAnioPeriodSelect } from "@/components/ui/MesAnioPeriodSelect";
 import { NumericSelect } from "@/components/ui/NumericSelect";
 import { formInputClass } from "@/lib/ui/interactive-focus";
 
@@ -215,28 +216,13 @@ export function LiquidacionPropietarioModal({
       }
     >
       <div className="flex flex-col gap-4 p-1">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="text-text-secondary">Año</span>
-            <input
-              type="number"
-              className={formInputClass}
-              value={anio}
-              onChange={(e) => setPeriod({ anio: Number(e.target.value), mes })}
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="text-text-secondary">Mes</span>
-            <input
-              type="number"
-              min={1}
-              max={12}
-              className={formInputClass}
-              value={mes}
-              onChange={(e) => setPeriod({ anio, mes: Number(e.target.value) })}
-            />
-          </label>
-        </div>
+        <MesAnioPeriodSelect
+          label="Período a liquidar"
+          mes={mes}
+          anio={anio}
+          onChange={setPeriod}
+          disabled={submitting}
+        />
 
         {loading ? <p className="text-sm text-text-secondary">Cargando propietarios…</p> : null}
         {error ? (

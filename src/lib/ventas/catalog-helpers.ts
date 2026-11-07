@@ -1,4 +1,8 @@
 import type { CatalogSearchItem, OfertaRecord } from "@/lib/api/types";
+import {
+  inmueblePropiedadSinCodigo,
+  inmuebleUbicacionCompleta,
+} from "@/lib/inmuebles/display-label";
 
 import { VENTA_EMPTY_FIELD } from "@/lib/ventas/empty-field";
 
@@ -12,6 +16,15 @@ export function parseOffMarketMotivo(notas: string | null | undefined): string |
 
 export function saleOferta(item: CatalogSearchItem): OfertaRecord | undefined {
   return item.ofertasActivas.find((o) => o.tipoOperacionCode === "venta") ?? item.ofertasActivas[0];
+}
+
+export function catalogInmuebleHeading(item: CatalogSearchItem): string {
+  return inmueblePropiedadSinCodigo(item.inmueble, item.tipoInmueble.name);
+}
+
+export function catalogInmuebleUbicacion(item: CatalogSearchItem): string | null {
+  const ubicacion = inmuebleUbicacionCompleta(item.inmueble, item.localidad);
+  return ubicacion !== "—" ? ubicacion : null;
 }
 
 export function propietarioDisplay(

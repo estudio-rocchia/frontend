@@ -1092,8 +1092,10 @@ export function completarVenta(
   });
 }
 
-export function cancelVenta(token: string, id: number) {
-  return apiRequest<import("./types").VentaRecord>(`/ventas/${id}/cancelar`, {
+export function cancelVenta(token: string, id: number, fecha: string, notas: string) {
+  const query = new URLSearchParams({ fecha });
+  if (notas.trim()) query.set("notas", notas.trim());
+  return apiRequest<import("./types").VentaRecord>(`/ventas/${id}/cancelar?${query}`, {
     method: "POST",
     token,
     body: JSON.stringify({}),

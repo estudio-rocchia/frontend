@@ -26,6 +26,7 @@ import {
   createVenta,
   createVentaFinanciacion,
   fetchCatalog,
+  fetchInmueblePropietarios,
   fetchInmuebles,
   searchCatalogo,
 } from "@/lib/api";
@@ -34,6 +35,7 @@ import { todayIso } from "@/lib/ventas/catalog-helpers";
 import type { CatalogSearchItem, CatalogoItem, InmuebleRecord } from "@/lib/api/types";
 import { altaInmuebleCatalogo } from "@/lib/inmuebles/alta-inmueble";
 import { saleOferta } from "@/lib/ventas/catalog-helpers";
+import { personaFieldFromPropietario } from "@/lib/ventas/propietario-persona-field";
 import { resolvePartePersona } from "@/lib/ventas/persona-resolve";
 import { nextInmuebleCode, prefixForTipoInmueble } from "@/lib/codes";
 
@@ -57,6 +59,8 @@ type NewVentaModalProps = {
   token: string;
   catalogSearch: CatalogSearchConfig | null;
   preselectedItem?: CatalogSearchItem | null;
+  /** Vendedor sugerido (p. ej. propietario ya cargado en la ficha del inmueble). */
+  preselectedSeller?: PersonaFieldValue | null;
   onCreated: (ventaId: number) => void;
 };
 
@@ -66,6 +70,7 @@ export function NewVentaModal({
   token,
   catalogSearch,
   preselectedItem,
+  preselectedSeller,
   onCreated,
 }: NewVentaModalProps) {
   const [inmuebleSource, setInmuebleSource] = useState<InmuebleSource>("catalogo");
@@ -108,7 +113,7 @@ export function NewVentaModal({
     setSearchResults([]);
     setSearchError(null);
     setBuyer(emptyPersona);
-    setSeller(emptyPersona);
+    setSeller(preselectedSeller ?? emptyPersona);
     setGarantes([]);
     setFechaBoleto("");
     setEscribano("");
@@ -124,7 +129,26 @@ export function NewVentaModal({
     const oferta = item ? saleOferta(item) : null;
     setMonto(oferta?.montoPrecio ?? "");
     setMoneda(oferta?.codigoMoneda?.trim() === "ARS" ? "ARS" : "USD");
-  }, [open, preselectedItem]);
+  }, [open, preselectedItem, preselectedSeller]);
+
+  useEffect(() => {
+    if (!open || !token || inmuebleSource !== "catalogo" || preselectedSeller) return;
+    const inmuebleId = selectedItem?.inmueble.id;
+    if (!inmuebleId) return;
+
+    let cancelled = false;
+    void fetchInmueblePropietarios(token, inmuebleId)
+      .then((res) => {
+        if (cancelled) return;
+        const field = personaFieldFromPropietario(res.items[0]);
+        if (field) setSeller(field);
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, token, inmuebleSource, selectedItem, preselectedSeller]);
 
   useEffect(() => {
     if (!open || !token || inmuebleSource !== "nuevo") return;

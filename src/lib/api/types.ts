@@ -1027,6 +1027,9 @@ export interface VentaRecord {
   tieneEscritura: boolean;
   estado: VentaEstado;
   notas: string | null;
+  cancelacionDocumentoId?: number | null;
+  cancelacionEn?: string | null;
+  cancelacionNotas?: string | null;
 }
 
 export interface FinanciacionResumen {

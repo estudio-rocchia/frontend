@@ -24,6 +24,7 @@ import {
 } from "@/components/base/dropdown/menu-styles";
 import { Label } from "@/components/base/input/label";
 import { ChevronDownSmall } from "@/components/foundations/icons/chevrons";
+import { useOverlayPortalContainer } from "@/lib/ui/overlay-portal";
 import { cx } from "@/utils/cx";
 import { useDismissOnOutsidePress, useTriggerToggle } from "@/utils/use-dismiss-on-outside-press";
 
@@ -94,6 +95,7 @@ export function Select<T extends object>({
   // date-picker family (see utils/use-dismiss-on-outside-press.ts).
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLElement>(null);
+  const overlayPortal = useOverlayPortalContainer();
   const [isOpen, setIsOpen] = useState(false);
   useDismissOnOutsidePress(isOpen, () => setIsOpen(false), [triggerRef, popoverRef]);
   // Pressing the trigger while open closes the popover instead of reopening
@@ -146,6 +148,7 @@ export function Select<T extends object>({
             ref={popoverRef}
             isNonModal
             offset={4}
+            UNSTABLE_portalContainer={overlayPortal}
             className={cx(
               MENU_POPOVER_WIDTH,
               MENU_POPOVER_SURFACE,

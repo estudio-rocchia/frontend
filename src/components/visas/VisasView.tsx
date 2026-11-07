@@ -18,7 +18,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { SearchField } from "@/components/ui/SearchField";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useListRefreshTransition } from "@/lib/ui/use-list-refresh-transition";
-import { StatusBadge } from "@/components/ui/StatusBadge";
+import { StatusChip } from "@/components/ui/StatusChip";
 import { useAuth } from "@/context/auth-context";
 import { ApiError, fetchVisas, fetchVisasResumen } from "@/lib/api";
 import type { EstadoTramiteVisa, TramiteVisaListItem, VisasResumen } from "@/lib/api/types";
@@ -29,7 +29,7 @@ import {
   canEditVisas,
   ESTADO_VISA_LABEL,
   ESTADOS_TRAMITE_VISA,
-  estadoVisaVariant,
+  estadoVisaTone,
   formatUsd,
 } from "@/lib/visas/labels";
 
@@ -127,7 +127,9 @@ function VisaMobileCard({ item, onOpen }: { item: TramiteVisaListItem; onOpen: (
           {miembros.map((miembro) => (
             <span key={miembro.id} className="flex flex-wrap items-center gap-2">
               <span className="font-medium text-text-primary">{personaDisplayName(miembro.persona)}</span>
-              <StatusBadge label={ESTADO_VISA_LABEL[miembro.estado]} variant={estadoVisaVariant(miembro.estado)} />
+              <StatusChip tone={estadoVisaTone(miembro.estado)} title={ESTADO_VISA_LABEL[miembro.estado]}>
+                {ESTADO_VISA_LABEL[miembro.estado]}
+              </StatusChip>
             </span>
           ))}
         </span>
@@ -494,14 +496,17 @@ export function VisasView() {
                             ) : null}
                           </div>
                         </td>
-                        <td className={`text-center ${bodyCell}`}>
+                        <td className={`max-w-[12rem] text-center ${bodyCell}`}>
                           <div className="flex flex-col items-center gap-1">
                             {estados.map((estadoFila, index) => (
-                              <StatusBadge
+                              <StatusChip
                                 key={`${item.id}-${estadoFila}-${index}`}
-                                label={ESTADO_VISA_LABEL[estadoFila]}
-                                variant={estadoVisaVariant(estadoFila)}
-                              />
+                                tone={estadoVisaTone(estadoFila)}
+                                className="max-w-full"
+                                title={ESTADO_VISA_LABEL[estadoFila]}
+                              >
+                                {ESTADO_VISA_LABEL[estadoFila]}
+                              </StatusChip>
                             ))}
                           </div>
                         </td>

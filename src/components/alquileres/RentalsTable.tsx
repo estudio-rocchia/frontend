@@ -43,7 +43,7 @@ function ServiceMarks({ servicios }: { servicios: RentalRow["servicios"] }) {
     <Chip
       variant="caption"
       color={serviceVariantToChipColor(servicios.status.variant)}
-      className="block w-full min-w-0 max-w-full truncate"
+      className="max-w-[8.5rem] truncate"
       title={tooltip}
     >
       {servicios.status.label}
@@ -93,12 +93,13 @@ function RowActions({
 const cellPad = "px-4";
 const headCell = `h-10 border-b border-border bg-bg-cream ${cellPad} text-[12px] font-medium text-text-primary`;
 const bodyCell = `min-h-[52px] border-b border-border bg-bg-card py-3 ${cellPad} transition-colors duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:bg-bg-cream motion-reduce:transition-none`;
-const stickyShadowLeft = "shadow-[4px_0_8px_-4px_rgba(0,0,0,0.1)]";
-const stickyShadowRight = "shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)]";
-const stickyLeftHead = `sticky left-0 z-20 w-[14rem] bg-bg-cream ${stickyShadowLeft}`;
-const stickyLeftBody = `sticky left-0 z-10 w-[14rem] bg-bg-card ${stickyShadowLeft} group-hover:bg-bg-cream`;
-const stickyRightHead = `sticky right-0 z-20 w-[9.5rem] bg-bg-cream ${stickyShadowRight}`;
-const stickyRightBody = `sticky right-0 z-10 w-[9.5rem] bg-bg-card ${stickyShadowRight} group-hover:bg-bg-cream`;
+/** Column visibility tracks the table container (max-w-7xl), not the viewport — avoids extra columns on wide monitors with a narrow content pane. */
+const colMora = "hidden @[58rem]/rentals-table:table-cell";
+const colServicios = "hidden @[62rem]/rentals-table:table-cell";
+const colInicio = "hidden @[70rem]/rentals-table:table-cell";
+const colPeriodo = "hidden @[82rem]/rentals-table:table-cell";
+const actionsHeadCell = `sticky right-0 z-30 min-w-[9rem] whitespace-nowrap bg-bg-cream shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)] ${headCell}`;
+const actionsBodyCell = `sticky right-0 z-20 min-w-[9rem] whitespace-nowrap bg-bg-card shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.08)] group-hover:bg-bg-cream ${bodyCell}`;
 
 function RentalMobileCard({
   row,
@@ -325,8 +326,8 @@ export function RentalsTable({
   }, []);
 
   const shellClass = embedded
-    ? "flex min-h-[400px] min-w-0 flex-1 flex-col overflow-hidden"
-    : "flex min-h-[400px] min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-bg-card shadow-[var(--shadow-card)]";
+    ? "flex min-h-[400px] min-w-0 w-full flex-1 flex-col overflow-hidden"
+    : "flex min-h-[400px] min-w-0 w-full flex-1 flex-col overflow-hidden rounded-xl border border-border bg-bg-card shadow-[var(--shadow-card)]";
 
   return (
     <section className={shellClass}>
@@ -448,29 +449,29 @@ export function RentalsTable({
         )}
       </div>
 
-      <div className="hidden w-full min-w-0 overflow-x-auto border-t border-border md:block">
-          <table className="w-full min-w-[960px] table-fixed border-separate border-spacing-0 text-left text-[13px]">
+      <div className="@container/rentals-table rocchia-table-shell hidden w-full max-w-full min-w-0 overflow-x-auto overscroll-x-contain border-t border-border md:block">
+          <table className="w-max min-w-full border-separate border-spacing-0 text-left text-[13px]">
             <thead>
               <tr>
-                <th className={`text-left ${headCell} ${stickyLeftHead}`}>
+                <th className={`sticky left-0 z-20 max-w-[14rem] bg-bg-cream text-left ${headCell}`}>
                   Contrato / Propiedad
                 </th>
-                <th className={`w-[11rem] text-left ${headCell}`}>Inquilino</th>
+                <th className={`max-w-[11rem] text-left ${headCell}`}>Inquilino</th>
                 <th
-                  className={`hidden w-[7rem] text-left 2xl:table-cell ${headCell}`}
+                  className={`text-left ${colPeriodo} ${headCell}`}
                   title="Mes de la cuota pendiente o en mora"
                 >
                   Período a cobrar
                 </th>
-                <th className={`w-[8rem] text-right ${headCell}`}>Alquiler actual</th>
-                <th className={`hidden w-[5.5rem] text-right lg:table-cell ${headCell}`}>Días mora</th>
-                <th className={`w-[9rem] text-center ${headCell}`}>Estado</th>
-                <th className={`hidden w-[6.5rem] text-right xl:table-cell ${headCell}`}>Inicio</th>
-                <th className={`w-[7rem] text-right ${headCell}`}>Fin</th>
-                <th className={`hidden w-[8.5rem] text-left lg:table-cell ${headCell}`}>
+                <th className={`text-right ${headCell}`}>Alquiler actual</th>
+                <th className={`text-right ${colMora} ${headCell}`}>Días mora</th>
+                <th className={`max-w-[10rem] text-center ${headCell}`}>Estado</th>
+                <th className={`text-right ${colInicio} ${headCell}`}>Inicio</th>
+                <th className={`text-right ${headCell}`}>Fin</th>
+                <th className={`w-[8.5rem] max-w-[8.5rem] text-left ${colServicios} ${headCell}`}>
                   Servicios
                 </th>
-                <th className={`text-right ${headCell} ${stickyRightHead}`}>Acciones</th>
+                <th className={`text-right ${actionsHeadCell}`}>Acciones</th>
               </tr>
             </thead>
             <motion.tbody
@@ -545,23 +546,21 @@ export function RentalsTable({
                         onViewFicha(row);
                       }}
                     >
-                      <td className={`text-left ${bodyCell} ${stickyLeftBody}`}>
+                      <td className={`sticky left-0 z-10 max-w-[14rem] bg-bg-card text-left group-hover:bg-bg-cream ${bodyCell}`}>
                         <PropertyCell label={row.contractProperty} />
                       </td>
-                      <td className={`text-left text-text-primary ${bodyCell}`}>
+                      <td className={`max-w-[11rem] text-left text-text-primary ${bodyCell}`}>
                         <span className="block truncate" title={row.tenant}>
                           {row.tenant}
                         </span>
                       </td>
-                      <td className={`hidden truncate text-left text-text-secondary 2xl:table-cell ${bodyCell}`} title={row.month}>
-                        {row.month}
-                      </td>
-                      <td className={`text-right font-medium text-text-primary ${bodyCell} ${moneyTableClass(row.amount)}`}>
+                      <td className={`text-left text-text-secondary ${colPeriodo} ${bodyCell}`}>{row.month}</td>
+                      <td className={`max-w-[8.5rem] text-right font-medium text-text-primary ${bodyCell} ${moneyTableClass(row.amount)}`}>
                         <span className="block truncate" title={row.amount}>
                           {row.amount}
                         </span>
                       </td>
-                      <td className={`hidden text-right lg:table-cell ${bodyCell}`}>
+                      <td className={`text-right ${colMora} ${bodyCell}`}>
                         <span
                           className={`tabular-nums ${
                             row.daysOverdue > 0
@@ -572,31 +571,26 @@ export function RentalsTable({
                           {row.daysOverdue}
                         </span>
                       </td>
-                      <td className={`text-center ${bodyCell}`}>
-                        <div className="flex justify-center overflow-hidden">
-                          <StatusChip
-                            dot
-                            tone={contractStatusTone(row)}
-                            className="max-w-full"
-                            title={row.status.label}
-                          >
-                            {row.status.label}
-                          </StatusChip>
-                        </div>
+                      <td className={`max-w-[10rem] text-center ${bodyCell}`}>
+                        <StatusChip
+                          tone={contractStatusTone(row)}
+                          className="mx-auto max-w-full"
+                          title={row.status.label}
+                        >
+                          {row.status.label}
+                        </StatusChip>
                       </td>
-                      <td className={`hidden whitespace-nowrap text-right tabular-nums text-text-secondary xl:table-cell ${bodyCell}`}>
+                      <td className={`whitespace-nowrap text-right tabular-nums text-text-secondary ${colInicio} ${bodyCell}`}>
                         {row.contractStart}
                       </td>
                       <td className={`whitespace-nowrap text-right ${bodyCell}`}>
                         <ContractEndCell row={row} />
                       </td>
-                      <td className={`hidden lg:table-cell ${bodyCell}`}>
-                        <div className="w-[8.5rem] max-w-[8.5rem] overflow-hidden">
-                          <ServiceMarks servicios={row.servicios} />
-                        </div>
+                      <td className={`${colServicios} ${bodyCell}`}>
+                        <ServiceMarks servicios={row.servicios} />
                       </td>
                       <td
-                        className={`whitespace-nowrap text-right ${bodyCell} ${stickyRightBody}`}
+                        className={`text-right ${actionsBodyCell}`}
                         onClick={(event) => event.stopPropagation()}
                         onKeyDown={(event) => event.stopPropagation()}
                       >

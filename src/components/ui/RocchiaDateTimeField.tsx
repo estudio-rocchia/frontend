@@ -59,10 +59,7 @@ export function RocchiaDateTimeField({
         disabled={disabled}
         invalid={invalid}
       />
-      <div className="flex flex-col gap-1.5">
-        <span className="text-[11px] font-semibold text-text-secondary">Hora</span>
-        <RocchiaTimePicker value={time} onChange={updateTime} disabled={disabled} />
-      </div>
+      <RocchiaTimePicker value={time} onChange={updateTime} disabled={disabled} />
       {errorId ? (
         <span id={errorId} className="text-xs text-danger">
           {error}

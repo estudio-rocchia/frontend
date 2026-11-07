@@ -24,6 +24,7 @@ import { Label } from "@/components/base/input/label";
 import { useDirection } from "@/components/foundations/direction/direction";
 import { ChevronDownSmall } from "@/components/foundations/icons/chevrons";
 import { ScrollFade, useScrollFade } from "@/components/foundations/scroll-fade/scroll-fade";
+import { useOverlayPortalContainer } from "@/lib/ui/overlay-portal";
 import { cx } from "@/utils/cx";
 
 /**
@@ -78,6 +79,7 @@ export function ComboBox<T extends object>({
   ...props
 }: ComboBoxProps<T>) {
   const direction = useDirection();
+  const overlayPortal = useOverlayPortalContainer();
   const fieldRef = useRef<HTMLDivElement>(null);
   const fade = useScrollFade();
   const [fieldWidth, setFieldWidth] = useState<number>();
@@ -130,6 +132,7 @@ export function ComboBox<T extends object>({
             triggerRef={fieldRef}
             dir={direction}
             offset={4}
+            UNSTABLE_portalContainer={overlayPortal}
             style={{ width: fieldWidth }}
             className={cx(MENU_POPOVER_SURFACE, "flex flex-col overflow-hidden p-2", popoverClassName)}
           >

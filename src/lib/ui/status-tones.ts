@@ -21,7 +21,7 @@ export function statusToneClass(tone: StatusTone): string {
 export function statusToneToChipColor(tone: StatusTone): ChipColor {
   if (tone === "mora") return "rose";
   if (tone === "ajuste") return "yellow";
-  if (tone === "ok") return "lime";
+  if (tone === "ok") return "emerald";
   return "soft";
 }
 
@@ -33,11 +33,19 @@ export function statusToneToDotColor(tone: StatusTone): StatusDotColor {
   return "indigo";
 }
 
-export function serviceVariantToChipColor(variant: "success" | "warning" | "danger"): ChipColor {
+export type SemanticBadgeVariant = "success" | "warning" | "danger";
+
+export function serviceVariantToChipColor(variant: SemanticBadgeVariant): ChipColor {
   if (variant === "danger") return "rose";
-  if (variant === "success") return "lime";
+  if (variant === "success") return "emerald";
   if (variant === "warning") return "yellow";
   return "soft";
+}
+
+export function semanticVariantToStatusTone(variant: SemanticBadgeVariant): StatusTone {
+  if (variant === "danger") return "mora";
+  if (variant === "success") return "ok";
+  return "ajuste";
 }
 
 export function ventaEstadoTone(estado: VentaEstado): StatusTone {

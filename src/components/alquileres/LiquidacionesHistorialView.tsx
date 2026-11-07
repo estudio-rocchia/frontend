@@ -5,6 +5,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Download, Search } from "lucide-react";
 
 import { ButtonOutline } from "@/components/ui/Button";
+import {
+  MES_OPTIONS,
+  periodYearSelectOptions,
+  SYSTEM_PERIOD_START_YEAR,
+} from "@/components/ui/MesAnioPeriodSelect";
 import { NumericSelect } from "@/components/ui/NumericSelect";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { resolveBreakUiLiquidaciones } from "@/data/alquileres-break-ui-fixtures";
@@ -157,7 +162,7 @@ export function LiquidacionesHistorialView() {
   const { token, logout } = useAuth();
   const breakUi = useBreakUiMode();
   const now = new Date();
-  const [anio, setAnio] = useState(now.getFullYear());
+  const [anio, setAnio] = useState(Math.max(now.getFullYear(), SYSTEM_PERIOD_START_YEAR));
   const [mes, setMes] = useState<number | "">("");
   const [estadoFilter, setEstadoFilter] = useState<EstadoFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -252,25 +257,19 @@ export function LiquidacionesHistorialView() {
 
       <div className="flex flex-col gap-4 rounded-md border border-border bg-bg-card p-4">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="text-text-secondary">Año</span>
-            <input
-              type="number"
-              className={formInputClass}
-              value={anio}
-              onChange={(e) => setAnio(Number(e.target.value))}
-            />
-          </label>
+          <NumericSelect
+            label="Año"
+            value={anio}
+            onChange={(y) => y != null && setAnio(y)}
+            options={periodYearSelectOptions(anio)}
+          />
           <NumericSelect
             label="Mes"
             value={mes === "" ? null : mes}
             onChange={(id) => setMes(id ?? "")}
             allowEmpty
             emptyLabel="Todos los meses"
-            options={Array.from({ length: 12 }, (_, i) => ({
-              value: i + 1,
-              label: formatMonthYear(anio, i + 1),
-            }))}
+            options={MES_OPTIONS}
           />
           <label className="flex flex-col gap-1 text-sm sm:col-span-2">
             <span className="text-text-secondary">Buscar propietario o Nº</span>

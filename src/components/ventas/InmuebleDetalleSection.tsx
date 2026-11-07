@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ClipboardList, Pencil, Save, X } from "lucide-react";
 
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { resumenFieldGridClass, ResumenField, ResumenPanel } from "@/components/ui/ResumenFields";
@@ -203,10 +204,12 @@ function DetalleEditorForm({
       ) : null}
       {error ? <p className="text-sm text-danger">{error}</p> : null}
       <div className="flex justify-end gap-2">
-        <ButtonOutline type="button" disabled={saving} onClick={onCancel}>
+        <ButtonOutline type="button" className="gap-2" disabled={saving} onClick={onCancel}>
+          <X className="h-4 w-4" aria-hidden />
           Cancelar
         </ButtonOutline>
-        <ButtonPrimary type="button" disabled={saving} onClick={() => void handleSave()}>
+        <ButtonPrimary type="button" className="gap-2" disabled={saving} onClick={() => void handleSave()}>
+          <Save className="h-4 w-4" aria-hidden />
           {saving ? "Guardando…" : "Guardar detalle"}
         </ButtonPrimary>
       </div>
@@ -241,16 +244,24 @@ export function InmuebleDetalleSection({
     setEditing(true);
   }
 
-  return (
-    <ResumenPanel title={profile.sectionTitle} description={profile.sectionHint}>
-      {canEdit && !editing ? (
-        <div className="flex min-w-0 justify-end">
-          <ButtonOutline type="button" onClick={startEditing}>
-            {detalle ? "Editar" : "Cargar detalle"}
-          </ButtonOutline>
-        </div>
-      ) : null}
+  const headerAction =
+    canEdit && !editing ? (
+      <ButtonOutline type="button" className="gap-2" onClick={startEditing}>
+        {detalle ? (
+          <Pencil className="h-4 w-4" aria-hidden />
+        ) : (
+          <ClipboardList className="h-4 w-4" aria-hidden />
+        )}
+        {detalle ? "Editar" : "Cargar detalle"}
+      </ButtonOutline>
+    ) : undefined;
 
+  return (
+    <ResumenPanel
+      title={profile.sectionTitle}
+      description={profile.sectionHint}
+      headerAction={headerAction}
+    >
       {!editing ? (
         <div className={resumenFieldGridClass}>
           <ResumenField label="Resumen" value={displayDetalleValue(summary)} span={2} />

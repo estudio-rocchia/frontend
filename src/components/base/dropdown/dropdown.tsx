@@ -14,6 +14,7 @@ import {
   MENU_POPOVER_SURFACE,
   MENU_POPOVER_WIDTH,
 } from "@/components/base/dropdown/menu-styles";
+import { useOverlayPortalContainer } from "@/lib/ui/overlay-portal";
 import { cx } from "@/utils/cx";
 import { useDismissOnOutsidePress, useTriggerToggle } from "@/utils/use-dismiss-on-outside-press";
 
@@ -137,6 +138,7 @@ export function DropdownPopover({
   children,
 }: DropdownPopoverProps) {
   const context = useContext(DropdownContext);
+  const overlayPortal = useOverlayPortalContainer();
   return (
     <AriaPopover
       ref={context?.popoverRef}
@@ -144,6 +146,7 @@ export function DropdownPopover({
       placement={placement}
       offset={offset}
       crossOffset={crossOffset}
+      UNSTABLE_portalContainer={overlayPortal}
       className={cx(
         MENU_POPOVER_WIDTH,
         MENU_POPOVER_SURFACE,

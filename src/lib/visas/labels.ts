@@ -1,4 +1,5 @@
 import type { EstadoTramiteVisa } from "@/lib/api/types";
+import { semanticVariantToStatusTone } from "@/lib/ui/status-tones";
 
 export const ESTADOS_TRAMITE_VISA: EstadoTramiteVisa[] = [
   "borrador",
@@ -30,6 +31,10 @@ export function estadoVisaVariant(
   if (estado === "aprobado") return "success";
   if (estado === "rechazado") return "danger";
   return "warning";
+}
+
+export function estadoVisaTone(estado: EstadoTramiteVisa) {
+  return semanticVariantToStatusTone(estadoVisaVariant(estado));
 }
 
 export function formatUsd(amount: number): string {

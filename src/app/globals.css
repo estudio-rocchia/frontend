@@ -118,6 +118,8 @@ body {
   border: none;
   background: transparent;
   color: inherit;
+  /* Popovers (select, calendario) se portalizan aquí; sin esto el overflow del dialog los recorta. */
+  overflow: visible;
 }
 
 .rocchia-dialog::backdrop {

@@ -60,7 +60,8 @@ import { useClientePrefetch } from "@/lib/use-cliente-prefetch";
 import type { ContratoListItem, PersonaRecord } from "@/lib/api/types";
 import { canEditVisas } from "@/lib/visas/labels";
 import { pagePaddingClass } from "@/lib/layout";
-import { buildClientesContext, mapPersonaToClienteRow, vinculoBadgeClass } from "@/lib/mappers/clientes";
+import { ClienteVinculoChip } from "@/components/clientes/ClienteVinculoChip";
+import { buildClientesContext, mapPersonaToClienteRow } from "@/lib/mappers/clientes";
 import {
   normalizeModoHonorariosAdministracion,
   type ModoHonorariosAdministracion,
@@ -344,12 +345,7 @@ export function ClienteFichaView() {
           clienteRow && clienteRow.vinculos.length > 0 ? (
             <div className="flex flex-wrap gap-2">
               {clienteRow.vinculos.map((vinculo) => (
-                <span
-                  key={vinculo.id}
-                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${vinculoBadgeClass(vinculo.id)}`}
-                >
-                  {vinculo.label}
-                </span>
+                <ClienteVinculoChip key={vinculo.id} vinculo={vinculo} />
               ))}
             </div>
           ) : null

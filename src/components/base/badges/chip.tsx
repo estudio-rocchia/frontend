@@ -15,6 +15,7 @@ import { cx, sortCx } from "@/utils/cx";
  *
  * Status pairs are semantic so the same component follows both Figma modes:
  *   lime    light 200/800 · dark 950 @ 60% / 500
+ *   emerald light 200/800 · dark 950 @ 60% / 500 (success / active)
  *   rose    light 200/800 · dark 950 @ 60% / 500
  *   yellow  light 200/800 · dark 950 @ 60% / 500
  *   cyan    light 200/800 · dark 950 @ 60% / 400
@@ -27,12 +28,24 @@ import { cx, sortCx } from "@/utils/cx";
  */
 
 type ChipVariant = "bold" | "subtle" | "caption";
-export type ChipColor = "orange" | "lime" | "rose" | "yellow" | "cyan" | "blue" | "purple" | "neutral" | "gray" | "soft";
+export type ChipColor =
+  | "orange"
+  | "lime"
+  | "emerald"
+  | "rose"
+  | "yellow"
+  | "cyan"
+  | "blue"
+  | "purple"
+  | "neutral"
+  | "gray"
+  | "soft";
 
 /** Background and text pair per colour, shared with Tag Group's tags. */
 export const CHIP_COLORS: Record<ChipColor, string> = {
   orange: "bg-status-orange-background text-status-orange-text",
   lime: "bg-status-lime-background text-status-lime-text",
+  emerald: "bg-status-emerald-background text-status-emerald-text",
   rose: "bg-status-rose-background text-status-rose-text",
   yellow: "bg-status-yellow-background text-status-yellow-text",
   cyan: "bg-status-cyan-background text-status-cyan-text",

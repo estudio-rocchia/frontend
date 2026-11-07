@@ -82,6 +82,21 @@ export function inmueblePropiedadNombre(
   return title || code || "Inmueble";
 }
 
+/** Tipo y alias de publicación, sin código interno. */
+export function inmueblePropiedadSinCodigo(
+  inmueble: { title?: string | null },
+  tipoName?: string | null,
+): string {
+  const title = inmueble.title?.trim() || "";
+  const tipo = tipoName?.trim() || "";
+
+  if (tipo && title) {
+    if (title.toLowerCase().includes(tipo.toLowerCase())) return title;
+    return `${tipo} — ${title}`;
+  }
+  return title || tipo || "Inmueble";
+}
+
 /** Etiqueta de propiedad en listados de contratos (evita duplicar el código). */
 export function contractPropertyLabel(inmuebleCode: string, inmuebleTitle: string): string {
   const code = inmuebleCode.trim();

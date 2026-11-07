@@ -29,10 +29,33 @@ export const kpiTones = [
     bar: "bg-[var(--kpi-bar-4)]",
     dot: "bg-[var(--kpi-dot-4)]",
   },
-] as const;
+] as const satisfies readonly KpiTone[];
 
-export type KpiTone = (typeof kpiTones)[number];
+export type KpiTone = {
+  wash: string;
+  edge: string;
+  bar: string;
+  dot: string;
+};
 
 export function kpiTone(index: number): KpiTone {
   return kpiTones[index % kpiTones.length];
 }
+
+/** KPI «En mora» / morosos — rojo semántico, no el tono global 3 (cian). */
+export const moraKpiTone: KpiTone = {
+  wash: "bg-danger-bg",
+  edge: "border-[color-mix(in_srgb,var(--danger)_28%,var(--border))]",
+  bar: "bg-danger",
+  dot: "bg-danger",
+};
+
+export const clientesMorosoKpiTone = moraKpiTone;
+
+/** KPI «Ajuste pendiente» — fondo opaco, misma intensidad que los demás washes de Alquileres. */
+export const ajusteKpiTone: KpiTone = {
+  wash: "bg-[#fef08a]",
+  edge: "border-[#facc15]",
+  bar: "bg-[#eab308]",
+  dot: "bg-[#eab308]",
+};

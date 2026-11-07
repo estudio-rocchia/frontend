@@ -1,5 +1,7 @@
 "use client";
 
+import { ExternalLink } from "lucide-react";
+
 import { FichaSummaryCard } from "@/components/alquileres/FichaSummaryCard";
 import { InmuebleDetalleSection } from "@/components/ventas/InmuebleDetalleSection";
 import { ButtonOutline } from "@/components/ui/Button";
@@ -160,7 +162,8 @@ export function CatalogInmuebleResumenSection({
               />
             </div>
             <div className="flex min-w-0 flex-col items-start gap-4">
-              <ButtonOutline type="button" onClick={onOpenVenta}>
+              <ButtonOutline type="button" className="gap-2" onClick={onOpenVenta}>
+                <ExternalLink className="h-4 w-4" aria-hidden />
                 Abrir ficha de operación
               </ButtonOutline>
             </div>

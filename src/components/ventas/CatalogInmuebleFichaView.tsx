@@ -2,7 +2,15 @@
 
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import {
+  ArrowLeft,
+  Building2,
+  CircleDollarSign,
+  EyeOff,
+  Handshake,
+  Wallet,
+  ExternalLink,
+} from "lucide-react";
 
 import {
   CATALOG_FICHA_PANEL_ID,
@@ -30,10 +38,12 @@ import {
   fetchVentas,
 } from "@/lib/api";
 import type { CatalogSearchItem, HistorialPrecioRecord, InmuebleFicha, OfertaRecord, VentaDetail } from "@/lib/api/types";
+import { inmueblePropiedadSinCodigo, inmuebleUbicacionCompleta } from "@/lib/inmuebles/display-label";
 import { formatMoney, moneyClassName } from "@/lib/format";
 import { pagePaddingClass } from "@/lib/layout";
 import { parseRouteId } from "@/lib/parse-route-id";
 import { catalogMotivo, propietarioDisplay } from "@/lib/ventas/catalog-helpers";
+import { personaFieldFromPropietario } from "@/lib/ventas/propietario-persona-field";
 import { VENTA_EMPTY_FIELD } from "@/lib/ventas/empty-field";
 import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 import { ofertaEstadoLabel, ofertaEstadoVariant, ventaEstadoLabel, ventaEstadoVariant } from "@/lib/ventas/status-labels";
@@ -179,7 +189,6 @@ export function CatalogInmuebleFichaView() {
 
   const inmueble = ficha?.inmueble;
   const inmuebleCode = inmueble?.code ?? `Inmueble #${inmuebleId ?? ""}`;
-  const inmuebleTitle = inmueble?.title ?? "Inmueble";
   const propietario = propietarioDisplay(ficha?.propietarios ?? []);
   const motivo = useMemo(() => {
     if (!inmueble || !oferta) return VENTA_EMPTY_FIELD;
@@ -191,10 +200,18 @@ export function CatalogInmuebleFichaView() {
     });
   }, [inmueble, ficha?.tipoInmueble, ficha?.localidad, oferta]);
 
+  const inmuebleHeading = useMemo(() => {
+    if (!inmueble) return inmuebleCode;
+    return inmueblePropiedadSinCodigo(inmueble, ficha?.tipoInmueble?.name);
+  }, [inmueble, ficha?.tipoInmueble?.name, inmuebleCode]);
+
   const metaLine = useMemo(() => {
-    const parts = [propietario !== VENTA_EMPTY_FIELD ? propietario : null, inmuebleTitle].filter(Boolean);
+    if (!inmueble) return "";
+    const ubicacion = inmuebleUbicacionCompleta(inmueble, ficha?.localidad);
+    const ubicacionLine = ubicacion !== "—" ? ubicacion : null;
+    const parts = [ubicacionLine, propietario !== VENTA_EMPTY_FIELD ? propietario : null].filter(Boolean);
     return parts.join(" · ");
-  }, [propietario, inmuebleTitle]);
+  }, [inmueble, ficha?.localidad, propietario]);
 
   const estadoCode = oferta?.estadoCode ?? "available";
   const isOffMarket = estadoCode === "off_market";
@@ -230,6 +247,11 @@ export function CatalogInmuebleFichaView() {
     };
   }, [inmueble, oferta, ficha?.tipoInmueble, ficha?.localidad, ficha?.detalle]);
 
+  const preselectedSeller = useMemo(
+    () => personaFieldFromPropietario(ficha?.propietarios?.[0]),
+    [ficha?.propietarios],
+  );
+
   function openEstadoModal(mode: CambiarEstadoMode) {
     setEstadoModalMode(mode);
     setEstadoModalOpen(true);
@@ -245,7 +267,10 @@ export function CatalogInmuebleFichaView() {
         <p className="rounded-sm border border-danger bg-danger-bg px-3 py-2 text-sm text-danger">
           {error ?? "Inmueble no encontrado."}
         </p>
-        <ButtonOutline onClick={volverAlListado}>Volver al listado</ButtonOutline>
+        <ButtonOutline type="button" className="gap-2" onClick={volverAlListado}>
+          <ArrowLeft className="h-4 w-4" aria-hidden />
+          Volver al listado
+        </ButtonOutline>
       </div>
     );
   }
@@ -289,7 +314,7 @@ export function CatalogInmuebleFichaView() {
             {inmuebleInitials(inmuebleCode)}
           </div>
           <div className="flex flex-col gap-2">
-            <h1 className="text-[26px] font-bold text-primary">{inmuebleCode}</h1>
+            <h1 className="text-[26px] font-bold text-primary">{inmuebleHeading}</h1>
             {metaLine ? <p className="text-sm text-text-secondary">{metaLine}</p> : null}
             <div className="flex flex-wrap items-center gap-2">
               <StatusBadge
@@ -323,38 +348,45 @@ export function CatalogInmuebleFichaView() {
             <div className="flex w-full flex-col gap-3 sm:w-auto sm:items-end">
               <div className="flex flex-wrap justify-end gap-2">
                 {isAvailable ? (
-                  <ButtonPrimary type="button" onClick={() => setNewVentaOpen(true)}>
+                  <ButtonPrimary type="button" className="gap-2" onClick={() => setNewVentaOpen(true)}>
+                    <Handshake className="h-4 w-4" aria-hidden />
                     Iniciar venta
                   </ButtonPrimary>
                 ) : null}
                 {isOffMarket ? (
-                  <ButtonPrimary type="button" onClick={() => openEstadoModal("available")}>
+                  <ButtonPrimary type="button" className="gap-2" onClick={() => openEstadoModal("available")}>
+                    <Building2 className="h-4 w-4" aria-hidden />
                     Poner en venta
                   </ButtonPrimary>
                 ) : null}
                 {isSold && ventaVinculada ? (
                   <ButtonPrimary
                     type="button"
+                    className="gap-2"
                     onClick={() => router.push(`/ventas/${ventaVinculada.id}`)}
                   >
+                    <ExternalLink className="h-4 w-4" aria-hidden />
                     Ver operación
                   </ButtonPrimary>
                 ) : null}
               </div>
               {!isSold ? (
                 <div className="flex flex-wrap justify-end gap-2">
-                  <ButtonOutline type="button" onClick={() => setPriceModalOpen(true)}>
+                  <ButtonOutline type="button" className="gap-2" onClick={() => setPriceModalOpen(true)}>
+                    <CircleDollarSign className="h-4 w-4" aria-hidden />
                     Actualizar precio
                   </ButtonOutline>
-                  <ButtonOutline type="button" onClick={() => setFormaPagoModalOpen(true)}>
+                  <ButtonOutline type="button" className="gap-2" onClick={() => setFormaPagoModalOpen(true)}>
+                    <Wallet className="h-4 w-4" aria-hidden />
                     Forma de pago
                   </ButtonOutline>
                   {isAvailable ? (
                     <ButtonOutline
                       type="button"
-                      className="border-danger/40 text-danger hover:bg-danger-bg"
+                      className="gap-2 border-danger/40 text-danger hover:bg-danger-bg"
                       onClick={() => openEstadoModal("off_market")}
                     >
+                      <EyeOff className="h-4 w-4" aria-hidden />
                       Sacar de venta
                     </ButtonOutline>
                   ) : null}
@@ -483,6 +515,7 @@ export function CatalogInmuebleFichaView() {
             : null
         }
         preselectedItem={catalogItemForVenta}
+        preselectedSeller={preselectedSeller}
         onCreated={(ventaId) => {
           setNewVentaOpen(false);
           router.push(`/ventas/${ventaId}`);
