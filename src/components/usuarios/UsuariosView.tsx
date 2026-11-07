@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Lock } from "lucide-react";
+import { UserPlus } from "lucide-react";
 
 const UsuarioFichaDrawer = dynamic(
   () =>
@@ -164,23 +164,7 @@ export function UsuariosView() {
         <PageHeader
           title="Usuarios y roles"
           description="Control de accesos, permisos y protección de datos sensibles"
-          actions={
-            <ButtonPrimary className="w-fit" onClick={() => router.push("/usuarios/nuevo")}>
-              Crear usuario
-            </ButtonPrimary>
-          }
         />
-
-        <div className="flex items-center gap-3.5 rounded-md border border-primary bg-primary-soft p-4">
-          <Lock className="h-5 w-5 shrink-0 text-primary" aria-hidden />
-          <div className="flex flex-col gap-1">
-            <p className="text-sm font-semibold text-primary">Zona restringida — datos confidenciales</p>
-            <p className="text-[13px] text-text-secondary">
-              El acceso a contratos, precios netos y edición de plazos queda limitado por rol. Toda
-              modificación queda registrada en auditoría.
-            </p>
-          </div>
-        </div>
 
         <div className="grid gap-4 md:grid-cols-2">
           {kpis.map((kpi, index) => (
@@ -190,9 +174,20 @@ export function UsuariosView() {
 
         <Card accent className="rocchia-panel--flat">
           <div className="flex flex-col gap-5 border-b border-border px-5 py-5">
-            <div className="flex flex-col gap-1">
-              <h2 className="text-[15px] font-semibold tracking-tight text-text-primary">Matriz de permisos por rol</h2>
-              <p className="text-xs text-text-secondary">{resultSummary}</p>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex min-w-0 flex-col gap-1">
+                <h2 className="text-[15px] font-semibold tracking-tight text-text-primary">
+                  Matriz de permisos por rol
+                </h2>
+                <p className="text-xs text-text-secondary">{resultSummary}</p>
+              </div>
+              <ButtonPrimary
+                className="w-full shrink-0 sm:w-fit"
+                onClick={() => router.push("/usuarios/nuevo")}
+              >
+                <UserPlus className="mr-1.5 h-4 w-4" aria-hidden />
+                Crear usuario
+              </ButtonPrimary>
             </div>
 
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">

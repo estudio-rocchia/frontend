@@ -1,113 +1,22 @@
-"use client";
-
-import { Mail } from "lucide-react";
 import Link from "next/link";
-import { FormEvent, useState } from "react";
 
 import { LoginHeading, LoginShell } from "@/components/auth/LoginShell";
-import { LoginSpinner } from "@/components/auth/LoginSpinner";
-import { requestPasswordReset } from "@/lib/api";
-import { getLoginErrorPresentation } from "@/lib/auth/login-errors";
-import { LoginErrorAlert } from "@/components/auth/LoginErrorAlert";
-import {
-  loginInputClass,
-  loginInputIconClass,
-  loginLinkClass,
-  loginSubmitClass,
-} from "@/lib/ui/login-styles";
+import { loginLinkClass } from "@/lib/ui/login-styles";
 
 export default function RecuperarCuentaPage() {
-  const [email, setEmail] = useState("");
-  const [fieldError, setFieldError] = useState<string | null>(null);
-  const [submitError, setSubmitError] = useState<ReturnType<
-    typeof getLoginErrorPresentation
-  > | null>(null);
-  const [submitted, setSubmitted] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-
-  const canSubmit = Boolean(email.trim() && !submitting);
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!email.trim()) {
-      setFieldError("Ingresá tu email.");
-      return;
-    }
-
-    setFieldError(null);
-    setSubmitError(null);
-    setSubmitting(true);
-    try {
-      await requestPasswordReset(email.trim());
-      setSubmitted(true);
-    } catch (error) {
-      setSubmitError(getLoginErrorPresentation(error));
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
   return (
-    <LoginShell asForm onSubmit={handleSubmit}>
-      <LoginHeading
-        title="Recuperar cuenta"
-        subtitle="Ingresá tu email y te enviaremos instrucciones para restablecer tu contraseña."
-      />
+    <LoginShell>
+      <LoginHeading title="Recuperar cuenta" />
 
-      {submitted ? (
-        <div
-          role="status"
-          className="login-alert-enter mt-7 rounded-lg border border-success bg-success-bg px-4 py-3 text-sm text-success"
-        >
-          Enviamos las instrucciones a <span className="font-semibold">{email.trim()}</span>.
-          Revisá tu bandeja de entrada y el correo no deseado. El enlace vence en 1 hora.
-        </div>
-      ) : (
-        <div className="mt-7 flex flex-col gap-5">
-          <label className="flex flex-col gap-2">
-            <span className="text-sm font-semibold text-text-primary">Email</span>
-            <div className="relative">
-              <Mail className={loginInputIconClass} aria-hidden />
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                  if (fieldError) setFieldError(null);
-                  if (submitError) setSubmitError(null);
-                }}
-                disabled={submitting}
-                autoComplete="email"
-                autoFocus
-                aria-invalid={Boolean(fieldError)}
-                aria-describedby={fieldError ? "recuperar-email-error" : undefined}
-                placeholder="usuario@rocchia.com"
-                className={loginInputClass(Boolean(fieldError), {
-                  leadingIcon: true,
-                })}
-              />
-            </div>
-            {fieldError ? (
-              <span id="recuperar-email-error" className="login-alert-enter text-xs text-danger">
-                {fieldError}
-              </span>
-            ) : null}
-          </label>
-
-          {submitError ? <LoginErrorAlert id="recuperar-submit-error" error={submitError} /> : null}
-
-          <button type="submit" disabled={!canSubmit} className={loginSubmitClass}>
-            {submitting ? (
-              <>
-                <LoginSpinner className="text-white" />
-                Enviando…
-              </>
-            ) : (
-              "Enviar instrucciones"
-            )}
-          </button>
-        </div>
-      )}
+      <div
+        role="status"
+        className="login-alert-enter mt-7 rounded-lg border border-border bg-bg-page px-4 py-3 text-sm text-text-secondary"
+      >
+        <p>
+          Si olvidaste tu contraseña, contactá a un administrador del estudio para que la
+          restablezca desde el panel de usuarios.
+        </p>
+      </div>
 
       <p className="mt-6 text-center">
         <Link href="/login" className={loginLinkClass}>

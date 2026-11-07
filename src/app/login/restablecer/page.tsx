@@ -211,10 +211,12 @@ function RestablecerContrasenaForm() {
         </div>
       )}
 
-      <p className="mt-6 text-center">
-        <Link href="/login/recuperar" className={loginLinkClass}>
-          Solicitar un enlace nuevo
-        </Link>
+      <p className="mt-6 text-center text-xs text-text-secondary">
+        ¿El enlace venció?{" "}
+        <Link href="/login" className={loginLinkClass}>
+          Volvé al inicio de sesión
+        </Link>{" "}
+        y contactá al administrador del estudio.
       </p>
     </LoginShell>
   );
