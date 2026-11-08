@@ -8,9 +8,9 @@ import type { EstadoExpediente } from "@/lib/juridico/model";
 export type StatusTone = "mora" | "ajuste" | "ok" | "neutral";
 
 const toneClass: Record<StatusTone, string> = {
-  mora: "bg-status-mora text-text-primary",
-  ajuste: "bg-status-ajuste text-text-primary",
-  ok: "bg-status-ok text-text-primary",
+  mora: "bg-status-mora text-[var(--status-mora-fg)]",
+  ajuste: "bg-status-ajuste text-[var(--status-ajuste-fg)]",
+  ok: "bg-status-ok text-[var(--status-ok-fg)]",
   neutral: "bg-bg-cream text-text-primary",
 };
 

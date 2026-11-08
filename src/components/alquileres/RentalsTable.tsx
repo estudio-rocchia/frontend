@@ -23,7 +23,11 @@ import type { ContratoTableStats } from "@/lib/api/types";
 import { contractEndHint, moneyTableClass } from "@/lib/format";
 import { rentCollectionWindowHint } from "@/lib/rental-collection";
 import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
-import { serviceVariantToChipColor, type StatusTone } from "@/lib/ui/status-tones";
+import {
+  serviceVariantToChipColor,
+  statusToneClass,
+  type StatusTone,
+} from "@/lib/ui/status-tones";
 
 const riseEase = [0.16, 1, 0.3, 1] as const;
 
@@ -91,7 +95,7 @@ function RowActions({
 }
 
 const cellPad = "px-4";
-const headCell = `h-10 border-b border-border bg-bg-cream ${cellPad} text-[12px] font-medium text-text-primary`;
+const headCell = `h-10 border-b border-border bg-bg-cream ${cellPad} text-[12px] font-semibold text-text-primary`;
 const bodyCell = `min-h-[52px] border-b border-border bg-bg-card py-3 ${cellPad} transition-colors duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:bg-bg-cream motion-reduce:transition-none`;
 /** Column visibility tracks the table container (max-w-7xl), not the viewport — avoids extra columns on wide monitors with a narrow content pane. */
 const colMora = "hidden @[58rem]/rentals-table:table-cell";
@@ -564,7 +568,7 @@ export function RentalsTable({
                         <span
                           className={`tabular-nums ${
                             row.daysOverdue > 0
-                              ? "rounded-md bg-status-mora px-1.5 py-0.5 font-medium text-text-primary"
+                              ? `rounded-md px-1.5 py-0.5 font-semibold ${statusToneClass("mora")}`
                               : "text-text-secondary"
                           }`}
                         >
