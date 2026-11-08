@@ -767,7 +767,9 @@ export function AlquileresWorkspace() {
               onSearchChange={setSearchQuery}
               onChipChange={setActiveChip}
               onClearFilters={clearFilters}
-              onPrefetch={(row) => prefetchContrato(Number(row.id))}
+              onPrefetch={(row) => {
+                if (!breakUi.active) prefetchContrato(Number(row.id));
+              }}
               onViewFicha={(row) => openFicha(row.id)}
               onCollect={(row) => void openCollectFromRow(row)}
               onAdjust={(row) => void openAdjustFromRow(row)}

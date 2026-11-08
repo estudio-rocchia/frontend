@@ -24,7 +24,7 @@ type PrefetchEntry = {
   } | null;
 };
 
-const cache = new Map<number, Promise<PrefetchEntry>>();
+const cache = new Map<number, Promise<PrefetchEntry | null>>();
 
 export function useContratoPrefetch(token: string | null) {
   const inflight = useRef(cache);
@@ -33,23 +33,28 @@ export function useContratoPrefetch(token: string | null) {
     (contratoId: number) => {
       if (!token || inflight.current.has(contratoId)) return;
 
-      const promise = fetchContrato(token, contratoId).then(async (detail) => {
-        let propietarios: PrefetchEntry["propietarios"] = [];
-        let inmuebleContext: PrefetchEntry["inmuebleContext"] = null;
-        if (detail.inmueble?.id) {
-          try {
-            const ficha = await fetchInmuebleFicha(token, detail.inmueble.id);
-            propietarios = ficha.propietarios;
-            inmuebleContext = {
-              localidad: ficha.localidad ?? null,
-              tipoName: ficha.tipoInmueble?.name ?? null,
-            };
-          } catch {
-            // staff may lack owner detail permission
+      const promise = fetchContrato(token, contratoId)
+        .then(async (detail) => {
+          let propietarios: PrefetchEntry["propietarios"] = [];
+          let inmuebleContext: PrefetchEntry["inmuebleContext"] = null;
+          if (detail.inmueble?.id) {
+            try {
+              const ficha = await fetchInmuebleFicha(token, detail.inmueble.id);
+              propietarios = ficha.propietarios;
+              inmuebleContext = {
+                localidad: ficha.localidad ?? null,
+                tipoName: ficha.tipoInmueble?.name ?? null,
+              };
+            } catch {
+              // staff may lack owner detail permission
+            }
           }
-        }
-        return { detail, propietarios, inmuebleContext };
-      });
+          return { detail, propietarios, inmuebleContext };
+        })
+        .catch(() => {
+          inflight.current.delete(contratoId);
+          return null;
+        });
 
       inflight.current.set(contratoId, promise);
     },
@@ -59,12 +64,11 @@ export function useContratoPrefetch(token: string | null) {
   const consume = useCallback(async (contratoId: number): Promise<PrefetchEntry | null> => {
     const pending = inflight.current.get(contratoId);
     if (!pending) return null;
-    try {
-      return await pending;
-    } catch {
+    const result = await pending;
+    if (!result) {
       inflight.current.delete(contratoId);
-      return null;
     }
+    return result;
   }, []);
 
   const invalidate = useCallback((contratoId?: number) => {
