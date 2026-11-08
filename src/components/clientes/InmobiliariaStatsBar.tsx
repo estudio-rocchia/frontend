@@ -48,7 +48,7 @@ export function InmobiliariaStatsBar({
       {items.map((item) => (
         <div
           key={item.label}
-          className="flex items-start gap-3 rounded-md border border-border bg-bg-card px-4 py-3 shadow-[var(--shadow-card)]"
+          className="flex items-start gap-3 glass-card px-4 py-3"
         >
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary-soft text-primary">
             <item.icon className="h-4 w-4" aria-hidden />

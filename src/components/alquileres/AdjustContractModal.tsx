@@ -490,7 +490,7 @@ export function AdjustContractModal({
           <AdjustmentUnpaidCuotasNotice periods={unpaidPeriods} />
         ) : null}
 
-        <div className="rounded-md border border-border bg-primary-soft px-5 py-6 text-center shadow-[var(--shadow-card)]">
+        <div className="rounded-md border border-border bg-primary-soft px-5 py-6 text-center">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
             Alquiler actual
           </p>

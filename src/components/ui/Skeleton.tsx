@@ -17,7 +17,7 @@ export function KpiSkeletonRow({ count = 4 }: { count?: number }) {
       {Array.from({ length: count }).map((_, index) => (
         <div
           key={index}
-          className="flex flex-col gap-2 rounded-md border border-border bg-bg-card p-4"
+          className="flex flex-col gap-2 glass-card p-4"
         >
           <Skeleton className="h-3 w-24" />
           <Skeleton className="h-8 w-16" />
@@ -36,7 +36,7 @@ export function TableSkeleton({
   columns?: number;
 }) {
   return (
-    <div className="overflow-hidden rounded-md border border-border bg-bg-card">
+    <div className="overflow-hidden glass-card">
       <div className="border-b border-border px-5 py-4">
         <Skeleton className="mb-2 h-4 w-48" />
         <Skeleton className="h-3 w-32" />

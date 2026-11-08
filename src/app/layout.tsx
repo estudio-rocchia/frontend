@@ -4,6 +4,7 @@ import localFont from "next/font/local";
 import { DirectionProvider } from "@/components/foundations/direction/direction";
 import { WebVitalsReporter } from "@/components/observability/WebVitalsReporter";
 import { AuthProvider } from "@/context/auth-context";
+import { ThemeProvider } from "@/context/theme-context";
 import "./globals.css";
 
 // Archivo local: next/font/google se rompe en Turbopack cuando Google responde
@@ -31,8 +32,10 @@ export default function RootLayout({
       <body className="min-h-full">
         <DirectionProvider locale="es-AR">
           <AuthProvider>
-            <WebVitalsReporter />
-            {children}
+            <ThemeProvider>
+              <WebVitalsReporter />
+              {children}
+            </ThemeProvider>
           </AuthProvider>
         </DirectionProvider>
       </body>

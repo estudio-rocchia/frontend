@@ -107,7 +107,7 @@ export function CrearClienteView() {
         <p className="rounded-sm border border-danger bg-danger-bg px-3 py-2 text-sm text-danger">{error}</p>
       ) : null}
 
-      <section className="max-w-3xl rounded-md border border-border bg-bg-card p-6">
+      <section className="max-w-3xl glass-card p-6">
         <FormSection
           title="Datos del cliente"
           description="Registro unificado para vincular áreas del estudio"

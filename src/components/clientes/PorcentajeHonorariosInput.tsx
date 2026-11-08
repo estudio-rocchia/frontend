@@ -92,7 +92,7 @@ export function PorcentajeHonorariosInput({
             disabled={saving}
             value={value}
             onChange={(event) => onChange(event.target.value)}
-            className="w-full rounded-md border border-border bg-bg-card py-2.5 pl-3 pr-10 text-[14px] text-text-primary outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
+            className="w-full glass-card py-2.5 pl-3 pr-10 text-[14px] text-text-primary outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
           />
           <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[13px] font-medium text-text-secondary">
             %

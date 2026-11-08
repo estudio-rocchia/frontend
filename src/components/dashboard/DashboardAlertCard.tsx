@@ -1,14 +1,18 @@
+"use client";
+
 import Link from "next/link";
 import { memo } from "react";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, CalendarDays, Handshake, KeyRound } from "lucide-react";
+import { motion } from "framer-motion";
 
+import { StatusBadge } from "@/components/ui/StatusBadge";
 import type { DashboardAlertRow } from "@/data/dashboard-contracts";
 import { moneyClassName } from "@/lib/format";
 
-const statusInk: Record<DashboardAlertRow["status"]["variant"], string> = {
-  danger: "text-danger",
-  warning: "text-warning",
-  success: "text-success",
+const tierAccent: Record<DashboardAlertRow["tier"], { rail: string; amount: string }> = {
+  urgente: { rail: "bg-danger", amount: "text-text-primary" },
+  proximo: { rail: "bg-warning", amount: "text-text-primary" },
+  admin: { rail: "bg-primary", amount: "text-text-primary" },
 };
 
 export const DashboardAlertCard = memo(function DashboardAlertCard({
@@ -22,42 +26,59 @@ export const DashboardAlertCard = memo(function DashboardAlertCard({
   read?: boolean;
   onMarkRead?: () => void;
 }) {
-  const delay = Math.min(index, 8) * 30;
+  const accent = tierAccent[alert.tier];
+  const ModuloIcon =
+    alert.modulo === "venta" ? Handshake : alert.modulo === "calendario" ? CalendarDays : KeyRound;
 
   return (
-    <li
-      className="dashboard-animate-in border-b border-border last:border-b-0"
-      style={{
-        animationDelay: `${delay}ms`,
-        boxShadow: alert.tier === "urgente" ? "inset 1px 0 0 var(--danger)" : undefined,
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{
+        delay: index * 0.04,
+        duration: 0.3,
+        ease: [0.22, 1, 0.36, 1],
+        y: { duration: 0.28 },
       }}
+      whileHover={{
+        y: -5,
+        boxShadow: "0 14px 44px rgba(26, 43, 50, 0.14)",
+      }}
+      className="glass-card group flex overflow-hidden"
     >
+      <div className={`w-1 shrink-0 ${accent.rail}`} aria-hidden />
+
       <Link
         href={alert.href}
         onClick={() => {
           if (!read) onMarkRead?.();
         }}
-        className="dashboard-row grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 px-4 py-3.5 hover:bg-bg-cream focus-visible:bg-bg-cream focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--login-accent)] sm:px-5"
+        className="flex min-w-0 flex-1 items-center gap-4 px-4 py-3.5 sm:px-5"
       >
-        <span className="truncate text-[14px] font-semibold text-text-primary">{alert.property}</span>
-        <span className={`text-right text-[14px] font-medium text-text-primary ${moneyClassName}`}>
-          {alert.amount}
-        </span>
-        <span className="truncate text-[13px] text-text-secondary">
-          {alert.party}
-          <span aria-hidden> · </span>
-          {alert.dueDate}
-        </span>
-        <span className="flex items-center justify-end gap-3">
-          <span className={`text-[12px] font-medium ${statusInk[alert.status.variant]}`}>
-            {alert.status.label}
-          </span>
-          <span className="inline-flex items-center gap-0.5 text-[12px] font-medium text-primary">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary">
+          <ModuloIcon className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
+        </div>
+
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="truncate text-[14px] font-semibold text-text-primary">{alert.property}</span>
+            <span className="rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-text-secondary">
+              {alert.moduloLabel}
+            </span>
+          </div>
+          <p className="truncate text-[13px] text-text-secondary">{alert.party}</p>
+          <p className="line-clamp-1 text-[12px] text-text-secondary">{alert.dueDate}</p>
+        </div>
+
+        <div className="flex shrink-0 flex-col items-end gap-1.5 sm:min-w-[7.5rem]">
+          <span className={`text-[14px] font-semibold ${accent.amount} ${moneyClassName}`}>{alert.amount}</span>
+          <StatusBadge label={alert.status.label} variant={alert.status.variant} />
+          <span className="flex items-center gap-0.5 text-[11px] font-medium text-primary opacity-0 transition-opacity group-hover:opacity-100">
             {alert.action}
             <ArrowUpRight className="h-3 w-3" strokeWidth={2} aria-hidden />
           </span>
-        </span>
+        </div>
       </Link>
-    </li>
+    </motion.div>
   );
 });

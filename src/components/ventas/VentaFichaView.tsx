@@ -331,7 +331,7 @@ export function VentaFichaView() {
       <div className={`flex flex-col gap-6 ${pagePaddingClass}`}>
         <Skeleton className="h-4 w-32" />
         <PageHeaderSkeleton />
-        <div className="rounded-md border border-border bg-bg-card p-5">
+        <div className="glass-card p-5">
           <div className="grid gap-4 sm:grid-cols-2">
             {Array.from({ length: 6 }).map((_, index) => (
               <div key={index} className="flex flex-col gap-2">
@@ -367,7 +367,7 @@ export function VentaFichaView() {
         ) : null}
       </div>
 
-      <header className="flex flex-col gap-4 rounded-md border border-border bg-bg-card p-5 sm:flex-row sm:items-start sm:justify-between">
+      <header className="flex flex-col gap-4 glass-card p-5 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex gap-4">
           <div
             className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary-soft text-lg font-bold text-primary"
@@ -442,7 +442,7 @@ export function VentaFichaView() {
 
       {fichaKpis.length > 0 ? <VentasKpiStrip kpis={fichaKpis} loading={loading} /> : null}
 
-      <section className="rounded-md border border-border bg-bg-card">
+      <section className="glass-card">
         <VentaFichaTabs
           active={activeTab}
           onChange={selectTab}

@@ -88,7 +88,7 @@ function EditSection({
   children: React.ReactNode;
 }) {
   return (
-    <section className="flex flex-col gap-4 rounded-md border border-border bg-bg-card p-4 shadow-[var(--shadow-card)]">
+    <section className="flex flex-col gap-4 glass-card p-4">
       <div className="flex flex-col gap-0.5">
         <h3 className="text-sm font-semibold text-text-primary">{title}</h3>
         {description ? (
@@ -165,7 +165,7 @@ function CitaEditHero({
     : null;
 
   return (
-    <div className="relative overflow-hidden rounded-md border border-border bg-bg-card shadow-[var(--shadow-card)]">
+    <div className="relative overflow-hidden glass-card">
       <div className={`absolute inset-y-0 left-0 w-1 ${estadoStyles.dot}`} aria-hidden />
       <div className="flex flex-col gap-4 p-5 pl-6">
         <div className="flex flex-wrap items-start gap-4">
@@ -360,7 +360,7 @@ export function CitaEditDrawer(props: CitaEditDrawerProps) {
               />
             </EditSection>
 
-            <details className="group overflow-hidden rounded-md border border-border bg-bg-card shadow-[var(--shadow-card)]">
+            <details className="group overflow-hidden glass-card">
               <summary
                 className={`flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 marker:content-none ${interactiveFocusClass}`}
               >

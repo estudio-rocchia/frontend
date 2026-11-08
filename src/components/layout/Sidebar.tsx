@@ -91,8 +91,8 @@ const SidebarNav = memo(function SidebarNav({ onNavigate }: { onNavigate?: () =>
           <span className="absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full bg-[#FBC7FB] ring-2 ring-[#107077]" />
         </div>
         <div className="min-w-0">
-          <p className="text-[17px] font-semibold tracking-tight text-white">Rocchia</p>
-          <p className="text-[11px] text-white/70">Jurídico · Inmobiliario</p>
+          <p className="text-[17px] font-semibold tracking-tight text-text-primary">Rocchia</p>
+          <p className="text-[11px] text-text-secondary">Jurídico · Inmobiliario</p>
         </div>
       </div>
 
@@ -102,7 +102,7 @@ const SidebarNav = memo(function SidebarNav({ onNavigate }: { onNavigate?: () =>
           if (items.length === 0) return null;
           return (
             <div key={group.label} className="flex flex-col gap-1">
-              <p className="px-3.5 pb-1.5 text-[11px] font-medium tracking-wide text-white/40 uppercase">
+              <p className="px-3.5 pb-1.5 text-[11px] font-medium tracking-wide text-text-secondary uppercase">
                 {group.label}
               </p>
               {items.map(({ label, href, icon: Icon }) => {
@@ -122,8 +122,8 @@ const SidebarNav = memo(function SidebarNav({ onNavigate }: { onNavigate?: () =>
                     }}
                     className={`${itemClass} ${
                       active
-                        ? "border-white/10 bg-white/15 font-semibold text-white backdrop-blur-sm"
-                        : "border-transparent font-medium text-white/80 hover:bg-white/10 hover:text-white"
+                        ? "border-primary/20 bg-primary-soft font-semibold text-primary"
+                        : "border-transparent font-medium text-text-secondary hover:bg-bg-page/80 hover:text-text-primary"
                     }`}
                   >
                     <Icon
@@ -160,20 +160,20 @@ const SidebarAccount = memo(function SidebarAccount() {
   const roleName = role ? (roleLabel[role] ?? role) : null;
 
   return (
-    <div className="mt-4 flex items-center gap-2.5 border-t border-white/10 px-1.5 pt-4">
-      <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/15 text-[11px] font-semibold text-white">
+    <div className="mt-4 flex items-center gap-2.5 border-t border-border/80 px-1.5 pt-4">
+      <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-soft text-[11px] font-semibold text-primary">
         <span className="sr-only">{displayName}{roleName ? `, ${roleName}` : ""}</span>
         <span aria-hidden>{userInitials(displayName)}</span>
-        <span className="absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full bg-[#45B3A6] ring-2 ring-[#107077]" aria-hidden />
+        <span className="absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full bg-mint ring-2 ring-bg-card" aria-hidden />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[13px] font-medium text-white">{displayName}</span>
-        {roleName ? <span className="block truncate text-[11px] text-white/60">{roleName}</span> : null}
+        <span className="block truncate text-[13px] font-medium text-text-primary">{displayName}</span>
+        {roleName ? <span className="block truncate text-[11px] text-text-secondary">{roleName}</span> : null}
       </span>
       <button
         type="button"
         onClick={logout}
-        className="rounded-md p-2 text-white/70 transition-all duration-100 ease-out hover:bg-white/10 hover:text-white motion-reduce:transition-none"
+        className="rounded-md p-2 text-text-secondary transition-all duration-100 ease-out hover:bg-bg-page hover:text-text-primary motion-reduce:transition-none"
         aria-label="Cerrar sesión"
       >
         <LogOut className="h-4 w-4" strokeWidth={1.75} />
@@ -206,7 +206,7 @@ export function Sidebar({
 
   return (
     <>
-      <aside className="hidden h-full w-64 shrink-0 flex-col border-r border-rocchia-teal-hover/40 bg-primary px-3 py-6 xl:flex">
+      <aside className="glass-card hidden h-full w-[248px] shrink-0 flex-col rounded-none border-y-0 border-l-0 px-4 py-6 xl:flex">
         <SidebarFrame />
       </aside>
 
@@ -214,15 +214,15 @@ export function Sidebar({
         <div className="fixed inset-0 z-50 xl:hidden">
           <button
             type="button"
-            className="absolute inset-0 bg-[#010400]/40"
+            className="absolute inset-0 bg-[#1a2b3240] backdrop-blur-[2px]"
             aria-label="Cerrar menú"
             onClick={onMobileClose}
           />
-          <aside className="relative flex h-dvh max-h-dvh w-[min(280px,88vw)] flex-col overflow-hidden bg-primary px-3 py-6">
+          <aside className="glass-card relative flex h-dvh max-h-dvh w-[min(280px,88vw)] max-w-[min(280px,88vw)] flex-col overflow-hidden rounded-none border-y-0 border-l-0 px-4 py-6">
             <button
               type="button"
               onClick={onMobileClose}
-              className="absolute top-4 right-3 rounded-md p-2 text-white/70 transition-all duration-100 ease-out hover:bg-white/10 hover:text-white motion-reduce:transition-none"
+              className="absolute top-4 right-3 rounded-md p-2 text-text-secondary transition-all duration-100 ease-out hover:bg-bg-page hover:text-text-primary motion-reduce:transition-none"
               aria-label="Cerrar menú"
             >
               <X className="h-5 w-5" />

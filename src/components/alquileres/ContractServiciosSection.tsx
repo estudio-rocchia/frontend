@@ -623,7 +623,7 @@ export function ContractServiciosSection({
                   return (
                     <section
                       key={group.servicio.id}
-                      className="rounded-md border border-border bg-bg-card"
+                      className="glass-card"
                       data-testid={`servicios-periodos-group-${group.servicio.tipoServicioCode}`}
                     >
                       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border bg-bg-page px-4 py-3">

@@ -2,11 +2,12 @@ import dynamic from "next/dynamic";
 import type { ComponentType } from "react";
 
 import { PageHeaderSkeleton, TableSkeleton } from "@/components/ui/Skeleton";
-import { pagePaddingClass } from "@/lib/layout";
+import { pagePaddingClass, workspaceStackClass } from "@/lib/layout";
 
 function WorkspaceLoadingFallback() {
   return (
-    <div className={`flex flex-col gap-6 ${pagePaddingClass}`}>
+    <div className={`${workspaceStackClass} ${pagePaddingClass}`}>
+      <p className="text-sm font-medium text-text-secondary">Cargando módulo…</p>
       <PageHeaderSkeleton />
       <TableSkeleton rows={6} columns={5} />
     </div>

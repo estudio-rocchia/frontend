@@ -194,9 +194,7 @@ export const VentasTable = memo(function VentasTable({
 }: VentasTableProps) {
   const isCatalogTab = tab !== "en_operacion";
   const colSpan = isCatalogTab ? (tab === "fuera_mercado" ? 4 : 3) : 5;
-  const panelClass = embedded
-    ? ""
-    : "overflow-hidden rounded-xl border border-border bg-bg-card shadow-[var(--shadow-card)]";
+  const panelClass = embedded ? "" : "overflow-hidden glass-card";
   const shellPadding = embedded ? "px-5 py-5" : "";
 
   return (
