@@ -66,7 +66,7 @@ export function BalanceCurrencyLegend({ className = "" }: { className?: string }
 function BalanceBreakdownColumnLegend() {
   return (
     <div className="balance-breakdown-grid w-full" aria-hidden>
-      <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-text-secondary">Rubro</span>
+      <span className="balance-breakdown-legend-rubro text-[10px] uppercase tracking-[0.08em]">Rubro</span>
       <span className="balance-legend-col text-[var(--balance-ars)]">
         <span className="balance-bar-ars h-1.5 w-5 shrink-0 rounded-full" />
         ARS
@@ -308,11 +308,11 @@ export function BalancePanel({
             {action ? <div className="shrink-0">{action}</div> : null}
           </div>
           {description ? (
-            <p className="mt-0.5 text-[11px] leading-snug text-text-secondary">{description}</p>
+            <p className="balance-panel-description mt-0.5 text-[11px] leading-snug">{description}</p>
           ) : null}
         </div>
         {toolbar ? (
-          <div className="balance-panel-toolbar border-t border-border/50 bg-[#f0ece4]/35 px-4 py-2.5 sm:px-5">
+          <div className="balance-panel-toolbar balance-wash-toolbar border-t border-border/50 px-4 py-2.5 sm:px-5">
             {toolbar}
           </div>
         ) : null}
@@ -355,7 +355,7 @@ export function BalanceSegmented<T extends string>({
 
   return (
     <div
-      className="balance-segmented relative inline-flex rounded-[10px] bg-[#ebe6de]/80 p-0.5 ring-1 ring-border/90"
+      className="balance-segmented balance-segmented-surface relative inline-flex rounded-[10px] p-0.5 ring-1 ring-border/90"
       role="group"
       aria-label={name}
     >
@@ -436,12 +436,12 @@ export function BalanceHeroMetric({
     >
       <div className="balance-hero-grid pointer-events-none absolute inset-0 opacity-[0.4]" aria-hidden />
       <p className="balance-hero-label text-[11px] font-medium uppercase tracking-[0.12em]">{label}</p>
-      <p className="mt-3 min-w-0 text-text-primary">
+      <p className="balance-hero-value mt-3 min-w-0">
         <BalanceAnimatedCount value={value} format={formatted} className={moneyHeroClass(display)} />
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <BalanceYoYChip side={yoySide} />
-        <span className="text-[11px] text-text-secondary">vs período anterior</span>
+        <span className="balance-hero-muted text-[11px]">vs período anterior</span>
       </div>
     </article>
   );
@@ -453,7 +453,7 @@ function BreakdownBar({ pct, tone }: { pct: number; tone: "ars" | "usd" }) {
   const scale = pct > 0 ? Math.max(pct / 100, 0.02) : 0;
 
   return (
-    <div className="h-1 overflow-hidden rounded-full bg-bg-page" aria-hidden>
+    <div className="balance-breakdown-bar-track h-1 overflow-hidden rounded-full" aria-hidden>
       <span
         className={`balance-breakdown-bar-fill block h-full origin-left rounded-full ${
           tone === "ars" ? "balance-bar-ars" : "balance-bar-usd"
@@ -482,7 +482,7 @@ export function BalanceBreakdownList({
   return (
     <>
       {showLegend && visibleRows.length > 0 ? (
-        <div className="balance-breakdown-legend border-b border-border/60 bg-[#f0ece4]/45 px-4 py-2.5 sm:px-5">
+        <div className="balance-breakdown-legend balance-wash-legend border-b border-border/60 px-4 py-2.5 sm:px-5">
           <BalanceBreakdownColumnLegend />
           <p className="sr-only">
             Barras horizontales: proporción relativa del monto en pesos argentinos y dólares
@@ -510,12 +510,16 @@ export function BalanceBreakdownList({
                 {row.label}
               </span>
               <span
-                className={`balance-amount-col text-[13px] ${row.montos.ARS > 0 ? "text-text-primary" : "text-text-secondary"}`}
+                className={`balance-amount-col text-[13px] ${
+                  row.montos.ARS > 0 ? "font-medium text-text-primary" : "balance-amount-empty"
+                }`}
               >
                 {row.montos.ARS > 0 ? formatMoney(String(row.montos.ARS), "ARS") : "—"}
               </span>
               <span
-                className={`balance-amount-col text-[13px] ${row.montos.USD > 0 ? "text-text-primary" : "text-text-secondary"}`}
+                className={`balance-amount-col text-[13px] ${
+                  row.montos.USD > 0 ? "font-medium text-text-primary" : "balance-amount-empty"
+                }`}
               >
                 {row.montos.USD > 0 ? formatMoney(String(row.montos.USD), "USD") : "—"}
               </span>
@@ -707,7 +711,7 @@ function buildColumnGroups(columns: BalanceDenseTableColumn[]) {
 }
 
 const denseHeadClass =
-  "border-b border-border bg-[#f0ece4]/80 text-[10px] font-semibold tracking-[0.08em] text-text-secondary uppercase";
+  "balance-dense-thead border-b border-border text-[10px] font-semibold tracking-[0.08em] uppercase";
 
 export function BalanceDenseTable({
   columns,

@@ -750,6 +750,16 @@ body {
   --balance-usd: #8a6740;
   --balance-usd-warm: #c4a574;
   --balance-usd-soft: #f5efe6;
+  --balance-wash: #f0ece4;
+  --balance-segmented: #ebe6de;
+  --balance-hero-fg: var(--text-primary);
+  --balance-hero-muted: var(--text-secondary);
+  --balance-dense-head-bg: color-mix(in srgb, var(--balance-wash) 80%, var(--bg-card));
+  --balance-dense-head-fg: var(--text-secondary);
+  --balance-table-sticky-head: color-mix(in srgb, var(--balance-wash) 92%, var(--bg-card));
+  --balance-breakdown-legend-fg: var(--text-secondary);
+  --balance-breakdown-bar-track: color-mix(in srgb, var(--text-primary) 10%, var(--bg-page));
+  --balance-amount-empty-fg: color-mix(in srgb, var(--text-secondary) 82%, var(--text-primary));
   --balance-nav-stack-extra: 0rem;
   /* Sticky stack height + buffer (toolbar only; + nav when report loaded) */
   scroll-padding-top: calc(22rem + var(--balance-nav-stack-extra));
@@ -886,7 +896,7 @@ body {
   border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--border));
   background:
     radial-gradient(ellipse 120% 80% at 100% 0%, rgba(16, 112, 119, 0.1), transparent 55%),
-    linear-gradient(165deg, #ffffff 0%, #f7f4ef 100%);
+    linear-gradient(165deg, var(--bg-card) 0%, var(--bg-page) 100%);
   box-shadow: var(--shadow-card);
   transition:
     transform 180ms var(--balance-ease),
@@ -899,11 +909,20 @@ body {
   border-left: 3px solid var(--balance-ars-mint);
   background:
     radial-gradient(ellipse 90% 65% at 100% 0%, rgba(69, 179, 166, 0.2), transparent 52%),
-    linear-gradient(165deg, #ffffff 0%, var(--balance-ars-soft) 100%);
+    linear-gradient(165deg, var(--bg-card) 0%, var(--balance-ars-soft) 100%);
 }
 
 .balance-hero-ars .balance-hero-label {
   color: var(--balance-ars);
+}
+
+.balance-hero-ars .balance-hero-value,
+.balance-hero-usd .balance-hero-value {
+  color: var(--balance-hero-fg);
+}
+
+.balance-hero .balance-hero-muted {
+  color: var(--balance-hero-muted);
 }
 
 .balance-hero-usd {
@@ -911,7 +930,7 @@ body {
   border-left: 3px solid var(--balance-usd-warm);
   background:
     radial-gradient(ellipse 90% 65% at 100% 0%, rgba(196, 165, 116, 0.22), transparent 52%),
-    linear-gradient(165deg, #ffffff 0%, var(--balance-usd-soft) 100%);
+    linear-gradient(165deg, var(--bg-card) 0%, var(--balance-usd-soft) 100%);
 }
 
 .balance-hero-usd .balance-hero-label {
@@ -1052,6 +1071,33 @@ body {
   text-transform: uppercase;
 }
 
+.balance-breakdown-legend-rubro {
+  color: var(--balance-breakdown-legend-fg);
+  font-weight: 700;
+}
+
+.balance-amount-empty {
+  color: var(--balance-amount-empty-fg);
+}
+
+.balance-breakdown-bar-track {
+  background: var(--balance-breakdown-bar-track);
+}
+
+.balance-panel-description {
+  color: var(--text-secondary);
+}
+
+html[data-theme="dark"] .balance-shell .balance-wash-legend {
+  background: color-mix(in srgb, var(--bg-cream) 58%, var(--bg-card));
+}
+
+html[data-theme="dark"] .balance-shell .balance-breakdown-row .balance-legend-col,
+html[data-theme="dark"] .balance-shell .balance-wash-legend .balance-legend-col {
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
 .balance-hero-grid-row {
   align-items: stretch;
 }
@@ -1066,7 +1112,7 @@ body {
   align-items: flex-end;
   gap: 0.75rem 1.25rem;
   border-bottom: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
-  background: color-mix(in srgb, var(--primary) 4%, #f0ece4);
+  background: color-mix(in srgb, var(--primary) 4%, var(--balance-wash));
   padding: 0.75rem 1rem;
 }
 
@@ -1085,7 +1131,7 @@ body {
 .balance-movimientos-highlight-card,
 .balance-scope-help {
   border: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
-  background: color-mix(in srgb, var(--bg-card) 92%, #f0ece4);
+  background: color-mix(in srgb, var(--bg-card) 92%, var(--balance-wash));
 }
 
 .balance-scope-help[open] {
@@ -1119,7 +1165,24 @@ body {
 }
 
 .balance-table-viewport .balance-dense-table thead th {
-  background: color-mix(in srgb, #f0ece4 92%, var(--bg-card));
+  background: var(--balance-table-sticky-head);
+}
+
+.balance-dense-thead {
+  background: var(--balance-dense-head-bg);
+  color: var(--balance-dense-head-fg);
+}
+
+.balance-wash-toolbar {
+  background: color-mix(in srgb, var(--balance-wash) 35%, transparent);
+}
+
+.balance-wash-legend {
+  background: color-mix(in srgb, var(--balance-wash) 45%, transparent);
+}
+
+.balance-segmented-surface {
+  background: color-mix(in srgb, var(--balance-segmented) 80%, transparent);
 }
 
 .balance-table-viewport tfoot td,
@@ -1131,7 +1194,7 @@ body {
 
 .balance-dense-total-row td,
 .balance-dense-total-row th {
-  background: color-mix(in srgb, var(--primary) 9%, #f0ece4);
+  background: color-mix(in srgb, var(--primary) 9%, var(--balance-wash));
   border-top: 2px solid color-mix(in srgb, var(--primary) 22%, var(--border));
   font-weight: 700;
 }
@@ -1306,34 +1369,34 @@ body {
 }
 
 .balance-matrix-table thead .balance-matrix-total-col {
-  background: color-mix(in srgb, var(--primary) 8%, #f0ece4);
+  background: color-mix(in srgb, var(--primary) 8%, var(--balance-wash));
 }
 
 .balance-matrix-table .balance-matrix-total-row > td,
 .balance-matrix-table .balance-matrix-total-row > th {
-  background: color-mix(in srgb, var(--primary) 7%, #f0ece4);
+  background: color-mix(in srgb, var(--primary) 7%, var(--balance-wash));
   border-top: 2px solid color-mix(in srgb, var(--primary) 24%, var(--border));
 }
 
 .balance-matrix-table .balance-matrix-total-label {
-  background: color-mix(in srgb, var(--primary) 7%, #f0ece4);
+  background: color-mix(in srgb, var(--primary) 7%, var(--balance-wash));
 }
 
 .balance-matrix-table .balance-matrix-total-row .balance-sticky-col {
-  background: color-mix(in srgb, var(--primary) 7%, #f0ece4);
+  background: color-mix(in srgb, var(--primary) 7%, var(--balance-wash));
 }
 
 .balance-matrix-table .balance-matrix-total-row-cell {
-  background: color-mix(in srgb, var(--primary) 7%, #f0ece4);
+  background: color-mix(in srgb, var(--primary) 7%, var(--balance-wash));
 }
 
 .balance-matrix-table .balance-matrix-grand-total {
-  background: color-mix(in srgb, var(--primary) 12%, #f0ece4);
+  background: color-mix(in srgb, var(--primary) 12%, var(--balance-wash));
   box-shadow: inset 2px 0 0 color-mix(in srgb, var(--primary) 28%, transparent);
 }
 
 .balance-matrix-table tbody .balance-matrix-total-col.balance-matrix-grand-total {
-  background: color-mix(in srgb, var(--primary) 12%, #f0ece4);
+  background: color-mix(in srgb, var(--primary) 12%, var(--balance-wash));
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -1419,7 +1482,43 @@ body {
 }
 
 .balance-table-scroll thead .balance-sticky-col {
-  background: #f0ece4;
+  background: var(--balance-table-sticky-head);
+}
+
+html[data-theme="dark"] .balance-shell {
+  --balance-grid: rgba(69, 179, 166, 0.1);
+  --balance-ars: #7ec4bf;
+  --balance-ars-mint: #45b3a6;
+  --balance-ars-soft: #1a3338;
+  --balance-usd: #d4b896;
+  --balance-usd-warm: #c4a574;
+  --balance-usd-soft: #2a2418;
+  --balance-wash: var(--bg-cream);
+  --balance-segmented: var(--bg-page);
+  --balance-hero-fg: #e8f2f4;
+  --balance-hero-muted: #b4c4cb;
+  --balance-dense-head-bg: color-mix(in srgb, var(--bg-cream) 72%, var(--bg-card));
+  --balance-dense-head-fg: var(--text-primary);
+  --balance-table-sticky-head: color-mix(in srgb, var(--bg-cream) 78%, var(--bg-card));
+  --balance-breakdown-legend-fg: var(--text-primary);
+  --balance-breakdown-bar-track: color-mix(in srgb, var(--text-primary) 14%, transparent);
+  --balance-amount-empty-fg: #8fa3ab;
+}
+
+html[data-theme="dark"] .balance-shell .balance-panel-description {
+  color: color-mix(in srgb, var(--text-secondary) 92%, var(--text-primary));
+}
+
+html[data-theme="dark"] .balance-shell .balance-hero-ars {
+  background:
+    radial-gradient(ellipse 90% 65% at 100% 0%, rgba(69, 179, 166, 0.14), transparent 52%),
+    linear-gradient(165deg, var(--bg-card) 0%, var(--balance-ars-soft) 100%);
+}
+
+html[data-theme="dark"] .balance-shell .balance-hero-usd {
+  background:
+    radial-gradient(ellipse 90% 65% at 100% 0%, rgba(196, 165, 116, 0.16), transparent 52%),
+    linear-gradient(165deg, var(--bg-card) 0%, var(--balance-usd-soft) 100%);
 }
 
 .balance-date-input {
