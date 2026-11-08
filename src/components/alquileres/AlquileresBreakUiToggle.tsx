@@ -21,7 +21,7 @@ export function AlquileresBreakUiToggle() {
       <div
         role="group"
         aria-label="Dataset de prueba break-ui"
-        className="pointer-events-auto flex rounded-full border border-[#d4d4d8] bg-[#f4f4f5] p-1 font-sans text-[11px] font-medium text-[#3f3f46] shadow-sm"
+        className="pointer-events-auto flex rounded-full border border-border bg-bg-card p-1 font-sans text-[11px] font-medium text-text-primary shadow-[var(--shadow-card)]"
       >
         {SEGMENTS.map((segment) => {
           const active = mode === segment.id;
@@ -32,7 +32,9 @@ export function AlquileresBreakUiToggle() {
               aria-pressed={active}
               onClick={() => setMode(segment.id)}
               className={`rounded-full px-3 py-1.5 transition-none ${
-                active ? "bg-white text-[#18181b] shadow-sm" : "text-[#71717a] hover:text-[#18181b]"
+                active
+                  ? "bg-primary text-text-on-primary shadow-sm"
+                  : "text-text-secondary hover:bg-bg-page hover:text-text-primary"
               }`}
             >
               {segment.label}
