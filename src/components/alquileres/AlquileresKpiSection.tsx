@@ -6,7 +6,7 @@ import { KpiSkeletonRow } from "@/components/ui/Skeleton";
 import type { RentalChipId } from "@/data/alquileres-rentals";
 import type { ContratoTableStats } from "@/lib/api/types";
 import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
-import { ajusteKpiTone, moraKpiTone } from "@/lib/ui/kpi-tones";
+import { ajusteKpiTone, kpiTone, moraKpiTone, type KpiTone } from "@/lib/ui/kpi-tones";
 
 const ease = [0.16, 1, 0.3, 1] as const;
 
@@ -15,60 +15,42 @@ const KPI_FILTERS: Array<{
   label: string;
   hint: string;
   statKey: keyof ContratoTableStats;
-  wash: string;
-  edge: string;
-  bar: string;
-  dot: string;
+  palette: KpiTone;
 }> = [
   {
     chip: "todos",
     label: "Activos",
     hint: "Contratos en curso",
     statKey: "total",
-    wash: "bg-[#e6f3f2]",
-    edge: "border-[#b7d9d6]",
-    bar: "bg-primary",
-    dot: "bg-primary",
+    palette: kpiTone(0),
   },
   {
     chip: "a_cobrar",
     label: "A cobrar",
     hint: "Cuota del mes",
     statKey: "aCobrar",
-    wash: "bg-[#dff6f2]",
-    edge: "border-[#9ed9cf]",
-    bar: "bg-[#45B3A6]",
-    dot: "bg-[#45B3A6]",
+    palette: kpiTone(1),
   },
   {
     chip: "en_mora",
     label: "En mora",
     hint: "Con atraso",
     statKey: "enMora",
-    wash: moraKpiTone.wash,
-    edge: moraKpiTone.edge,
-    bar: moraKpiTone.bar,
-    dot: moraKpiTone.dot,
+    palette: moraKpiTone,
   },
   {
     chip: "ajuste_pendiente",
     label: "Ajuste",
     hint: "Pendiente de índice",
     statKey: "ajustePendiente",
-    wash: ajusteKpiTone.wash,
-    edge: ajusteKpiTone.edge,
-    bar: ajusteKpiTone.bar,
-    dot: ajusteKpiTone.dot,
+    palette: ajusteKpiTone,
   },
   {
     chip: "renovacion_proxima",
     label: "Por vencer",
     hint: "Cierre próximo",
     statKey: "renovacionProxima",
-    wash: "bg-[#e4f1ef]",
-    edge: "border-[#9ec9c4]",
-    bar: "bg-[#0b555a]",
-    dot: "bg-[#0b555a]",
+    palette: kpiTone(4),
   },
 ];
 
@@ -112,7 +94,8 @@ export function AlquileresKpiSection({
         show: { transition: { staggerChildren: reduce ? 0 : 0.05 } },
       }}
     >
-      {KPI_FILTERS.map(({ chip, label, hint, statKey, wash, edge, bar, dot }) => {
+      {KPI_FILTERS.map(({ chip, label, hint, statKey, palette }) => {
+        const { wash, edge, bar, dot } = palette;
         const selected = activeChip === chip;
         const value = stats[statKey];
         const mora = chip === "en_mora";
@@ -146,7 +129,7 @@ export function AlquileresKpiSection({
               {value}
             </span>
             <span className="text-[12px] text-text-secondary">{hint}</span>
-            <span className="mt-1 h-1 w-full overflow-hidden rounded-full bg-white/70" aria-hidden>
+            <span className="mt-1 h-1 w-full overflow-hidden rounded-full bg-[var(--kpi-track)]" aria-hidden>
               <span
                 className={`block h-full rounded-full ${bar}`}
                 style={{ width: `${value === 0 ? 0 : Math.max(share, 8)}%` }}

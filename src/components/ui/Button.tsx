@@ -3,9 +3,9 @@ import type { ButtonHTMLAttributes } from "react";
 import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 
 const base =
-  `rocchia-action inline-flex h-9 items-center justify-center rounded-lg px-3.5 text-[13px] font-medium disabled:cursor-not-allowed disabled:opacity-50 ${interactiveFocusClass}`;
+  `rocchia-action inline-flex h-9 items-center justify-center rounded-lg px-3.5 text-[13px] font-medium disabled:cursor-not-allowed ${interactiveFocusClass}`;
 
-export const buttonOutlineClass = `${base} border border-border bg-bg-card text-text-primary hover:bg-bg-page`;
+export const buttonOutlineClass = `${base} border border-border bg-bg-card text-text-primary hover:bg-bg-page disabled:border-border disabled:bg-bg-page/60 disabled:text-text-secondary`;
 
 export function ButtonOutline({
   className = "",

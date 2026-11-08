@@ -37,3 +37,24 @@
   --color-border-focus-ring: var(--primary);
   --color-border-table: var(--border);
 }
+
+html[data-theme="dark"] {
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: color-mix(in srgb, var(--text-secondary) 88%, white);
+
+  --color-background-full: var(--bg-page);
+  --color-background-primary-default: var(--bg-card);
+  --color-background-primary-hover: color-mix(in srgb, var(--bg-card) 92%, var(--text-primary));
+  --color-background-primary-active: var(--bg-cream);
+  --color-background-primary-disabled: var(--bg-cream);
+  --color-background-secondary-default: var(--bg-cream);
+  --color-background-secondary-hover: color-mix(in srgb, var(--bg-cream) 88%, var(--text-primary));
+
+  --color-border-button-default: var(--border);
+  --color-border-button-hover: color-mix(in srgb, var(--primary) 35%, var(--border));
+  --color-border-button-active: color-mix(in srgb, var(--primary) 45%, var(--border));
+  --color-separator-border: var(--border);
+  --color-border-focus-ring: color-mix(in srgb, var(--primary) 75%, white);
+  --color-border-table: var(--border);
+}

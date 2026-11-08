@@ -26,7 +26,9 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 const STORAGE_KEY = "rocchia-theme";
 
 function applyTheme(mode: ThemeMode) {
-  document.documentElement.setAttribute("data-theme", mode);
+  const root = document.documentElement;
+  root.setAttribute("data-theme", mode);
+  root.classList.toggle("dark", mode === "dark");
   try {
     localStorage.setItem(STORAGE_KEY, mode);
   } catch {

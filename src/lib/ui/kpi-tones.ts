@@ -52,10 +52,10 @@ export const moraKpiTone: KpiTone = {
 
 export const clientesMorosoKpiTone = moraKpiTone;
 
-/** KPI «Ajuste pendiente» — fondo opaco, misma intensidad que los demás washes de Alquileres. */
+/** KPI «Ajuste pendiente» — tokens con wash claro/oscuro vía CSS. */
 export const ajusteKpiTone: KpiTone = {
-  wash: "bg-[#fef08a]",
-  edge: "border-[#facc15]",
-  bar: "bg-[#eab308]",
-  dot: "bg-[#eab308]",
+  wash: "bg-[var(--kpi-wash-ajuste)]",
+  edge: "border-[var(--kpi-edge-ajuste)]",
+  bar: "bg-[var(--kpi-bar-ajuste)]",
+  dot: "bg-[var(--kpi-dot-ajuste)]",
 };

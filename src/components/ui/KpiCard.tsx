@@ -31,7 +31,10 @@ export function KpiCard({
       </p>
       <p className="text-[22px] font-normal leading-none text-text-primary tabular-nums">{value}</p>
       <p className="text-[12px] text-text-secondary">{hint}</p>
-      <span className="mt-1 h-1 w-full overflow-hidden rounded-full bg-white/70" aria-hidden>
+      <span
+        className="mt-1 h-1 w-full overflow-hidden rounded-full bg-[var(--kpi-track)]"
+        aria-hidden
+      >
         <span className={`block h-full w-full rounded-full ${colors.bar}`} />
       </span>
     </>
