@@ -54,7 +54,7 @@ function ContratosInquilinoSection({ contratos }: { contratos: ContratoListItem[
               {contratos.map((contrato) => (
                 <li
                   key={contrato.id}
-                  className="flex flex-col gap-1.5 rounded-md border border-border bg-bg-card px-3 py-3"
+                  className="flex flex-col gap-1.5 glass-card px-3 py-3"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <p className="text-[13px] font-medium leading-snug text-text-primary">
@@ -100,7 +100,7 @@ function PropiedadCarteraItem({
       aria-current={selected ? "true" : undefined}
       className={`group flex w-full items-stretch gap-0 overflow-hidden rounded-lg border text-left transition-all ${
         selected
-          ? "border-primary bg-primary-soft/20 shadow-[var(--shadow-card)] ring-1 ring-primary/25"
+          ? "border-primary bg-primary-soft/20 ring-1 ring-primary/25"
           : "border-border bg-bg-card hover:border-primary/25 hover:shadow-sm"
       }`}
     >
@@ -305,7 +305,7 @@ export function ClienteInmobiliariaPropiedadesSection({
       ) : (
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
           <div className="order-2 flex flex-col gap-4 lg:order-1">
-            <div className="overflow-hidden rounded-lg border border-border bg-bg-card shadow-[var(--shadow-card)]">
+            <div className="overflow-hidden glass-card">
               <div className="border-b border-border px-4 py-3">
                 <h3 className="text-sm font-semibold text-text-primary">Cartera</h3>
                 <p className="text-[12px] text-text-secondary">

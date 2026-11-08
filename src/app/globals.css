@@ -60,11 +60,32 @@
   --kpi-dot-4: var(--primary-dark);
   --radius-sm: 8px;
   --radius-md: 12px;
+  --radius-xl: 18px;
+  --shadow-glass: 0 1px 2px rgba(26, 43, 50, 0.05), 0 8px 32px rgba(26, 43, 50, 0.08);
+  --theme-wipe: #f3ede4;
   --login-accent: #c4a574;
   --login-accent-hover: #b8935e;
   --login-input-border: #d1d5db;
   --login-shadow-card: 0 8px 32px rgba(0, 0, 0, 0.18);
   --login-shadow-logo: 0 4px 24px rgba(0, 0, 0, 0.25);
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --bg-page: #10181c;
+  --bg-cream: #152229;
+  --bg-card: #1a2b32;
+  --primary-soft: #123945;
+  --text-primary: #e8f2f4;
+  --text-secondary: #9eb0b8;
+  --border: #2a3d45;
+  --accent-lilac-bg: #2a2438;
+  --accent-sky-bg: #16313d;
+  --success-bg: #1a3328;
+  --warning-bg: #3a3020;
+  --danger-bg: #3a2222;
+  --shadow-glass: 0 1px 2px rgba(0, 0, 0, 0.2), 0 10px 36px rgba(0, 0, 0, 0.35);
+  --theme-wipe: #0a3a47;
 }
 
 @theme inline {
@@ -98,6 +119,7 @@
   --font-sans: var(--font-dm-sans);
   --radius-sm: var(--radius-sm);
   --radius-md: var(--radius-md);
+  --radius-xl: var(--radius-xl);
 }
 
 html {
@@ -1451,5 +1473,36 @@ body {
 
   .login-window {
     opacity: 0.7;
+  }
+
+  .logo-shimmer {
+    transition: none;
+  }
+}
+
+@layer components {
+  .glass-card {
+    border-radius: var(--radius-xl);
+    border: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
+    background: color-mix(in srgb, var(--bg-card) 82%, transparent);
+    box-shadow: var(--shadow-glass);
+    backdrop-filter: blur(14px);
+  }
+
+  .logo-shimmer {
+    background: linear-gradient(
+      120deg,
+      var(--accent-sky) 0%,
+      var(--primary-soft) 35%,
+      var(--accent-lilac) 70%,
+      var(--accent-sky) 100%
+    );
+    background-size: 220% 220%;
+    transition: background-position 0.6s ease;
+  }
+
+  .logo-shimmer:hover,
+  .group:hover .logo-shimmer {
+    background-position: 100% 50%;
   }
 }

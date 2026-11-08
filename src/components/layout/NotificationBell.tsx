@@ -97,7 +97,7 @@ export const NotificationBell = memo(function NotificationBell({ tone = "default
 
       {open ? (
         <div
-          className="absolute right-0 z-50 mt-2 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-lg border border-border bg-bg-card shadow-[var(--shadow-card)]"
+          className="absolute right-0 z-50 mt-2 w-[min(22rem,calc(100vw-2rem))] overflow-hidden glass-card"
           role="dialog"
           aria-label="Pendientes"
         >

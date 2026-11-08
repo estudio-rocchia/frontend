@@ -53,7 +53,7 @@ export const HonorariosPanel = forwardRef<
   return (
     <aside
       ref={ref}
-      className="flex flex-col gap-0 overflow-hidden rounded-lg border border-border bg-bg-card shadow-[var(--shadow-card)] lg:sticky lg:top-6 lg:self-start"
+      className="flex flex-col gap-0 overflow-hidden glass-card lg:sticky lg:top-6 lg:self-start"
     >
       <header className="border-b border-border bg-gradient-to-br from-primary-soft/40 to-bg-card px-4 py-4">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">

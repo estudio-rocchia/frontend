@@ -106,7 +106,7 @@ export function VentaCobranzasSection({
               return (
                 <article
                   key={pago.id}
-                  className="flex flex-col gap-3 rounded-md border border-border bg-bg-card p-4"
+                  className="flex flex-col gap-3 glass-card p-4"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">

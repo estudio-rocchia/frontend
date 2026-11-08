@@ -27,7 +27,7 @@ export function ClienteInmobiliariaAgregarSection({
 
   return (
     <div className="flex flex-col gap-4">
-      <header className="rounded-lg border border-border bg-bg-card px-4 py-4 shadow-[var(--shadow-card)]">
+      <header className="glass-card px-4 py-4">
         <div className="flex items-start gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-primary-soft text-primary">
             <Link2 className="h-5 w-5" aria-hidden />

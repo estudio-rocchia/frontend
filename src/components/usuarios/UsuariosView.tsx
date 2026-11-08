@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { UserPlus } from "lucide-react";
+import { Lock, Search } from "lucide-react";
 
 const UsuarioFichaDrawer = dynamic(
   () =>
@@ -13,11 +13,7 @@ const UsuarioFichaDrawer = dynamic(
   { ssr: false },
 );
 import { ButtonPrimary } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
 import { KpiCard } from "@/components/ui/KpiCard";
-import { PageHeader } from "@/components/ui/PageHeader";
-import { SearchField } from "@/components/ui/SearchField";
-import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useAuth } from "@/context/auth-context";
 import { type PermissionValue, type UserStatus } from "@/data/usuarios";
@@ -161,57 +157,88 @@ export function UsuariosView() {
           </p>
         ) : null}
 
-        <PageHeader
-          title="Usuarios y roles"
-          description="Control de accesos, permisos y protección de datos sensibles"
-        />
+        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-1">
+            <h1 className="text-[26px] font-bold text-primary">Usuarios y roles</h1>
+            <p className="text-sm text-text-secondary">
+              Control de accesos, permisos y protección de datos sensibles
+            </p>
+          </div>
+          <ButtonPrimary className="shrink-0" onClick={() => router.push("/usuarios/nuevo")}>
+            Crear usuario
+          </ButtonPrimary>
+        </header>
+
+        <div className="flex items-center gap-3.5 rounded-md border border-primary bg-primary-soft p-4">
+          <Lock className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+          <div className="flex flex-col gap-1">
+            <p className="text-sm font-semibold text-primary">Zona restringida — datos confidenciales</p>
+            <p className="text-[13px] text-text-secondary">
+              El acceso a contratos, precios netos y edición de plazos queda limitado por rol. Toda
+              modificación queda registrada en auditoría.
+            </p>
+          </div>
+        </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          {kpis.map((kpi, index) => (
-            <KpiCard key={kpi.label} {...kpi} tone={index} />
+          {kpis.map((kpi) => (
+            <KpiCard key={kpi.label} {...kpi} />
           ))}
         </div>
 
-        <Card accent className="rocchia-panel--flat">
+        <section className="overflow-hidden glass-card">
           <div className="flex flex-col gap-5 border-b border-border px-5 py-5">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div className="flex min-w-0 flex-col gap-1">
-                <h2 className="text-[15px] font-semibold tracking-tight text-text-primary">
-                  Matriz de permisos por rol
-                </h2>
-                <p className="text-xs text-text-secondary">{resultSummary}</p>
-              </div>
-              <ButtonPrimary
-                className="w-full shrink-0 sm:w-fit"
-                onClick={() => router.push("/usuarios/nuevo")}
-              >
-                <UserPlus className="mr-1.5 h-4 w-4" aria-hidden />
-                Crear usuario
-              </ButtonPrimary>
+            <div className="flex flex-col gap-1">
+              <h2 className="text-base font-semibold text-text-primary">Matriz de permisos por rol</h2>
+              <p className="text-xs text-text-secondary">{resultSummary}</p>
             </div>
 
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <SearchField
-                className="min-w-0 flex-1 lg:max-w-md"
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="Usuario, correo o rol…"
-                aria-label="Buscar usuarios por nombre, correo o rol"
-              />
+              <div className="flex min-w-0 flex-1 flex-col gap-2 lg:max-w-md">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
+                  Buscar
+                </span>
+                <label className="flex items-center gap-2.5 rounded-sm border border-border bg-bg-page px-3 py-2.5 focus-within:border-primary">
+                  <Search className="h-4 w-4 shrink-0 text-text-secondary" aria-hidden />
+                  <input
+                    type="search"
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    placeholder="Usuario, correo o rol…"
+                    aria-label="Buscar usuarios por nombre, correo o rol"
+                    className="min-w-0 flex-1 bg-transparent text-sm text-text-primary outline-none placeholder:text-text-secondary"
+                  />
+                </label>
+              </div>
 
-              <SegmentedControl
-                options={activityFilters.map(({ id, label }) => ({
-                  id,
-                  label,
-                  count: activityCounts[id],
-                }))}
-                value={activityFilter}
-                onChange={setActivityFilter}
-              />
+              <div className="flex flex-col gap-2">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
+                  Estado
+                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  {activityFilters.map(({ id, label }) => {
+                    const selected = activityFilter === id;
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => setActivityFilter(id)}
+                        className={`rounded-full border border-border px-3.5 py-2 text-[13px] transition-colors ${
+                          selected
+                            ? "bg-primary-soft font-semibold text-primary"
+                            : "bg-bg-card font-normal text-text-secondary hover:text-text-primary"
+                        }`}
+                      >
+                        {label} ({activityCounts[id]})
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="rocchia-table-shell max-h-[min(32rem,62vh)] overflow-auto overscroll-contain">
+          <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] border-collapse text-left">
               <thead>
                 <tr className="bg-bg-cream">
@@ -271,7 +298,7 @@ export function UsuariosView() {
               </tbody>
             </table>
           </div>
-        </Card>
+        </section>
       </div>
 
       <UsuarioFichaDrawer
