@@ -15,11 +15,14 @@ import { AdjustmentUnpaidCuotasNotice } from "@/components/alquileres/Adjustment
 import { useContratoAdjustmentPreview } from "@/components/alquileres/useContratoAdjustmentPreview";
 import type { ContratoDetail, IndiceCode } from "@/lib/api/types";
 import {
+  caretAfterSignificant,
+  formatAmountTyping,
   formatIndexValue,
   formatMoney,
   formatMonthYear,
   moneyClassName,
   moneyDisplaySizeClass,
+  parseAmountInput,
   personaDisplayName,
 } from "@/lib/format";
 import {
@@ -66,43 +69,6 @@ function formatAmountInput(amount: string): string {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   });
-}
-
-/** Agrupa los miles con punto mientras se escribe. La coma queda para los centavos. */
-function formatAmountTyping(raw: string): string {
-  const cleaned = raw.replace(/[^\d,]/g, "");
-  if (!cleaned) return "";
-  const comma = cleaned.indexOf(",");
-  const wholeDigits = (comma === -1 ? cleaned : cleaned.slice(0, comma)).replace(/\D/g, "");
-  const whole = wholeDigits.replace(/^0+(?=\d)/, "");
-  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-  if (comma === -1) return grouped;
-  const frac = cleaned.slice(comma + 1).replace(/\D/g, "").slice(0, 2);
-  return `${grouped || "0"},${frac}`;
-}
-
-function caretAfterSignificant(formatted: string, significantCount: number): number {
-  if (significantCount <= 0) return 0;
-  let seen = 0;
-  for (let index = 0; index < formatted.length; index += 1) {
-    if (/\d|,/.test(formatted[index] ?? "")) {
-      seen += 1;
-      if (seen === significantCount) return index + 1;
-    }
-  }
-  return formatted.length;
-}
-
-/** Acepta 150000, 150.000 y 150.000,50. */
-function parseAmountInput(raw: string): number | null {
-  const trimmed = raw.trim();
-  if (!trimmed) return null;
-  const [wholeRaw, fracRaw] = trimmed.replace(/[^\d.,]/g, "").split(",");
-  const whole = (wholeRaw ?? "").replace(/\D/g, "");
-  if (!whole) return null;
-  const frac = (fracRaw ?? "").replace(/\D/g, "").slice(0, 2);
-  const value = Number(frac ? `${whole}.${frac}` : whole);
-  return Number.isFinite(value) ? value : null;
 }
 
 function formatCoefficient(value: number): string {

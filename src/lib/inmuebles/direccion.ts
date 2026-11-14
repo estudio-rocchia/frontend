@@ -20,7 +20,15 @@ export function buildInmuebleDireccion(input: InmuebleDireccionInput): string {
   return linea;
 }
 
+/** Requiere localidad; calle, número y referencia son opcionales (campos rurales o sin domicilio urbano). */
 export function isInmuebleDireccionValid(input: InmuebleDireccionInput & { localidadId: number | string }): boolean {
   const localidadId = Number(input.localidadId);
-  return Number.isInteger(localidadId) && localidadId > 0 && input.calle.trim().length > 0;
+  return Number.isInteger(localidadId) && localidadId > 0;
+}
+
+/** Campo/hectáreas: localidad opcional; ubicación suele ir en referencia o descripción. */
+export function isCampoDireccionValid(input: InmuebleDireccionInput & { localidadId: number | string }): boolean {
+  if (!input.localidadId) return true;
+  const localidadId = Number(input.localidadId);
+  return Number.isInteger(localidadId) && localidadId > 0;
 }

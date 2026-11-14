@@ -7,6 +7,7 @@ import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { ChipToggle, FormField } from "@/components/ui/FormLayout";
 import { ApiError, changeOfertaEstado } from "@/lib/api";
 import type { OfertaRecord } from "@/lib/api/types";
+import { MOTIVOS_FUERA_ALQUILER } from "@/lib/ventas/motivos-alquiler";
 import { MOTIVOS_FUERA_MERCADO } from "@/lib/ventas/motivos";
 
 export type CambiarEstadoMode = "off_market" | "available";
@@ -19,6 +20,38 @@ type CambiarEstadoOfertaModalProps = {
   mode: CambiarEstadoMode;
   estadoId: number | undefined;
   onSaved: () => void;
+  /** Defaults to venta copy and motivos. */
+  modalidad?: "venta" | "alquiler";
+};
+
+const COPY: Record<
+  "venta" | "alquiler",
+  Record<CambiarEstadoMode, { title: string; subtitle: string; availableHint: string }>
+> = {
+  venta: {
+    off_market: {
+      title: "Sacar de venta",
+      subtitle: "El inmueble pasará a Fuera de mercado (venta).",
+      availableHint: "",
+    },
+    available: {
+      title: "Poner en venta",
+      subtitle: "El inmueble aparecerá en la pestaña A la venta.",
+      availableHint: 'El inmueble quedará disponible en la pestaña "A la venta".',
+    },
+  },
+  alquiler: {
+    off_market: {
+      title: "Sacar de alquiler",
+      subtitle: "La oferta de alquiler pasará a Fuera de mercado.",
+      availableHint: "",
+    },
+    available: {
+      title: "Poner en alquiler",
+      subtitle: "El galpón quedará disponible para alquilar.",
+      availableHint: "La oferta de alquiler quedará en estado Disponible.",
+    },
+  },
 };
 
 export function CambiarEstadoOfertaModal({
@@ -29,18 +62,20 @@ export function CambiarEstadoOfertaModal({
   mode,
   estadoId,
   onSaved,
+  modalidad = "venta",
 }: CambiarEstadoOfertaModalProps) {
-  const [motivo, setMotivo] = useState<string>(MOTIVOS_FUERA_MERCADO[0]);
+  const motivos = modalidad === "alquiler" ? [...MOTIVOS_FUERA_ALQUILER] : [...MOTIVOS_FUERA_MERCADO];
+  const [motivo, setMotivo] = useState<string>(motivos[0]);
   const [motivoCustom, setMotivoCustom] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
-    setMotivo(MOTIVOS_FUERA_MERCADO[0]);
+    setMotivo(motivos[0]);
     setMotivoCustom("");
     setError(null);
-  }, [open, mode]);
+  }, [open, mode, motivos]);
 
   async function handleSubmit() {
     if (!oferta || !estadoId) return;
@@ -65,11 +100,9 @@ export function CambiarEstadoOfertaModal({
     }
   }
 
-  const title = mode === "off_market" ? "Sacar de venta" : "Poner en venta";
-  const subtitle =
-    mode === "off_market"
-      ? "El inmueble pasará a Fuera de mercado."
-      : "El inmueble aparecerá en la pestaña A la venta.";
+  const copy = COPY[modalidad][mode];
+  const title = copy.title;
+  const subtitle = copy.subtitle;
 
   return (
     <Modal
@@ -91,11 +124,7 @@ export function CambiarEstadoOfertaModal({
           <>
             <div className="flex flex-col gap-1.5">
               <span className="text-[11px] font-semibold text-text-secondary">Motivo</span>
-              <ChipToggle
-                options={[...MOTIVOS_FUERA_MERCADO, "Otro"]}
-                value={motivo}
-                onChange={setMotivo}
-              />
+              <ChipToggle options={motivos} value={motivo} onChange={setMotivo} />
             </div>
             {motivo === "Otro" ? (
               <FormField
@@ -107,9 +136,7 @@ export function CambiarEstadoOfertaModal({
             ) : null}
           </>
         ) : (
-          <p className="text-sm text-text-secondary">
-            El inmueble quedará disponible en la pestaña &quot;A la venta&quot;.
-          </p>
+          <p className="text-sm text-text-secondary">{copy.availableHint}</p>
         )}
         {error ? <p className="text-sm text-danger">{error}</p> : null}
       </div>

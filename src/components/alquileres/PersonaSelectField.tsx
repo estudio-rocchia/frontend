@@ -339,7 +339,7 @@ function PorcentajeAdministracionFields({
       return;
     }
     const next = Number(normalized);
-    if (!Number.isFinite(next) || next <= 0 || next > 100) {
+    if (!Number.isFinite(next) || next < 0 || next > 100) {
       setInputValue(String(value));
       return;
     }
@@ -389,7 +389,7 @@ function PorcentajeAdministracionFields({
               const normalized = raw.replace(",", ".").trim();
               if (!normalized || normalized === ".") return;
               const next = Number(normalized);
-              if (Number.isFinite(next) && next > 0 && next <= 100) {
+              if (Number.isFinite(next) && next >= 0 && next <= 100) {
                 onChange(next);
               }
             }}

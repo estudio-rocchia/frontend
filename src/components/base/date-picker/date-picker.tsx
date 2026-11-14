@@ -7,10 +7,7 @@ import type { RefObject } from "react";
 import { Calendar, Dialog, Popover, useLocale } from "react-aria-components";
 import type { CalendarDate } from "@internationalized/date";
 import { RiCalendarLine } from "@remixicon/react";
-import { AnimatePresence, motion } from "motion/react";
-import { Button } from "@/components/base/buttons/button";
 import {
-  DateChipInput,
   MonthPanel,
   formatTriggerDate,
   popoverClassName,
@@ -26,8 +23,7 @@ import { useDismissOnOutsidePress } from "@/utils/use-dismiss-on-outside-press";
  * A single-date picker: trigger button opens a popover with one month
  * (react-aria's plain `Calendar`, so both nav chevrons are fully functional —
  * unlike `DateRangePicker`'s dual view, there's only one month to navigate)
- * and a footer with an editable "DD/MM/YYYY" chip plus Cancel/Apply. No
- * quick-select sidebar in this Figma frame.
+ * Selecting a day commits immediately and closes the popover (no Apply/Cancel).
  *
  * Reuses the exact chevrons, day-cell rendering, month-panel chrome, editable
  * date chip, and trigger/popover surfaces built for `DateRangePicker` — see
@@ -86,7 +82,6 @@ export function DatePicker({
   const [internalValue, setInternalValue] = useState<CalendarDate | null>(defaultValue);
   const committedValue = isControlled ? (value ?? null) : internalValue;
 
-  const [pendingValue, setPendingValue] = useState<CalendarDate | null>(committedValue);
   // React Aria's `Calendar` keeps its own internal `visibleRange` state for
   // as long as it stays mounted (Popover keeps its content mounted between
   // opens for the exit animation), so it never re-derives the visible month
@@ -102,10 +97,8 @@ export function DatePicker({
   // external trigger (`triggerRef`), which never runs `openChange` below.
   useEffect(() => {
     if (isOpen) {
-      setPendingValue(committedValue);
       setOpenKey((k) => k + 1);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- resync on the open transition only, not every committedValue change
   }, [isOpen]);
 
   const commit = (next: CalendarDate | null) => {
@@ -148,40 +141,14 @@ export function DatePicker({
         className={popoverClassName}
       >
         <Dialog aria-label={ariaLabel} className="outline-none">
-          <Calendar key={openKey} aria-label={ariaLabel} value={pendingValue} onChange={setPendingValue}>
+          <Calendar
+            key={openKey}
+            aria-label={ariaLabel}
+            value={committedValue}
+            onChange={(next) => commit(next)}
+          >
             <div className="flex flex-col pt-2 pe-2 pb-3 ps-2">
               <MonthPanel offset={0} showPrev showNext />
-              <div className="flex items-center justify-between pt-3 pe-4 ps-4">
-                <div>
-                  <AnimatePresence>
-                    {pendingValue && (
-                      <motion.div
-                        key="date-summary"
-                        initial={{ opacity: 0, y: -12 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -12 }}
-                        transition={{ duration: 0.25, ease: [0.34, 1.2, 0.64, 1] }}
-                      >
-                        <DateChipInput date={pendingValue} label="Fecha" onCommit={setPendingValue} />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-                <div className="flex items-center gap-2.5">
-                  <Button
-                    variant="secondary"
-                    onClick={() => {
-                      setPendingValue(committedValue);
-                      setIsOpen(false);
-                    }}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button onClick={() => commit(pendingValue)} disabled={!pendingValue}>
-                    Aplicar
-                  </Button>
-                </div>
-              </div>
             </div>
           </Calendar>
         </Dialog>

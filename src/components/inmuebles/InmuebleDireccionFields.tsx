@@ -27,6 +27,7 @@ export function InmuebleDireccionFields({
   onLocalidadesChange,
   token,
   loadingLocalidades,
+  variant = "urbano",
 }: {
   value: InmuebleDireccionValue;
   onChange: (value: InmuebleDireccionValue) => void;
@@ -34,7 +35,11 @@ export function InmuebleDireccionFields({
   onLocalidadesChange?: (localidades: LocalidadOption[]) => void;
   token?: string;
   loadingLocalidades?: boolean;
+  /** `campo`: sin calle ni número; localidad opcional. */
+  variant?: "urbano" | "campo";
 }) {
+  const esCampo = variant === "campo";
+
   return (
     <div className="flex flex-col gap-3">
       <LocalidadSelectField
@@ -44,29 +49,43 @@ export function InmuebleDireccionFields({
         onLocalidadesChange={onLocalidadesChange}
         token={token}
         loading={loadingLocalidades}
+        label={esCampo ? "Localidad (opcional)" : "Localidad"}
+        placeholder={esCampo ? "Opcional — ej. Las Breñas, Charata…" : undefined}
+        allowClear={esCampo}
       />
 
-      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_120px]">
+      {esCampo ? (
         <FormField
-          label="Calle"
-          value={value.calle}
-          onChange={(calle) => onChange({ ...value, calle })}
-          placeholder="Ej. Sarmiento"
+          label="Referencia / ubicación (opcional)"
+          value={value.referencia}
+          onChange={(referencia) => onChange({ ...value, referencia })}
+          placeholder="Ej. A 50 km de Quimili, sobre ruta 6, camino a La Dorila"
         />
-        <FormField
-          label="Número"
-          value={value.numero}
-          onChange={(numero) => onChange({ ...value, numero })}
-          placeholder="Ej. 812"
-        />
-      </div>
+      ) : (
+        <>
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_120px]">
+            <FormField
+              label="Calle (opcional)"
+              value={value.calle}
+              onChange={(calle) => onChange({ ...value, calle })}
+              placeholder="Ej. Sarmiento"
+            />
+            <FormField
+              label="Número (opcional)"
+              value={value.numero}
+              onChange={(numero) => onChange({ ...value, numero })}
+              placeholder="Ej. 812"
+            />
+          </div>
 
-      <FormField
-        label="Entre calles / referencia (opcional)"
-        value={value.referencia}
-        onChange={(referencia) => onChange({ ...value, referencia })}
-        placeholder="Ej. entre Belgrano y Moreno"
-      />
+          <FormField
+            label="Entre calles / referencia (opcional)"
+            value={value.referencia}
+            onChange={(referencia) => onChange({ ...value, referencia })}
+            placeholder="Ej. entre Belgrano y Moreno"
+          />
+        </>
+      )}
     </div>
   );
 }

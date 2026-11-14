@@ -21,6 +21,13 @@ export interface InmuebleSinAlquiler {
   propietarioIds: number[];
   propietarios: InmueblePropietarioResumen[];
   propietarioLabel: string;
+  tieneOfertaAlquiler: boolean;
+  estadoOfertaAlquiler: string | null;
+  origen: "cartel" | "administracion";
+  enAdministracion: boolean;
+  ofertaAlquilerId: number | null;
+  estadoRedesId: number | null;
+  estadoRedesCode: string | null;
 }
 
 export type PropiedadAdministrada = PropiedadAdministradaRecord;
@@ -54,6 +61,8 @@ export async function loadInmueblesCatalog(token: string): Promise<InmuebleRecor
   const inmueblesRes = await fetchInmuebles(token, { limit: 200 });
   return inmueblesRes.items;
 }
+
+export { vacanteComercializacionLabel as vacanteElegibilidadLabel } from "@/lib/alquileres/inmuebles-vacantes";
 
 export async function loadInmueblesSinAlquiler(
   token: string,
@@ -89,6 +98,13 @@ export async function loadInmueblesSinAlquiler(
       propietarioIds,
       propietarios: links,
       propietarioLabel: propietarioLabel || "Sin propietario asignado",
+      tieneOfertaAlquiler: inmueble.tieneOfertaAlquiler,
+      estadoOfertaAlquiler: inmueble.estadoOfertaAlquiler,
+      origen: inmueble.origen,
+      enAdministracion: inmueble.enAdministracion,
+      ofertaAlquilerId: inmueble.ofertaAlquilerId,
+      estadoRedesId: inmueble.estadoRedesId,
+      estadoRedesCode: inmueble.estadoRedesCode,
     };
   });
 

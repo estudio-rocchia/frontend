@@ -4,12 +4,18 @@ import { useRef, type KeyboardEvent } from "react";
 
 import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 
-export type CatalogInmuebleFichaTabId = "resumen" | "precio";
+export type CatalogInmuebleFichaTabId = "resumen" | "precio" | "comercializacion";
 
-const TAB_ITEMS: { id: CatalogInmuebleFichaTabId; label: string }[] = [
-  { id: "resumen", label: "Resumen" },
-  { id: "precio", label: "Precio" },
-];
+function buildTabItems(showComercializacion: boolean): { id: CatalogInmuebleFichaTabId; label: string }[] {
+  const items: { id: CatalogInmuebleFichaTabId; label: string }[] = [
+    { id: "resumen", label: "Resumen" },
+    { id: "precio", label: "Precio" },
+  ];
+  if (showComercializacion) {
+    items.push({ id: "comercializacion", label: "Comercialización" });
+  }
+  return items;
+}
 
 export const CATALOG_FICHA_PANEL_ID = "catalog-ficha-panel";
 
@@ -21,25 +27,28 @@ export function CatalogInmuebleFichaTabs({
   active,
   onChange,
   historialCount,
+  showComercializacion = false,
 }: {
   active: CatalogInmuebleFichaTabId;
   onChange: (tab: CatalogInmuebleFichaTabId) => void;
   historialCount?: number;
+  showComercializacion?: boolean;
 }) {
   const tablistRef = useRef<HTMLDivElement>(null);
+  const tabItems = buildTabItems(showComercializacion);
 
   function focusTab(tabId: CatalogInmuebleFichaTabId) {
     tablistRef.current?.querySelector<HTMLButtonElement>(`#${catalogFichaTabDomId(tabId)}`)?.focus();
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>, tabId: CatalogInmuebleFichaTabId) {
-    const index = TAB_ITEMS.findIndex((tab) => tab.id === tabId);
+    const index = tabItems.findIndex((tab) => tab.id === tabId);
     if (index < 0) return;
 
     if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
       event.preventDefault();
       const delta = event.key === "ArrowRight" ? 1 : -1;
-      const next = TAB_ITEMS[(index + delta + TAB_ITEMS.length) % TAB_ITEMS.length];
+      const next = tabItems[(index + delta + tabItems.length) % tabItems.length];
       onChange(next.id);
       focusTab(next.id);
       return;
@@ -47,14 +56,14 @@ export function CatalogInmuebleFichaTabs({
 
     if (event.key === "Home") {
       event.preventDefault();
-      onChange(TAB_ITEMS[0].id);
-      focusTab(TAB_ITEMS[0].id);
+      onChange(tabItems[0].id);
+      focusTab(tabItems[0].id);
       return;
     }
 
     if (event.key === "End") {
       event.preventDefault();
-      const last = TAB_ITEMS[TAB_ITEMS.length - 1];
+      const last = tabItems[tabItems.length - 1];
       onChange(last.id);
       focusTab(last.id);
     }
@@ -67,7 +76,7 @@ export function CatalogInmuebleFichaTabs({
       role="tablist"
       aria-label="Secciones de la ficha de catálogo"
     >
-      {TAB_ITEMS.map((tab) => {
+      {tabItems.map((tab) => {
         const selected = active === tab.id;
         const count = tab.id === "precio" ? historialCount : undefined;
         return (

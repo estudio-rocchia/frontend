@@ -1,6 +1,6 @@
 "use client";
 
-import { ExternalLink } from "lucide-react";
+import { CircleDollarSign, ClipboardList, ExternalLink, Pencil } from "lucide-react";
 
 import { FichaSummaryCard } from "@/components/alquileres/FichaSummaryCard";
 import { InmuebleDetalleSection } from "@/components/ventas/InmuebleDetalleSection";
@@ -9,6 +9,7 @@ import { resumenFieldGridClass, ResumenField, ResumenPanel } from "@/components/
 import type { InmuebleCatalogRecord, InmuebleFicha, OfertaRecord, VentaDetail } from "@/lib/api/types";
 import { formatDateDisplay, formatMoney } from "@/lib/format";
 import { inmueblePropiedadNombre, inmuebleUbicacionCompleta } from "@/lib/inmuebles/display-label";
+import { permutaResumenLabel } from "@/lib/ventas/catalog-helpers";
 import { VENTA_EMPTY_FIELD } from "@/lib/ventas/empty-field";
 import { formaPagoLabel } from "@/lib/ventas/forma-pago";
 import { ofertaEstadoLabel, ofertaEstadoVariant, ventaEstadoLabel } from "@/lib/ventas/status-labels";
@@ -17,17 +18,21 @@ type CatalogInmuebleResumenSectionProps = {
   ficha: InmuebleFicha;
   inmueble: InmuebleCatalogRecord;
   oferta: OfertaRecord | null;
+  ofertaAlquiler?: OfertaRecord | null;
   ventaVinculada: VentaDetail | null;
   propietario: string;
   motivo: string;
   isOffMarket: boolean;
   headerPrecio: { label: string; value: string };
   historialCount: number;
+  historialAlquilerCount?: number;
   inmuebleId: number;
   token: string | null;
   canEditDetalle: boolean;
   onDetalleSaved: () => void;
   onOpenVenta: () => void;
+  onEditRequisitosAlquiler?: () => void;
+  onActualizarPrecioAlquiler?: () => void;
 };
 
 function displayValue(value: string | null | undefined): string {
@@ -44,28 +49,34 @@ export function CatalogInmuebleResumenSection({
   ficha,
   inmueble,
   oferta,
+  ofertaAlquiler = null,
   ventaVinculada,
   propietario,
   motivo,
   isOffMarket,
   headerPrecio,
   historialCount,
+  historialAlquilerCount = 0,
   inmuebleId,
   token,
   canEditDetalle,
   onDetalleSaved,
   onOpenVenta,
+  onEditRequisitosAlquiler,
+  onActualizarPrecioAlquiler,
 }: CatalogInmuebleResumenSectionProps) {
   const estadoCode = oferta?.estadoCode ?? "available";
   const tipoName = ficha.tipoInmueble?.name ?? "—";
   const ubicacion = inmuebleUbicacionCompleta(inmueble, ficha.localidad);
   const propiedadNombre = inmueblePropiedadNombre(inmueble, tipoName !== "—" ? tipoName : null);
 
+  const historialReferencia = oferta ? historialCount : historialAlquilerCount;
+  const monedaReferencia = oferta?.codigoMoneda ?? ofertaAlquiler?.codigoMoneda;
   const precioHint =
-    historialCount > 0
-      ? `${historialCount} ${historialCount === 1 ? "cambio" : "cambios"} en historial de precio`
-      : oferta?.codigoMoneda
-        ? `Moneda ${oferta.codigoMoneda}`
+    historialReferencia > 0
+      ? `${historialReferencia} ${historialReferencia === 1 ? "cambio" : "cambios"} en historial de precio`
+      : monedaReferencia
+        ? `Moneda ${monedaReferencia}`
         : "Sin historial de precio";
 
   const formaPagoValue = formaPagoLabel(oferta?.formaPagoCode);
@@ -97,27 +108,88 @@ export function CatalogInmuebleResumenSection({
           </div>
         </ResumenPanel>
 
-        <ResumenPanel title="Oferta de venta" description="Condiciones comerciales de la publicación">
-          <div className={resumenFieldGridClass}>
-            <ResumenField
-              label="Estado"
-              value={ofertaEstadoLabel(estadoCode)}
-              statusVariant={ofertaEstadoVariant(estadoCode)}
-            />
-            {isOffMarket ? <ResumenField label="Motivo" value={displayValue(motivo)} /> : null}
-            <ResumenField label="Forma de pago" value={formaPagoValue} />
-            <ResumenField label="Financiación" value={displayValue(oferta?.condicionesFinanciacion)} span={2} />
-            <ResumenField label="Notas de precio" value={displayValue(oferta?.notasPrecio)} span={2} />
-            <ResumenField label="Acepta permuta" value={boolLabel(inmueble.aceptaPermuta)} />
-            <ResumenField label="Acepta financiación" value={boolLabel(inmueble.aceptaFinanciacion)} />
-          </div>
-        </ResumenPanel>
+        {oferta?.tipoOperacionCode === "venta" ? (
+          <ResumenPanel title="Oferta de venta" description="Condiciones comerciales de la publicación">
+            <div className={resumenFieldGridClass}>
+              <ResumenField
+                label="Estado"
+                value={ofertaEstadoLabel(estadoCode)}
+                statusVariant={ofertaEstadoVariant(estadoCode)}
+              />
+              {isOffMarket ? <ResumenField label="Motivo" value={displayValue(motivo)} /> : null}
+              <ResumenField label="Forma de pago" value={formaPagoValue} />
+              <ResumenField label="Financiación" value={displayValue(oferta.condicionesFinanciacion)} span={2} />
+              <ResumenField label="Notas de precio" value={displayValue(oferta.notasPrecio)} span={2} />
+              <ResumenField label="Permuta" value={permutaResumenLabel(inmueble)} />
+              <ResumenField label="Acepta financiación" value={boolLabel(inmueble.aceptaFinanciacion)} />
+            </div>
+          </ResumenPanel>
+        ) : null}
+
+        {ofertaAlquiler ? (
+          <ResumenPanel
+            title="Oferta de alquiler"
+            description="Precio y requisitos de la publicación"
+            headerAction={
+              canEditDetalle && (onActualizarPrecioAlquiler || onEditRequisitosAlquiler) ? (
+                <div className="flex flex-wrap justify-end gap-2">
+                  {onActualizarPrecioAlquiler ? (
+                    <ButtonOutline type="button" className="gap-2" onClick={onActualizarPrecioAlquiler}>
+                      <CircleDollarSign className="h-4 w-4" aria-hidden />
+                      Actualizar precio
+                    </ButtonOutline>
+                  ) : null}
+                  {onEditRequisitosAlquiler ? (
+                    <ButtonOutline type="button" className="gap-2" onClick={onEditRequisitosAlquiler}>
+                      {ofertaAlquiler.notasPrecio?.trim() ? (
+                        <Pencil className="h-4 w-4" aria-hidden />
+                      ) : (
+                        <ClipboardList className="h-4 w-4" aria-hidden />
+                      )}
+                      {ofertaAlquiler.notasPrecio?.trim() ? "Editar requisitos" : "Cargar requisitos"}
+                    </ButtonOutline>
+                  ) : null}
+                </div>
+              ) : undefined
+            }
+          >
+            <div className={resumenFieldGridClass}>
+              <ResumenField
+                label="Estado"
+                value={ofertaEstadoLabel(ofertaAlquiler.estadoCode)}
+                statusVariant={ofertaEstadoVariant(ofertaAlquiler.estadoCode)}
+              />
+              <ResumenField
+                label="Precio mensual"
+                value={
+                  ofertaAlquiler.montoPrecio
+                    ? formatMoney(ofertaAlquiler.montoPrecio, ofertaAlquiler.codigoMoneda ?? "ARS")
+                    : "—"
+                }
+              />
+              {historialAlquilerCount > 0 ? (
+                <p className="sm:col-span-2 text-[12px] text-text-secondary">
+                  {historialAlquilerCount}{" "}
+                  {historialAlquilerCount === 1 ? "cambio" : "cambios"} en historial de precio de alquiler
+                </p>
+              ) : null}
+              <ResumenField
+                label="Requisitos para alquilar"
+                value={displayValue(ofertaAlquiler.notasPrecio)}
+                span={2}
+                longText
+              />
+            </div>
+          </ResumenPanel>
+        ) : null}
 
         {token ? (
           <InmuebleDetalleSection
             token={token}
             inmuebleId={inmuebleId}
             tipoInmuebleCode={ficha.tipoInmueble?.code}
+            esTerreno={ficha.tipoInmueble?.esTerreno ?? false}
+            inmueble={inmueble}
             detalle={ficha.detalle}
             canEdit={canEditDetalle}
             onSaved={onDetalleSaved}

@@ -112,7 +112,7 @@ export function VincularInmueblePropietarioForm({
 
       const pctSource = honorariosPorCliente ? porcentajeCliente : porcentajeAdministracion;
       const pct = Number(pctSource);
-      if (!Number.isFinite(pct) || pct <= 0 || pct > 100) {
+      if (!Number.isFinite(pct) || pct < 0 || pct > 100) {
         onError("El porcentaje de administración debe estar entre 0 y 100.");
         return;
       }
@@ -237,7 +237,7 @@ export function VincularInmueblePropietarioForm({
             <span className="text-[11px] font-semibold text-text-secondary">Otro porcentaje</span>
             <input
               type="number"
-              min={0.01}
+              min={0}
               max={100}
               step={0.01}
               value={porcentajeAdministracion}

@@ -375,7 +375,7 @@ export function VentasCatalogFiltersPanel({
                         onChange={(e) => onChange({ ...filters, tieneEscritura: e.target.checked })}
                         className="h-3.5 w-3.5 rounded border-border"
                       />
-                      Escritura
+                      Tiene escritura
                     </label>
                   ) : null}
                   {showsTerrainFilterField(tipoCode, "tieneConstruccion") ? (

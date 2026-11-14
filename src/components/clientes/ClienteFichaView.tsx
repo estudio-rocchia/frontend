@@ -254,8 +254,8 @@ export function ClienteFichaView() {
   async function handleSaveClienteHonorarios() {
     if (!token || !persona) return;
     const numeric = Number(clientePctEdit);
-    if (!Number.isFinite(numeric) || numeric <= 0 || numeric > 100) {
-      setError("El porcentaje debe estar entre 0 y 100.");
+   if (!Number.isFinite(numeric) || numeric < 0 || numeric > 100) {
+     setError("El porcentaje debe estar entre 0 y 100.");
       return;
     }
 
@@ -283,8 +283,8 @@ export function ClienteFichaView() {
   async function handleSavePropiedadAdministracion(propiedad: PropiedadAdministrada) {
     if (!token) return;
     const numeric = Number(pctEdits[propiedad.propietarioId]);
-    if (!Number.isFinite(numeric) || numeric <= 0 || numeric > 100) {
-      setError("El porcentaje debe estar entre 0 y 100.");
+   if (!Number.isFinite(numeric) || numeric < 0 || numeric > 100) {
+     setError("El porcentaje debe estar entre 0 y 100.");
       return;
     }
 

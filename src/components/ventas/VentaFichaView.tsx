@@ -54,6 +54,12 @@ import { parseRouteId } from "@/lib/parse-route-id";
 import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 import { VENTA_EMPTY_FIELD } from "@/lib/ventas/empty-field";
 import { parteNombre } from "@/lib/ventas/partes";
+import type { VentasTabId } from "@/components/ventas/VentasFilterChips";
+import {
+  buildVentasInmuebleHref,
+  buildVentasListHref,
+  parseVentasListStateFromSearchParams,
+} from "@/lib/ventas/ventas-list-state";
 
 const CobrarVentaModal = dynamic(
   () =>
@@ -110,11 +116,27 @@ function tabFromQuery(value: string | null): VentaFichaTabId | null {
   return null;
 }
 
+function isVentasTabId(value: string | null): value is VentasTabId {
+  return (
+    value === "en_operacion" ||
+    value === "a_la_venta" ||
+    value === "fuera_mercado" ||
+    value === "vendidos"
+  );
+}
+
 export function VentaFichaView() {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
   const ventaId = parseRouteId(params.id);
+  const fromTab: VentasTabId = isVentasTabId(searchParams.get("from"))
+    ? searchParams.get("from")!
+    : "en_operacion";
+  const listReturnState = useMemo(
+    () => parseVentasListStateFromSearchParams(searchParams),
+    [searchParams],
+  );
 
   const { token, logout, user } = useAuth();
   const [activeTab, setActiveTab] = useState<VentaFichaTabId>("resumen");
@@ -262,7 +284,10 @@ export function VentaFichaView() {
     setSuccess(null);
     setActiveTab(tab);
     if (ventaId !== null) {
-      router.replace(`/ventas/${ventaId}?tab=${tab}`, { scroll: false });
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("from", fromTab);
+      params.set("tab", tab);
+      router.replace(`/ventas/${ventaId}?${params.toString()}`, { scroll: false });
     }
   }
 
@@ -321,7 +346,13 @@ export function VentaFichaView() {
         <p className="rounded-sm border border-danger bg-danger-bg px-3 py-2 text-sm text-danger">
           {error ?? "Venta no encontrada."}
         </p>
-        <ButtonOutline onClick={() => router.push("/ventas")}>Volver al listado</ButtonOutline>
+        <ButtonOutline
+          onClick={() =>
+            router.push(buildVentasListHref(fromTab, listReturnState.filters, listReturnState.search))
+          }
+        >
+          Volver al listado
+        </ButtonOutline>
       </div>
     );
   }
@@ -350,7 +381,11 @@ export function VentaFichaView() {
       <div className="flex flex-wrap items-center gap-3">
         <button
           type="button"
-          onClick={() => router.push("/ventas?tab=en_operacion")}
+          onClick={() =>
+            router.push(
+              buildVentasListHref(fromTab, listReturnState.filters, listReturnState.search),
+            )
+          }
           className={`flex w-fit items-center gap-2 text-sm font-medium text-text-secondary transition-colors hover:text-primary ${interactiveFocusClass}`}
         >
           <ArrowLeft className="h-4 w-4" aria-hidden />
@@ -359,7 +394,16 @@ export function VentaFichaView() {
         {venta.inmueble?.id ? (
           <button
             type="button"
-            onClick={() => router.push(`/ventas/inmueble/${venta.inmueble!.id}?from=en_operacion`)}
+            onClick={() =>
+              router.push(
+                buildVentasInmuebleHref(
+                  venta.inmueble!.id,
+                  fromTab,
+                  listReturnState.filters,
+                  listReturnState.search,
+                ),
+              )
+            }
             className={`text-sm font-medium text-primary hover:underline ${interactiveFocusClass}`}
           >
             Ver inmueble en catálogo
@@ -585,7 +629,9 @@ export function VentaFichaView() {
           onClose={() => setCancelarVentaOpen(false)}
           onCancelled={() => {
             setCancelarVentaOpen(false);
-            router.push("/ventas");
+            router.push(
+              buildVentasListHref(fromTab, listReturnState.filters, listReturnState.search),
+            );
           }}
         />
       ) : null}

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Search, X } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
@@ -26,7 +27,16 @@ import {
 import type { CatalogoItem, PersonaRecord } from "@/lib/api/types";
 import { MoraPunitoriaFields } from "@/components/alquileres/MoraPunitoriaFields";
 import { DEFAULT_MORA_PUNITORIA, type MoraPunitoriaForm, isMoraPunitoriaValid } from "@/lib/mora-punitoria";
+import {
+  MIN_VACANTE_SEARCH_LEN,
+  VACANTES_MODAL_PAGE_SIZE,
+  alquilerInmuebleFichaPath,
+  filterInmueblesSinAlquiler,
+  vacanteComercializacionLabel,
+  vacanteDisplayLabel,
+} from "@/lib/alquileres/inmuebles-vacantes";
 import type { InmuebleSinAlquiler } from "@/lib/mappers/propietario-inmuebles";
+import { defaultOperationalContractDates } from "@/lib/alquileres/contract-dates";
 import { personaDisplayName } from "@/lib/format";
 import { formInputClass } from "@/lib/ui/interactive-focus";
 
@@ -44,6 +54,8 @@ export type NewContractForm = {
   property: PropertyFieldValue;
   tenant: PersonaFieldValue;
   owner: OwnerFieldValue;
+  fechaInicio: string;
+  fechaFin: string;
   amount: string;
   depositAmount: string;
   currency: "ARS" | "USD";
@@ -56,7 +68,6 @@ export type NewContractForm = {
 };
 
 const STEP_TITLES = ["Inmueble", "Partes", "Economía", "Condiciones"] as const;
-const MIN_VACANTE_SEARCH_LEN = 2;
 
 const emptyTenant: PersonaFieldValue = emptyNewPersonaField();
 const emptyOwner: OwnerFieldValue = emptyNewOwnerField();
@@ -67,11 +78,18 @@ function emptyProperty(hasVacantes: boolean): PropertyFieldValue {
     : { mode: "nuevo", alta: emptyInmuebleAlta() };
 }
 
+function isContractDatesValid(fechaInicio: string, fechaFin: string): boolean {
+  return Boolean(fechaInicio && fechaFin && fechaFin > fechaInicio);
+}
+
 function emptyForm(hasVacantes: boolean): NewContractForm {
+  const { fechaInicio, fechaFin } = defaultOperationalContractDates();
   return {
     property: emptyProperty(hasVacantes),
     tenant: emptyTenant,
     owner: emptyOwner,
+    fechaInicio,
+    fechaFin,
     amount: "",
     depositAmount: "",
     currency: "ARS",
@@ -103,27 +121,6 @@ function isPropertyValid(property: PropertyFieldValue): boolean {
 function isAmountValid(value: string): boolean {
   const parsed = Number.parseFloat(value.replace(",", "."));
   return Number.isFinite(parsed) && parsed > 0;
-}
-
-function filterInmueblesSinAlquiler(
-  inmuebles: InmuebleSinAlquiler[],
-  query: string,
-): InmuebleSinAlquiler[] {
-  const normalized = query.trim().toLowerCase();
-  if (normalized.length < MIN_VACANTE_SEARCH_LEN) return [];
-
-  return inmuebles.filter((inmueble) => {
-    const haystack = [inmueble.code, inmueble.direccion]
-      .filter(Boolean)
-      .join(" ")
-      .toLowerCase();
-    return haystack.includes(normalized);
-  });
-}
-
-function vacanteDisplayLabel(inmueble: InmuebleSinAlquiler): string {
-  const direccion = inmueble.direccion?.trim();
-  return direccion ? `${inmueble.code} · ${direccion}` : `${inmueble.code} · Sin dirección cargada`;
 }
 
 function ownerFromInmueble(
@@ -167,6 +164,7 @@ export function NewContractModal({
   personas = [],
   token,
   inmueblesSinAlquiler = [],
+  initialInmuebleId = null,
 }: {
   open: boolean;
   onClose: () => void;
@@ -177,27 +175,56 @@ export function NewContractModal({
   personas?: PersonaRecord[];
   token?: string;
   inmueblesSinAlquiler?: InmuebleSinAlquiler[];
+  initialInmuebleId?: number | null;
 }) {
   const hasVacantes = inmueblesSinAlquiler.length > 0;
   const [step, setStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<NewContractForm>(() => emptyForm(hasVacantes));
   const [vacanteSearchQuery, setVacanteSearchQuery] = useState("");
+  const [vacantePage, setVacantePage] = useState(0);
 
   useEffect(() => {
     if (open) {
       setStep(0);
       setError(null);
-      setForm(emptyForm(hasVacantes));
       setVacanteSearchQuery("");
+      setVacantePage(0);
+      const base = emptyForm(hasVacantes);
+      const vacante =
+        initialInmuebleId && inmueblesSinAlquiler.find((item) => item.inmuebleId === initialInmuebleId);
+      if (vacante) {
+        setForm({
+          ...base,
+          property: { mode: "existente", inmuebleId: vacante.inmuebleId },
+          owner: ownerFromInmueble(vacante, personas) ?? emptyOwner,
+        });
+        return;
+      }
+      setForm(base);
     }
-  }, [open, hasVacantes]);
+  }, [open, hasVacantes, initialInmuebleId, inmueblesSinAlquiler, personas]);
 
   const vacantesFiltradas = useMemo(
     () => filterInmueblesSinAlquiler(inmueblesSinAlquiler, vacanteSearchQuery),
     [inmueblesSinAlquiler, vacanteSearchQuery],
   );
-  const vacanteQueryTooShort = vacanteSearchQuery.trim().length < MIN_VACANTE_SEARCH_LEN;
+  const vacanteTotalPages = Math.max(1, Math.ceil(vacantesFiltradas.length / VACANTES_MODAL_PAGE_SIZE));
+  const vacantePageClamped = Math.min(vacantePage, vacanteTotalPages - 1);
+  const vacantesEnPagina = useMemo(() => {
+    const start = vacantePageClamped * VACANTES_MODAL_PAGE_SIZE;
+    return vacantesFiltradas.slice(start, start + VACANTES_MODAL_PAGE_SIZE);
+  }, [vacantesFiltradas, vacantePageClamped]);
+
+  useEffect(() => {
+    setVacantePage(0);
+  }, [vacanteSearchQuery, inmueblesSinAlquiler.length]);
+
+  useEffect(() => {
+    if (vacantePage > vacanteTotalPages - 1) {
+      setVacantePage(Math.max(0, vacanteTotalPages - 1));
+    }
+  }, [vacantePage, vacanteTotalPages]);
 
   const propertyNuevo = form.property.mode === "nuevo" ? form.property : null;
 
@@ -211,7 +238,8 @@ export function NewContractModal({
     return inmueblesSinAlquiler.find((item) => item.inmuebleId === selectedInmuebleId) ?? null;
   }, [selectedInmuebleId, inmueblesSinAlquiler]);
 
-  const showVacantesResults = !selectedInmuebleId && !vacanteQueryTooShort;
+  const showVacantesResults = !selectedInmuebleId;
+  const vacanteFiltroActivo = vacanteSearchQuery.trim().length >= MIN_VACANTE_SEARCH_LEN;
 
   const hasAssignedOwner = Boolean(selectedVacante && selectedVacante.propietarioIds.length > 0);
 
@@ -226,6 +254,7 @@ export function NewContractModal({
     isPropertyValid(form.property) &&
     isPersonaFieldValid(form.tenant) &&
     ownerValid &&
+    isContractDatesValid(form.fechaInicio, form.fechaFin) &&
     isAmountValid(form.amount) &&
     isAmountValid(form.depositAmount) &&
     isMoraPunitoriaValid(form.mora) &&
@@ -238,7 +267,7 @@ export function NewContractModal({
       }
       if (!isPropertyValid(form.property)) {
         return form.property.mode === "existente"
-          ? "Seleccioná un inmueble sin alquiler activo."
+          ? "Seleccioná un inmueble para alquilar."
           : "Completá los datos del nuevo inmueble.";
       }
       return null;
@@ -257,6 +286,15 @@ export function NewContractModal({
       return null;
     }
     if (current === 2) {
+      if (!form.fechaInicio) {
+        return "Ingresá la fecha de inicio del contrato.";
+      }
+      if (!form.fechaFin) {
+        return "Ingresá la fecha de fin del contrato.";
+      }
+      if (form.fechaFin <= form.fechaInicio) {
+        return "La fecha de fin debe ser posterior al inicio.";
+      }
       if (!isAmountValid(form.amount)) {
         return "Ingresá un monto mensual válido.";
       }
@@ -314,6 +352,7 @@ export function NewContractModal({
 
   function clearVacanteSelection() {
     setVacanteSearchQuery("");
+    setVacantePage(0);
     patch({
       property: { mode: "existente", inmuebleId: null },
       owner: emptyOwner,
@@ -336,8 +375,9 @@ export function NewContractModal({
       open={open}
       onClose={handleClose}
       title="Crear contrato"
-      subtitle={`Paso ${step + 1} de ${STEP_TITLES.length}: ${STEP_TITLES[step]}`}
+      subtitle={<WizardStepIndicator steps={STEP_TITLES} currentStep={step} />}
       maxWidthClass="max-w-2xl"
+      contentScrollKey={step}
       footer={
         <>
           <ButtonOutline type="button" onClick={handleClose} disabled={submitting}>
@@ -361,15 +401,13 @@ export function NewContractModal({
       }
     >
       <div className="flex flex-col gap-5">
-        <WizardStepIndicator steps={STEP_TITLES} currentStep={step} />
-
         {step === 0 ? (
           <FormSection title="Inmueble" variant="prominent">
             <div className="flex flex-col gap-4">
               <div className="flex flex-wrap gap-2">
                 {(
                   [
-                    { id: "existente" as const, label: "Sin alquiler activo" },
+                    { id: "existente" as const, label: "Alquileres disponibles" },
                     { id: "nuevo" as const, label: "Cargar nuevo inmueble" },
                   ] as const
                 ).map((option) => {
@@ -412,16 +450,37 @@ export function NewContractModal({
                 <div className="flex flex-col gap-3">
                   {hasVacantes ? (
                     <>
-                      <p className="text-xs text-text-secondary">
-                        Inmuebles en administración u operativos que todavía no tienen contrato de alquiler activo.
-                      </p>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-xs text-text-secondary">
+                          Inmuebles con oferta de alquiler o en administración, sin contrato vigente. No incluye los que
+                          están solo en venta.
+                        </p>
+                        {inmueblesSinAlquiler.length > VACANTES_MODAL_PAGE_SIZE ? (
+                          <Link
+                            href="/alquileres/para-alquilar"
+                            className="shrink-0 text-[12px] font-medium text-primary underline"
+                          >
+                            Ver listado completo ({inmueblesSinAlquiler.length})
+                          </Link>
+                        ) : null}
+                      </div>
                       {selectedVacante ? (
                         <div className="flex flex-col gap-1.5">
                           <span className="text-[11px] font-semibold text-text-secondary">Inmueble</span>
                           <div className="flex items-center justify-between gap-2 rounded-sm border border-border bg-bg-page px-3 py-2.5">
-                            <span className="min-w-0 text-[13px] font-medium text-text-primary">
-                              {vacanteDisplayLabel(selectedVacante)}
-                            </span>
+                            <div className="min-w-0">
+                              <span className="block text-[13px] font-medium text-text-primary">
+                                {vacanteDisplayLabel(selectedVacante)}
+                              </span>
+                              <Link
+                                href={alquilerInmuebleFichaPath(selectedVacante.inmuebleId)}
+                                className="text-[12px] text-primary underline"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                Ver condiciones de alquiler
+                              </Link>
+                            </div>
                             <button
                               type="button"
                               onClick={clearVacanteSelection}
@@ -440,49 +499,93 @@ export function NewContractModal({
                               type="text"
                               value={vacanteSearchQuery}
                               onChange={(event) => setVacanteSearchQuery(event.target.value)}
-                              placeholder="Buscar por código o dirección…"
+                              placeholder="Filtrar por código, dirección o título…"
                               aria-label="Buscar inmuebles por código o dirección"
                               autoComplete="off"
                               className="min-w-0 flex-1 bg-transparent text-sm text-text-primary outline-none placeholder:text-text-secondary"
                             />
                           </label>
                           {showVacantesResults ? (
-                            <p className="text-[11px] text-text-secondary">
-                              {vacantesFiltradas.length} de {inmueblesSinAlquiler.length} inmueble
-                              {vacantesFiltradas.length === 1 ? "" : "s"}
-                            </p>
-                          ) : null}
-                          {showVacantesResults ? (
-                            <ul className="flex max-h-56 flex-col gap-2 overflow-y-auto">
-                              {vacantesFiltradas.length === 0 ? (
-                                <li className="rounded-md border border-border bg-bg-page px-4 py-3 text-sm text-text-secondary">
-                                  No hay inmuebles que coincidan con &quot;{vacanteSearchQuery.trim()}&quot;.
-                                </li>
-                              ) : (
-                                vacantesFiltradas.map((inmueble) => (
-                                  <li key={inmueble.inmuebleId}>
-                                    <button
-                                      type="button"
-                                      onMouseDown={(event) => event.preventDefault()}
-                                      onClick={() => selectVacante(inmueble)}
-                                      className="flex w-full flex-col gap-1 rounded-md border border-border bg-bg-page px-4 py-3 text-left transition-colors hover:border-primary/40"
-                                    >
-                                      <span className="text-[13px] font-semibold text-text-primary">
-                                        {vacanteDisplayLabel(inmueble)}
-                                      </span>
-                                    </button>
+                            <div className="flex flex-col gap-2">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <p className="text-[11px] text-text-secondary">
+                                  {vacanteFiltroActivo
+                                    ? `${vacantesFiltradas.length} coincidencia${vacantesFiltradas.length === 1 ? "" : "s"}`
+                                    : `${inmueblesSinAlquiler.length} inmueble${inmueblesSinAlquiler.length === 1 ? "" : "s"}`}
+                                  {vacantesFiltradas.length > VACANTES_MODAL_PAGE_SIZE
+                                    ? ` · página ${vacantePageClamped + 1} de ${vacanteTotalPages}`
+                                    : ""}
+                                </p>
+                                {inmueblesSinAlquiler.length > VACANTES_MODAL_PAGE_SIZE && !vacanteFiltroActivo ? (
+                                  <Link
+                                    href="/alquileres/para-alquilar"
+                                    className="text-[11px] font-medium text-primary underline"
+                                  >
+                                    Abrir listado completo
+                                  </Link>
+                                ) : null}
+                              </div>
+                              <ul className="flex max-h-72 flex-col gap-2 overflow-y-auto">
+                                {vacantesEnPagina.length === 0 ? (
+                                  <li className="rounded-md border border-border bg-bg-page px-4 py-3 text-sm text-text-secondary">
+                                    {vacanteFiltroActivo
+                                      ? `No hay inmuebles que coincidan con "${vacanteSearchQuery.trim()}".`
+                                      : "No hay inmuebles para mostrar."}
                                   </li>
-                                ))
-                              )}
-                            </ul>
+                                ) : (
+                                  vacantesEnPagina.map((inmueble) => (
+                                    <li key={inmueble.inmuebleId}>
+                                      <button
+                                        type="button"
+                                        onMouseDown={(event) => event.preventDefault()}
+                                        onClick={() => selectVacante(inmueble)}
+                                        className="flex w-full flex-col gap-1.5 rounded-md border border-border bg-bg-page px-4 py-3 text-left transition-colors hover:border-primary/40"
+                                      >
+                                        <span className="text-[13px] font-semibold text-text-primary">
+                                          {vacanteDisplayLabel(inmueble)}
+                                        </span>
+                                        <span className="w-fit rounded-full bg-bg-card px-2 py-0.5 text-[11px] font-semibold text-text-secondary">
+                                          {vacanteComercializacionLabel(inmueble)}
+                                        </span>
+                                      </button>
+                                    </li>
+                                  ))
+                                )}
+                              </ul>
+                              {vacanteTotalPages > 1 ? (
+                                <div className="flex items-center justify-between gap-2">
+                                  <button
+                                    type="button"
+                                    disabled={vacantePageClamped <= 0}
+                                    onClick={() => setVacantePage((page) => Math.max(0, page - 1))}
+                                    className="rounded-sm border border-border px-3 py-1.5 text-[12px] font-medium text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
+                                  >
+                                    Anterior
+                                  </button>
+                                  <span className="text-[12px] text-text-secondary">
+                                    {vacantePageClamped + 1} / {vacanteTotalPages}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    disabled={vacantePageClamped >= vacanteTotalPages - 1}
+                                    onClick={() =>
+                                      setVacantePage((page) => Math.min(vacanteTotalPages - 1, page + 1))
+                                    }
+                                    className="rounded-sm border border-border px-3 py-1.5 text-[12px] font-medium text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
+                                  >
+                                    Siguiente
+                                  </button>
+                                </div>
+                              ) : null}
+                            </div>
                           ) : null}
                         </>
                       )}
                     </>
                   ) : (
                     <p className="text-sm text-text-secondary">
-                      No hay inmuebles disponibles sin alquiler. Usá cargar nuevo inmueble o vinculá un inmueble desde
-                      Clientes.
+                      No hay inmuebles listos para alquilar. Publicá en alquiler desde Ventas, vinculá un propietario en
+                      Clientes o cargá un inmueble nuevo.
                     </p>
                   )}
                 </div>
@@ -605,6 +708,24 @@ export function NewContractModal({
         {step === 2 ? (
           <FormSection title="Condiciones económicas" variant="prominent">
             <div className="flex flex-col gap-4">
+              <p className="text-[12px] leading-snug text-text-secondary">
+                Inicio operativo el <strong className="font-semibold text-text-primary">1° del mes</strong> en que
+                arrancan a cobrar en el sistema.
+              </p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FormField
+                  label="Inicio operativo"
+                  type="date"
+                  value={form.fechaInicio}
+                  onChange={(v) => patch({ fechaInicio: v })}
+                />
+                <FormField
+                  label="Fin del contrato"
+                  type="date"
+                  value={form.fechaFin}
+                  onChange={(v) => patch({ fechaFin: v })}
+                />
+              </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <FormField
                   label="Monto mensual"

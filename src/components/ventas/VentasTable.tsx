@@ -124,9 +124,7 @@ const VentaMobileCard = memo(function VentaMobileCard({
         <div className="font-semibold text-text-primary">{title}</div>
         {ubicacion ? (
           <div className="mt-0.5 text-[11px] text-text-secondary">{ubicacion}</div>
-        ) : (
-          <div className="mt-0.5 text-[11px] text-text-secondary">{item.inmueble.code}</div>
-        )}
+        ) : null}
         {detalleSummary ? (
           <p className="mt-1 text-[11px] text-text-secondary">{detalleSummary}</p>
         ) : null}
@@ -346,9 +344,7 @@ export const VentasTable = memo(function VentasTable({
                           <div className="font-semibold text-text-primary">{catalogInmuebleHeading(item)}</div>
                           {ubicacion ? (
                             <div className="text-[11px] text-text-secondary">{ubicacion}</div>
-                          ) : (
-                            <div className="text-[11px] text-text-secondary">{item.inmueble.code}</div>
-                          )}
+                          ) : null}
                         {detalleSummary ? (
                           <div className="mt-0.5 text-[11px] text-text-secondary">{detalleSummary}</div>
                         ) : null}

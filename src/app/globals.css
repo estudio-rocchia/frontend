@@ -80,6 +80,7 @@
 
 html[data-theme="dark"] {
   color-scheme: dark;
+  --login-input-border: #3a4f58;
   --bg-page: #10181c;
   --bg-cream: #152229;
   --bg-card: #1a2b32;
@@ -166,7 +167,7 @@ body {
 
 .rocchia-dialog {
   width: calc(100vw - 2rem);
-  max-height: 90vh;
+  max-height: 90dvh;
   margin: auto;
   padding: 0;
   border: none;
@@ -353,6 +354,16 @@ body {
 
 .login-alert-enter {
   animation: dashboard-rise-in 0.25s ease-out both;
+}
+
+/* Login: fondo y texto alineados al tema (evita texto claro sobre input blanco en dark). */
+.login-card input:-webkit-autofill,
+.login-card input:-webkit-autofill:hover,
+.login-card input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px var(--bg-page) inset;
+  -webkit-text-fill-color: var(--text-primary);
+  caret-color: var(--text-primary);
+  transition: background-color 99999s ease-out 0s;
 }
 
 @keyframes login-draw {

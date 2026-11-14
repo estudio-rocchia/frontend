@@ -14,6 +14,8 @@ type ActualizarPrecioModalProps = {
   onClose: () => void;
   token: string;
   oferta: OfertaRecord | null;
+  /** Si no se indica, se infiere de `oferta.tipoOperacionCode`. */
+  modalidad?: "venta" | "alquiler";
   onSaved: () => void;
 };
 
@@ -22,6 +24,7 @@ export function ActualizarPrecioModal({
   onClose,
   token,
   oferta,
+  modalidad,
   onSaved,
 }: ActualizarPrecioModalProps) {
   const [monto, setMonto] = useState("");
@@ -31,14 +34,17 @@ export function ActualizarPrecioModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const esAlquiler = modalidad === "alquiler" || oferta?.tipoOperacionCode === "rent";
+
   useEffect(() => {
     if (!open || !oferta) return;
     setMonto(oferta.montoPrecio ?? "");
-    setMoneda(oferta.codigoMoneda?.trim() === "ARS" ? "ARS" : "USD");
+    const currency = oferta.codigoMoneda?.trim();
+    setMoneda(currency === "USD" || currency === "ARS" ? currency : esAlquiler ? "ARS" : "USD");
     setVigenteDesde(todayIso());
     setNota("");
     setError(null);
-  }, [open, oferta]);
+  }, [open, oferta, esAlquiler]);
 
   async function handleSubmit() {
     if (!oferta) return;
@@ -69,7 +75,7 @@ export function ActualizarPrecioModal({
     <Modal
       open={open}
       onClose={onClose}
-      title="Actualizar precio de venta"
+      title={esAlquiler ? "Actualizar precio de alquiler" : "Actualizar precio de venta"}
       subtitle="El cambio queda registrado en el historial de precios."
       footer={
         <>
@@ -81,7 +87,13 @@ export function ActualizarPrecioModal({
       }
     >
       <div className="flex flex-col gap-4">
-        <FormField label="Monto" value={monto} onChange={setMonto} type="number" placeholder="Ej. 18000" />
+        <FormField
+          label={esAlquiler ? "Precio mensual" : "Monto"}
+          value={monto}
+          onChange={setMonto}
+          type="number"
+          placeholder={esAlquiler ? "Ej. 485000" : "Ej. 18000"}
+        />
         <div className="flex flex-col gap-1.5">
           <span className="text-[11px] font-semibold text-text-secondary">Moneda</span>
           <ChipToggle options={["USD", "ARS"]} value={moneda} onChange={setMoneda} />

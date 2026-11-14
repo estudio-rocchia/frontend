@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Plus, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
 
 import {
   PersonaSelectField,
@@ -22,12 +23,12 @@ import { WizardStepIndicator } from "@/components/ui/WizardStepIndicator";
 import { Modal } from "@/components/ui/Modal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { ChipToggle, FormField, FormSection } from "@/components/ui/FormLayout";
+import { MoneyAmountField } from "@/components/ui/MoneyAmountField";
 import { NumericSelect } from "@/components/ui/NumericSelect";
 import { ApiError, fetchCatalog, fetchFormasPago, fetchLocalidades } from "@/lib/api";
+import { parseAmountInput } from "@/lib/format";
 import { fetchAllInmuebleCodes } from "@/lib/inmuebles/inmueble-codes";
 import type { CatalogoItem } from "@/lib/api/types";
-import { formatInmuebleDisplayLabel } from "@/lib/inmuebles/display-label";
-import { nextInmuebleCode, prefixForTipoInmueble } from "@/lib/codes";
 import {
   buildPropietarioInput,
   buildPublishEnVentaPayload,
@@ -35,8 +36,18 @@ import {
   resolveTipoInmuebleId,
 } from "@/lib/ventas/publish-en-venta";
 
-const emptyPersona: PersonaFieldValue = emptyNewPersonaField();
-const STEP_TITLES = ["Propiedad", "Propietario", "Oferta"] as const;
+type PropietarioDraft = {
+  field: PersonaFieldValue;
+  phone: string;
+  address: string;
+  localidadId: string;
+};
+
+function emptyPropietarioDraft(): PropietarioDraft {
+  return { field: emptyNewPersonaField(), phone: "", address: "", localidadId: "" };
+}
+
+const STEP_TITLES = ["Propiedad", "Propietarios", "Oferta"] as const;
 type PublicarEnVentaModalProps = {
   open: boolean;
   onClose: () => void;
@@ -63,15 +74,13 @@ export function PublicarEnVentaModal({
   const [aceptaPermuta, setAceptaPermuta] = useState(false);
   const [aceptaFinanciacion, setAceptaFinanciacion] = useState(false);
   const [aceptaVehiculo, setAceptaVehiculo] = useState(false);
-  const [propietario, setPropietario] = useState<PersonaFieldValue>(emptyPersona);
-  const [propietarioPhone, setPropietarioPhone] = useState("");
-  const [propietarioAddress, setPropietarioAddress] = useState("");
-  const [propietarioLocalidadId, setPropietarioLocalidadId] = useState("");
+  const [propietarios, setPropietarios] = useState<PropietarioDraft[]>([emptyPropietarioDraft()]);
   const [monto, setMonto] = useState("");
   const [moneda, setMoneda] = useState("USD");
   const [formaPagoId, setFormaPagoId] = useState("");
   const [condicionesFinanciacion, setCondicionesFinanciacion] = useState("");
   const [notasPrecio, setNotasPrecio] = useState("");
+  const [precioPendiente, setPrecioPendiente] = useState(false);
   const [tiposInmueble, setTiposInmueble] = useState<CatalogoItem[]>([]);
   const [formasPago, setFormasPago] = useState<CatalogoItem[]>([]);
   const [localidades, setLocalidades] = useState<LocalidadOption[]>([]);
@@ -90,15 +99,13 @@ export function PublicarEnVentaModal({
     setAceptaPermuta(false);
     setAceptaFinanciacion(false);
     setAceptaVehiculo(false);
-    setPropietario(emptyPersona);
-    setPropietarioPhone("");
-    setPropietarioAddress("");
-    setPropietarioLocalidadId("");
+    setPropietarios([emptyPropietarioDraft()]);
     setMonto("");
     setMoneda("USD");
     setFormaPagoId("");
     setCondicionesFinanciacion("");
     setNotasPrecio("");
+    setPrecioPendiente(false);
     setError(null);
   }, [open]);
 
@@ -137,39 +144,24 @@ export function PublicarEnVentaModal({
     }
   }
 
-  const codePreview = useMemo(() => {
-    if (!isVentaNuevaPropiedadValid(propiedad)) return null;
-    const prefix = prefixForTipoInmueble(propiedad.tipoInmuebleCode);
-    const code = nextInmuebleCode(prefix, existingCodes);
-    const tipoName =
-      tiposInmueble.find((item) => item.code === propiedad.tipoInmuebleCode)?.name ?? "Inmueble";
-    return {
-      code,
-      label: formatInmuebleDisplayLabel({
-        code,
-        tipoName,
-        direccion: propiedad.direccion,
-        alias: propiedad.alias,
-      }),
-    };
-  }, [propiedad, existingCodes, tiposInmueble]);
-
   function validateStep(current: number): string | null {
     if (current === 0) {
       if (!isVentaNuevaPropiedadValid(propiedad)) {
-        return "Completá tipo y dirección de la propiedad.";
+        return "Completá el tipo de inmueble.";
       }
       return null;
     }
     if (current === 1) {
-      if (!isPersonaValid(propietario)) {
-        return "Seleccioná o ingresá el propietario.";
+      if (propietarios.some((draft) => !isPersonaValid(draft.field))) {
+        return "Seleccioná o ingresá todos los propietarios.";
       }
       return null;
     }
-    const montoPrecio = Number.parseFloat(monto.replace(",", "."));
-    if (!Number.isFinite(montoPrecio) || montoPrecio <= 0) {
-      return "Ingresá un precio de publicación válido.";
+    if (!precioPendiente) {
+      const montoPrecio = parseAmountInput(monto);
+      if (montoPrecio == null || montoPrecio <= 0) {
+        return "Ingresá un precio de publicación válido o marcá «Definir precio más tarde».";
+      }
     }
     if (!estadoOfertaAvailableId || !tipoOperacionVentaId) {
       return "Catálogo de ventas no disponible. Recargá la página.";
@@ -209,13 +201,21 @@ export function PublicarEnVentaModal({
     setSaving(true);
     setError(null);
     try {
-      const montoPrecio = Number.parseFloat(monto.replace(",", "."));
+      const montoPrecio = precioPendiente ? null : parseAmountInput(monto);
       const tipoInmuebleId = resolveTipoInmuebleId(tiposInmueble, propiedad.tipoInmuebleCode);
-      const propietarioInput = buildPropietarioInput(propietario, {
-        phone: propietarioPhone,
-        address: propietarioAddress,
-        localidadId: propietarioLocalidadId ? Number(propietarioLocalidadId) : null,
+      const [first, ...rest] = propietarios;
+      const propietarioInput = buildPropietarioInput(first.field, {
+        phone: first.phone,
+        address: first.address,
+        localidadId: first.localidadId ? Number(first.localidadId) : null,
       });
+      const propietariosAdicionales = rest.map((draft) =>
+        buildPropietarioInput(draft.field, {
+          phone: draft.phone,
+          address: draft.address,
+          localidadId: draft.localidadId ? Number(draft.localidadId) : null,
+        }),
+      );
       const payload = buildPublishEnVentaPayload({
         propiedad,
         tipoInmuebleId,
@@ -223,8 +223,9 @@ export function PublicarEnVentaModal({
         aceptaFinanciacion,
         aceptaVehiculo,
         propietario: propietarioInput,
+        propietariosAdicionales,
         montoPrecio,
-        codigoMoneda: moneda,
+        codigoMoneda: precioPendiente ? null : moneda,
         formaPagoId: formaPagoId ? Number(formaPagoId) : null,
         condicionesFinanciacion,
         notasPrecio,
@@ -260,8 +261,9 @@ export function PublicarEnVentaModal({
       open={open}
       onClose={onClose}
       title="Nueva publicación"
-      subtitle={`Paso ${step + 1} de ${STEP_TITLES.length}: ${STEP_TITLES[step]}`}
+      subtitle={<WizardStepIndicator steps={STEP_TITLES} currentStep={step} />}
       maxWidthClass="max-w-2xl"
+      contentScrollKey={step}
       footer={
         <>
           <ButtonOutline type="button" onClick={onClose} disabled={saving}>
@@ -289,8 +291,6 @@ export function PublicarEnVentaModal({
       }
     >
       <div className="flex flex-col gap-5">
-        <WizardStepIndicator steps={STEP_TITLES} currentStep={step} />
-
         {step === 0 ? (
           <>
             <VentaNuevaPropiedadFields
@@ -301,16 +301,8 @@ export function PublicarEnVentaModal({
               existingCodes={existingCodes}
               loadingTipos={loadingTipos}
               onLoadTipos={() => void ensureTiposInmueble()}
-              intro="La propiedad se publicará a la venta con un código asignado automáticamente."
+              intro="Completá los datos de la propiedad que vas a publicar a la venta."
             />
-            {codePreview ? (
-              <div className="rounded-sm border border-primary/25 bg-primary-soft/15 px-3 py-2 text-[12px] text-text-secondary">
-                Código asignado:{" "}
-                <span className="font-mono font-semibold text-primary">{codePreview.code}</span>
-                <span className="text-text-secondary"> · </span>
-                <span className="font-medium text-text-primary">{codePreview.label}</span>
-              </div>
-            ) : null}
             <FormSection title="Condiciones de permuta">
               <div className="flex flex-col gap-2">
                 <label className="flex items-center gap-2 text-[13px] text-text-primary">
@@ -343,54 +335,144 @@ export function PublicarEnVentaModal({
         ) : null}
 
         {step === 1 ? (
-          <FormSection title="Propietario">
-            <PersonaSelectField
-              label="Propietario"
-              value={propietario}
-              onChange={setPropietario}
-              token={token}
-              searchId="publicar-propietario-search"
-              placeholder="Nombre, apellido o documento del propietario…"
-            />
-            {propietario.mode === "new" ? (
-              <div className="flex flex-col gap-3 rounded-md border border-dashed border-border bg-bg-page/50 p-3">
-                <FormField
-                  label="Teléfono (opcional)"
-                  value={propietarioPhone}
-                  onChange={setPropietarioPhone}
-                  placeholder="Ej. +54 9 11 1234-5678"
-                />
-                <FormField
-                  label="Dirección (opcional)"
-                  value={propietarioAddress}
-                  onChange={setPropietarioAddress}
-                  placeholder="Calle y número"
-                />
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-[11px] font-semibold text-text-secondary">
-                    Localidad (opcional)
-                  </span>
-                  <LocalidadSelectField
-                    value={propietarioLocalidadId}
-                    onChange={setPropietarioLocalidadId}
-                    localidades={localidades}
-                    onLocalidadesChange={setLocalidades}
+          <FormSection title="Propietarios">
+            <div className="flex flex-col gap-4">
+              {propietarios.map((draft, index) => (
+                <div
+                  key={index}
+                  className="flex flex-col gap-3 rounded-md border border-border bg-bg-page/30 p-3"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[12px] font-semibold text-text-primary">
+                      {index === 0 ? "Titular" : `Copropietario ${index}`}
+                    </span>
+                    {index > 0 ? (
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1 text-[11px] font-medium text-danger hover:underline"
+                        onClick={() =>
+                          setPropietarios((prev) => prev.filter((_, itemIndex) => itemIndex !== index))
+                        }
+                        disabled={saving}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                        Quitar
+                      </button>
+                    ) : null}
+                  </div>
+                  <PersonaSelectField
+                    label={index === 0 ? "Propietario titular" : "Copropietario"}
+                    value={draft.field}
+                    onChange={(field) =>
+                      setPropietarios((prev) =>
+                        prev.map((item, itemIndex) => (itemIndex === index ? { ...item, field } : item)),
+                      )
+                    }
                     token={token}
+                    searchId={`publicar-propietario-search-${index}`}
+                    placeholder="Nombre, apellido o documento…"
                   />
+                  {draft.field.mode === "new" ? (
+                    <div className="flex flex-col gap-3 rounded-md border border-dashed border-border bg-bg-page/50 p-3">
+                      <FormField
+                        label="Teléfono (opcional)"
+                        value={draft.phone}
+                        onChange={(phone) =>
+                          setPropietarios((prev) =>
+                            prev.map((item, itemIndex) =>
+                              itemIndex === index ? { ...item, phone } : item,
+                            ),
+                          )
+                        }
+                        placeholder="Ej. +54 9 11 1234-5678"
+                      />
+                      <FormField
+                        label="Dirección (opcional)"
+                        value={draft.address}
+                        onChange={(address) =>
+                          setPropietarios((prev) =>
+                            prev.map((item, itemIndex) =>
+                              itemIndex === index ? { ...item, address } : item,
+                            ),
+                          )
+                        }
+                        placeholder="Calle y número"
+                      />
+                      <div className="flex flex-col gap-1.5">
+                        <span className="text-[11px] font-semibold text-text-secondary">
+                          Localidad (opcional)
+                        </span>
+                        <LocalidadSelectField
+                          value={draft.localidadId}
+                          onChange={(localidadId) =>
+                            setPropietarios((prev) =>
+                              prev.map((item, itemIndex) =>
+                                itemIndex === index ? { ...item, localidadId } : item,
+                              ),
+                            )
+                          }
+                          localidades={localidades}
+                          onLocalidadesChange={setLocalidades}
+                          token={token}
+                        />
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
-              </div>
-            ) : null}
+              ))}
+              <ButtonOutline
+                type="button"
+                className="self-start"
+                onClick={() => setPropietarios((prev) => [...prev, emptyPropietarioDraft()])}
+                disabled={saving || propietarios.length >= 10}
+              >
+                <Plus className="mr-1.5 h-4 w-4" aria-hidden />
+                Agregar otro propietario
+              </ButtonOutline>
+            </div>
           </FormSection>
         ) : null}
 
         {step === 2 ? (
           <FormSection title="Oferta de venta">
             <div className="grid gap-3 sm:grid-cols-2">
-              <FormField label="Precio de publicación" value={monto} onChange={setMonto} type="number" />
-              <div className="flex flex-col gap-1.5 sm:col-span-2">
-                <span className="text-[11px] font-semibold text-text-secondary">Moneda</span>
-                <ChipToggle options={["USD", "ARS"]} value={moneda} onChange={setMoneda} />
-              </div>
+              <label
+                className={`flex cursor-pointer items-start gap-3 rounded-md border p-3 transition-colors sm:col-span-2 ${
+                  precioPendiente
+                    ? "border-primary/40 bg-primary-soft/40"
+                    : "border-border bg-bg-page/30 hover:bg-bg-page/50"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={precioPendiente}
+                  onChange={(event) => setPrecioPendiente(event.target.checked)}
+                  className="mt-0.5 h-4 w-4 shrink-0 rounded border-border"
+                />
+                <span className="flex flex-col gap-0.5">
+                  <span className="text-[13px] font-medium text-text-primary">
+                    Definir precio más tarde
+                  </span>
+                  <span className="text-[12px] text-text-secondary">
+                    El inmueble se publica sin precio. Podés cargarlo después desde la ficha con
+                    «Actualizar precio».
+                  </span>
+                </span>
+              </label>
+              {!precioPendiente ? (
+                <>
+                  <MoneyAmountField
+                    label="Precio de publicación"
+                    value={monto}
+                    onChange={setMonto}
+                    placeholder="Ej. 15.000.000"
+                  />
+                  <div className="flex flex-col gap-1.5 sm:col-span-2">
+                    <span className="text-[11px] font-semibold text-text-secondary">Moneda</span>
+                    <ChipToggle options={["USD", "ARS"]} value={moneda} onChange={setMoneda} />
+                  </div>
+                </>
+              ) : null}
               <div className="sm:col-span-2">
                 <NumericSelect
                   label="Forma de pago"
@@ -402,18 +484,26 @@ export function PublicarEnVentaModal({
                   options={formasPago.map((item) => ({ value: item.id, label: item.name }))}
                 />
               </div>
-              <FormField
-                label="Condiciones de financiación"
-                value={condicionesFinanciacion}
-                onChange={setCondicionesFinanciacion}
-                placeholder="Ej. Acepta financiación bancaria"
-              />
-              <FormField
-                label="Notas de precio (opcional)"
-                value={notasPrecio}
-                onChange={setNotasPrecio}
-                placeholder="Observaciones internas sobre el precio"
-              />
+              <div className="sm:col-span-2">
+                <FormField
+                  label="Condiciones de financiación"
+                  type="textarea"
+                  rows={6}
+                  value={condicionesFinanciacion}
+                  onChange={setCondicionesFinanciacion}
+                  placeholder="Ej. Entrega del 50% y el resto en 6 cuotas en dólares. Se escuchan ofertas."
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <FormField
+                  label="Notas de precio (opcional)"
+                  type="textarea"
+                  rows={6}
+                  value={notasPrecio}
+                  onChange={setNotasPrecio}
+                  placeholder="Observaciones internas sobre el precio e historial de cambios"
+                />
+              </div>
             </div>
             {!catalogReady ? (
               <p className="text-xs text-danger">

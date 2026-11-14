@@ -9,6 +9,7 @@ import { useSyncScope } from "@/lib/sync/use-sync-scope";
 
 import { CalendarioDayPanel } from "@/components/calendario/CalendarioDayPanel";
 import { CalendarioKpiStrip } from "@/components/calendario/CalendarioKpiStrip";
+import { CalendarMonthYearControls } from "@/components/ui/CalendarMonthYearControls";
 
 const CitaModal = dynamic(
   () => import("@/components/calendario/CitaModal").then((mod) => ({ default: mod.CitaModal })),
@@ -160,6 +161,11 @@ export function CalendarioView() {
     setMonth(next.getMonth());
   }
 
+  function jumpToMonth(nextYear: number, nextMonth: number) {
+    setYear(nextYear);
+    setMonth(nextMonth - 1);
+  }
+
   function goToday() {
     setYear(today.getFullYear());
     setMonth(today.getMonth());
@@ -199,24 +205,30 @@ export function CalendarioView() {
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.85fr)]">
         <Card accent className="rocchia-panel--flat">
           <div className="flex flex-wrap items-center justify-between gap-3 px-4 pt-4 pb-2 sm:px-5">
-            <div className="flex items-center gap-1">
+            <div className="flex flex-wrap items-center gap-1">
               <button
                 type="button"
                 onClick={() => shiftMonth(-1)}
                 aria-label="Mes anterior"
-                className={`inline-flex h-9 w-9 items-center justify-center rounded-full text-text-primary transition-colors hover:bg-bg-page ${interactiveFocusClass}`}
+                className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-text-primary transition-colors hover:bg-bg-page ${interactiveFocusClass}`}
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
-              <h2 className="min-w-[190px] px-1 text-center text-[22px] font-semibold tracking-tight text-text-primary">
-                {MONTHS_FULL_ES[month]}
-                <span className="ml-2 text-base font-medium text-text-secondary">{year}</span>
+              <h2 id="calendario-mes-actual" className="sr-only">
+                {MONTHS_FULL_ES[month]} {year}
               </h2>
+              <CalendarMonthYearControls
+                month={month + 1}
+                year={year}
+                onChange={jumpToMonth}
+                monthId="calendario-mes"
+                yearId="calendario-anio"
+              />
               <button
                 type="button"
                 onClick={() => shiftMonth(1)}
                 aria-label="Mes siguiente"
-                className={`inline-flex h-9 w-9 items-center justify-center rounded-full text-text-primary transition-colors hover:bg-bg-page ${interactiveFocusClass}`}
+                className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-text-primary transition-colors hover:bg-bg-page ${interactiveFocusClass}`}
               >
                 <ChevronRight className="h-4 w-4" />
               </button>

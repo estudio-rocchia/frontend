@@ -14,6 +14,7 @@ import {
 } from "react-aria-components";
 import type { CalendarCellRenderProps } from "react-aria-components";
 import { CalendarDate, endOfWeek, getLocalTimeZone, isSameDay, startOfWeek } from "@internationalized/date";
+import { CalendarMonthYearControls } from "@/components/ui/CalendarMonthYearControls";
 import { cx } from "@/utils/cx";
 
 /**
@@ -198,6 +199,8 @@ export function MonthPanel({
   const state = rangeState ?? singleState;
   const isRange = rangeState != null;
   const panelDate = state ? state.visibleRange.start.add({ months: offset }) : null;
+  const minYear = state?.minValue?.year;
+  const maxYear = state?.maxValue?.year;
   const title = panelDate
     ? new Intl.DateTimeFormat(locale, { month: "long", year: "numeric" }).format(panelDate.toDate(getLocalTimeZone()))
     : "";
@@ -223,7 +226,20 @@ export function MonthPanel({
             ) : (
               <span className="size-4" aria-hidden />
             )}
-            <span className="flex-1 text-center text-body-medium text-text-primary">{title}</span>
+            {panelDate && state ? (
+              <CalendarMonthYearControls
+                className="flex-1"
+                month={panelDate.month}
+                year={panelDate.year}
+                minYear={minYear}
+                maxYear={maxYear}
+                onChange={(nextYear, nextMonth) => {
+                  state.setFocusedDate(new CalendarDate(nextYear, nextMonth, 1));
+                }}
+              />
+            ) : (
+              <span className="flex-1 text-center text-body-medium text-text-primary">{title}</span>
+            )}
             {showNext ? (
               <RACButton
                 slot="next"

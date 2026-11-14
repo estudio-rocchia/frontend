@@ -5,11 +5,14 @@ import { Check } from "lucide-react";
 type WizardStepIndicatorProps = {
   steps: readonly string[];
   currentStep: number;
+  align?: "start" | "center";
 };
 
-export function WizardStepIndicator({ steps, currentStep }: WizardStepIndicatorProps) {
+export function WizardStepIndicator({ steps, currentStep, align = "center" }: WizardStepIndicatorProps) {
   return (
-    <div className="flex w-full justify-center">
+    <div
+      className={`flex w-full ${align === "start" ? "justify-start" : "justify-center"}`}
+    >
       <ol className="flex items-center" aria-label="Pasos del asistente">
       {steps.map((label, index) => {
         const done = index < currentStep;

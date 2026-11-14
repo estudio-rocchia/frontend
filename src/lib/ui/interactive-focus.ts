@@ -4,3 +4,6 @@ export const interactiveFocusClass =
 
 export const formInputClass =
   `min-h-11 rounded-sm border border-[var(--border-input)] bg-bg-page px-3 py-2.5 text-base text-text-primary focus:border-primary sm:text-sm ${interactiveFocusClass}`;
+
+export const formTextareaClass =
+  `min-h-32 resize-y rounded-sm border border-[var(--border-input)] bg-bg-page px-3 py-2.5 text-base text-text-primary focus:border-primary sm:text-sm ${interactiveFocusClass}`;

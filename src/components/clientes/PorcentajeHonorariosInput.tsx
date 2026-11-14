@@ -86,7 +86,7 @@ export function PorcentajeHonorariosInput({
         <div className="relative">
           <input
             type="number"
-            min={0.01}
+            min={0}
             max={100}
             step={0.01}
             disabled={saving}

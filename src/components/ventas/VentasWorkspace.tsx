@@ -55,6 +55,12 @@ import {
 } from "@/lib/ventas/characteristic-filters";
 import { catalogItemSearchText } from "@/lib/ventas/catalog-helpers";
 import { VENTAS_TAB_COPY, ventasEmptyHint } from "@/lib/ventas/workspace-copy";
+import {
+  buildVentasInmuebleHref,
+  buildVentasListHref,
+  buildVentasVentaHref,
+  parseVentasListStateFromSearchParams,
+} from "@/lib/ventas/ventas-list-state";
 
 function isVentasTabId(value: string | null): value is VentasTabId {
   return (
@@ -97,6 +103,7 @@ export function VentasWorkspace() {
   const characteristicFiltersRef = useRef(characteristicFilters);
   characteristicFiltersRef.current = characteristicFilters;
   const skipFilterReloadRef = useRef(true);
+  const skipListUrlSyncRef = useRef(true);
   const loadGenerationRef = useRef(0);
 
   useEffect(() => {
@@ -108,8 +115,24 @@ export function VentasWorkspace() {
     if (isVentasTabId(tabParam)) {
       setTab(tabParam);
     }
+    const { filters, search: q } = parseVentasListStateFromSearchParams(searchParams);
+    setCharacteristicFilters(filters);
+    setSearch(q);
     setUrlTabReady(true);
+    skipListUrlSyncRef.current = true;
+    const frame = window.requestAnimationFrame(() => {
+      skipListUrlSyncRef.current = false;
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, [searchParams]);
+
+  const syncListUrl = useCallback(
+    (nextTab: VentasTabId, nextFilters: VentasCharacteristicFilters, nextSearch: string) => {
+      if (skipListUrlSyncRef.current) return;
+      router.replace(buildVentasListHref(nextTab, nextFilters, nextSearch), { scroll: false });
+    },
+    [router],
+  );
 
   useEffect(() => {
     if (!token) return;
@@ -151,6 +174,7 @@ export function VentasWorkspace() {
 
   const load = useCallback(async (options?: { silent?: boolean }) => {
     if (!token) return;
+    if (tab !== "en_operacion" && !tipoVentaId) return;
     const generation = ++loadGenerationRef.current;
     const stillCurrent = () => generation === loadGenerationRef.current;
     const silent = options?.silent ?? false;
@@ -227,13 +251,13 @@ export function VentasWorkspace() {
 
   useEffect(() => {
     if (!urlTabReady) return;
-    if (tab !== "en_operacion" && Object.keys(estadoIds).length === 0) return;
+    if (tab !== "en_operacion" && (Object.keys(estadoIds).length === 0 || !tipoVentaId)) return;
     void load();
-  }, [load, tab, estadoIds, urlTabReady]);
+  }, [load, tab, estadoIds, tipoVentaId, urlTabReady]);
 
   useEffect(() => {
     if (tab === "en_operacion") return;
-    if (Object.keys(estadoIds).length === 0) return;
+    if (Object.keys(estadoIds).length === 0 || !tipoVentaId) return;
     if (skipFilterReloadRef.current) {
       skipFilterReloadRef.current = false;
       return;
@@ -242,7 +266,7 @@ export function VentasWorkspace() {
       void load();
     }, 350);
     return () => window.clearTimeout(timer);
-  }, [characteristicFilters, load, tab, estadoIds]);
+  }, [characteristicFilters, load, tab, estadoIds, tipoVentaId]);
 
   const tableRows: VentasTableRow[] = useMemo(() => {
     if (tab === "en_operacion") {
@@ -254,6 +278,7 @@ export function VentasWorkspace() {
         .map((venta) => ({ kind: "venta", venta }));
     }
     return catalogRows
+      .filter((item) => item.ofertasActivas.some((oferta) => oferta.tipoOperacionCode === "venta"))
       .filter((item) => matchesSearch(catalogItemSearchText(item), search))
       .map((item) => ({ kind: "catalog", item }));
   }, [tab, ventaRows, catalogRows, search, parteNombres]);
@@ -301,14 +326,17 @@ export function VentasWorkspace() {
   function changeTab(next: VentasTabId) {
     setTab(next);
     setSearch("");
-    router.replace(`/ventas?tab=${next}`, { scroll: false });
+    skipFilterReloadRef.current = true;
+    router.replace(buildVentasListHref(next, characteristicFilters, ""), { scroll: false });
   }
 
   async function handleOpenRow(row: VentasTableRow) {
     if (row.kind === "venta") {
       const id = row.venta.id;
       if (!Number.isInteger(id) || id <= 0) return;
-      router.push(`/ventas/${id}`);
+      router.push(
+        buildVentasVentaHref(id, tab, characteristicFiltersRef.current, search),
+      );
       return;
     }
     const inmuebleId = row.item.inmueble.id;
@@ -322,7 +350,14 @@ export function VentasWorkspace() {
           res.items.find((v) => v.estado !== "cancelled") ??
           res.items[0];
         if (venta) {
-          router.push(`/ventas/${venta.id}`);
+          router.push(
+            buildVentasVentaHref(
+              venta.id,
+              tab,
+              characteristicFiltersRef.current,
+              search,
+            ),
+          );
           return;
         }
       } catch {
@@ -331,7 +366,14 @@ export function VentasWorkspace() {
     }
 
     if (tab === "fuera_mercado" || tab === "a_la_venta" || tab === "vendidos") {
-      router.push(`/ventas/inmueble/${inmuebleId}?from=${tab}`);
+      router.push(
+        buildVentasInmuebleHref(
+          inmuebleId,
+          tab,
+          characteristicFiltersRef.current,
+          search,
+        ),
+      );
     }
   }
 
@@ -359,10 +401,12 @@ export function VentasWorkspace() {
           tiposInmueble={tiposInmueble}
           onChange={(next) => {
             setCharacteristicFilters(next);
+            syncListUrl(tab, next, search);
           }}
           onClear={() => {
             setCharacteristicFilters(EMPTY_CHARACTERISTIC_FILTERS);
             setSearch("");
+            syncListUrl(tab, EMPTY_CHARACTERISTIC_FILTERS, "");
           }}
         />
       ) : null}
@@ -402,7 +446,10 @@ export function VentasWorkspace() {
               searchPlaceholder={tabCopy.searchPlaceholder}
               emptyHint={emptyHint}
               parteNombres={parteNombres}
-              onSearchChange={setSearch}
+              onSearchChange={(next) => {
+                setSearch(next);
+                syncListUrl(tab, characteristicFilters, next);
+              }}
               onOpenRow={handleOpenRow}
               embedded
             />

@@ -5,6 +5,7 @@ export const TIPO_INMUEBLE_PREFIX: Record<string, string> = {
   apartment: "D",
   duplex: "D",
   commercial: "S",
+  salon: "S",
   warehouse: "G",
   hectares: "H",
   tower: "T",

@@ -1,4 +1,5 @@
 import type { ContratoDetail, CuotaDetail, ImputacionInput } from "@/lib/api/types";
+import { billingPeriodStartIso } from "@/lib/alquileres/contract-dates";
 import { formatMonthYear } from "@/lib/format";
 
 export type CuotaCobranzasRow = CuotaDetail & { projected?: boolean };
@@ -123,7 +124,7 @@ export function buildCuotasCobranzasView(
       : contractEndPeriod;
 
   const rows: CuotaCobranzasRow[] = [];
-  let cursor = periodFromIsoDate(contrato.fechaInicio);
+  let cursor = periodFromIsoDate(billingPeriodStartIso(contrato));
 
   for (let guard = 0; guard < 600 && comparePeriod(cursor, capPeriod) <= 0; guard += 1) {
     const fechaVencimiento = resolveCuotaDueDateForContrato(
