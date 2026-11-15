@@ -12,6 +12,7 @@ export function DetalleMetricField({
   min = 0,
   unit,
   placeholder = "—",
+  readOnly = false,
 }: {
   label: string;
   value: string;
@@ -20,6 +21,7 @@ export function DetalleMetricField({
   min?: number;
   unit?: string;
   placeholder?: string;
+  readOnly?: boolean;
 }) {
   return (
     <label className="flex min-w-0 flex-col gap-1">
@@ -30,9 +32,11 @@ export function DetalleMetricField({
           min={min}
           step={step}
           value={value}
+          readOnly={readOnly}
+          aria-readonly={readOnly || undefined}
           onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder}
-          className={metricInputClass}
+          className={`${metricInputClass}${readOnly ? " cursor-default text-text-secondary" : ""}`}
         />
         {unit ? <span className="shrink-0 pb-1 text-[11px] text-text-secondary">{unit}</span> : null}
       </div>

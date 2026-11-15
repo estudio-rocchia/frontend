@@ -49,16 +49,25 @@ import { pagePaddingClass } from "@/lib/layout";
 import { parseRouteId } from "@/lib/parse-route-id";
 import {
   catalogInmuebleHeadingFromParts,
-  catalogInmuebleReferencia,
+  catalogLocalidadLabel,
   catalogMotivo,
   propietarioDisplay,
 } from "@/lib/ventas/catalog-helpers";
+import { catalogOfertaPrecioDisplay } from "@/lib/ventas/catalog-precio";
 import { personaFieldFromPropietario } from "@/lib/ventas/propietario-persona-field";
 import { VENTA_EMPTY_FIELD } from "@/lib/ventas/empty-field";
 import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
-import { ofertaEstadoLabel, ofertaEstadoVariant, ventaEstadoLabel, ventaEstadoVariant } from "@/lib/ventas/status-labels";
+import {
+  ofertaEstadoLabel,
+  ofertaEstadoVariant,
+  ventaEstadoLabel,
+  ventaEstadoVariant,
+  ventaInmobiliariaLabel,
+  ventaInmobiliariaVariant,
+} from "@/lib/ventas/status-labels";
 import type { VentasTabId } from "@/components/ventas/VentasFilterChips";
 import { supportsDualModalidad } from "@/lib/inmuebles/dual-modalidad";
+import { buildClienteFichaHref, parseClienteFichaReturn } from "@/lib/clientes/cliente-ficha-state";
 import {
   buildVentasListHref,
   parseVentasListStateFromSearchParams,
@@ -273,11 +282,11 @@ export function CatalogInmuebleFichaView() {
   }, [inmueble, ficha?.tipoInmueble?.name, ficha?.localidad, inmuebleCode]);
 
   const metaLine = useMemo(() => {
-    if (!inmueble) return "";
-    return catalogInmuebleReferencia(inmueble) ?? "";
-  }, [inmueble]);
+    return catalogLocalidadLabel(ficha?.localidad) ?? "";
+  }, [ficha?.localidad]);
 
   const soloAlquiler = !oferta && Boolean(ofertaAlquiler);
+  const fichaAlquiler = enContextoAlquileres || soloAlquiler;
   const estadoCode = oferta?.estadoCode ?? ofertaAlquiler?.estadoCode ?? "available";
   const isOffMarket = estadoCode === "off_market";
   const isAvailable = estadoCode === "available";
@@ -290,11 +299,11 @@ export function CatalogInmuebleFichaView() {
         value: formatMoney(ventaVinculada.montoPrecioVenta, ventaVinculada.codigoMoneda),
       };
     }
-    if (oferta?.montoPrecio) {
-      return {
-        label: "Precio publicado",
-        value: formatMoney(oferta.montoPrecio, oferta.codigoMoneda ?? "ARS"),
-      };
+    if (oferta?.tipoOperacionCode === "venta") {
+      const display = catalogOfertaPrecioDisplay(oferta, {
+        tipoInmuebleCode: ficha?.tipoInmueble?.code,
+      });
+      return { label: display.label, value: display.text };
     }
     if (ofertaAlquiler?.montoPrecio) {
       return {
@@ -302,8 +311,14 @@ export function CatalogInmuebleFichaView() {
         value: formatMoney(ofertaAlquiler.montoPrecio, ofertaAlquiler.codigoMoneda ?? "ARS"),
       };
     }
-    return { label: "Precio publicado", value: "Sin precio" };
-  }, [isSold, ventaVinculada, oferta, ofertaAlquiler]);
+    if (isSold) {
+      return { label: "Precio de cierre", value: "Sin precio — pendiente de carga" };
+    }
+    const display = catalogOfertaPrecioDisplay(oferta, {
+      tipoInmuebleCode: ficha?.tipoInmueble?.code,
+    });
+    return { label: display.label, value: display.text };
+  }, [isSold, ventaVinculada, oferta, ofertaAlquiler, ficha?.tipoInmueble?.code]);
 
   const catalogItemForVenta = useMemo((): CatalogSearchItem | null => {
     if (!inmueble || !oferta || !ficha?.tipoInmueble) return null;
@@ -344,13 +359,19 @@ export function CatalogInmuebleFichaView() {
     if (actionsRef.current) actionsRef.current.open = false;
   }
 
+  const clienteReturn = parseClienteFichaReturn(searchParams);
+
   function volverAlListado() {
+    if (clienteReturn) {
+      router.push(buildClienteFichaHref(clienteReturn.clienteId, clienteReturn.clienteTab));
+      return;
+    }
     if (enContextoAlquileres || soloAlquiler) {
       router.push(enContextoAlquileres ? "/alquileres/para-alquilar" : "/alquileres");
       return;
     }
-    const { filters, search } = parseVentasListStateFromSearchParams(searchParams);
-    router.push(buildVentasListHref(fromTab, filters, search));
+    const { filters, search, soldYear } = parseVentasListStateFromSearchParams(searchParams);
+    router.push(buildVentasListHref(fromTab, filters, search, soldYear));
   }
 
   if (inmuebleId === null || (error && !ficha && !loading)) {
@@ -394,11 +415,13 @@ export function CatalogInmuebleFichaView() {
         className={`flex w-fit items-center gap-2 text-sm font-medium text-text-secondary transition-colors hover:text-primary ${interactiveFocusClass}`}
       >
         <ArrowLeft className="h-4 w-4" aria-hidden />
-        {enContextoAlquileres
-          ? "Volver a alquileres disponibles"
-          : soloAlquiler
-            ? "Volver a alquileres"
-            : "Volver al listado"}
+        {clienteReturn
+          ? "Volver al cliente"
+          : enContextoAlquileres
+            ? "Volver a alquileres disponibles"
+            : soloAlquiler
+              ? "Volver a alquileres"
+              : "Volver al listado"}
       </button>
 
       <header className="relative z-20 flex flex-col gap-4 overflow-visible glass-card p-5 sm:flex-row sm:items-start sm:justify-between">
@@ -440,10 +463,16 @@ export function CatalogInmuebleFichaView() {
                 </span>
               ) : null}
               {isSold && ventaVinculada ? (
-                <StatusBadge
-                  label={ventaEstadoLabel(ventaVinculada.estado)}
-                  variant={ventaEstadoVariant(ventaVinculada.estado)}
-                />
+                <>
+                  <StatusBadge
+                    label={ventaEstadoLabel(ventaVinculada.estado)}
+                    variant={ventaEstadoVariant(ventaVinculada.estado)}
+                  />
+                  <StatusBadge
+                    label={ventaInmobiliariaLabel(ventaVinculada.estadoInmobiliaria)}
+                    variant={ventaInmobiliariaVariant(ventaVinculada.estadoInmobiliaria)}
+                  />
+                </>
               ) : null}
             </div>
           </div>
@@ -484,6 +513,16 @@ export function CatalogInmuebleFichaView() {
                 >
                   <ExternalLink className="h-4 w-4" aria-hidden />
                   Ver operación
+                </ButtonPrimary>
+              ) : null}
+              {isSold && !ventaVinculada ? (
+                <ButtonPrimary
+                  type="button"
+                  className="gap-2"
+                  onClick={() => setNewVentaOpen(true)}
+                >
+                  <Handshake className="h-4 w-4" aria-hidden />
+                  Registrar precio de venta
                 </ButtonPrimary>
               ) : null}
               {!isSold ? (
@@ -535,6 +574,75 @@ export function CatalogInmuebleFichaView() {
                   </div>
                 </details>
               ) : null}
+            </div>
+          ) : fichaAlquiler && ofertaAlquiler ? (
+            <div className="flex w-full flex-wrap justify-end gap-2 sm:w-auto">
+              {isOffMarket ? (
+                <ButtonPrimary
+                  type="button"
+                  className="gap-2"
+                  onClick={() => openEstadoModal("available", ofertaAlquiler, "alquiler")}
+                >
+                  <Building2 className="h-4 w-4" aria-hidden />
+                  Poner en alquiler
+                </ButtonPrimary>
+              ) : null}
+              {enContextoAlquileres && inmuebleId !== null ? (
+                <Link
+                  href={nuevoContratoHref(inmuebleId)}
+                  className={`rocchia-action inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-[13px] font-semibold text-text-on-primary hover:bg-primary-dark ${interactiveFocusClass}`}
+                >
+                  <Plus className="h-4 w-4" aria-hidden />
+                  Crear contrato
+                </Link>
+              ) : null}
+              <details ref={actionsRef} className="relative z-30">
+                <summary
+                  className={`${buttonOutlineClass} gap-2 cursor-pointer list-none [&::-webkit-details-marker]:hidden ${interactiveFocusClass}`}
+                >
+                  <MoreHorizontal className="h-4 w-4" aria-hidden />
+                  Más acciones
+                </summary>
+                <div className="absolute right-0 z-50 mt-1 flex min-w-52 flex-col rounded-md border border-border bg-bg-card p-1 shadow-[var(--shadow-card)]">
+                  {canEditDetalle ? (
+                    <button
+                      type="button"
+                      className={`flex items-center gap-2 rounded-sm px-3 py-2 text-left text-[13px] font-medium text-text-primary hover:bg-bg-page ${interactiveFocusClass}`}
+                      onClick={() => {
+                        closeActions();
+                        setEditModalOpen(true);
+                      }}
+                    >
+                      <Pencil className="h-4 w-4" aria-hidden />
+                      Editar
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    className={`flex items-center gap-2 rounded-sm px-3 py-2 text-left text-[13px] font-medium text-text-primary hover:bg-bg-page ${interactiveFocusClass}`}
+                    onClick={() => {
+                      closeActions();
+                      openPriceModal(ofertaAlquiler, "alquiler");
+                    }}
+                  >
+                    <CircleDollarSign className="h-4 w-4" aria-hidden />
+                    Actualizar precio
+                  </button>
+                  {isAvailable ? (
+                    <button
+                      type="button"
+                      className={`flex items-center gap-2 rounded-sm px-3 py-2 text-left text-[13px] font-medium text-danger hover:bg-danger-bg ${interactiveFocusClass}`}
+                      onClick={() => {
+                        closeActions();
+                        openEstadoModal("off_market", ofertaAlquiler, "alquiler");
+                      }}
+                    >
+                      <EyeOff className="h-4 w-4" aria-hidden />
+                      Sacar de alquiler
+                    </button>
+                  ) : null}
+                </div>
+              </details>
             </div>
           ) : enContextoAlquileres && inmuebleId !== null ? (
             <Link
@@ -596,6 +704,7 @@ export function CatalogInmuebleFichaView() {
               propietario={propietario}
               motivo={motivo}
               isOffMarket={isOffMarket}
+              isSold={isSold}
               headerPrecio={headerPrecio}
               historialCount={historial.length}
               historialAlquilerCount={historialAlquiler.length}
@@ -607,6 +716,9 @@ export function CatalogInmuebleFichaView() {
                 void load();
               }}
               onOpenVenta={() => ventaVinculada && router.push(`/ventas/${ventaVinculada.id}`)}
+              onRegistrarVenta={
+                isSold && !ventaVinculada ? () => setNewVentaOpen(true) : undefined
+              }
               onEditRequisitosAlquiler={
                 ofertaAlquiler ? () => setRequisitosAlquilerOpen(true) : undefined
               }
@@ -688,9 +800,10 @@ export function CatalogInmuebleFichaView() {
         onClose={() => setRequisitosAlquilerOpen(false)}
         token={token ?? ""}
         oferta={ofertaAlquiler}
-        onSaved={() => {
+        onSaved={(updated) => {
+          setOfertaAlquiler(updated);
           setRequisitosAlquilerOpen(false);
-          setSuccess("Requisitos de alquiler actualizados.");
+          setSuccess("Condiciones de alquiler actualizadas.");
           void load();
         }}
       />

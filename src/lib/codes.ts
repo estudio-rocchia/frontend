@@ -9,6 +9,7 @@ export const TIPO_INMUEBLE_PREFIX: Record<string, string> = {
   warehouse: "G",
   hectares: "H",
   tower: "T",
+  cabin: "B",
 };
 
 export function prefixForTipoInmueble(tipoCode: string): string {

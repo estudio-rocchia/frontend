@@ -3,13 +3,14 @@
 import { ChevronRight } from "lucide-react";
 import { memo, type ReactNode } from "react";
 
+import { RedesSocialesSelect } from "@/components/alquileres/RedesSocialesSelect";
 import { VentasEmptyState } from "@/components/ventas/VentasEmptyState";
 import type { VentasTabId } from "@/components/ventas/VentasFilterChips";
 import { ListTableContent } from "@/components/ui/ListTableContent";
 import { SearchField } from "@/components/ui/SearchField";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { StatusChip } from "@/components/ui/StatusChip";
-import { ofertaEstadoTone, ventaEstadoTone } from "@/lib/ui/status-tones";
+import { ofertaEstadoTone, ventaEstadoTone, ventaInmobiliariaTone } from "@/lib/ui/status-tones";
 import type { CatalogSearchItem, VentaDetail } from "@/lib/api/types";
 import { formatMoney, moneyClassName } from "@/lib/format";
 import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
@@ -19,11 +20,13 @@ import {
   catalogMotivo,
   saleOferta,
 } from "@/lib/ventas/catalog-helpers";
+import { formatCatalogOfertaPrecio } from "@/lib/ventas/catalog-precio";
 import { parteNombre } from "@/lib/ventas/partes";
 import { formatDetalleSummary } from "@/lib/ventas/detalle-labels";
 import {
   ofertaEstadoLabel,
   ventaEstadoLabel,
+  ventaInmobiliariaLabel,
 } from "@/lib/ventas/status-labels";
 
 export type VentasTableRow =
@@ -44,6 +47,8 @@ type VentasTableProps = {
   parteNombres?: Record<number, string>;
   onSearchChange: (value: string) => void;
   onOpenRow: (row: VentasTableRow) => void;
+  savingRedesOfertaId?: number | null;
+  onChangeEstadoRedes?: (item: CatalogSearchItem, nextCode: string) => void;
   embedded?: boolean;
 };
 
@@ -65,11 +70,15 @@ const VentaMobileCard = memo(function VentaMobileCard({
   tab,
   parteNombres,
   onOpenRow,
+  savingRedesOfertaId,
+  onChangeEstadoRedes,
 }: {
   row: VentasTableRow;
   tab: VentasTabId;
   parteNombres: Record<number, string>;
   onOpenRow: (row: VentasTableRow) => void;
+  savingRedesOfertaId?: number | null;
+  onChangeEstadoRedes?: (item: CatalogSearchItem, nextCode: string) => void;
 }) {
   if (row.kind === "venta") {
     const venta = row.venta;
@@ -95,8 +104,11 @@ const VentaMobileCard = memo(function VentaMobileCard({
             </span>
             <span className="text-xs text-text-secondary">{financiacionHint(venta)}</span>
           </div>
-          <div className="mt-2">
+          <div className="mt-2 flex flex-wrap gap-1.5">
             <StatusChip tone={ventaEstadoTone(venta.estado)}>{ventaEstadoLabel(venta.estado)}</StatusChip>
+            <StatusChip tone={ventaInmobiliariaTone(venta.estadoInmobiliaria)}>
+              {ventaInmobiliariaLabel(venta.estadoInmobiliaria)}
+            </StatusChip>
           </div>
         </div>
         <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-text-secondary" aria-hidden />
@@ -106,42 +118,54 @@ const VentaMobileCard = memo(function VentaMobileCard({
 
   const item = row.item;
   const oferta = saleOferta(item);
-  const precio = oferta?.montoPrecio ?? null;
-  const moneda = oferta?.codigoMoneda ?? "ARS";
+  const precioText = formatCatalogOfertaPrecio(oferta, { tipoInmuebleCode: item.tipoInmueble.code });
   const estadoCode = oferta?.estadoCode ?? "";
   const title = catalogInmuebleHeading(item);
   const ubicacion = catalogInmuebleUbicacion(item);
   const detalleSummary = formatDetalleSummary(item.detalle, item.tipoInmueble.code);
+  const showRedesMobile = tab === "a_la_venta" && Boolean(onChangeEstadoRedes) && Boolean(oferta);
 
   return (
-    <button
-      type="button"
-      onClick={() => onOpenRow(row)}
-      className={`flex w-full items-start gap-3 rounded-xl border border-border bg-bg-card p-4 text-left shadow-[var(--shadow-card)] ${rowFocusClass}`}
-      aria-label={`Abrir ficha ${item.inmueble.code}`}
-    >
-      <div className="min-w-0 flex-1">
-        <div className="font-semibold text-text-primary">{title}</div>
-        {ubicacion ? (
-          <div className="mt-0.5 text-[11px] text-text-secondary">{ubicacion}</div>
-        ) : null}
-        {detalleSummary ? (
-          <p className="mt-1 text-[11px] text-text-secondary">{detalleSummary}</p>
-        ) : null}
-        {tab === "fuera_mercado" ? (
-          <p className="mt-2 line-clamp-2 text-xs text-text-secondary">{catalogMotivo(item)}</p>
-        ) : null}
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-          <span className={`text-sm font-semibold ${moneyClassName}`}>
-            {precio ? formatMoney(precio, moneda) : "Sin precio"}
-          </span>
+    <div className="flex w-full flex-col gap-3 rounded-xl border border-border bg-bg-card p-4 shadow-[var(--shadow-card)]">
+      <button
+        type="button"
+        onClick={() => onOpenRow(row)}
+        className={`flex w-full items-start gap-3 text-left ${rowFocusClass}`}
+        aria-label={`Abrir ficha ${item.inmueble.code}`}
+      >
+        <div className="min-w-0 flex-1">
+          <div className="font-semibold text-text-primary">{title}</div>
+          {ubicacion ? (
+            <div className="mt-0.5 text-[11px] text-text-secondary">{ubicacion}</div>
+          ) : null}
+          {detalleSummary ? (
+            <p className="mt-1 text-[11px] text-text-secondary">{detalleSummary}</p>
+          ) : null}
+          {tab === "fuera_mercado" ? (
+            <p className="mt-2 line-clamp-2 text-xs text-text-secondary">{catalogMotivo(item)}</p>
+          ) : null}
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+            <span className={`text-sm font-semibold ${moneyClassName}`}>
+              {precioText}
+            </span>
+          </div>
+          <div className="mt-2">
+            <StatusChip tone={ofertaEstadoTone(estadoCode)}>{ofertaEstadoLabel(estadoCode)}</StatusChip>
+          </div>
         </div>
-        <div className="mt-2">
-          <StatusChip tone={ofertaEstadoTone(estadoCode)}>{ofertaEstadoLabel(estadoCode)}</StatusChip>
+        <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-text-secondary" aria-hidden />
+      </button>
+      {showRedesMobile ? (
+        <div className="flex flex-col gap-1">
+          <span className="text-[11px] text-text-secondary">Redes sociales</span>
+          <RedesSocialesSelect
+            value={oferta!.estadoRedesCode}
+            disabled={savingRedesOfertaId === oferta!.id}
+            onChange={(next) => onChangeEstadoRedes!(item, next)}
+          />
         </div>
-      </div>
-      <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-text-secondary" aria-hidden />
-    </button>
+      ) : null}
+    </div>
   );
 });
 
@@ -188,10 +212,19 @@ export const VentasTable = memo(function VentasTable({
   emptyActions,
   parteNombres = {},
   onOpenRow,
+  savingRedesOfertaId = null,
+  onChangeEstadoRedes,
   embedded = false,
 }: VentasTableProps) {
   const isCatalogTab = tab !== "en_operacion";
-  const colSpan = isCatalogTab ? (tab === "fuera_mercado" ? 4 : 3) : 5;
+  const showRedesColumn = tab === "a_la_venta" && Boolean(onChangeEstadoRedes);
+  const colSpan = isCatalogTab
+    ? tab === "fuera_mercado"
+      ? 4
+      : showRedesColumn
+        ? 4
+        : 3
+    : 5;
   const panelClass = embedded ? "" : "overflow-hidden glass-card";
   const shellPadding = embedded ? "px-5 py-5" : "";
 
@@ -242,6 +275,8 @@ export const VentasTable = memo(function VentasTable({
                   tab={tab}
                   parteNombres={parteNombres}
                   onOpenRow={onOpenRow}
+                  savingRedesOfertaId={savingRedesOfertaId}
+                  onChangeEstadoRedes={onChangeEstadoRedes}
                 />
               );
             })}
@@ -258,6 +293,7 @@ export const VentasTable = memo(function VentasTable({
                   ) : null}
                   <th scope="col" className="px-4 py-3">Precio</th>
                   {!isCatalogTab ? <th scope="col" className="px-4 py-3">Financiación</th> : null}
+                  {showRedesColumn ? <th scope="col" className="px-4 py-3">Redes sociales</th> : null}
                   <th scope="col" className="px-4 py-3">Estado</th>
                   <th scope="col" className="w-10 px-2 py-3" aria-hidden />
                 </tr>
@@ -303,9 +339,14 @@ export const VentasTable = memo(function VentasTable({
                         </td>
                         <td className="px-4 py-3 text-text-secondary">{financiacionHint(venta)}</td>
                         <td className="px-4 py-3">
-                          <StatusChip tone={ventaEstadoTone(venta.estado)}>
-                            {ventaEstadoLabel(venta.estado)}
-                          </StatusChip>
+                          <div className="flex flex-col gap-1.5">
+                            <StatusChip tone={ventaEstadoTone(venta.estado)}>
+                              {ventaEstadoLabel(venta.estado)}
+                            </StatusChip>
+                            <StatusChip tone={ventaInmobiliariaTone(venta.estadoInmobiliaria)}>
+                              {ventaInmobiliariaLabel(venta.estadoInmobiliaria)}
+                            </StatusChip>
+                          </div>
                         </td>
                         <td className="px-2 py-3 text-text-secondary">
                           <ChevronRight
@@ -319,8 +360,7 @@ export const VentasTable = memo(function VentasTable({
 
                   const item = row.item;
                   const oferta = saleOferta(item);
-                  const precio = oferta?.montoPrecio ?? null;
-                  const moneda = oferta?.codigoMoneda ?? "ARS";
+                  const precioText = formatCatalogOfertaPrecio(oferta, { tipoInmuebleCode: item.tipoInmueble.code });
                   const estadoCode = oferta?.estadoCode ?? "";
                   const ubicacion = catalogInmuebleUbicacion(item);
                   const detalleSummary = formatDetalleSummary(item.detalle, item.tipoInmueble.code);
@@ -358,8 +398,17 @@ export const VentasTable = memo(function VentasTable({
                         </td>
                       ) : null}
                       <td className={`px-4 py-3 ${moneyClassName}`}>
-                        {precio ? formatMoney(precio, moneda) : "Sin precio"}
+                        {precioText}
                       </td>
+                      {showRedesColumn && oferta ? (
+                        <td className="px-4 py-3">
+                          <RedesSocialesSelect
+                            value={oferta.estadoRedesCode}
+                            disabled={savingRedesOfertaId === oferta.id}
+                            onChange={(next) => onChangeEstadoRedes?.(item, next)}
+                          />
+                        </td>
+                      ) : null}
                       <td className="px-4 py-3">
                         <StatusChip tone={ofertaEstadoTone(estadoCode)}>
                           {ofertaEstadoLabel(estadoCode)}

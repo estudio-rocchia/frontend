@@ -147,7 +147,9 @@ export function Select<T extends object>({
           <AriaPopover
             ref={popoverRef}
             isNonModal
-            offset={4}
+            offset={8}
+            shouldFlip
+            containerPadding={16}
             UNSTABLE_portalContainer={overlayPortal}
             className={cx(
               MENU_POPOVER_WIDTH,

@@ -28,6 +28,11 @@ export function emptyNewOwnerField(porcentajeAdministracion = 6): OwnerFieldValu
   return { mode: "new", nombre: "", apellido: "", porcentajeAdministracion };
 }
 
+export function isEmptyPersonaField(field: PersonaFieldValue): boolean {
+  if (field.mode === "existing") return false;
+  return field.nombre.trim().length === 0 && field.apellido.trim().length === 0;
+}
+
 export function isNewPersonaFieldValid(field: PersonaFieldValue): boolean {
   if (field.mode === "existing") return field.personaId > 0;
   return field.nombre.trim().length > 0;

@@ -40,9 +40,21 @@ export function appendVentasListStateParams(
   if (filters.precioMax.trim()) params.set("lpmax", filters.precioMax.trim());
 }
 
+export function parseSoldYear(searchParams: {
+  get(name: string): string | null;
+}): number | null {
+  return readInt(searchParams.get("anio"));
+}
+
+function appendVentasSoldYear(params: URLSearchParams, soldYear: number | null | undefined): void {
+  if (soldYear != null && Number.isFinite(soldYear)) {
+    params.set("anio", String(soldYear));
+  }
+}
+
 export function parseVentasListStateFromSearchParams(searchParams: {
   get(name: string): string | null;
-}): { filters: VentasCharacteristicFilters; search: string } {
+}): { filters: VentasCharacteristicFilters; search: string; soldYear: number | null } {
   const filters: VentasCharacteristicFilters = {
     ...EMPTY_CHARACTERISTIC_FILTERS,
     tipoInmuebleCode: searchParams.get("ltipo")?.trim() ?? "",
@@ -66,6 +78,7 @@ export function parseVentasListStateFromSearchParams(searchParams: {
   return {
     filters: sanitizeCharacteristicFiltersForTipo(filters),
     search: searchParams.get("q")?.trim() ?? "",
+    soldYear: parseSoldYear(searchParams),
   };
 }
 
@@ -73,10 +86,12 @@ export function buildVentasListHref(
   tab: VentasTabId,
   filters: VentasCharacteristicFilters,
   search: string,
+  soldYear?: number | null,
 ): string {
   const params = new URLSearchParams();
   params.set("tab", tab);
   appendVentasListStateParams(params, sanitizeCharacteristicFiltersForTipo(filters), search);
+  if (tab === "vendidos") appendVentasSoldYear(params, soldYear);
   const qs = params.toString();
   return qs ? `/ventas?${qs}` : "/ventas";
 }
@@ -86,10 +101,12 @@ export function buildVentasInmuebleHref(
   fromTab: VentasTabId,
   filters: VentasCharacteristicFilters,
   search: string,
+  soldYear?: number | null,
 ): string {
   const params = new URLSearchParams();
   params.set("from", fromTab);
   appendVentasListStateParams(params, sanitizeCharacteristicFiltersForTipo(filters), search);
+  if (fromTab === "vendidos") appendVentasSoldYear(params, soldYear);
   return `/ventas/inmueble/${inmuebleId}?${params.toString()}`;
 }
 
@@ -98,9 +115,11 @@ export function buildVentasVentaHref(
   fromTab: VentasTabId,
   filters: VentasCharacteristicFilters,
   search: string,
+  soldYear?: number | null,
 ): string {
   const params = new URLSearchParams();
   params.set("from", fromTab);
   appendVentasListStateParams(params, sanitizeCharacteristicFiltersForTipo(filters), search);
+  if (fromTab === "vendidos") appendVentasSoldYear(params, soldYear);
   return `/ventas/${ventaId}?${params.toString()}`;
 }

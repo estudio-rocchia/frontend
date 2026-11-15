@@ -16,12 +16,14 @@ const ClienteInmobiliariaAgregarSection = dynamic(
 import { useAuth } from "@/context/auth-context";
 import type { ContratoListItem, InmuebleRecord } from "@/lib/api/types";
 import type { ModoHonorariosAdministracion } from "@/lib/honorarios-admin";
+import type { ClienteFichaTabId } from "@/lib/clientes/cliente-ficha-state";
 import { loadInmueblesCatalog, type PropiedadAdministrada } from "@/lib/mappers/propietario-inmuebles";
 
 type InmobiliariaView = "propiedades" | "agregar";
 
 export function ClienteInmobiliariaTab({
   personaId,
+  clienteFichaTab = "inmobiliaria",
   modoHonorarios,
   porcentajeCliente,
   clientePctEdit,
@@ -41,6 +43,7 @@ export function ClienteInmobiliariaTab({
   onError,
 }: {
   personaId: number;
+  clienteFichaTab?: ClienteFichaTabId;
   modoHonorarios: ModoHonorariosAdministracion;
   porcentajeCliente: string;
   clientePctEdit: string;
@@ -136,6 +139,8 @@ export function ClienteInmobiliariaTab({
       </div>
 
       <ClienteInmobiliariaPropiedadesSection
+        clienteId={personaId}
+        clienteFichaTab={clienteFichaTab}
         modoHonorarios={modoHonorarios}
         porcentajeCliente={porcentajeCliente}
         clientePctEdit={clientePctEdit}

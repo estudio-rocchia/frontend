@@ -4,9 +4,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { KeyboardEvent } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Plus, Search } from "lucide-react";
+import { ArrowLeft, KeyRound, Plus, Search } from "lucide-react";
 
 import { DisponibilidadSelect } from "@/components/alquileres/DisponibilidadSelect";
+import { PublicarEnAlquilerCatalogModal } from "@/components/alquileres/PublicarEnAlquilerCatalogModal";
 import { EnAdministracionSwitch } from "@/components/alquileres/EnAdministracionSwitch";
 import { RedesSocialesSelect } from "@/components/alquileres/RedesSocialesSelect";
 import { useAuth } from "@/context/auth-context";
@@ -14,7 +15,9 @@ import {
   ApiError,
   changeOfertaEstado,
   fetchCatalog,
+  fetchEstadosOferta,
   fetchPersonas,
+  fetchTiposOperacion,
   updateInmueble,
   updateOferta,
 } from "@/lib/api";
@@ -45,6 +48,13 @@ export function InmueblesParaAlquilarView() {
   const [estadoRedesByCode, setEstadoRedesByCode] = useState<Map<string, number>>(new Map());
   const [estadoOfertaByCode, setEstadoOfertaByCode] = useState<Map<string, number>>(new Map());
   const [savingDisponibilidadOfertaId, setSavingDisponibilidadOfertaId] = useState<number | null>(null);
+  const [publicarAlquilerOpen, setPublicarAlquilerOpen] = useState(false);
+  const [catalogAlquilerIds, setCatalogAlquilerIds] = useState<{
+    estadoAvailableId: number | null;
+    tipoOperacionRentId: number | null;
+  }>({ estadoAvailableId: null, tipoOperacionRentId: null });
+  const [publishCatalogLoading, setPublishCatalogLoading] = useState(false);
+  const [success, setSuccess] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -234,6 +244,35 @@ export function InmueblesParaAlquilarView() {
     ? `No hay inmuebles que coincidan con "${searchQuery.trim()}".`
     : "No hay alquileres disponibles.";
 
+  const openPublicarAlquilerModal = useCallback(async () => {
+    if (!token) return;
+    setPublishCatalogLoading(true);
+    setError(null);
+    try {
+      const [estadosRes, tiposRes] = await Promise.all([
+        fetchEstadosOferta(token),
+        fetchTiposOperacion(token),
+      ]);
+      const estadoAvailableId =
+        estadosRes.items.find((item) => item.code === "available")?.id ?? null;
+      const tipoOperacionRentId = tiposRes.items.find((item) => item.code === "rent")?.id ?? null;
+      if (!estadoAvailableId || !tipoOperacionRentId) {
+        setError("No se pudo cargar el catálogo para publicar en alquiler.");
+        return;
+      }
+      setCatalogAlquilerIds({ estadoAvailableId, tipoOperacionRentId });
+      setPublicarAlquilerOpen(true);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        logout();
+        return;
+      }
+      setError(err instanceof ApiError ? err.message : "No se pudo abrir el asistente de publicación.");
+    } finally {
+      setPublishCatalogLoading(false);
+    }
+  }, [token, logout]);
+
   return (
     <div className={`flex flex-col gap-6 sm:gap-8 ${pagePaddingClass}`}>
       <header className="flex flex-col gap-2">
@@ -244,14 +283,35 @@ export function InmueblesParaAlquilarView() {
           <ArrowLeft className="size-4" aria-hidden />
           Volver a alquileres
         </Link>
-        <div className="flex flex-col gap-1">
-          <h1 className="text-[22px] font-bold text-text-primary">Alquileres disponibles</h1>
-          <p className="max-w-2xl text-sm text-text-secondary">
-            Inmuebles sin contrato vigente. Editá disponibilidad, redes y administración desde la tabla. Abrí la ficha
-            para ver precio y condiciones.
-          </p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex min-w-0 flex-col gap-1">
+            <h1 className="text-[22px] font-bold text-text-primary">Alquileres disponibles</h1>
+            <p className="max-w-2xl text-sm text-text-secondary">
+              Inmuebles sin contrato vigente. Editá disponibilidad, redes y administración desde la tabla. Abrí la ficha
+              para ver precio y condiciones.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void openPublicarAlquilerModal()}
+            disabled={loading || publishCatalogLoading || !token}
+            className={`rocchia-action inline-flex h-9 shrink-0 items-center gap-1.5 self-start rounded-lg border border-border bg-bg-card px-3 text-[13px] font-medium text-text-primary hover:bg-bg-page disabled:cursor-not-allowed disabled:opacity-50 ${interactiveFocusClass}`}
+          >
+            <KeyRound className="h-4 w-4" aria-hidden />
+            {publishCatalogLoading ? "Cargando…" : "Publicar en alquiler"}
+          </button>
         </div>
       </header>
+
+      {success ? (
+        <p
+          className="rounded-sm border border-success bg-success-bg px-3 py-2 text-sm text-success"
+          role="status"
+          aria-live="polite"
+        >
+          {success}
+        </p>
+      ) : null}
 
       <div className="flex flex-col gap-3 rounded-md border border-border bg-bg-card p-4">
         <label className="flex flex-col gap-1 text-sm">
@@ -460,6 +520,21 @@ export function InmueblesParaAlquilarView() {
             Siguiente
           </button>
         </div>
+      ) : null}
+
+      {publicarAlquilerOpen && token ? (
+        <PublicarEnAlquilerCatalogModal
+          open={publicarAlquilerOpen}
+          onClose={() => setPublicarAlquilerOpen(false)}
+          token={token}
+          estadoOfertaAvailableId={catalogAlquilerIds.estadoAvailableId}
+          tipoOperacionAlquilerId={catalogAlquilerIds.tipoOperacionRentId}
+          onPublished={(_inmuebleId) => {
+            setPublicarAlquilerOpen(false);
+            setSuccess("Inmueble publicado en alquiler. Ya figura en esta lista.");
+            void load();
+          }}
+        />
       ) : null}
     </div>
   );

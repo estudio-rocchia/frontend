@@ -1,15 +1,10 @@
 "use client";
 
-import { MONTHS_FULL_ES } from "@/lib/calendar/month";
-import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
-import { cx } from "@/utils/cx";
+import { useMemo } from "react";
 
-const SELECT_CLASS = cx(
-  "h-9 cursor-pointer rounded-lg border border-border bg-bg-card text-sm font-medium text-text-primary",
-  "outline-none transition-colors hover:bg-bg-page",
-  "focus-visible:ring-2 focus-visible:ring-primary/35",
-  interactiveFocusClass,
-);
+import { NumericSelect } from "@/components/ui/NumericSelect";
+import { MES_OPTIONS } from "@/components/ui/MesAnioPeriodSelect";
+import { cx } from "@/utils/cx";
 
 function buildYearRange(centerYear: number, minYear?: number, maxYear?: number): number[] {
   const min = minYear ?? centerYear - 12;
@@ -39,36 +34,33 @@ export function CalendarMonthYearControls({
   monthId?: string;
   yearId?: string;
 }) {
-  const years = buildYearRange(year, minYear, maxYear);
+  const yearOptions = useMemo(() => {
+    return buildYearRange(year, minYear, maxYear).map((value) => ({
+      value,
+      label: String(value),
+    }));
+  }, [year, minYear, maxYear]);
 
   return (
     <div className={cx("flex items-center justify-center gap-2", className)}>
-      <select
+      <NumericSelect
         id={monthId}
-        aria-label="Mes"
+        ariaLabel="Mes"
         value={month}
-        onChange={(event) => onChange(year, Number(event.target.value))}
-        className={cx(SELECT_CLASS, "min-w-[8.5rem] px-2")}
-      >
-        {MONTHS_FULL_ES.map((label, index) => (
-          <option key={label} value={index + 1}>
-            {label}
-          </option>
-        ))}
-      </select>
-      <select
+        onChange={(m) => m != null && onChange(year, m)}
+        options={MES_OPTIONS}
+        size="sm"
+        className="min-w-[8.5rem] shrink-0"
+      />
+      <NumericSelect
         id={yearId}
-        aria-label="Año"
+        ariaLabel="Año"
         value={year}
-        onChange={(event) => onChange(Number(event.target.value), month)}
-        className={cx(SELECT_CLASS, "min-w-[5.5rem] px-2 tabular-nums")}
-      >
-        {years.map((y) => (
-          <option key={y} value={y}>
-            {y}
-          </option>
-        ))}
-      </select>
+        onChange={(y) => y != null && onChange(y, month)}
+        options={yearOptions}
+        size="sm"
+        className="min-w-[5.5rem] shrink-0"
+      />
     </div>
   );
 }

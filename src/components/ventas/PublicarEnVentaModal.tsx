@@ -25,7 +25,7 @@ import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { ChipToggle, FormField, FormSection } from "@/components/ui/FormLayout";
 import { MoneyAmountField } from "@/components/ui/MoneyAmountField";
 import { NumericSelect } from "@/components/ui/NumericSelect";
-import { ApiError, fetchCatalog, fetchFormasPago, fetchLocalidades } from "@/lib/api";
+import { ApiError, fetchFormasPago, fetchLocalidades, fetchTiposInmueble } from "@/lib/api";
 import { parseAmountInput } from "@/lib/format";
 import { fetchAllInmuebleCodes } from "@/lib/inmuebles/inmueble-codes";
 import type { CatalogoItem } from "@/lib/api/types";
@@ -127,20 +127,21 @@ export function PublicarEnVentaModal({
     setLoadingCatalog(true);
     void Promise.all([
       fetchFormasPago(token).then((res) => setFormasPago(res.items)),
-      ensureTiposInmueble(),
+      loadTiposInmueble(true),
     ]).finally(() => setLoadingCatalog(false));
   }, [open, token]);
 
-  async function ensureTiposInmueble() {
-    if (tiposInmueble.length > 0 || !token) return;
-    setLoadingTipos(true);
+  async function loadTiposInmueble(refresh = false) {
+    if (!token) return;
+    const initialLoad = tiposInmueble.length === 0;
+    if (initialLoad) setLoadingTipos(true);
     try {
-      const response = await fetchCatalog<CatalogoItem>(token, "/catalogos/tipos-inmueble");
+      const response = await fetchTiposInmueble(token, { refresh: refresh || initialLoad });
       setTiposInmueble(response.items);
     } catch {
       setError("No se pudieron cargar los tipos de inmueble.");
     } finally {
-      setLoadingTipos(false);
+      if (initialLoad) setLoadingTipos(false);
     }
   }
 
@@ -300,7 +301,6 @@ export function PublicarEnVentaModal({
               tiposInmueble={tiposInmueble}
               existingCodes={existingCodes}
               loadingTipos={loadingTipos}
-              onLoadTipos={() => void ensureTiposInmueble()}
               intro="Completá los datos de la propiedad que vas a publicar a la venta."
             />
             <FormSection title="Condiciones de permuta">

@@ -1018,6 +1018,7 @@ export function searchCatalogo(
     tieneEscritura?: boolean;
     tieneConstruccion?: boolean;
     disponibleAlquiler?: boolean;
+    vendidoAnio?: number;
     limit?: number;
     offset?: number;
   },
@@ -1055,9 +1056,20 @@ export function searchCatalogo(
   if (params?.disponibleAlquiler !== undefined) {
     query.set("disponibleAlquiler", String(params.disponibleAlquiler));
   }
+  if (params?.vendidoAnio !== undefined) query.set("vendidoAnio", String(params.vendidoAnio));
   query.set("limit", String(params?.limit ?? 100));
   if (params?.offset) query.set("offset", String(params.offset));
   return apiRequest<{ items: CatalogSearchItem[] }>(`/catalogo/buscar?${query}`, { token });
+}
+
+export function fetchVendidoAnios(token: string, tipoOperacionId?: number) {
+  const query = new URLSearchParams();
+  if (tipoOperacionId) query.set("tipoOperacionId", String(tipoOperacionId));
+  const qs = query.toString();
+  return apiRequest<{ items: number[] }>(
+    `/catalogo/vendidos-anios${qs ? `?${qs}` : ""}`,
+    { token },
+  );
 }
 
 export function fetchEstadosOferta(token: string) {
@@ -1070,6 +1082,13 @@ export function fetchTiposOperacion(token: string) {
 
 export function fetchFormasPago(token: string) {
   return fetchCatalog<CatalogoItem>(token, "/catalogos/formas-pago");
+}
+
+export function fetchTiposInmueble(token: string, options?: { refresh?: boolean }) {
+  if (options?.refresh) {
+    invalidateCache("catalog:/catalogos/tipos-inmueble");
+  }
+  return fetchCatalog<CatalogoItem>(token, "/catalogos/tipos-inmueble");
 }
 
 export function fetchOfertaHistorialPrecio(token: string, ofertaId: number) {

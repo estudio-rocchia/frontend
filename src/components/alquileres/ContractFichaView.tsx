@@ -223,7 +223,7 @@ export function ContractFichaView() {
         {backLabel}
       </Link>
 
-      <header className="flex flex-col gap-4 rounded-md border border-border bg-bg-card p-5">
+      <header className="relative z-20 flex flex-col gap-4 overflow-visible rounded-md border border-border bg-bg-card p-5">
         <div className="flex flex-col gap-3">
           <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-[minmax(0,1fr)_auto] min-[480px]:items-end min-[480px]:gap-x-6">
             <h1
@@ -268,11 +268,11 @@ export function ContractFichaView() {
                   Cobrar alquiler
                 </ButtonPrimary>
               ) : null}
-              <details ref={actionsRef} className="relative">
+              <details ref={actionsRef} className="relative z-30">
                 <summary className={`${buttonOutlineClass} cursor-pointer list-none [&::-webkit-details-marker]:hidden ${interactiveFocusClass}`}>
                   Más acciones
                 </summary>
-                <div className="absolute left-0 z-20 mt-1 flex min-w-52 flex-col rounded-md border border-border bg-bg-card p-1 shadow-[var(--shadow-card)]">
+                <div className="absolute left-0 z-50 mt-1 flex min-w-52 flex-col rounded-md border border-border bg-bg-card p-1 shadow-[var(--shadow-card)]">
                   <button
                     type="button"
                     className={`flex items-center gap-2 rounded-sm px-3 py-2 text-left text-[13px] font-medium text-text-primary hover:bg-bg-page disabled:opacity-50 ${interactiveFocusClass}`}

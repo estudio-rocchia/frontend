@@ -18,6 +18,7 @@ const PublicarEnVentaModal = dynamic(
   { ssr: false },
 );
 import { VentasCatalogFiltersPanel } from "@/components/ventas/VentasCatalogFiltersPanel";
+import { VentasSoldYearFilter } from "@/components/ventas/VentasSoldYearFilter";
 import { VentasCreateActions } from "@/components/ventas/VentasCreateActions";
 import {
   VENTAS_MAIN_PANEL_ID,
@@ -39,10 +40,13 @@ import {
   fetchCatalog,
   fetchEstadosOferta,
   fetchTiposOperacion,
+  fetchVendidoAnios,
   fetchVentas,
   searchCatalogo,
+  updateOferta,
 } from "@/lib/api";
 import { buyerSearchText } from "@/lib/ventas/partes";
+import { ventaInmobiliariaLabel } from "@/lib/ventas/status-labels";
 import { fetchVentasEnOperacion } from "@/lib/ventas/en-operacion-load";
 import { invalidateVentasCaches } from "@/lib/ventas/invalidate-caches";
 import { fetchVentasTabCounts } from "@/lib/ventas/tab-counts";
@@ -53,7 +57,7 @@ import {
   EMPTY_CHARACTERISTIC_FILTERS,
   type VentasCharacteristicFilters,
 } from "@/lib/ventas/characteristic-filters";
-import { catalogItemSearchText } from "@/lib/ventas/catalog-helpers";
+import { catalogItemSearchText, saleOferta } from "@/lib/ventas/catalog-helpers";
 import { VENTAS_TAB_COPY, ventasEmptyHint } from "@/lib/ventas/workspace-copy";
 import {
   buildVentasInmuebleHref,
@@ -97,11 +101,17 @@ export function VentasWorkspace() {
   const [characteristicFilters, setCharacteristicFilters] =
     useState<VentasCharacteristicFilters>(EMPTY_CHARACTERISTIC_FILTERS);
   const [tipoVentaId, setTipoVentaId] = useState<number | undefined>();
+  const [estadoRedesByCode, setEstadoRedesByCode] = useState<Map<string, number>>(new Map());
+  const [savingRedesOfertaId, setSavingRedesOfertaId] = useState<number | null>(null);
   const [newVentaOpen, setNewVentaOpen] = useState(false);
   const [publicarOpen, setPublicarOpen] = useState(false);
   const [newVentaInmuebleId, setNewVentaInmuebleId] = useState<number | null>(null);
+  const [soldYear, setSoldYear] = useState<number | null>(null);
+  const [soldYears, setSoldYears] = useState<number[]>([]);
   const characteristicFiltersRef = useRef(characteristicFilters);
   characteristicFiltersRef.current = characteristicFilters;
+  const soldYearRef = useRef(soldYear);
+  soldYearRef.current = soldYear;
   const skipFilterReloadRef = useRef(true);
   const skipListUrlSyncRef = useRef(true);
   const loadGenerationRef = useRef(0);
@@ -115,9 +125,10 @@ export function VentasWorkspace() {
     if (isVentasTabId(tabParam)) {
       setTab(tabParam);
     }
-    const { filters, search: q } = parseVentasListStateFromSearchParams(searchParams);
+    const { filters, search: q, soldYear: anio } = parseVentasListStateFromSearchParams(searchParams);
     setCharacteristicFilters(filters);
     setSearch(q);
+    setSoldYear(anio);
     setUrlTabReady(true);
     skipListUrlSyncRef.current = true;
     const frame = window.requestAnimationFrame(() => {
@@ -127,9 +138,16 @@ export function VentasWorkspace() {
   }, [searchParams]);
 
   const syncListUrl = useCallback(
-    (nextTab: VentasTabId, nextFilters: VentasCharacteristicFilters, nextSearch: string) => {
+    (
+      nextTab: VentasTabId,
+      nextFilters: VentasCharacteristicFilters,
+      nextSearch: string,
+      nextSoldYear?: number | null,
+    ) => {
       if (skipListUrlSyncRef.current) return;
-      router.replace(buildVentasListHref(nextTab, nextFilters, nextSearch), { scroll: false });
+      router.replace(buildVentasListHref(nextTab, nextFilters, nextSearch, nextSoldYear), {
+        scroll: false,
+      });
     },
     [router],
   );
@@ -138,14 +156,16 @@ export function VentasWorkspace() {
     if (!token) return;
     void (async () => {
       try {
-        const [estados, tipos, tiposInmueble] = await Promise.all([
+        const [estados, tipos, tiposInmueble, estadosRedes] = await Promise.all([
           fetchEstadosOferta(token),
           fetchTiposOperacion(token),
           fetchCatalog<CatalogoItem>(token, "/catalogos/tipos-inmueble"),
+          fetchCatalog<CatalogoItem>(token, "/catalogos/estados-redes"),
         ]);
         const map: Record<string, number> = {};
         for (const item of estados.items) map[item.code] = item.id;
         setEstadoIds(map);
+        setEstadoRedesByCode(new Map(estadosRedes.items.map((item) => [item.code, item.id])));
         const tipoMap: Record<string, number> = {};
         for (const item of tiposInmueble.items) tipoMap[item.code] = item.id;
         setTipoInmuebleIds(tipoMap);
@@ -172,6 +192,18 @@ export function VentasWorkspace() {
     void loadTabCounts();
   }, [loadTabCounts]);
 
+  useEffect(() => {
+    if (!token || !tipoVentaId) return;
+    void (async () => {
+      try {
+        const res = await fetchVendidoAnios(token, tipoVentaId);
+        setSoldYears(res.items);
+      } catch {
+        setSoldYears([]);
+      }
+    })();
+  }, [token, tipoVentaId]);
+
   const load = useCallback(async (options?: { silent?: boolean }) => {
     if (!token) return;
     if (tab !== "en_operacion" && !tipoVentaId) return;
@@ -181,7 +213,7 @@ export function VentasWorkspace() {
     const listKey =
       tab === "en_operacion"
         ? tab
-        : `${tab}-${JSON.stringify(characteristicFiltersRef.current)}`;
+        : `${tab}-${JSON.stringify(characteristicFiltersRef.current)}-${soldYearRef.current ?? "all"}`;
     const { startedAt, isInitial } = start(silent);
     if (!silent && isInitial) {
       setLoading(true);
@@ -207,7 +239,9 @@ export function VentasWorkspace() {
           return;
         }
         const filters = characteristicFiltersSearchParams(characteristicFiltersRef.current, tipoInmuebleIds);
-        const catalogCacheKey = `ventas-catalog:${token}:${tab}:${JSON.stringify(filters)}`;
+        const vendidoAnio =
+          tab === "vendidos" && soldYearRef.current != null ? soldYearRef.current : undefined;
+        const catalogCacheKey = `ventas-catalog:${token}:${tab}:${JSON.stringify(filters)}:${vendidoAnio ?? "all"}`;
         const res = await withCache(
           catalogCacheKey,
           () =>
@@ -215,6 +249,7 @@ export function VentasWorkspace() {
               estadoOfertaId,
               tipoOperacionId: tipoVentaId,
               ...filters,
+              vendidoAnio,
               limit: 200,
             }),
           { ttlMs: 25_000 },
@@ -268,11 +303,24 @@ export function VentasWorkspace() {
     return () => window.clearTimeout(timer);
   }, [characteristicFilters, load, tab, estadoIds, tipoVentaId]);
 
+  useEffect(() => {
+    if (tab !== "vendidos") return;
+    if (Object.keys(estadoIds).length === 0 || !tipoVentaId) return;
+    if (skipFilterReloadRef.current) {
+      skipFilterReloadRef.current = false;
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void load();
+    }, 150);
+    return () => window.clearTimeout(timer);
+  }, [soldYear, load, tab, estadoIds, tipoVentaId]);
+
   const tableRows: VentasTableRow[] = useMemo(() => {
     if (tab === "en_operacion") {
       return ventaRows
         .filter((venta) => {
-          const label = `${venta.inmueble?.code ?? ""} ${venta.inmueble?.title ?? ""} ${buyerSearchText(venta, parteNombres)}`;
+          const label = `${venta.inmueble?.code ?? ""} ${venta.inmueble?.title ?? ""} ${buyerSearchText(venta, parteNombres)} ${ventaInmobiliariaLabel(venta.estadoInmobiliaria)}`;
           return matchesSearch(label, search);
         })
         .map((venta) => ({ kind: "venta", venta }));
@@ -289,6 +337,57 @@ export function VentasWorkspace() {
     setNewVentaInmuebleId(inmuebleId ?? null);
     setNewVentaOpen(true);
   }
+
+  const changeEstadoRedes = useCallback(
+    async (item: CatalogSearchItem, nextCode: string) => {
+      const oferta = saleOferta(item);
+      const ofertaId = oferta?.id;
+      if (!token || !ofertaId) return;
+      const estadoRedesId = estadoRedesByCode.get(nextCode);
+      if (!estadoRedesId) {
+        setError("No se pudo resolver el estado de redes.");
+        return;
+      }
+      setSavingRedesOfertaId(ofertaId);
+      const prevCode = oferta.estadoRedesCode;
+      const prevId = oferta.estadoRedesId;
+      const inmuebleId = item.inmueble.id;
+      setCatalogRows((current) =>
+        current.map((row) => {
+          if (row.inmueble.id !== inmuebleId) return row;
+          return {
+            ...row,
+            ofertasActivas: row.ofertasActivas.map((o) =>
+              o.id === ofertaId ? { ...o, estadoRedesCode: nextCode, estadoRedesId } : o,
+            ),
+          };
+        }),
+      );
+      try {
+        await updateOferta(token, ofertaId, { estadoRedesId });
+      } catch (err) {
+        setCatalogRows((current) =>
+          current.map((row) => {
+            if (row.inmueble.id !== inmuebleId) return row;
+            return {
+              ...row,
+              ofertasActivas: row.ofertasActivas.map((o) =>
+                o.id === ofertaId ? { ...o, estadoRedesCode: prevCode, estadoRedesId: prevId } : o,
+              ),
+            };
+          }),
+        );
+        if (err instanceof ApiError && err.status === 401) {
+          logout();
+          return;
+        }
+        setError(err instanceof ApiError ? err.message : "No se pudo actualizar redes sociales.");
+      } finally {
+        setSavingRedesOfertaId((current) => (current === ofertaId ? null : current));
+      }
+    },
+    [token, estadoRedesByCode, logout],
+  );
 
   const kpis = useMemo(() => {
     if (tab === "en_operacion") {
@@ -327,7 +426,8 @@ export function VentasWorkspace() {
     setTab(next);
     setSearch("");
     skipFilterReloadRef.current = true;
-    router.replace(buildVentasListHref(next, characteristicFilters, ""), { scroll: false });
+    setSoldYear(null);
+    router.replace(buildVentasListHref(next, characteristicFilters, "", null), { scroll: false });
   }
 
   async function handleOpenRow(row: VentasTableRow) {
@@ -335,7 +435,7 @@ export function VentasWorkspace() {
       const id = row.venta.id;
       if (!Number.isInteger(id) || id <= 0) return;
       router.push(
-        buildVentasVentaHref(id, tab, characteristicFiltersRef.current, search),
+        buildVentasVentaHref(id, tab, characteristicFiltersRef.current, search, soldYearRef.current),
       );
       return;
     }
@@ -356,6 +456,7 @@ export function VentasWorkspace() {
               tab,
               characteristicFiltersRef.current,
               search,
+              soldYearRef.current,
             ),
           );
           return;
@@ -372,6 +473,7 @@ export function VentasWorkspace() {
           tab,
           characteristicFiltersRef.current,
           search,
+          soldYearRef.current,
         ),
       );
     }
@@ -396,19 +498,33 @@ export function VentasWorkspace() {
       <VentasFilterChips active={tab} onChange={changeTab} counts={tabCounts} />
 
       {tab !== "en_operacion" ? (
-        <VentasCatalogFiltersPanel
-          filters={characteristicFilters}
-          tiposInmueble={tiposInmueble}
-          onChange={(next) => {
-            setCharacteristicFilters(next);
-            syncListUrl(tab, next, search);
-          }}
-          onClear={() => {
-            setCharacteristicFilters(EMPTY_CHARACTERISTIC_FILTERS);
-            setSearch("");
-            syncListUrl(tab, EMPTY_CHARACTERISTIC_FILTERS, "");
-          }}
-        />
+        <>
+          {tab === "vendidos" ? (
+            <VentasSoldYearFilter
+              value={soldYear}
+              years={soldYears}
+              loading={loading && isInitialLoad}
+              onChange={(next) => {
+                setSoldYear(next);
+                syncListUrl(tab, characteristicFilters, search, next);
+              }}
+            />
+          ) : null}
+          <VentasCatalogFiltersPanel
+            filters={characteristicFilters}
+            tiposInmueble={tiposInmueble}
+            onChange={(next) => {
+              setCharacteristicFilters(next);
+              syncListUrl(tab, next, search, soldYear);
+            }}
+            onClear={() => {
+              setCharacteristicFilters(EMPTY_CHARACTERISTIC_FILTERS);
+              setSearch("");
+              setSoldYear(null);
+              syncListUrl(tab, EMPTY_CHARACTERISTIC_FILTERS, "", null);
+            }}
+          />
+        </>
       ) : null}
 
       <div
@@ -448,9 +564,13 @@ export function VentasWorkspace() {
               parteNombres={parteNombres}
               onSearchChange={(next) => {
                 setSearch(next);
-                syncListUrl(tab, characteristicFilters, next);
+                syncListUrl(tab, characteristicFilters, next, soldYear);
               }}
               onOpenRow={handleOpenRow}
+              savingRedesOfertaId={savingRedesOfertaId}
+              onChangeEstadoRedes={
+                tab === "a_la_venta" ? (item, next) => void changeEstadoRedes(item, next) : undefined
+              }
               embedded
             />
           </Card>

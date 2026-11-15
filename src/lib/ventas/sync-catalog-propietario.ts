@@ -1,5 +1,8 @@
 import type { PersonaFieldValue } from "@/components/alquileres/PersonaSelectField";
-import { isNewPersonaFieldValid } from "@/components/alquileres/PersonaSelectField";
+import {
+  isEmptyPersonaField,
+  isNewPersonaFieldValid,
+} from "@/components/alquileres/PersonaSelectField";
 import {
   addInmueblePropietario,
   createPersona,
@@ -14,6 +17,14 @@ export async function syncCatalogPropietario(params: {
   field: PersonaFieldValue;
 }): Promise<void> {
   const { token, inmuebleId, currentPropietarioId, currentPersonaId, field } = params;
+
+  if (isEmptyPersonaField(field)) {
+    if (currentPropietarioId != null) {
+      await removeInmueblePropietario(token, inmuebleId, currentPropietarioId);
+    }
+    return;
+  }
+
   if (!isNewPersonaFieldValid(field)) {
     throw new Error("Elegí un propietario válido.");
   }

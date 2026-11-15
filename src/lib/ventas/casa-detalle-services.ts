@@ -42,12 +42,13 @@ export function showsDuplexDetalleForm(tipoInmuebleCode: string | null | undefin
 }
 
 export function showsCasaDetalleAmenities(tipoInmuebleCode: string | null | undefined): boolean {
-  return tipoInmuebleCode === "house";
+  return tipoInmuebleCode === "house" || tipoInmuebleCode === "cabin";
 }
 
 function showsResidentialParcelaMedidas(tipoInmuebleCode: string | null | undefined): boolean {
   return (
     tipoInmuebleCode === "house" ||
+    tipoInmuebleCode === "cabin" ||
     tipoInmuebleCode === "duplex" ||
     tipoInmuebleCode === "apartment"
   );

@@ -7,13 +7,14 @@ import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { FormField } from "@/components/ui/FormLayout";
 import { ApiError, updateOferta } from "@/lib/api";
 import type { OfertaRecord } from "@/lib/api/types";
+import { alquilerTieneRequisitos } from "@/lib/alquileres/oferta-fields";
 
 type EditarRequisitosAlquilerModalProps = {
   open: boolean;
   onClose: () => void;
   token: string;
   oferta: OfertaRecord | null;
-  onSaved: () => void;
+  onSaved: (oferta: OfertaRecord) => void;
 };
 
 export function EditarRequisitosAlquilerModal({
@@ -24,12 +25,14 @@ export function EditarRequisitosAlquilerModal({
   onSaved,
 }: EditarRequisitosAlquilerModalProps) {
   const [requisitos, setRequisitos] = useState("");
+  const [notasPrecio, setNotasPrecio] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open || !oferta) return;
-    setRequisitos(oferta.notasPrecio?.trim() ?? "");
+    setRequisitos(oferta.condicionesFinanciacion?.trim() ?? "");
+    setNotasPrecio(oferta.notasPrecio?.trim() ?? "");
     setError(null);
   }, [open, oferta]);
 
@@ -38,10 +41,11 @@ export function EditarRequisitosAlquilerModal({
     setSaving(true);
     setError(null);
     try {
-      await updateOferta(token, oferta.id, {
-        notasPrecio: requisitos.trim() || null,
+      const updated = await updateOferta(token, oferta.id, {
+        condicionesFinanciacion: requisitos.trim() || null,
+        notasPrecio: notasPrecio.trim() || null,
       });
-      onSaved();
+      onSaved(updated);
       onClose();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudieron guardar los requisitos.");
@@ -50,21 +54,21 @@ export function EditarRequisitosAlquilerModal({
     }
   }
 
-  const hasRequisitos = Boolean(oferta?.notasPrecio?.trim());
+  const hasRequisitos = oferta ? alquilerTieneRequisitos(oferta) : false;
 
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title={hasRequisitos ? "Editar requisitos para alquilar" : "Cargar requisitos para alquilar"}
-      subtitle="Quedan visibles en la ficha del inmueble y al crear un contrato."
+      title={hasRequisitos ? "Editar condiciones de alquiler" : "Cargar condiciones de alquiler"}
+      subtitle="Requisitos y notas de precio visibles en la ficha del inmueble."
       footer={
         <>
           <ButtonOutline type="button" onClick={onClose} disabled={saving}>
             Cancelar
           </ButtonOutline>
           <ButtonPrimary type="button" onClick={() => void handleSubmit()} disabled={saving || !oferta}>
-            {saving ? "Guardando…" : "Guardar requisitos"}
+            {saving ? "Guardando…" : "Guardar cambios"}
           </ButtonPrimary>
         </>
       }
@@ -77,6 +81,14 @@ export function EditarRequisitosAlquilerModal({
           value={requisitos}
           onChange={setRequisitos}
           placeholder="Duración mínima, depósito, garantías, índice de actualización, mascotas, etc."
+        />
+        <FormField
+          label="Notas de precio"
+          type="textarea"
+          rows={6}
+          value={notasPrecio}
+          onChange={setNotasPrecio}
+          placeholder="Observaciones internas sobre el precio e historial de cambios"
         />
         {error ? <p className="text-sm text-danger">{error}</p> : null}
       </div>

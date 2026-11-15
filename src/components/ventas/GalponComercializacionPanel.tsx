@@ -6,7 +6,9 @@ import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import type { OfertaRecord } from "@/lib/api/types";
 import { formatMoney, moneyClassName } from "@/lib/format";
+import { formatCatalogOfertaPrecio } from "@/lib/ventas/catalog-precio";
 import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
+import { alquilerRequisitosText, alquilerTieneRequisitos } from "@/lib/alquileres/oferta-fields";
 import { ofertaEstadoLabel, ofertaEstadoVariant } from "@/lib/ventas/status-labels";
 
 type Modalidad = "venta" | "alquiler";
@@ -48,9 +50,16 @@ function OfertaCard({
   const isAvailable = estadoCode === "available";
   const isOffMarket = estadoCode === "off_market";
   const precioLabel = modalidad === "venta" ? "Precio de venta" : "Precio de alquiler";
-  const precioValue = oferta?.montoPrecio
-    ? formatMoney(oferta.montoPrecio, oferta.codigoMoneda ?? (modalidad === "alquiler" ? "ARS" : "USD"))
-    : "Consultar detalle";
+  const precioValue =
+    modalidad === "alquiler"
+      ? oferta?.montoPrecio
+        ? formatMoney(oferta.montoPrecio, oferta.codigoMoneda ?? "ARS")
+        : "Sin precio"
+      : oferta
+        ? formatCatalogOfertaPrecio(oferta, { sinPrecioLabel: "Consultar detalle" })
+        : "Consultar detalle";
+  const requisitosAlquiler =
+    modalidad === "alquiler" && oferta != null ? alquilerRequisitosText(oferta) : null;
 
   return (
     <article className="flex flex-col gap-3 rounded-lg border border-border bg-bg-page/60 p-4">
@@ -67,11 +76,15 @@ function OfertaCard({
           {precioLabel}
         </span>
         <span className={`text-xl font-bold text-primary ${moneyClassName}`}>{precioValue}</span>
-        {oferta?.notasPrecio?.trim() ? (
+        {modalidad === "alquiler" ? (
+          requisitosAlquiler ? (
+            <p className="text-xs text-text-secondary whitespace-pre-wrap">{requisitosAlquiler}</p>
+          ) : (
+            <p className="text-xs text-text-secondary">Sin requisitos cargados.</p>
+          )
+        ) : oferta?.notasPrecio?.trim() ? (
           <p className="text-xs text-text-secondary whitespace-pre-wrap">{oferta.notasPrecio.trim()}</p>
-        ) : (
-          <p className="text-xs text-text-secondary">Sin requisitos cargados.</p>
-        )}
+        ) : null}
       </div>
       <div className="flex flex-wrap gap-2">
         {!oferta && onPublicar && canEdit ? (
@@ -116,12 +129,12 @@ function OfertaCard({
                 className={`inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-[13px] font-medium text-text-primary hover:bg-bg-page ${interactiveFocusClass}`}
                 onClick={onRequisitos}
               >
-                {oferta.notasPrecio?.trim() ? (
+                {oferta && alquilerTieneRequisitos(oferta) ? (
                   <Pencil className="h-4 w-4" aria-hidden />
                 ) : (
                   <ClipboardList className="h-4 w-4" aria-hidden />
                 )}
-                {oferta.notasPrecio?.trim() ? "Editar requisitos" : "Cargar requisitos"}
+                {oferta && alquilerTieneRequisitos(oferta) ? "Editar condiciones" : "Cargar condiciones"}
               </button>
             ) : null}
           </>

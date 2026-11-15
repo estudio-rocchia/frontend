@@ -56,7 +56,7 @@ export function InmuebleDireccionFields({
 
       {esCampo ? (
         <FormField
-          label="Referencia / ubicación (opcional)"
+          label="Referencia (opcional)"
           value={value.referencia}
           onChange={(referencia) => onChange({ ...value, referencia })}
           placeholder="Ej. A 50 km de Quimili, sobre ruta 6, camino a La Dorila"

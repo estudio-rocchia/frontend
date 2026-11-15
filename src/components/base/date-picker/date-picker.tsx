@@ -108,6 +108,11 @@ export function DatePicker({
   };
 
   const openChange = (open: boolean) => {
+    if (open) {
+      requestAnimationFrame(() => {
+        triggerRef.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
+      });
+    }
     setIsOpen(open);
   };
 
@@ -134,8 +139,10 @@ export function DatePicker({
         triggerRef={triggerRef}
         isOpen={isOpen}
         onOpenChange={openChange}
-        offset={4}
-        placement="bottom end"
+        offset={8}
+        placement="bottom start"
+        shouldFlip
+        containerPadding={16}
         isNonModal
         UNSTABLE_portalContainer={overlayPortal}
         className={popoverClassName}

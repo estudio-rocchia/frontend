@@ -108,7 +108,7 @@ const FILTER_PANEL_COPY: Record<string, FilterPanelCopy> = {
   duplex: {
     collapsedHint: "Precio y características del dúplex",
     detailSectionTitle: "Dúplex",
-    detailSectionDescription: "Distribución y equipamiento de la unidad.",
+    detailSectionDescription: "Distribución por piso, superficies e instalaciones del dúplex.",
     terrainSectionTitle: null,
     terrainSectionDescription: null,
   },
@@ -137,6 +137,13 @@ const FILTER_PANEL_COPY: Record<string, FilterPanelCopy> = {
     collapsedHint: "Precio y unidad en torre",
     detailSectionTitle: "Unidad en torre",
     detailSectionDescription: "Dormitorios, baños y cochera.",
+    terrainSectionTitle: null,
+    terrainSectionDescription: null,
+  },
+  cabin: {
+    collapsedHint: "Precio y características de la cabaña",
+    detailSectionTitle: "Cabaña",
+    detailSectionDescription: "Ambientes, equipamiento y servicios de la unidad.",
     terrainSectionTitle: null,
     terrainSectionDescription: null,
   },
@@ -214,7 +221,7 @@ const APARTMENT_PROFILE: TipoDetalleProfile = {
 
 const DUPLEX_PROFILE: TipoDetalleProfile = {
   sectionTitle: "Detalle edilicio",
-  sectionHint: "Medidas del lote, superficies, plantas y equipamiento del dúplex.",
+  sectionHint: "Superficies, distribución por piso (dormitorios y baños) e instalaciones.",
   filterFields: ["bedroomsMin", "bathroomsMin", "tieneCochera"],
   terrainFilterFields: [],
   editorFields: [
@@ -340,6 +347,7 @@ const PROFILES: Record<string, TipoDetalleProfile> = {
   salon: SALON_PROFILE,
   warehouse: WAREHOUSE_PROFILE,
   tower: TOWER_PROFILE,
+  cabin: HOUSE_PROFILE,
 };
 
 export function getTipoDetalleProfile(tipoInmuebleCode: string | null | undefined): TipoDetalleProfile {

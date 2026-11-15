@@ -131,7 +131,9 @@ export function ComboBox<T extends object>({
           <AriaPopover
             triggerRef={fieldRef}
             dir={direction}
-            offset={4}
+            offset={8}
+            shouldFlip
+            containerPadding={16}
             UNSTABLE_portalContainer={overlayPortal}
             style={{ width: fieldWidth }}
             className={cx(MENU_POPOVER_SURFACE, "flex flex-col overflow-hidden p-2", popoverClassName)}

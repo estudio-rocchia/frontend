@@ -6,6 +6,7 @@ import type { VentaDetail } from "@/lib/api/types";
 import { formatDateDisplay, moneyClassName } from "@/lib/format";
 import { VENTA_EMPTY_FIELD } from "@/lib/ventas/empty-field";
 import { formaPagoLabel } from "@/lib/ventas/forma-pago";
+import { ventaInmobiliariaLabel } from "@/lib/ventas/status-labels";
 import { VentaPartesSection } from "@/components/ventas/VentaPartesSection";
 
 function ResumenPanel({
@@ -78,6 +79,7 @@ export function VentaResumenSection({
             <DetailTile label="Código" value={inmuebleCode} emphasize />
             <DetailTile label="Propiedad" value={inmuebleTitle} />
             <DetailTile label="Operación" value={`Venta #${venta.id}`} />
+            <DetailTile label="Gestión" value={ventaInmobiliariaLabel(venta.estadoInmobiliaria)} />
             <DetailTile label="Moneda" value={moneda} />
           </div>
         </ResumenPanel>

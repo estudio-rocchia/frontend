@@ -1,4 +1,4 @@
-import type { VentaEstado } from "@/lib/api/types";
+import type { VentaAgencyStatus, VentaEstado } from "@/lib/api/types";
 
 const VENTA_ESTADO_LABELS: Record<VentaEstado, string> = {
   boleto: "Venta en curso",
@@ -19,6 +19,27 @@ const OFERTA_ESTADO_LABELS: Record<string, string> = {
 
 export function ventaEstadoLabel(estado: VentaEstado): string {
   return VENTA_ESTADO_LABELS[estado] ?? estado;
+}
+
+const VENTA_INMOBILIARIA_LABELS: Record<VentaAgencyStatus, string> = {
+  sold_by_agency: "Vendido por RBR",
+  sold_privately: "Venta particular",
+  off_market: "Fuera de mercado",
+};
+
+export function ventaInmobiliariaLabel(
+  status: VentaAgencyStatus | null | undefined,
+): string {
+  if (!status) return "Vendido por RBR";
+  return VENTA_INMOBILIARIA_LABELS[status] ?? status;
+}
+
+export function ventaInmobiliariaVariant(
+  status: VentaAgencyStatus | null | undefined,
+): "success" | "warning" | "danger" {
+  if (status === "sold_privately") return "warning";
+  if (status === "off_market") return "danger";
+  return "success";
 }
 
 export function ofertaEstadoLabel(code: string): string {

@@ -8,11 +8,18 @@ import { ButtonOutline } from "@/components/ui/Button";
 import { resumenFieldGridClass, ResumenField, ResumenPanel } from "@/components/ui/ResumenFields";
 import type { InmuebleCatalogRecord, InmuebleFicha, OfertaRecord, VentaDetail } from "@/lib/api/types";
 import { formatDateDisplay, formatMoney } from "@/lib/format";
-import { inmueblePropiedadNombre, inmuebleUbicacionCompleta } from "@/lib/inmuebles/display-label";
-import { permutaResumenLabel } from "@/lib/ventas/catalog-helpers";
+import { inmueblePropiedadResumen } from "@/lib/inmuebles/display-label";
+import { alquilerNotasPrecioText, alquilerRequisitosText, alquilerTieneRequisitos } from "@/lib/alquileres/oferta-fields";
+import { catalogLocalidadLabel, permutaResumenLabel } from "@/lib/ventas/catalog-helpers";
 import { VENTA_EMPTY_FIELD } from "@/lib/ventas/empty-field";
 import { formaPagoLabel } from "@/lib/ventas/forma-pago";
-import { ofertaEstadoLabel, ofertaEstadoVariant, ventaEstadoLabel } from "@/lib/ventas/status-labels";
+import {
+  ofertaEstadoLabel,
+  ofertaEstadoVariant,
+  ventaEstadoLabel,
+  ventaInmobiliariaLabel,
+  ventaInmobiliariaVariant,
+} from "@/lib/ventas/status-labels";
 
 type CatalogInmuebleResumenSectionProps = {
   ficha: InmuebleFicha;
@@ -23,6 +30,7 @@ type CatalogInmuebleResumenSectionProps = {
   propietario: string;
   motivo: string;
   isOffMarket: boolean;
+  isSold?: boolean;
   headerPrecio: { label: string; value: string };
   historialCount: number;
   historialAlquilerCount?: number;
@@ -31,6 +39,7 @@ type CatalogInmuebleResumenSectionProps = {
   canEditDetalle: boolean;
   onDetalleSaved: () => void;
   onOpenVenta: () => void;
+  onRegistrarVenta?: () => void;
   onEditRequisitosAlquiler?: () => void;
   onActualizarPrecioAlquiler?: () => void;
 };
@@ -54,6 +63,7 @@ export function CatalogInmuebleResumenSection({
   propietario,
   motivo,
   isOffMarket,
+  isSold = false,
   headerPrecio,
   historialCount,
   historialAlquilerCount = 0,
@@ -62,13 +72,15 @@ export function CatalogInmuebleResumenSection({
   canEditDetalle,
   onDetalleSaved,
   onOpenVenta,
+  onRegistrarVenta,
   onEditRequisitosAlquiler,
   onActualizarPrecioAlquiler,
 }: CatalogInmuebleResumenSectionProps) {
   const estadoCode = oferta?.estadoCode ?? "available";
   const tipoName = ficha.tipoInmueble?.name ?? "—";
-  const ubicacion = inmuebleUbicacionCompleta(inmueble, ficha.localidad);
-  const propiedadNombre = inmueblePropiedadNombre(inmueble, tipoName !== "—" ? tipoName : null);
+  const ubicacion = catalogLocalidadLabel(ficha.localidad);
+  const referencia = inmueble.referencia?.trim() || null;
+  const propiedadNombre = inmueblePropiedadResumen(inmueble, tipoName !== "—" ? tipoName : null);
 
   const historialReferencia = oferta ? historialCount : historialAlquilerCount;
   const monedaReferencia = oferta?.codigoMoneda ?? ofertaAlquiler?.codigoMoneda;
@@ -102,8 +114,13 @@ export function CatalogInmuebleResumenSection({
           <div className={resumenFieldGridClass}>
             <ResumenField label="Código" value={inmueble.code} />
             <ResumenField label="Tipo" value={displayValue(tipoName)} />
-            <ResumenField label="Propiedad" value={propiedadNombre} span={2} />
+            {propiedadNombre ? (
+              <ResumenField label="Nombre" value={propiedadNombre} span={2} />
+            ) : null}
             <ResumenField label="Ubicación" value={displayValue(ubicacion)} span={2} />
+            {referencia ? (
+              <ResumenField label="Referencia" value={displayValue(referencia)} span={2} />
+            ) : null}
             <ResumenField label="Propietario" value={displayValue(propietario)} span={2} />
           </div>
         </ResumenPanel>
@@ -141,12 +158,12 @@ export function CatalogInmuebleResumenSection({
                   ) : null}
                   {onEditRequisitosAlquiler ? (
                     <ButtonOutline type="button" className="gap-2" onClick={onEditRequisitosAlquiler}>
-                      {ofertaAlquiler.notasPrecio?.trim() ? (
+                      {alquilerTieneRequisitos(ofertaAlquiler) ? (
                         <Pencil className="h-4 w-4" aria-hidden />
                       ) : (
                         <ClipboardList className="h-4 w-4" aria-hidden />
                       )}
-                      {ofertaAlquiler.notasPrecio?.trim() ? "Editar requisitos" : "Cargar requisitos"}
+                      {alquilerTieneRequisitos(ofertaAlquiler) ? "Editar condiciones" : "Cargar condiciones"}
                     </ButtonOutline>
                   ) : null}
                 </div>
@@ -175,7 +192,13 @@ export function CatalogInmuebleResumenSection({
               ) : null}
               <ResumenField
                 label="Requisitos para alquilar"
-                value={displayValue(ofertaAlquiler.notasPrecio)}
+                value={displayValue(alquilerRequisitosText(ofertaAlquiler))}
+                span={2}
+                longText
+              />
+              <ResumenField
+                label="Notas de precio"
+                value={displayValue(alquilerNotasPrecioText(ofertaAlquiler))}
                 span={2}
                 longText
               />
@@ -196,6 +219,22 @@ export function CatalogInmuebleResumenSection({
           />
         ) : null}
 
+        {isSold && !ventaVinculada && onRegistrarVenta ? (
+          <ResumenPanel
+            title="Cierre de venta"
+            description="Todavía no hay precio ni operación registrada para esta venta cerrada."
+          >
+            <p className="text-sm text-text-secondary">
+              Cuando tengan el importe, podés cargar el precio de cierre, las partes y las fechas desde
+              acá.
+            </p>
+            <ButtonOutline type="button" className="gap-2" onClick={onRegistrarVenta}>
+              <CircleDollarSign className="h-4 w-4" aria-hidden />
+              Registrar precio de venta
+            </ButtonOutline>
+          </ResumenPanel>
+        ) : null}
+
         {ventaVinculada ? (
           <ResumenPanel title="Cierre de venta" description="Operación vinculada a esta propiedad">
             <div className={resumenFieldGridClass}>
@@ -203,6 +242,11 @@ export function CatalogInmuebleResumenSection({
                 label="Operación"
                 value={`Venta #${ventaVinculada.id} · ${ventaEstadoLabel(ventaVinculada.estado)}`}
                 span={2}
+              />
+              <ResumenField
+                label="Gestión"
+                value={ventaInmobiliariaLabel(ventaVinculada.estadoInmobiliaria)}
+                statusVariant={ventaInmobiliariaVariant(ventaVinculada.estadoInmobiliaria)}
               />
               <ResumenField
                 label="Fecha de boleto"

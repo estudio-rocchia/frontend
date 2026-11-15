@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 import { Modal } from "@/components/ui/Modal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
-import { ChipToggle, FormField } from "@/components/ui/FormLayout";
+import { ChipToggle, FieldBlock, FormField } from "@/components/ui/FormLayout";
 import { ApiError, changeOfertaEstado } from "@/lib/api";
 import type { OfertaRecord } from "@/lib/api/types";
 import { MOTIVOS_FUERA_ALQUILER } from "@/lib/ventas/motivos-alquiler";
@@ -64,7 +64,8 @@ export function CambiarEstadoOfertaModal({
   onSaved,
   modalidad = "venta",
 }: CambiarEstadoOfertaModalProps) {
-  const motivos = modalidad === "alquiler" ? [...MOTIVOS_FUERA_ALQUILER] : [...MOTIVOS_FUERA_MERCADO];
+  const motivos =
+    modalidad === "alquiler" ? MOTIVOS_FUERA_ALQUILER : MOTIVOS_FUERA_MERCADO;
   const [motivo, setMotivo] = useState<string>(motivos[0]);
   const [motivoCustom, setMotivoCustom] = useState("");
   const [saving, setSaving] = useState(false);
@@ -72,10 +73,12 @@ export function CambiarEstadoOfertaModal({
 
   useEffect(() => {
     if (!open) return;
-    setMotivo(motivos[0]);
+    setMotivo(
+      modalidad === "alquiler" ? MOTIVOS_FUERA_ALQUILER[0] : MOTIVOS_FUERA_MERCADO[0],
+    );
     setMotivoCustom("");
     setError(null);
-  }, [open, mode, motivos]);
+  }, [open, mode, modalidad]);
 
   async function handleSubmit() {
     if (!oferta || !estadoId) return;
@@ -123,17 +126,19 @@ export function CambiarEstadoOfertaModal({
         {mode === "off_market" ? (
           <>
             <div className="flex flex-col gap-1.5">
-              <span className="text-[11px] font-semibold text-text-secondary">Motivo</span>
+              <span className="text-[11px] font-semibold text-text-secondary">Elegir motivo</span>
               <ChipToggle options={motivos} value={motivo} onChange={setMotivo} />
             </div>
             {motivo === "Otro" ? (
               <FormField
-                label="Detalle del motivo"
+                label="Motivo"
                 value={motivoCustom}
                 onChange={setMotivoCustom}
                 placeholder="Ej. El propietario lo alquiló"
               />
-            ) : null}
+            ) : (
+              <FieldBlock label="Motivo" value={motivo} />
+            )}
           </>
         ) : (
           <p className="text-sm text-text-secondary">{copy.availableHint}</p>

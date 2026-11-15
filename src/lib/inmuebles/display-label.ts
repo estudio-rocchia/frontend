@@ -82,6 +82,49 @@ export function inmueblePropiedadNombre(
   return title || code || "Inmueble";
 }
 
+function stripTipoFromTitle(title: string, tipoName: string | null | undefined): string {
+  const tipo = tipoName?.trim();
+  if (!tipo) return title;
+  const lowerTitle = title.toLowerCase();
+  const lowerTipo = tipo.toLowerCase();
+  if (lowerTitle === lowerTipo) return "";
+  for (const sep of [" — ", " - ", " · ", ": "] as const) {
+    const prefix = `${lowerTipo}${sep}`;
+    if (lowerTitle.startsWith(prefix)) return title.slice(prefix.length).trim();
+  }
+  if (lowerTitle.startsWith(`${lowerTipo} `)) return title.slice(tipo.length + 1).trim();
+  return title;
+}
+
+/** Convierte títulos importados en MAYÚSCULAS a capitalización legible. */
+export function normalizeInmuebleTitulo(title: string): string {
+  const trimmed = title.trim();
+  if (!trimmed) return trimmed;
+  const alpha = trimmed.replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ]/g, "");
+  if (alpha.length === 0) return trimmed;
+  const upperCount = (alpha.match(/[A-ZÁÉÍÓÚÑ]/g) ?? []).length;
+  if (upperCount / alpha.length < 0.8) return trimmed;
+  return trimmed
+    .split(/(\s+)/)
+    .map((part) => {
+      if (!/[A-Za-zÁÉÍÓÚÑáéíóúñ]/.test(part)) return part;
+      return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
+    })
+    .join("");
+}
+
+/** Nombre publicado para ficha: solo título, sin repetir código ni tipo. */
+export function inmueblePropiedadResumen(
+  inmueble: { title?: string | null },
+  tipoName?: string | null,
+): string | null {
+  const raw = inmueble.title?.trim();
+  if (!raw) return null;
+  const withoutTipo = stripTipoFromTitle(raw, tipoName);
+  if (!withoutTipo) return null;
+  return normalizeInmuebleTitulo(withoutTipo);
+}
+
 /** Tipo y alias de publicación, sin código interno. */
 export function inmueblePropiedadSinCodigo(
   inmueble: { title?: string | null },

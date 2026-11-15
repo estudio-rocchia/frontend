@@ -1,6 +1,7 @@
 import type { VentasTabId } from "@/components/ventas/VentasFilterChips";
 import { fetchVentas, searchCatalogo } from "@/lib/api";
 import { withCache } from "@/lib/api/cache";
+import { isVentaEnOperacionVisible } from "@/lib/ventas/en-operacion-load";
 
 const TAB_COUNTS_TTL_MS = 45_000;
 
@@ -38,9 +39,7 @@ export async function fetchVentasTabCounts(
             })
           : Promise.resolve({ items: [] }),
       ]);
-      const activas = ventasRes.items.filter(
-        (venta) => venta.estado !== "completed" && venta.estado !== "cancelled",
-      );
+      const activas = ventasRes.items.filter(isVentaEnOperacionVisible);
       return {
         en_operacion: activas.length,
         a_la_venta: availableRes.items.length,

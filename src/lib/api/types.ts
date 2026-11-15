@@ -197,6 +197,13 @@ export interface LiquidacionLineaRecord {
   pagoId: number | null;
 }
 
+export interface PropiedadAdministradaOfertaSummary {
+  id: number;
+  estadoCode: string;
+  montoPrecio: string | null;
+  codigoMoneda: string | null;
+}
+
 export interface PropiedadAdministradaRecord {
   inmuebleId: number;
   propietarioId: number;
@@ -210,6 +217,9 @@ export interface PropiedadAdministradaRecord {
     montoAlquiler: string;
     codigoMoneda: string;
   } | null;
+  ofertaAlquiler: PropiedadAdministradaOfertaSummary | null;
+  ofertaVenta: PropiedadAdministradaOfertaSummary | null;
+  honorariosAplicables: boolean;
 }
 
 export interface PropietarioRecord {
@@ -236,6 +246,8 @@ export interface InmuebleVacanteConPropietarios {
   code: string;
   title: string;
   displayLabel?: string;
+  tipoName?: string | null;
+  localidadName?: string | null;
   direccion: string | null;
   propietarios: InmuebleVacantePropietarioResumen[];
   tieneOfertaAlquiler: boolean;
@@ -1029,6 +1041,8 @@ export interface InmuebleFicha {
 
 export type VentaEstado = "boleto" | "deeds_pending" | "completed" | "cancelled";
 
+export type VentaAgencyStatus = "sold_by_agency" | "sold_privately" | "off_market";
+
 export interface VentaRecord {
   id: number;
   inmuebleId: number;
@@ -1042,6 +1056,7 @@ export interface VentaRecord {
   nombreEscribano: string | null;
   tieneBoleto: boolean;
   tieneEscritura: boolean;
+  estadoInmobiliaria: VentaAgencyStatus;
   estado: VentaEstado;
   notas: string | null;
   cancelacionDocumentoId?: number | null;
@@ -1094,6 +1109,7 @@ export interface CreateVentaInput {
   nombreEscribano?: string | null;
   tieneBoleto?: boolean;
   tieneEscritura?: boolean;
+  estadoInmobiliaria?: VentaAgencyStatus;
   estado?: VentaEstado;
   notas?: string | null;
 }
@@ -1108,6 +1124,7 @@ export interface UpdateVentaInput {
   nombreEscribano?: string | null;
   tieneBoleto?: boolean;
   tieneEscritura?: boolean;
+  estadoInmobiliaria?: VentaAgencyStatus;
   estado?: VentaEstado;
   notas?: string | null;
 }

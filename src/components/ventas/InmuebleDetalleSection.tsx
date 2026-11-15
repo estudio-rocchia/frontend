@@ -27,8 +27,10 @@ import {
   writeCasaDetalleServices,
 } from "@/lib/ventas/casa-detalle-services";
 import {
-  buildDuplexDetalleFormValue,
-  writeDuplexDetalleServices,
+ buildDuplexDetalleFormValue,
+ buildDuplexDetalleResumenDisplay,
+ duplexFormToServices,
+ writeDuplexDetalleServices,
 } from "@/lib/ventas/duplex-detalle-services";
 import {
   readDeptoDetalleServices,
@@ -49,6 +51,78 @@ import { formInputClass } from "@/lib/ui/interactive-focus";
 
 function displayDetalleValue(value: string): string {
   return value === VENTA_EMPTY_FIELD ? "—" : value;
+}
+
+function displayOptionalValue(value: string | null | undefined, suffix = ""): string {
+  const trimmed = value?.trim();
+  if (!trimmed) return "—";
+  return suffix ? `${trimmed}${suffix}` : trimmed;
+}
+
+function DuplexDetalleResumenView({
+  detalle,
+}: {
+  detalle: DetalleInmuebleRecord | null | undefined;
+}) {
+  const display = buildDuplexDetalleResumenDisplay(detalle);
+  if (!display) {
+    return <ResumenField label="Resumen" value="—" span={2} />;
+  }
+
+  return (
+    <>
+      <ResumenField
+        label="Cubiertos"
+        value={displayOptionalValue(display.superficieCubierta, " m²")}
+        numeric
+      />
+      <ResumenField
+        label="Semicubiertos"
+        value={displayOptionalValue(display.superficieSemicubierta, " m²")}
+        numeric
+      />
+      <ResumenField
+        label="Descubiertos"
+        value={displayOptionalValue(display.superficieDescubierta, " m²")}
+        numeric
+      />
+      <ResumenField label="Ambientes" value={displayOptionalValue(display.ambientes)} numeric />
+      <ResumenField label="Dormitorios" value={displayOptionalValue(display.dormitorios)} numeric />
+      <ResumenField label="Baños" value={displayOptionalValue(display.banos)} numeric />
+      {display.equipamiento ? (
+        <ResumenField label="Cochera y equipamiento" value={display.equipamiento} span={2} />
+      ) : null}
+      {display.piso1Encabezado || display.piso1Distribucion || display.detallePiso1 ? (
+        <>
+          {display.piso1Encabezado ? (
+            <ResumenField label="1er piso" value={display.piso1Encabezado} />
+          ) : null}
+          {display.piso1Distribucion ? (
+            <ResumenField label="Distribución 1er piso" value={display.piso1Distribucion} />
+          ) : null}
+          {display.detallePiso1 ? (
+            <ResumenField label="Detalle 1er piso" value={display.detallePiso1} span={2} longText />
+          ) : null}
+        </>
+      ) : null}
+      {display.piso2Encabezado || display.piso2Distribucion || display.detallePiso2 ? (
+        <>
+          {display.piso2Encabezado ? (
+            <ResumenField label="2do piso" value={display.piso2Encabezado} />
+          ) : null}
+          {display.piso2Distribucion ? (
+            <ResumenField label="Distribución 2do piso" value={display.piso2Distribucion} />
+          ) : null}
+          {display.detallePiso2 ? (
+            <ResumenField label="Detalle 2do piso" value={display.detallePiso2} span={2} longText />
+          ) : null}
+        </>
+      ) : null}
+      {display.instalaciones ? (
+        <ResumenField label="Instalaciones y terminaciones" value={display.instalaciones} span={2} longText />
+      ) : null}
+    </>
+  );
 }
 
 function escrituraDisplay(value: boolean | null | undefined): string {
@@ -166,7 +240,7 @@ function DetalleEditorForm({
     setError(null);
     try {
       await updateInmueble(token, inmuebleId, {
-        description: description.trim() || null,
+        ...(!showDuplexForm ? { description: description.trim() || null } : {}),
         ...(showHectareas
           ? {
               superficieTotalM2: hectareasAresToM2(hectareas, ares),
@@ -219,8 +293,9 @@ function DetalleEditorForm({
           }),
         );
       }
-      if (showDuplexForm) {
-        Object.assign(nextServices, writeDuplexDetalleServices(nextServices, duplexForm));
+      const duplexServices = showDuplexForm ? duplexFormToServices(duplexForm) : null;
+      if (duplexServices) {
+        Object.assign(nextServices, writeDuplexDetalleServices(nextServices, duplexServices));
       }
 
       await upsertInmuebleDetalle(token, inmuebleId, {
@@ -354,23 +429,23 @@ function DetalleEditorForm({
         </ToggleChipGroup>
       ) : null}
       {showDuplexForm ? <DuplexDetalleFields value={duplexForm} onChange={setDuplexForm} /> : null}
-      <label className="flex flex-col gap-1.5">
-        <span className="text-[11px] font-semibold text-text-secondary">
-          {showHectareas ? "Descripción del predio" : "Características"}
-        </span>
-        <textarea
-          className={`${formInputClass} ${showDuplexForm ? "min-h-20" : "min-h-32"} resize-y`}
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder={
-            showHectareas
-              ? "Ubicación, estado del título, tipo de suelo, mejoras (casa, alambrado, monte), accesos…"
-              : showDuplexForm
-                ? "Placard, vestidor, suite, notas del dúplex…"
+      {!showDuplexForm ? (
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[11px] font-semibold text-text-secondary">
+            {showHectareas ? "Descripción del predio" : "Características"}
+          </span>
+          <textarea
+            className={`${formInputClass} min-h-32 resize-y`}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder={
+              showHectareas
+                ? "Ubicación, estado del título, tipo de suelo, mejoras (casa, alambrado, monte), accesos…"
                 : "Descripción de la propiedad"
-          }
-        />
-      </label>
+            }
+          />
+        </label>
+      ) : null}
       {numericFields > 0 ? (
         <DetalleMetricGrid>
           {show("bedrooms") ? (
@@ -494,8 +569,6 @@ export function InmuebleDetalleSection({
   const profile = getTipoDetalleProfile(tipoInmuebleCode);
 
   const summary = formatDetalleSummary(detalle, tipoInmuebleCode);
-  const caracteristicasDisplay =
-    resolveCaracteristicasText(inmueble.description, detalle?.observacion) ?? VENTA_EMPTY_FIELD;
   const superficieTotalDisplay =
     formatSuperficieTotalDisplay(inmueble.superficieTotalM2, tipoInmuebleCode) ?? VENTA_EMPTY_FIELD;
   const frenteDisplay = formatMedidaMetros(inmueble.frenteM) ?? VENTA_EMPTY_FIELD;
@@ -504,6 +577,9 @@ export function InmuebleDetalleSection({
   const construccionEnLoteLabel = hasConstruccionEnLote(detalle) ? "Sí" : "No";
   const showParcela = showsParcelaMedidas(tipoInmuebleCode);
   const showHectareas = showsHectareasMedidas(tipoInmuebleCode);
+  const showDuplexDetalle = showsDuplexDetalleForm(tipoInmuebleCode);
+  const caracteristicasDisplay =
+    resolveCaracteristicasText(inmueble.description, detalle?.observacion) ?? VENTA_EMPTY_FIELD;
 
   function startEditing() {
     setEditKey((current) => current + 1);
@@ -551,17 +627,21 @@ export function InmuebleDetalleSection({
               ) : null}
             </>
           ) : null}
-          {summary ? (
+          {showDuplexDetalle ? (
+            <DuplexDetalleResumenView detalle={detalle} />
+          ) : summary ? (
             <ResumenField label="Resumen" value={displayDetalleValue(summary)} span={2} />
           ) : !esTerreno ? (
             <ResumenField label="Resumen" value="—" span={2} />
           ) : null}
-          <ResumenField
-            label="Características"
-            value={displayDetalleValue(caracteristicasDisplay)}
-            span={2}
-            longText
-          />
+          {!showDuplexDetalle ? (
+            <ResumenField
+              label={showHectareas ? "Descripción del predio" : "Características"}
+              value={displayDetalleValue(caracteristicasDisplay)}
+              span={2}
+              longText
+            />
+          ) : null}
         </div>
       ) : (
         <DetalleEditorForm

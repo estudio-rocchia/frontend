@@ -11,6 +11,8 @@ export type NumericSelectOption = {
 
 export function NumericSelect({
   label,
+  ariaLabel,
+  id,
   value,
   onChange,
   options,
@@ -22,6 +24,9 @@ export function NumericSelect({
   emptyLabel = "—",
 }: {
   label?: string;
+  /** Nombre accesible cuando no hay label visible (p. ej. mes/año en calendario). */
+  ariaLabel?: string;
+  id?: string;
   value: number | null | undefined;
   onChange: (value: number | null) => void;
   options: NumericSelectOption[];
@@ -37,7 +42,9 @@ export function NumericSelect({
 
   return (
     <Select
+      id={id}
       label={label}
+      aria-label={label ? undefined : ariaLabel}
       selectedKey={selectedKey}
       onSelectionChange={(key) => {
         if (key == null) return;

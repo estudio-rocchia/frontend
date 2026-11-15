@@ -144,7 +144,11 @@ export function InmuebleAltaFields({
     <div className="flex flex-col gap-4">
       {intro ? <p className="text-[12px] leading-snug text-text-secondary">{intro}</p> : null}
 
-      <div onFocusCapture={onLoadTipos}>
+      <div
+        onFocusCapture={() => {
+          if (onLoadTipos && tiposInmueble.length <= 1) onLoadTipos();
+        }}
+      >
         <EnumSelect
           label="Tipo de inmueble"
           value={value.tipoInmuebleCode}

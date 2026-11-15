@@ -1,6 +1,5 @@
 import type { CatalogSearchItem, InmuebleCatalogRecord, OfertaRecord } from "@/lib/api/types";
 import { buildInmuebleDireccion } from "@/lib/inmuebles/direccion";
-import { inmueblePropiedadSinCodigo } from "@/lib/inmuebles/display-label";
 
 import { VENTA_EMPTY_FIELD } from "@/lib/ventas/empty-field";
 
@@ -40,7 +39,7 @@ export type CatalogInmuebleHeadingInput = {
   localidad?: { name: string; province: string } | null;
 };
 
-/** Listado ventas: tipo · calle N° · localidad. */
+/** Listado ventas: tipo · calle N° (la localidad va en la línea de ubicación). */
 export function catalogInmuebleHeadingFromParts(input: CatalogInmuebleHeadingInput): string {
   const tipo = input.tipoInmuebleName?.trim() || "Inmueble";
   const calleLine =
@@ -51,12 +50,17 @@ export function catalogInmuebleHeadingFromParts(input: CatalogInmuebleHeadingInp
     input.inmueble.calle?.trim() ||
     input.inmueble.direccion?.trim() ||
     "";
-  const localidad = input.localidad
-    ? [input.localidad.name, input.localidad.province].filter(Boolean).join(", ")
-    : "";
-  const parts = [tipo, calleLine, localidad].filter(Boolean);
+  const parts = [tipo, calleLine].filter(Boolean);
   if (parts.length > 0) return parts.join(" · ");
-  return inmueblePropiedadSinCodigo(input.inmueble, input.tipoInmuebleName);
+  return tipo;
+}
+
+export function catalogLocalidadLabel(
+  localidad?: { name: string; province?: string | null } | null,
+): string | null {
+  const name = localidad?.name?.trim();
+  if (!name) return null;
+  return [name, localidad?.province?.trim()].filter(Boolean).join(", ");
 }
 
 export function catalogInmuebleHeading(item: CatalogSearchItem): string {
@@ -75,9 +79,9 @@ export function catalogInmuebleReferencia(
   return referencia || null;
 }
 
-/** Listado ventas: subtítulo con referencia / entre calles, si existe. */
+/** Listado ventas: subtítulo con localidad (y provincia), si existe. */
 export function catalogInmuebleUbicacion(item: CatalogSearchItem): string | null {
-  return catalogInmuebleReferencia(item.inmueble);
+  return catalogLocalidadLabel(item.localidad);
 }
 
 export function propietarioDisplay(

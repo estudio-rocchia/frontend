@@ -7,10 +7,11 @@ import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { ChipToggle, FormField, FormSection } from "@/components/ui/FormLayout";
 import { NumericSelect } from "@/components/ui/NumericSelect";
 import { ApiError, fetchFormasPago, updateVenta } from "@/lib/api";
-import type { CatalogoItem, VentaDetail, VentaEstado } from "@/lib/api/types";
-import { ventaEstadoLabel } from "@/lib/ventas/status-labels";
+import type { CatalogoItem, VentaAgencyStatus, VentaDetail, VentaEstado } from "@/lib/api/types";
+import { ventaEstadoLabel, ventaInmobiliariaLabel } from "@/lib/ventas/status-labels";
 
 const ESTADOS: VentaEstado[] = ["boleto", "deeds_pending"];
+const GESTION_OPTIONS: VentaAgencyStatus[] = ["sold_by_agency", "sold_privately", "off_market"];
 
 type EditVentaModalProps = {
   open: boolean;
@@ -29,6 +30,7 @@ export function EditVentaModal({ open, onClose, token, venta, onSaved }: EditVen
   const [formasPago, setFormasPago] = useState<CatalogoItem[]>([]);
   const [notas, setNotas] = useState("");
   const [estado, setEstado] = useState<VentaEstado>("boleto");
+  const [gestion, setGestion] = useState<VentaAgencyStatus>("sold_by_agency");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,6 +50,7 @@ export function EditVentaModal({ open, onClose, token, venta, onSaved }: EditVen
     setFormaPagoId(venta.formaPagoId ? String(venta.formaPagoId) : "");
     setNotas(venta.notas ?? "");
     setEstado(venta.estado === "deeds_pending" ? "deeds_pending" : "boleto");
+    setGestion(venta.estadoInmobiliaria ?? "sold_by_agency");
     setError(null);
   }, [open, venta]);
 
@@ -69,6 +72,7 @@ export function EditVentaModal({ open, onClose, token, venta, onSaved }: EditVen
         formaPagoId: formaPagoId ? Number(formaPagoId) : null,
         notas: notas.trim() || null,
         estado,
+        estadoInmobiliaria: gestion,
       });
       onSaved();
       onClose();
@@ -125,6 +129,28 @@ export function EditVentaModal({ open, onClose, token, venta, onSaved }: EditVen
                       }`}
                     >
                       {ventaEstadoLabel(code)}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="flex flex-col gap-1.5 sm:col-span-2">
+              <span className="text-[11px] font-semibold text-text-secondary">Gestión de venta</span>
+              <div className="flex flex-wrap gap-2">
+                {GESTION_OPTIONS.map((code) => {
+                  const selected = gestion === code;
+                  return (
+                    <button
+                      key={code}
+                      type="button"
+                      onClick={() => setGestion(code)}
+                      className={`rounded-full border border-border px-3.5 py-2 text-[13px] transition-colors ${
+                        selected
+                          ? "bg-primary-soft font-semibold text-primary"
+                          : "bg-bg-card font-normal text-text-secondary hover:text-text-primary"
+                      }`}
+                    >
+                      {ventaInmobiliariaLabel(code)}
                     </button>
                   );
                 })}

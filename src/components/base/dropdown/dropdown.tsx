@@ -145,6 +145,8 @@ export function DropdownPopover({
       isNonModal
       placement={placement}
       offset={offset}
+      shouldFlip
+      containerPadding={16}
       crossOffset={crossOffset}
       UNSTABLE_portalContainer={overlayPortal}
       className={cx(

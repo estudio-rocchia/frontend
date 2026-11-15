@@ -24,7 +24,7 @@ import { Modal } from "@/components/ui/Modal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { ChipToggle, FormField, FormSection } from "@/components/ui/FormLayout";
 import { MoneyAmountField } from "@/components/ui/MoneyAmountField";
-import { ApiError, fetchCatalog, fetchLocalidades } from "@/lib/api";
+import { ApiError, fetchLocalidades, fetchTiposInmueble } from "@/lib/api";
 import { parseAmountInput } from "@/lib/format";
 import { fetchAllInmuebleCodes } from "@/lib/inmuebles/inmueble-codes";
 import type { CatalogoItem } from "@/lib/api/types";
@@ -72,7 +72,9 @@ export function PublicarEnAlquilerCatalogModal({
   const [propietarios, setPropietarios] = useState<PropietarioDraft[]>([emptyPropietarioDraft()]);
   const [monto, setMonto] = useState("");
   const [moneda, setMoneda] = useState<"ARS" | "USD">("ARS");
-  const [condiciones, setCondiciones] = useState("");
+  const [requisitos, setRequisitos] = useState("");
+  const [notasPrecio, setNotasPrecio] = useState("");
+  const [precioPendiente, setPrecioPendiente] = useState(false);
   const [tiposInmueble, setTiposInmueble] = useState<CatalogoItem[]>([]);
   const [localidades, setLocalidades] = useState<LocalidadOption[]>([]);
   const [existingCodes, setExistingCodes] = useState<string[]>([]);
@@ -89,7 +91,9 @@ export function PublicarEnAlquilerCatalogModal({
     setPropietarios([emptyPropietarioDraft()]);
     setMonto("");
     setMoneda("ARS");
-    setCondiciones("");
+    setRequisitos("");
+    setNotasPrecio("");
+    setPrecioPendiente(false);
     setError(null);
   }, [open]);
 
@@ -108,19 +112,20 @@ export function PublicarEnAlquilerCatalogModal({
     void fetchLocalidades(token)
       .then((res) => setLocalidades(res.items))
       .catch(() => setLocalidades([]));
-    void ensureTiposInmueble();
+    void loadTiposInmueble(true);
   }, [open, token]);
 
-  async function ensureTiposInmueble() {
-    if (tiposInmueble.length > 0 || !token) return;
-    setLoadingTipos(true);
+  async function loadTiposInmueble(refresh = false) {
+    if (!token) return;
+    const initialLoad = tiposInmueble.length === 0;
+    if (initialLoad) setLoadingTipos(true);
     try {
-      const response = await fetchCatalog<CatalogoItem>(token, "/catalogos/tipos-inmueble");
+      const response = await fetchTiposInmueble(token, { refresh: refresh || initialLoad });
       setTiposInmueble(response.items);
     } catch {
       setError("No se pudieron cargar los tipos de inmueble.");
     } finally {
-      setLoadingTipos(false);
+      if (initialLoad) setLoadingTipos(false);
     }
   }
 
@@ -137,9 +142,11 @@ export function PublicarEnAlquilerCatalogModal({
       }
       return null;
     }
-    const montoPrecio = parseAmountInput(monto);
-    if (montoPrecio == null || montoPrecio <= 0) {
-      return "Ingresá un precio de alquiler válido.";
+    if (!precioPendiente) {
+      const montoPrecio = parseAmountInput(monto);
+      if (montoPrecio == null || montoPrecio <= 0) {
+        return "Ingresá un precio de alquiler válido o marcá «Definir precio más tarde».";
+      }
     }
     if (!estadoOfertaAvailableId || !tipoOperacionAlquilerId) {
       return "Catálogo de alquileres no disponible. Recargá la página.";
@@ -179,10 +186,7 @@ export function PublicarEnAlquilerCatalogModal({
     setSaving(true);
     setError(null);
     try {
-      const montoPrecio = parseAmountInput(monto);
-      if (montoPrecio == null || montoPrecio <= 0) {
-        throw new Error("Precio inválido.");
-      }
+      const montoPrecio = precioPendiente ? null : parseAmountInput(monto);
       const tipoInmuebleId = resolveTipoInmuebleId(tiposInmueble, propiedad.tipoInmuebleCode);
       const [first, ...rest] = propietarios;
       const propietarioInput = buildPropietarioInput(first.field, {
@@ -203,8 +207,9 @@ export function PublicarEnAlquilerCatalogModal({
         propietario: propietarioInput,
         propietariosAdicionales,
         montoPrecio,
-        codigoMoneda: moneda,
-        notasPrecio: condiciones,
+        codigoMoneda: precioPendiente ? null : moneda,
+        condicionesFinanciacion: requisitos,
+        notasPrecio,
         estadoOfertaId: estadoOfertaAvailableId,
         tipoOperacionAlquilerId,
       });
@@ -275,7 +280,6 @@ export function PublicarEnAlquilerCatalogModal({
             tiposInmueble={tiposInmueble}
             existingCodes={existingCodes}
             loadingTipos={loadingTipos}
-            onLoadTipos={() => void ensureTiposInmueble()}
             intro="Datos del inmueble que el propietario quiere ofrecer en alquiler. Quedará disponible para crear contrato."
           />
         ) : null}
@@ -379,26 +383,65 @@ export function PublicarEnAlquilerCatalogModal({
 
         {step === 2 ? (
           <FormSection title="Oferta de alquiler">
-            <div className="flex flex-col gap-3">
-              <MoneyAmountField label="Precio mensual" value={monto} onChange={setMonto} />
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[11px] font-semibold text-text-secondary">Moneda</span>
-                <ChipToggle
-                  options={["ARS", "USD"]}
-                  value={moneda}
-                  onChange={(value) => setMoneda(value === "USD" ? "USD" : "ARS")}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label
+                className={`flex cursor-pointer items-start gap-3 rounded-md border p-3 transition-colors sm:col-span-2 ${
+                  precioPendiente
+                    ? "border-primary/40 bg-primary-soft/40"
+                    : "border-border bg-bg-page/30 hover:bg-bg-page/50"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={precioPendiente}
+                  onChange={(event) => setPrecioPendiente(event.target.checked)}
+                  className="mt-0.5 h-4 w-4 shrink-0 rounded border-border"
+                />
+                <span className="flex flex-col gap-0.5">
+                  <span className="text-[13px] font-medium text-text-primary">Definir precio más tarde</span>
+                  <span className="text-[12px] text-text-secondary">
+                    El inmueble se publica sin precio. Podés cargarlo después desde la ficha con
+                    «Actualizar precio».
+                  </span>
+                </span>
+              </label>
+              {!precioPendiente ? (
+                <>
+                  <MoneyAmountField label="Precio mensual" value={monto} onChange={setMonto} />
+                  <div className="flex flex-col gap-1.5 sm:col-span-2">
+                    <span className="text-[11px] font-semibold text-text-secondary">Moneda</span>
+                    <ChipToggle
+                      options={["ARS", "USD"]}
+                      value={moneda}
+                      onChange={(value) => setMoneda(value === "USD" ? "USD" : "ARS")}
+                    />
+                  </div>
+                </>
+              ) : null}
+              <div className="sm:col-span-2">
+                <FormField
+                  label="Requisitos para alquilar (opcional)"
+                  type="textarea"
+                  rows={6}
+                  value={requisitos}
+                  onChange={setRequisitos}
+                  placeholder="Duración, depósito, actualización por índice…"
                 />
               </div>
-              <FormField
-                label="Requisitos para alquilar (opcional)"
-                type="textarea"
-                rows={4}
-                value={condiciones}
-                onChange={setCondiciones}
-                placeholder="Duración, depósito, actualización por índice…"
-              />
+              <div className="sm:col-span-2">
+                <FormField
+                  label="Notas de precio (opcional)"
+                  type="textarea"
+                  rows={6}
+                  value={notasPrecio}
+                  onChange={setNotasPrecio}
+                  placeholder="Observaciones internas sobre el precio e historial de cambios"
+                />
+              </div>
               {!catalogReady ? (
-                <p className="text-xs text-danger">No se cargó el catálogo de estados de oferta.</p>
+                <p className="text-xs text-danger sm:col-span-2">
+                  No se cargó el catálogo de estados de oferta.
+                </p>
               ) : null}
             </div>
           </FormSection>

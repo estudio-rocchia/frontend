@@ -11,8 +11,9 @@ export function buildPublishEnAlquilerPayload(params: {
   tipoInmuebleId: number;
   propietario: PublishEnVentaInput["propietario"];
   propietariosAdicionales?: PublishEnVentaInput["propietariosAdicionales"];
-  montoPrecio: number;
-  codigoMoneda: string;
+  montoPrecio: number | null;
+  codigoMoneda: string | null;
+  condicionesFinanciacion: string;
   notasPrecio: string;
   estadoOfertaId: number;
   tipoOperacionAlquilerId: number;
@@ -46,8 +47,10 @@ export function buildPublishEnAlquilerPayload(params: {
     oferta: {
       tipoOperacionId: params.tipoOperacionAlquilerId,
       estadoId: params.estadoOfertaId,
-      montoPrecio: params.montoPrecio,
-      codigoMoneda: params.codigoMoneda,
+      ...(params.montoPrecio !== null && params.codigoMoneda
+        ? { montoPrecio: params.montoPrecio, codigoMoneda: params.codigoMoneda }
+        : { montoPrecio: null, codigoMoneda: null }),
+      condicionesFinanciacion: params.condicionesFinanciacion.trim() || null,
       notasPrecio: params.notasPrecio.trim() || null,
     },
   };

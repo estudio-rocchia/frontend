@@ -45,14 +45,14 @@ export function AlquileresPageActions({
         <HandCoins className="h-4 w-4" aria-hidden />
         Liquidar propietarios
       </button>
-      <details className="relative">
+      <details className="relative z-30">
         <summary
           className={`${ghost} cursor-pointer list-none [&::-webkit-details-marker]:hidden`}
         >
           <MoreHorizontal className="h-4 w-4" aria-hidden />
           Más acciones
         </summary>
-        <div className="absolute right-0 z-20 mt-1 flex min-w-56 flex-col rounded-md border border-border bg-bg-card p-1 shadow-[var(--shadow-card)]">
+        <div className="absolute right-0 z-50 mt-1 flex min-w-56 flex-col rounded-md border border-border bg-bg-card p-1 shadow-[var(--shadow-card)]">
           <Link href="/alquileres/historial" className={menuItem}>
             <Archive className="h-4 w-4 shrink-0 text-text-secondary" aria-hidden />
             Historial de contratos

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Building2,
@@ -13,14 +14,36 @@ import {
 import { HonorariosPanel } from "@/components/clientes/HonorariosPanel";
 import { InmobiliariaStatsBar } from "@/components/clientes/InmobiliariaStatsBar";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import {
+  aceptaHonorariosAdministracion,
+  buildCarteraEstadoBadges,
+  carteraOperacionDetalle,
+  countCarteraPorFiltro,
+  countPropiedadesConHonorarios,
+  honorariosPanelActivo,
+  matchCarteraFiltro,
+  type CarteraFiltro,
+} from "@/lib/clientes/cartera-propiedad";
+import {
+  buildInmuebleFichaFromClienteHref,
+  type ClienteFichaTabId,
+} from "@/lib/clientes/cliente-ficha-state";
 import type { ContratoListItem } from "@/lib/api/types";
 import { formatMoney } from "@/lib/format";
+import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 import { formatPorcentaje, type ModoHonorariosAdministracion } from "@/lib/honorarios-admin";
 import type { PropiedadAdministrada } from "@/lib/mappers/propietario-inmuebles";
 
-type FiltroCartera = "todas" | "alquiladas" | "libres";
 
-function ContratosInquilinoSection({ contratos }: { contratos: ContratoListItem[] }) {
+function ContratosInquilinoSection({
+  contratos,
+  clienteId,
+  clienteFichaTab,
+}: {
+  contratos: ContratoListItem[];
+  clienteId: number;
+  clienteFichaTab: ClienteFichaTabId;
+}) {
   const [open, setOpen] = useState(contratos.length > 0);
 
   return (
@@ -57,9 +80,16 @@ function ContratosInquilinoSection({ contratos }: { contratos: ContratoListItem[
                   className="flex flex-col gap-1.5 glass-card px-3 py-3"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <p className="text-[13px] font-medium leading-snug text-text-primary">
+                    <Link
+                      href={buildInmuebleFichaFromClienteHref(
+                        contrato.inmuebleId,
+                        clienteId,
+                        clienteFichaTab,
+                      )}
+                      className={`text-[13px] font-medium leading-snug text-text-primary hover:text-primary hover:underline ${interactiveFocusClass}`}
+                    >
                       {contrato.inmuebleTitle}
-                    </p>
+                    </Link>
                     <StatusBadge label="Activo" variant="success" />
                   </div>
                   <p className="text-[13px] font-semibold text-primary">
@@ -80,12 +110,16 @@ function ContratosInquilinoSection({ contratos }: { contratos: ContratoListItem[
 
 function PropiedadCarteraItem({
   propiedad,
+  clienteId,
+  clienteFichaTab,
   selected,
   showHonorario,
   honorarioCliente,
   onSelect,
 }: {
   propiedad: PropiedadAdministrada;
+  clienteId: number;
+  clienteFichaTab: ClienteFichaTabId;
   selected: boolean;
   showHonorario: boolean;
   honorarioCliente: string;
@@ -94,10 +128,7 @@ function PropiedadCarteraItem({
   const direccion = propiedad.direccion?.trim();
 
   return (
-    <button
-      type="button"
-      onClick={onSelect}
-      aria-current={selected ? "true" : undefined}
+    <div
       className={`group flex w-full items-stretch gap-0 overflow-hidden rounded-lg border text-left transition-all ${
         selected
           ? "border-primary bg-primary-soft/20 ring-1 ring-primary/25"
@@ -108,7 +139,12 @@ function PropiedadCarteraItem({
         className={`w-1 shrink-0 ${selected ? "bg-primary" : "bg-transparent group-hover:bg-primary/30"}`}
         aria-hidden
       />
-      <div className="flex min-w-0 flex-1 items-center gap-3 px-3 py-3">
+      <button
+        type="button"
+        onClick={onSelect}
+        aria-current={selected ? "true" : undefined}
+        className={`flex min-w-0 flex-1 items-center gap-3 px-3 py-3 text-left ${interactiveFocusClass}`}
+      >
         <div
           className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-md ${
             selected ? "bg-primary text-white" : "bg-bg-page text-text-secondary"
@@ -122,11 +158,14 @@ function PropiedadCarteraItem({
             <span className="rounded bg-bg-page px-1.5 py-0.5 font-mono text-[10px] font-semibold text-text-secondary">
               {propiedad.code}
             </span>
-            {!propiedad.contratoActivo ? (
-              <StatusBadge label="Sin alquiler" variant="warning" />
-            ) : (
-              <StatusBadge label="Alquilado" variant="success" />
-            )}
+            {buildCarteraEstadoBadges(propiedad).map((badge) => (
+              <span
+                key={badge.label}
+                className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold ${badge.className}`}
+              >
+                {badge.label}
+              </span>
+            ))}
           </div>
           <p className="truncate text-[13px] font-semibold text-text-primary">{propiedad.title}</p>
           {direccion ? (
@@ -140,30 +179,45 @@ function PropiedadCarteraItem({
               {formatMoney(propiedad.contratoActivo.montoAlquiler, propiedad.contratoActivo.codigoMoneda)}
               <span className="font-normal text-text-secondary"> / mes</span>
             </p>
+          ) : carteraOperacionDetalle(propiedad) ? (
+            <p className="text-[12px] font-medium text-text-primary">{carteraOperacionDetalle(propiedad)}</p>
           ) : null}
         </div>
 
         <div className="flex shrink-0 flex-col items-end justify-center gap-1">
-          {showHonorario ? (
-            <span className="rounded-full bg-primary-soft px-2.5 py-1 text-[12px] font-bold text-primary tabular-nums">
-              {formatPorcentaje(propiedad.porcentajeAdministracion)}
-            </span>
+          {aceptaHonorariosAdministracion(propiedad) ? (
+            showHonorario ? (
+              <span className="rounded-full bg-primary-soft px-2.5 py-1 text-[12px] font-bold text-primary tabular-nums">
+                {formatPorcentaje(propiedad.porcentajeAdministracion)}
+              </span>
+            ) : (
+              <span className="rounded-full bg-bg-page px-2 py-0.5 text-[10px] font-medium text-text-secondary">
+                {formatPorcentaje(honorarioCliente)}
+              </span>
+            )
           ) : (
-            <span className="rounded-full bg-bg-page px-2 py-0.5 text-[10px] font-medium text-text-secondary">
-              {formatPorcentaje(honorarioCliente)}
+            <span className="max-w-[88px] text-right text-[10px] font-medium leading-snug text-text-secondary">
+              Sin honorarios
             </span>
           )}
-          <ChevronRight
-            className={`h-4 w-4 ${selected ? "text-primary" : "text-text-secondary/50"}`}
-            aria-hidden
-          />
         </div>
-      </div>
-    </button>
+      </button>
+      <Link
+        href={buildInmuebleFichaFromClienteHref(propiedad.inmuebleId, clienteId, clienteFichaTab)}
+        className={`flex shrink-0 flex-col items-center justify-center gap-0.5 border-l border-border px-3 text-text-secondary transition-colors hover:bg-primary-soft/25 hover:text-primary ${interactiveFocusClass}`}
+        aria-label={`Ver ficha de ${propiedad.code}`}
+        title="Ver ficha del inmueble"
+      >
+        <ChevronRight className="h-4 w-4" aria-hidden />
+        <span className="text-[10px] font-semibold">Ficha</span>
+      </Link>
+    </div>
   );
 }
 
 export function ClienteInmobiliariaPropiedadesSection({
+  clienteId,
+  clienteFichaTab = "inmobiliaria",
   modoHonorarios,
   porcentajeCliente,
   clientePctEdit,
@@ -179,6 +233,8 @@ export function ClienteInmobiliariaPropiedadesSection({
   onPctChange,
   onSavePropiedad,
 }: {
+  clienteId: number;
+  clienteFichaTab?: ClienteFichaTabId;
   modoHonorarios: ModoHonorariosAdministracion;
   porcentajeCliente: string;
   clientePctEdit: string;
@@ -195,7 +251,7 @@ export function ClienteInmobiliariaPropiedadesSection({
   onSavePropiedad: (propiedad: PropiedadAdministrada) => void;
 }) {
   const honorariosPanelRef = useRef<HTMLElement>(null);
-  const [filtro, setFiltro] = useState<FiltroCartera>("todas");
+  const [filtro, setFiltro] = useState<CarteraFiltro>("todas");
   const [busqueda, setBusqueda] = useState("");
 
   const propiedadesOrdenadas = useMemo(
@@ -212,8 +268,7 @@ export function ClienteInmobiliariaPropiedadesSection({
   const propiedadesFiltradas = useMemo(() => {
     const query = busqueda.trim().toLowerCase();
     return propiedadesOrdenadas.filter((propiedad) => {
-      if (filtro === "alquiladas" && !propiedad.contratoActivo) return false;
-      if (filtro === "libres" && propiedad.contratoActivo) return false;
+      if (!matchCarteraFiltro(propiedad, filtro)) return false;
       if (!query) return true;
       const haystack = [propiedad.code, propiedad.title, propiedad.direccion ?? ""]
         .join(" ")
@@ -241,8 +296,13 @@ export function ClienteInmobiliariaPropiedadesSection({
   const propiedadSeleccionada =
     propiedadesOrdenadas.find((propiedad) => propiedad.propietarioId === selectedPropietarioId) ?? null;
 
-  const alquiladas = propiedades.filter((propiedad) => propiedad.contratoActivo).length;
+  const conteosCartera = useMemo(() => countCarteraPorFiltro(propiedades), [propiedades]);
+  const propiedadesConHonorarios = useMemo(
+    () => countPropiedadesConHonorarios(propiedades),
+    [propiedades],
+  );
   const honorariosPorCliente = modoHonorarios === "por_cliente";
+  const honorariosActivos = honorariosPanelActivo(filtro, conteosCartera, propiedadesConHonorarios);
 
   function handleSelectPropiedad(propietarioId: number) {
     setSelectedPropietarioId(propietarioId);
@@ -253,17 +313,18 @@ export function ClienteInmobiliariaPropiedadesSection({
     }
   }
 
-  const filtros: { id: FiltroCartera; label: string; count: number }[] = [
-    { id: "todas", label: "Todas", count: propiedades.length },
-    { id: "alquiladas", label: "Alquiladas", count: alquiladas },
-    { id: "libres", label: "Sin alquiler", count: propiedades.length - alquiladas },
+  const filtros: { id: CarteraFiltro; label: string; count: number }[] = [
+    { id: "todas", label: "Todas", count: conteosCartera.todas },
+    { id: "alquiladas", label: "Alquiladas", count: conteosCartera.alquiladas },
+    { id: "para_alquiler", label: "Para alquiler", count: conteosCartera.para_alquiler },
+    { id: "en_venta", label: "En venta", count: conteosCartera.en_venta },
+    { id: "alquiler_y_venta", label: "Alquiler y venta", count: conteosCartera.alquiler_y_venta },
   ];
 
   return (
     <div className="flex flex-col gap-6">
       <InmobiliariaStatsBar
-        propiedades={propiedades.length}
-        alquiladas={alquiladas}
+        conteosCartera={conteosCartera}
         contratosInquilino={contratosInquilino.length}
         modoHonorarios={modoHonorarios}
         porcentajeCliente={porcentajeCliente}
@@ -286,6 +347,9 @@ export function ClienteInmobiliariaPropiedadesSection({
 
           <HonorariosPanel
             ref={honorariosPanelRef}
+            clienteId={clienteId}
+            clienteFichaTab={clienteFichaTab}
+            activo={propiedadesConHonorarios > 0}
             modo={modoHonorarios}
             porcentajeCliente={porcentajeCliente}
             clientePctEdit={clientePctEdit}
@@ -295,7 +359,7 @@ export function ClienteInmobiliariaPropiedadesSection({
             onClientePctChange={onClientePctChange}
             onSaveClientePct={onSaveClientePct}
             propiedadSeleccionada={null}
-            propiedadesCount={0}
+            propiedadesCount={propiedadesConHonorarios}
             pctValue="6"
             savingPropiedad={false}
             onPctChange={() => undefined}
@@ -309,9 +373,9 @@ export function ClienteInmobiliariaPropiedadesSection({
               <div className="border-b border-border px-4 py-3">
                 <h3 className="text-sm font-semibold text-text-primary">Cartera</h3>
                 <p className="text-[12px] text-text-secondary">
-                  {honorariosPorCliente
-                    ? "Todas comparten el honorario del cliente"
-                    : "Tocá una propiedad para editar su %"}
+                {honorariosPorCliente
+                  ? "El honorario del cliente aplica solo a inmuebles en alquiler"
+                  : "Tocá una propiedad en alquiler para editar su %"}
                 </p>
               </div>
 
@@ -361,6 +425,8 @@ export function ClienteInmobiliariaPropiedadesSection({
                     <PropiedadCarteraItem
                       key={propiedad.inmuebleId}
                       propiedad={propiedad}
+                      clienteId={clienteId}
+                      clienteFichaTab={clienteFichaTab}
                       selected={propiedad.propietarioId === selectedPropietarioId}
                       showHonorario={!honorariosPorCliente}
                       honorarioCliente={porcentajeCliente}
@@ -375,6 +441,9 @@ export function ClienteInmobiliariaPropiedadesSection({
           <div className="order-1 lg:order-2">
             <HonorariosPanel
               ref={honorariosPanelRef}
+              clienteId={clienteId}
+              clienteFichaTab={clienteFichaTab}
+              activo={honorariosActivos}
               modo={modoHonorarios}
               porcentajeCliente={porcentajeCliente}
               clientePctEdit={clientePctEdit}
@@ -384,7 +453,7 @@ export function ClienteInmobiliariaPropiedadesSection({
               onClientePctChange={onClientePctChange}
               onSaveClientePct={onSaveClientePct}
               propiedadSeleccionada={honorariosPorCliente ? null : propiedadSeleccionada}
-              propiedadesCount={propiedades.length}
+              propiedadesCount={propiedadesConHonorarios}
               pctValue={
                 propiedadSeleccionada
                   ? pctEdits[propiedadSeleccionada.propietarioId] ??
@@ -405,7 +474,11 @@ export function ClienteInmobiliariaPropiedadesSection({
         </div>
       )}
 
-      <ContratosInquilinoSection contratos={contratosInquilino} />
+      <ContratosInquilinoSection
+        contratos={contratosInquilino}
+        clienteId={clienteId}
+        clienteFichaTab={clienteFichaTab}
+      />
     </div>
   );
 }

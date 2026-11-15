@@ -18,9 +18,9 @@ import { FormField, FormSection } from "@/components/ui/FormLayout";
 import { NumericSelect } from "@/components/ui/NumericSelect";
 import {
   ApiError,
-  fetchCatalog,
   fetchFormasPago,
   fetchLocalidades,
+  fetchTiposInmueble,
   updateInmueble,
   updateOferta,
 } from "@/lib/api";
@@ -89,9 +89,7 @@ export function EditarCatalogInmuebleModal({
     void Promise.all([
       fetchFormasPago(token).then((res) => setFormasPago(res.items)),
       fetchLocalidades(token).then((res) => setLocalidades(res.items)),
-      fetchCatalog<CatalogoItem>(token, "/catalogos/tipos-inmueble").then((res) =>
-        setTiposInmueble(res.items),
-      ),
+      fetchTiposInmueble(token, { refresh: true }).then((res) => setTiposInmueble(res.items)),
       fetchAllInmuebleCodes(token).then(setExistingCodes),
     ])
       .catch(() => {
@@ -230,7 +228,9 @@ export function EditarCatalogInmuebleModal({
           ? err.message.includes("code already exists")
             ? "Ese código ya está usado por otro inmueble."
             : err.message
-          : "No se pudieron guardar los cambios.";
+          : err instanceof Error
+            ? err.message
+            : "No se pudieron guardar los cambios.";
       setError(message);
     } finally {
       setSaving(false);
@@ -257,7 +257,7 @@ export function EditarCatalogInmuebleModal({
         </>
       }
     >
-      <div className="flex max-h-[min(70vh,640px)] flex-col gap-6 overflow-y-auto pr-1">
+      <div className="flex flex-col gap-6">
         <FormSection title="Inmueble" description="Identificación y ubicación">
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">

@@ -30,7 +30,9 @@ export function PublicarEnAlquilerModal({
 }: PublicarEnAlquilerModalProps) {
   const [monto, setMonto] = useState("");
   const [moneda, setMoneda] = useState<"ARS" | "USD">("ARS");
-  const [condiciones, setCondiciones] = useState("");
+  const [requisitos, setRequisitos] = useState("");
+  const [notasPrecio, setNotasPrecio] = useState("");
+  const [precioPendiente, setPrecioPendiente] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,25 +40,30 @@ export function PublicarEnAlquilerModal({
     if (!open) return;
     setMonto("");
     setMoneda("ARS");
-    setCondiciones("");
+    setRequisitos("");
+    setNotasPrecio("");
+    setPrecioPendiente(false);
     setError(null);
   }, [open]);
 
   async function handleSubmit() {
-    const parsed = parseAmountInput(monto);
-    if (parsed === null || parsed <= 0) {
-      setError("Ingresá un precio de alquiler válido.");
-      return;
+    if (!precioPendiente) {
+      const parsed = parseAmountInput(monto);
+      if (parsed === null || parsed <= 0) {
+        setError("Ingresá un precio de alquiler válido o marcá «Definir precio más tarde».");
+        return;
+      }
     }
     setSaving(true);
     setError(null);
     try {
+      const parsed = precioPendiente ? null : parseAmountInput(monto);
       await createOferta(token, inmuebleId, {
         tipoOperacionId: tipoOperacionAlquilerId,
         estadoId: estadoAvailableId,
-        montoPrecio: parsed,
-        codigoMoneda: moneda,
-        notasPrecio: condiciones.trim() || null,
+        ...(parsed !== null ? { montoPrecio: parsed, codigoMoneda: moneda } : { montoPrecio: null, codigoMoneda: null }),
+        condicionesFinanciacion: requisitos.trim() || null,
+        notasPrecio: notasPrecio.trim() || null,
       });
       onPublished();
       onClose();
@@ -85,20 +92,54 @@ export function PublicarEnAlquilerModal({
       }
     >
       <div className="flex flex-col gap-4">
-        <MoneyAmountField label="Precio de alquiler" value={monto} onChange={setMonto} />
-        <div className="flex flex-col gap-1.5">
-          <span className="text-[11px] font-semibold text-text-secondary">Moneda</span>
-          <ChipToggle
-            options={["ARS", "USD"]}
-            value={moneda}
-            onChange={(value) => setMoneda(value === "USD" ? "USD" : "ARS")}
+        <label
+          className={`flex cursor-pointer items-start gap-3 rounded-md border p-3 transition-colors ${
+            precioPendiente
+              ? "border-primary/40 bg-primary-soft/40"
+              : "border-border bg-bg-page/30 hover:bg-bg-page/50"
+          }`}
+        >
+          <input
+            type="checkbox"
+            checked={precioPendiente}
+            onChange={(event) => setPrecioPendiente(event.target.checked)}
+            className="mt-0.5 h-4 w-4 shrink-0 rounded border-border"
           />
-        </div>
+          <span className="flex flex-col gap-0.5">
+            <span className="text-[13px] font-medium text-text-primary">Definir precio más tarde</span>
+            <span className="text-[12px] text-text-secondary">
+              El inmueble se publica sin precio. Podés cargarlo después desde la ficha.
+            </span>
+          </span>
+        </label>
+        {!precioPendiente ? (
+          <>
+            <MoneyAmountField label="Precio de alquiler" value={monto} onChange={setMonto} />
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[11px] font-semibold text-text-secondary">Moneda</span>
+              <ChipToggle
+                options={["ARS", "USD"]}
+                value={moneda}
+                onChange={(value) => setMoneda(value === "USD" ? "USD" : "ARS")}
+              />
+            </div>
+          </>
+        ) : null}
         <FormField
           label="Requisitos para alquilar (opcional)"
-          value={condiciones}
-          onChange={setCondiciones}
+          type="textarea"
+          rows={4}
+          value={requisitos}
+          onChange={setRequisitos}
           placeholder="Duración, actualización, depósito…"
+        />
+        <FormField
+          label="Notas de precio (opcional)"
+          type="textarea"
+          rows={4}
+          value={notasPrecio}
+          onChange={setNotasPrecio}
+          placeholder="Observaciones internas sobre el precio"
         />
         {error ? <p className="text-sm text-danger">{error}</p> : null}
       </div>

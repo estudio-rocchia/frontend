@@ -358,16 +358,15 @@ export function CierreBalanceView() {
         className={`balance-sticky-stack sticky top-0 z-20 ${toolbarBusy ? "balance-toolbar--busy" : ""}`}
         aria-busy={toolbarBusy}
       >
-        <section className="balance-toolbar balance-toolbar-panel px-4 py-4 sm:px-5">
-          <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-            <div className="flex flex-col gap-3 sm:flex-row sm:gap-6">
+        <section className="balance-toolbar balance-toolbar-panel px-3 py-2.5 sm:px-4">
+          <div className="flex flex-col gap-1.5">
+            <div className="balance-toolbar-row">
               {PRESET_GROUPS.map((group) => (
-                <div key={group.groupLabel} className="min-w-0">
-                  <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-text-secondary">
+                <div key={group.groupLabel} className="balance-toolbar-preset-group min-w-0">
+                  <p className="mb-1 text-[9px] font-semibold uppercase tracking-[0.08em] text-text-secondary">
                     {group.groupLabel}
                   </p>
-                  <div className="flex flex-wrap gap-2" role="group" aria-label={group.groupLabel}>
+                  <div className="flex flex-wrap gap-1.5" role="group" aria-label={group.groupLabel}>
                     {group.options.map((option) => {
                       const key = presetKey(option, yearNow);
                       const selected = activePresetKey === key;
@@ -378,7 +377,7 @@ export function CierreBalanceView() {
                           aria-pressed={selected}
                           disabled={toolbarBusy}
                           onClick={() => applyPreset(option)}
-                          className={`rocchia-action rounded-lg px-3 py-1.5 text-[12px] font-medium disabled:cursor-not-allowed disabled:opacity-60 ${interactiveFocusClass} ${
+                          className={`rocchia-action rounded-md px-2.5 py-1 text-[11px] font-medium disabled:cursor-not-allowed disabled:opacity-60 ${interactiveFocusClass} ${
                             selected
                               ? "bg-primary text-text-on-primary shadow-[0_2px_8px_rgba(16,112,119,0.25)]"
                               : "bg-bg-page text-text-secondary ring-1 ring-border hover:text-text-primary"
@@ -391,80 +390,77 @@ export function CierreBalanceView() {
                   </div>
                 </div>
               ))}
-            </div>
-            <label className="flex cursor-pointer items-center gap-2.5 text-[12px] text-text-secondary xl:shrink-0">
-              <span
-                className={`relative h-5 w-9 shrink-0 rounded-full transition-colors duration-200 ${
-                  compararYoY ? "bg-primary" : "bg-border"
-                } ${toolbarBusy ? "opacity-60" : ""}`}
-              >
-                <input
-                  type="checkbox"
-                  checked={compararYoY}
-                  disabled={toolbarBusy}
-                  onChange={(e) => setCompararYoY(e.target.checked)}
-                  className="peer sr-only"
-                />
-                <span
-                  className={`absolute top-0.5 left-0.5 size-4 rounded-full bg-white shadow transition-transform duration-150 ease-out ${
-                    compararYoY ? "translate-x-4" : "translate-x-0"
-                  }`}
-                />
-              </span>
-              Comparar con el mismo rango del año anterior
-            </label>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_auto]">
-            <RocchiaDateField
-              label="Desde"
-              value={desde}
-              disabled={toolbarBusy}
-              onChange={(next) => {
-                setPreset("custom");
-                setDesde(next);
-              }}
-            />
-            <RocchiaDateField
-              label="Hasta"
-              value={hasta}
-              disabled={toolbarBusy}
-              onChange={(next) => {
-                setPreset("custom");
-                setHasta(next);
-              }}
-            />
-            <div className="flex flex-col items-stretch gap-1.5 sm:items-end">
-              <div className="flex flex-wrap items-end gap-2">
+              <RocchiaDateField
+                className="balance-date-field"
+                label="Desde"
+                value={desde}
+                disabled={toolbarBusy}
+                onChange={(next) => {
+                  setPreset("custom");
+                  setDesde(next);
+                }}
+              />
+              <RocchiaDateField
+                className="balance-date-field"
+                label="Hasta"
+                value={hasta}
+                disabled={toolbarBusy}
+                onChange={(next) => {
+                  setPreset("custom");
+                  setHasta(next);
+                }}
+              />
+              <div className="balance-toolbar-dates-actions">
                 {hasPendingPeriod ? (
                   <ButtonOutline
                     type="button"
                     onClick={() => discardDraftPeriod()}
                     disabled={toolbarBusy}
-                    className="rocchia-action w-full sm:w-auto"
+                    className="rocchia-action h-8 px-2.5 text-[12px]"
                   >
-                    Descartar cambios
+                    Descartar
                   </ButtonOutline>
                 ) : null}
                 <ButtonPrimary
                   type="button"
                   onClick={() => applyDraftPeriod()}
                   disabled={toolbarBusy || !desde || !hasta || datesInvalid || !hasPendingPeriod}
-                  className="rocchia-action w-full sm:w-auto"
+                  className="rocchia-action h-8 px-2.5 text-[12px]"
                 >
                   Aplicar período
                 </ButtonPrimary>
               </div>
-              {datesInvalid ? (
-                <p className="text-[11px] text-danger" role="alert">
-                  «Desde» no puede ser posterior a «Hasta».
-                </p>
-              ) : hasPendingPeriod && !toolbarBusy ? (
-                <p className="text-[11px] text-text-secondary" role="status">
-                  Período sin aplicar — confirmá para actualizar el balance.
-                </p>
-              ) : null}
+              <label className="balance-toolbar-yoy flex cursor-pointer items-center gap-2 text-[11px] leading-tight text-text-secondary">
+                <span
+                  className={`relative h-4 w-7 shrink-0 rounded-full transition-colors duration-200 ${
+                    compararYoY ? "bg-primary" : "bg-border"
+                  } ${toolbarBusy ? "opacity-60" : ""}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={compararYoY}
+                    disabled={toolbarBusy}
+                    onChange={(e) => setCompararYoY(e.target.checked)}
+                    className="peer sr-only"
+                  />
+                  <span
+                    className={`absolute top-0.5 left-0.5 size-3 rounded-full bg-white shadow transition-transform duration-150 ease-out ${
+                      compararYoY ? "translate-x-3" : "translate-x-0"
+                    }`}
+                  />
+                </span>
+                <span className="max-w-[11rem] sm:max-w-none">Comparar con el mismo rango del año anterior</span>
+              </label>
             </div>
-          </div>
+            {datesInvalid ? (
+              <p className="balance-toolbar-dates-hint text-danger" role="alert">
+                «Desde» no puede ser posterior a «Hasta».
+              </p>
+            ) : hasPendingPeriod && !toolbarBusy ? (
+              <p className="balance-toolbar-dates-hint text-text-secondary" role="status">
+                Sin aplicar — confirmá para actualizar.
+              </p>
+            ) : null}
           </div>
         </section>
 

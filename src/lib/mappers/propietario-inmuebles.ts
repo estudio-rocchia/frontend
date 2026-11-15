@@ -5,6 +5,7 @@ import {
   fetchPropietarioPersonaIds,
 } from "@/lib/api";
 import type { InmuebleRecord, PersonaRecord, PropiedadAdministradaRecord } from "@/lib/api/types";
+import { buildCarteraEstadoBadges, carteraOperacionDetalle } from "@/lib/clientes/cartera-propiedad";
 import { formatMoney, personaDisplayName } from "@/lib/format";
 
 export interface InmueblePropietarioResumen {
@@ -17,6 +18,8 @@ export interface InmuebleSinAlquiler {
   inmuebleId: number;
   code: string;
   title: string;
+  tipoName: string | null;
+  localidadName: string | null;
   direccion: string | null;
   propietarioIds: number[];
   propietarios: InmueblePropietarioResumen[];
@@ -94,6 +97,8 @@ export async function loadInmueblesSinAlquiler(
       inmuebleId: inmueble.inmuebleId,
       code: inmueble.code,
       title: inmueble.displayLabel ?? inmueble.title ?? inmueble.code,
+      tipoName: inmueble.tipoName ?? null,
+      localidadName: inmueble.localidadName ?? null,
       direccion: inmueble.direccion,
       propietarioIds,
       propietarios: links,
@@ -131,9 +136,14 @@ export function propiedadAdministradaLabel(propiedad: PropiedadAdministrada): {
   }
 
   const direccion = propiedad.direccion?.trim();
+  const operacion = carteraOperacionDetalle(propiedad);
+  const estados = buildCarteraEstadoBadges(propiedad)
+    .map((badge) => badge.label)
+    .join(" · ");
+  const detalleParts = [direccion, operacion, estados].filter(Boolean);
   return {
     titulo: `${propiedad.title} (${propiedad.code})`,
-    detalle: direccion ? `${direccion} · Sin alquiler activo` : "En administración · Sin alquiler activo",
-    etiqueta: "En administración",
+    detalle: detalleParts.length > 0 ? detalleParts.join(" · ") : "Sin operación activa",
+    etiqueta: estados,
   };
 }
