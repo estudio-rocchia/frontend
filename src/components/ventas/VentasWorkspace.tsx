@@ -88,7 +88,8 @@ export function VentasWorkspace() {
   const { refreshing, listTransitionKey, isInitialLoad, start, finish } = useListRefreshTransition();
   const [tab, setTab] = useState<VentasTabId>("en_operacion");
   const [urlTabReady, setUrlTabReady] = useState(false);
-  const [search, setSearch] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [ventaRows, setVentaRows] = useState<VentaDetail[]>([]);
@@ -127,7 +128,8 @@ export function VentasWorkspace() {
     }
     const { filters, search: q, soldYear: anio } = parseVentasListStateFromSearchParams(searchParams);
     setCharacteristicFilters(filters);
-    setSearch(q);
+    setSearchQuery(q);
+    setDebouncedSearch(q);
     setSoldYear(anio);
     setUrlTabReady(true);
     skipListUrlSyncRef.current = true;
@@ -136,6 +138,11 @@ export function VentasWorkspace() {
     });
     return () => window.cancelAnimationFrame(frame);
   }, [searchParams]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(searchQuery), 280);
+    return () => window.clearTimeout(timer);
+  }, [searchQuery]);
 
   const syncListUrl = useCallback(
     (
@@ -151,6 +158,11 @@ export function VentasWorkspace() {
     },
     [router],
   );
+
+  useEffect(() => {
+    if (skipListUrlSyncRef.current) return;
+    syncListUrl(tab, characteristicFilters, debouncedSearch, soldYear);
+  }, [debouncedSearch, tab, characteristicFilters, soldYear, syncListUrl]);
 
   useEffect(() => {
     if (!token) return;
@@ -321,15 +333,15 @@ export function VentasWorkspace() {
       return ventaRows
         .filter((venta) => {
           const label = `${venta.inmueble?.code ?? ""} ${venta.inmueble?.title ?? ""} ${buyerSearchText(venta, parteNombres)} ${ventaInmobiliariaLabel(venta.estadoInmobiliaria)}`;
-          return matchesSearch(label, search);
+          return matchesSearch(label, debouncedSearch);
         })
         .map((venta) => ({ kind: "venta", venta }));
     }
     return catalogRows
       .filter((item) => item.ofertasActivas.some((oferta) => oferta.tipoOperacionCode === "venta"))
-      .filter((item) => matchesSearch(catalogItemSearchText(item), search))
+      .filter((item) => matchesSearch(catalogItemSearchText(item), debouncedSearch))
       .map((item) => ({ kind: "catalog", item }));
-  }, [tab, ventaRows, catalogRows, search, parteNombres]);
+  }, [tab, ventaRows, catalogRows, debouncedSearch, parteNombres]);
 
   const emptyHint = useMemo(() => ventasEmptyHint(tab), [tab]);
 
@@ -424,7 +436,7 @@ export function VentasWorkspace() {
 
   function changeTab(next: VentasTabId) {
     setTab(next);
-    setSearch("");
+    setSearchQuery("");
     skipFilterReloadRef.current = true;
     setSoldYear(null);
     router.replace(buildVentasListHref(next, characteristicFilters, "", null), { scroll: false });
@@ -435,7 +447,7 @@ export function VentasWorkspace() {
       const id = row.venta.id;
       if (!Number.isInteger(id) || id <= 0) return;
       router.push(
-        buildVentasVentaHref(id, tab, characteristicFiltersRef.current, search, soldYearRef.current),
+        buildVentasVentaHref(id, tab, characteristicFiltersRef.current, searchQuery, soldYearRef.current),
       );
       return;
     }
@@ -455,7 +467,7 @@ export function VentasWorkspace() {
               venta.id,
               tab,
               characteristicFiltersRef.current,
-              search,
+              searchQuery,
               soldYearRef.current,
             ),
           );
@@ -472,7 +484,7 @@ export function VentasWorkspace() {
           inmuebleId,
           tab,
           characteristicFiltersRef.current,
-          search,
+          searchQuery,
           soldYearRef.current,
         ),
       );
@@ -506,7 +518,7 @@ export function VentasWorkspace() {
               loading={loading && isInitialLoad}
               onChange={(next) => {
                 setSoldYear(next);
-                syncListUrl(tab, characteristicFilters, search, next);
+                syncListUrl(tab, characteristicFilters, searchQuery, next);
               }}
             />
           ) : null}
@@ -515,11 +527,11 @@ export function VentasWorkspace() {
             tiposInmueble={tiposInmueble}
             onChange={(next) => {
               setCharacteristicFilters(next);
-              syncListUrl(tab, next, search, soldYear);
+              syncListUrl(tab, next, searchQuery, soldYear);
             }}
             onClear={() => {
               setCharacteristicFilters(EMPTY_CHARACTERISTIC_FILTERS);
-              setSearch("");
+              setSearchQuery("");
               setSoldYear(null);
               syncListUrl(tab, EMPTY_CHARACTERISTIC_FILTERS, "", null);
             }}
@@ -558,12 +570,12 @@ export function VentasWorkspace() {
               refreshing={refreshing}
               listTransitionKey={listTransitionKey}
               isInitialLoad={isInitialLoad}
-              search={search}
+              search={searchQuery}
               searchPlaceholder={tabCopy.searchPlaceholder}
               emptyHint={emptyHint}
               parteNombres={parteNombres}
               onSearchChange={(next) => {
-                setSearch(next);
+                setSearchQuery(next);
                 syncListUrl(tab, characteristicFilters, next, soldYear);
               }}
               onOpenRow={handleOpenRow}
