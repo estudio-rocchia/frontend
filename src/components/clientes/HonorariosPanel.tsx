@@ -206,7 +206,7 @@ export const HonorariosPanel = forwardRef<
                 </div>
                 <p className="text-[13px] font-medium text-text-primary">Ninguna propiedad seleccionada</p>
                 <p className="max-w-[220px] text-[12px] leading-snug text-text-secondary">
-                  Usá el filtro de alquileres para configurar honorarios.
+                  Elegí un inmueble alquilado o en alquiler para configurar honorarios.
                 </p>
               </div>
             )}

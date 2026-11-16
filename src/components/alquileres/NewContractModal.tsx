@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Search, X } from "lucide-react";
+import { Loader2, Search, X } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Modal } from "@/components/ui/Modal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { ChipToggle, FormField, FormSection } from "@/components/ui/FormLayout";
@@ -31,6 +32,7 @@ import {
   MIN_VACANTE_SEARCH_LEN,
   VACANTES_MODAL_PAGE_SIZE,
   alquilerInmuebleFichaPath,
+  economiaDefaultsFromVacante,
   filterInmueblesSinAlquiler,
   vacanteComercializacionLabel,
   vacanteDisplayLabel,
@@ -183,6 +185,7 @@ export function NewContractModal({
   const [form, setForm] = useState<NewContractForm>(() => emptyForm(hasVacantes));
   const [vacanteSearchQuery, setVacanteSearchQuery] = useState("");
   const [vacantePage, setVacantePage] = useState(0);
+  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
     if (open) {
@@ -194,10 +197,12 @@ export function NewContractModal({
       const vacante =
         initialInmuebleId && inmueblesSinAlquiler.find((item) => item.inmuebleId === initialInmuebleId);
       if (vacante) {
+        const economia = economiaDefaultsFromVacante(vacante);
         setForm({
           ...base,
           property: { mode: "existente", inmuebleId: vacante.inmuebleId },
           owner: ownerFromInmueble(vacante, personas) ?? emptyOwner,
+          ...(economia ?? {}),
         });
         return;
       }
@@ -325,6 +330,7 @@ export function NewContractModal({
   }
 
   function handleClose() {
+    if (submitting) return;
     setStep(0);
     setError(null);
     setForm(emptyForm(hasVacantes));
@@ -333,17 +339,15 @@ export function NewContractModal({
   }
 
   function handleSubmit() {
+    if (submitting) return;
     const message = validateStep(step);
     if (message) {
       setError(message);
       return;
     }
     if (!canSubmit) return;
-    onSubmit(form);
-    setStep(0);
     setError(null);
-    setForm(emptyForm(hasVacantes));
-    setVacanteSearchQuery("");
+    onSubmit(form);
   }
 
   function patch(partial: Partial<NewContractForm>) {
@@ -361,10 +365,12 @@ export function NewContractModal({
 
   function selectVacante(inmueble: InmuebleSinAlquiler) {
     const owner = ownerFromInmueble(inmueble, personas);
+    const economia = economiaDefaultsFromVacante(inmueble);
     setVacanteSearchQuery("");
     patch({
       property: { mode: "existente", inmuebleId: inmueble.inmuebleId },
       owner: owner ?? emptyOwner,
+      ...(economia ?? { amount: "", depositAmount: "", currency: "ARS" as const }),
     });
   }
 
@@ -375,32 +381,94 @@ export function NewContractModal({
       open={open}
       onClose={handleClose}
       title="Crear contrato"
-      subtitle={<WizardStepIndicator steps={STEP_TITLES} currentStep={step} />}
+      subtitle={
+        submitting ? (
+          <p className="text-[13px] text-text-secondary">Guardando el nuevo contrato…</p>
+        ) : (
+          <WizardStepIndicator steps={STEP_TITLES} currentStep={step} />
+        )
+      }
       maxWidthClass="max-w-2xl"
-      contentScrollKey={step}
+      contentScrollKey={submitting ? "creating" : step}
       footer={
-        <>
-          <ButtonOutline type="button" onClick={handleClose} disabled={submitting}>
-            Cancelar
-          </ButtonOutline>
-          {step > 0 ? (
-            <ButtonOutline type="button" onClick={goBack} disabled={submitting}>
-              Atrás
+        submitting ? null : (
+          <>
+            <ButtonOutline type="button" onClick={handleClose}>
+              Cancelar
             </ButtonOutline>
-          ) : null}
-          {isLastStep ? (
-            <ButtonPrimary type="button" disabled={!canSubmit || submitting} onClick={handleSubmit}>
-              {submitting ? "Creando…" : "Crear contrato"}
-            </ButtonPrimary>
-          ) : (
-            <ButtonPrimary type="button" onClick={goNext} disabled={submitting}>
-              Siguiente
-            </ButtonPrimary>
-          )}
-        </>
+            {step > 0 ? (
+              <ButtonOutline type="button" onClick={goBack}>
+                Atrás
+              </ButtonOutline>
+            ) : null}
+            {isLastStep ? (
+              <ButtonPrimary type="button" disabled={!canSubmit} onClick={handleSubmit}>
+                Crear contrato
+              </ButtonPrimary>
+            ) : (
+              <ButtonPrimary type="button" onClick={goNext}>
+                Siguiente
+              </ButtonPrimary>
+            )}
+          </>
+        )
       }
     >
-      <div className="flex flex-col gap-5">
+      <AnimatePresence mode="wait" initial={false}>
+        {submitting ? (
+          <motion.div
+            key="creating-contract"
+            initial={{ opacity: 0, y: reduceMotion ? 0 : 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: reduceMotion ? 0 : -8 }}
+            transition={{
+              duration: reduceMotion ? 0 : 0.32,
+              ease: [0.16, 1, 0.3, 1],
+            }}
+            className="flex min-h-72 flex-col items-center justify-center gap-4 px-4 py-8"
+            role="status"
+            aria-live="polite"
+            aria-busy="true"
+          >
+            <motion.div
+              initial={{ scale: reduceMotion ? 1 : 0.92, opacity: 0.6 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: reduceMotion ? 0 : 0.4, ease: [0.16, 1, 0.3, 1] }}
+              className="flex h-16 w-16 items-center justify-center rounded-full border border-primary/25 bg-primary-soft"
+            >
+              <Loader2
+                className="h-8 w-8 animate-spin text-primary motion-reduce:animate-none"
+                aria-hidden
+              />
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, y: reduceMotion ? 0 : 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{
+                duration: reduceMotion ? 0 : 0.28,
+                delay: reduceMotion ? 0 : 0.08,
+                ease: [0.16, 1, 0.3, 1],
+              }}
+              className="flex max-w-sm flex-col items-center gap-1.5 text-center"
+            >
+              <p className="text-base font-semibold text-text-primary">Creando contrato</p>
+              <p className="text-sm leading-snug text-text-secondary">
+                Registramos el inmueble, las partes, el alquiler y las cuotas del primer ciclo.
+              </p>
+            </motion.div>
+          </motion.div>
+        ) : (
+          <motion.div
+            key={`wizard-step-${step}`}
+            initial={{ opacity: 0, x: reduceMotion ? 0 : 14 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: reduceMotion ? 0 : -10 }}
+            transition={{
+              duration: reduceMotion ? 0 : 0.22,
+              ease: [0.16, 1, 0.3, 1],
+            }}
+            className="flex flex-col gap-5"
+          >
         {step === 0 ? (
           <FormSection title="Inmueble" variant="prominent">
             <div className="flex flex-col gap-4">
@@ -596,6 +664,7 @@ export function NewContractModal({
                   onChange={(alta) => patch({ property: { mode: "nuevo", alta } })}
                   tiposInmueble={tiposInmueble}
                   existingCodes={usedInmuebleCodes}
+                  showCodePreview={false}
                 />
               ) : (
                 <p className="text-sm text-text-secondary">Iniciá sesión para cargar un nuevo inmueble.</p>
@@ -726,6 +795,12 @@ export function NewContractModal({
                   onChange={(v) => patch({ fechaFin: v })}
                 />
               </div>
+              {selectedVacante && economiaDefaultsFromVacante(selectedVacante) ? (
+                <p className="text-[12px] leading-snug text-text-secondary">
+                  Monto y moneda tomados de la oferta de alquiler. Podés ajustarlos si el contrato acuerda otro
+                  valor.
+                </p>
+              ) : null}
               <div className="grid gap-4 sm:grid-cols-2">
                 <FormField
                   label="Monto mensual"
@@ -789,7 +864,9 @@ export function NewContractModal({
             {error}
           </p>
         ) : null}
-      </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </Modal>
   );
 }

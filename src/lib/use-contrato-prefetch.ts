@@ -64,10 +64,8 @@ export function useContratoPrefetch(token: string | null) {
   const consume = useCallback(async (contratoId: number): Promise<PrefetchEntry | null> => {
     const pending = inflight.current.get(contratoId);
     if (!pending) return null;
+    inflight.current.delete(contratoId);
     const result = await pending;
-    if (!result) {
-      inflight.current.delete(contratoId);
-    }
     return result;
   }, []);
 

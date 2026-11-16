@@ -48,7 +48,7 @@ const COPY: Record<
     },
     available: {
       title: "Poner en alquiler",
-      subtitle: "El galpón quedará disponible para alquilar.",
+      subtitle: "El inmueble quedará disponible para alquilar.",
       availableHint: "La oferta de alquiler quedará en estado Disponible.",
     },
   },

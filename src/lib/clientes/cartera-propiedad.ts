@@ -137,22 +137,13 @@ export function countPropiedadesConHonorarios(propiedades: PropiedadAdministrada
   return propiedades.filter((p) => aceptaHonorariosAdministracion(p)).length;
 }
 
-const FILTROS_HONORARIOS_ACTIVOS: CarteraFiltro[] = [
-  "alquiladas",
-  "para_alquiler",
-  "alquiler_y_venta",
-];
-
+/** Panel de honorarios nítido solo si hay inmuebles en alquiler y la fila elegida es alquilado o para alquiler. */
 export function honorariosPanelActivo(
-  filtro: CarteraFiltro,
-  conteos: Record<CarteraFiltro, number>,
+  propiedadSeleccionada: PropiedadAdministradaRecord | null,
   propiedadesConHonorarios: number,
 ): boolean {
   if (propiedadesConHonorarios === 0) return false;
-  if (filtro === "en_venta" || filtro === "todas") return false;
-  if (FILTROS_HONORARIOS_ACTIVOS.includes(filtro)) {
-    return conteos[filtro] > 0;
-  }
-  return false;
+  if (propiedadSeleccionada == null) return false;
+  return aceptaHonorariosAdministracion(propiedadSeleccionada);
 }
 

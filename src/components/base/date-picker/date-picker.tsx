@@ -2,7 +2,8 @@
 
 import { useTemplateCopy } from "@/components/foundations/template-copy/template-copy";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { RefObject } from "react";
 import { Calendar, Dialog, Popover, useLocale } from "react-aria-components";
 import type { CalendarDate } from "@internationalized/date";
@@ -15,7 +16,12 @@ import {
 } from "@/components/base/date-picker/shared";
 import { useOverlayPortalContainer } from "@/lib/ui/overlay-portal";
 import { cx } from "@/utils/cx";
-import { useDismissOnOutsidePress } from "@/utils/use-dismiss-on-outside-press";
+import {
+  closestRocchiaOverlayKind,
+  rocchiaOverlayKind,
+  useDismissOnOutsidePress,
+  useTriggerToggle,
+} from "@/utils/use-dismiss-on-outside-press";
 
 /**
  * Figma source: Board UI → "Calendar_single" (node 3879:6708).
@@ -36,9 +42,14 @@ import { useDismissOnOutsidePress } from "@/utils/use-dismiss-on-outside-press";
  * Standalone `Popover` + `triggerRef` (like `MeetingScheduler`), not
  * `DialogTrigger`, so an external trigger can be swapped in: pass
  * `triggerRef`/`isOpen`/`onOpenChange` to anchor the popover to your own
- * element (e.g. the calendar template's month-switcher label) instead of
+ * element (e.g. the calendar template's month switcher label) instead of
  * DatePicker's own button, which is hidden in that case.
  */
+
+/** Altura aproximada del panel; usada para flip fuera de modales. */
+const CALENDAR_POPOVER_ESTIMATE_PX = 470;
+
+type CalendarPopoverPlacement = "bottom start" | "top start";
 
 export interface DatePickerProps {
   value?: CalendarDate | null;
@@ -73,10 +84,13 @@ export function DatePicker({
   const isExternal = externalTriggerRef !== undefined;
   const popoverRef = useRef<HTMLElement>(null);
   const overlayPortal = useOverlayPortalContainer();
+  const inModal = overlayPortal != null;
 
+  const [placement, setPlacement] = useState<CalendarPopoverPlacement>("bottom start");
   const [internalOpen, setInternalOpen] = useState(false);
   const isOpen = isExternal ? (controlledIsOpen ?? false) : internalOpen;
   const setIsOpen = isExternal ? (controlledOnOpenChange ?? (() => {})) : setInternalOpen;
+  const allowOpenChange = useTriggerToggle(isOpen, ownTriggerRef);
 
   const isControlled = value !== undefined;
   const [internalValue, setInternalValue] = useState<CalendarDate | null>(defaultValue);
@@ -91,10 +105,6 @@ export function DatePicker({
   // calendar template's month switcher) between one open and the next.
   const [openKey, setOpenKey] = useState(0);
 
-  // Re-sync the calendar's displayed month/selection to the current
-  // committed value every time the popover opens — not just when DatePicker's
-  // own trigger toggles it, but also when `isOpen` is flipped true by an
-  // external trigger (`triggerRef`), which never runs `openChange` below.
   useEffect(() => {
     if (isOpen) {
       setOpenKey((k) => k + 1);
@@ -107,16 +117,67 @@ export function DatePicker({
     setIsOpen(false);
   };
 
-  const openChange = (open: boolean) => {
-    if (open) {
-      requestAnimationFrame(() => {
-        triggerRef.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
-      });
-    }
-    setIsOpen(open);
-  };
+  const resolvePlacement = useCallback((trigger: HTMLElement): CalendarPopoverPlacement => {
+    const needed = CALENDAR_POPOVER_ESTIMATE_PX;
+    const rect = trigger.getBoundingClientRect();
+    const padding = 16;
+    const spaceBelow = window.innerHeight - rect.bottom - padding;
+    const spaceAbove = rect.top - padding;
+    return spaceBelow < needed && (spaceAbove >= needed || spaceAbove > spaceBelow)
+      ? "top start"
+      : "bottom start";
+  }, []);
 
-  useDismissOnOutsidePress(isOpen, () => setIsOpen(false), [triggerRef, popoverRef]);
+  const setOpen = useCallback(
+    (open: boolean) => {
+      if (open && !inModal && triggerRef.current) {
+        setPlacement(resolvePlacement(triggerRef.current));
+      }
+      setIsOpen(open);
+    },
+    [inModal, resolvePlacement, setIsOpen],
+  );
+
+  const ignoreNestedMenuPress = useCallback(
+    (target: Node) => closestRocchiaOverlayKind(target) === "menu",
+    [],
+  );
+
+  const dismiss = useCallback(() => setIsOpen(false), [setIsOpen]);
+
+  useDismissOnOutsidePress(isOpen, dismiss, [triggerRef, popoverRef], {
+    ignoreIf: ignoreNestedMenuPress,
+  });
+
+  const calendarPanel = (
+    <Dialog aria-label={ariaLabel} className="overflow-visible outline-none">
+      <Calendar
+        key={openKey}
+        aria-label={ariaLabel}
+        value={committedValue}
+        onChange={(next) => commit(next)}
+      >
+        <div className="flex flex-col overflow-visible pt-2 pe-2 pb-4 ps-2">
+          <MonthPanel offset={0} showPrev showNext />
+        </div>
+      </Calendar>
+    </Dialog>
+  );
+
+  const modalCalendar =
+    inModal && isOpen && overlayPortal
+      ? createPortal(
+          <div
+            className="fixed inset-0 z-[109] flex items-center justify-center p-4"
+            role="presentation"
+          >
+            <div ref={popoverRef} className={popoverClassName} {...rocchiaOverlayKind("calendar")}>
+              {calendarPanel}
+            </div>
+          </div>,
+          overlayPortal,
+        )
+      : null;
 
   return localize((
     <>
@@ -125,7 +186,11 @@ export function DatePicker({
           ref={ownTriggerRef}
           type="button"
           disabled={isDisabled}
-          onClick={() => openChange(!isOpen)}
+          onClick={() => {
+            const next = !isOpen;
+            if (!allowOpenChange(next)) return;
+            setOpen(next);
+          }}
           className={cx(triggerButtonClassName, className)}
         >
           <RiCalendarLine className="size-5 shrink-0 text-foreground-icon-primary" aria-hidden />
@@ -134,32 +199,24 @@ export function DatePicker({
           </span>
         </button>
       )}
-      <Popover
-        ref={popoverRef}
-        triggerRef={triggerRef}
-        isOpen={isOpen}
-        onOpenChange={openChange}
-        offset={8}
-        placement="bottom start"
-        shouldFlip
-        containerPadding={16}
-        isNonModal
-        UNSTABLE_portalContainer={overlayPortal}
-        className={popoverClassName}
-      >
-        <Dialog aria-label={ariaLabel} className="outline-none">
-          <Calendar
-            key={openKey}
-            aria-label={ariaLabel}
-            value={committedValue}
-            onChange={(next) => commit(next)}
-          >
-            <div className="flex flex-col pt-2 pe-2 pb-3 ps-2">
-              <MonthPanel offset={0} showPrev showNext />
-            </div>
-          </Calendar>
-        </Dialog>
-      </Popover>
+      {modalCalendar}
+      {!inModal && (
+        <Popover
+          ref={popoverRef}
+          triggerRef={triggerRef}
+          isOpen={isOpen}
+          offset={8}
+          placement={placement}
+          shouldFlip
+          containerPadding={16}
+          isNonModal
+          UNSTABLE_portalContainer={overlayPortal}
+          className={popoverClassName}
+          {...rocchiaOverlayKind("calendar")}
+        >
+          {calendarPanel}
+        </Popover>
+      )}
     </>
   ));
 }

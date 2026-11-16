@@ -1,5 +1,6 @@
 import { disponibilidadAlquilerLabel } from "@/lib/alquileres/disponibilidad-labels";
 import type { InmuebleSinAlquiler } from "@/lib/mappers/propietario-inmuebles";
+import { montoFromApi } from "@/lib/rental-adjustment";
 import { ofertaEstadoVariant } from "@/lib/ventas/status-labels";
 
 export const MIN_VACANTE_SEARCH_LEN = 2;
@@ -74,4 +75,17 @@ export function alquilerInmuebleFichaPath(inmuebleId: number, tab?: "resumen" | 
 
 export function nuevoContratoHref(inmuebleId: number): string {
   return `/alquileres?nuevoContrato=1&inmuebleId=${inmuebleId}`;
+}
+
+export function economiaDefaultsFromVacante(inmueble: InmuebleSinAlquiler): {
+  amount: string;
+  depositAmount: string;
+  currency: "ARS" | "USD";
+} | null {
+  const monto = inmueble.ofertaAlquilerMontoPrecio;
+  if (!monto) return null;
+  const amount = montoFromApi(monto);
+  if (!amount) return null;
+  const currency = inmueble.ofertaAlquilerCodigoMoneda?.trim() === "USD" ? "USD" : "ARS";
+  return { amount, depositAmount: amount, currency };
 }

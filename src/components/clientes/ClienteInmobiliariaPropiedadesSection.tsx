@@ -185,16 +185,25 @@ function PropiedadCarteraItem({
         </div>
 
         <div className="flex shrink-0 flex-col items-end justify-center gap-1">
-          {aceptaHonorariosAdministracion(propiedad) ? (
-            showHonorario ? (
-              <span className="rounded-full bg-primary-soft px-2.5 py-1 text-[12px] font-bold text-primary tabular-nums">
-                {formatPorcentaje(propiedad.porcentajeAdministracion)}
-              </span>
-            ) : (
-              <span className="rounded-full bg-bg-page px-2 py-0.5 text-[10px] font-medium text-text-secondary">
-                {formatPorcentaje(honorarioCliente)}
-              </span>
-            )
+          {showHonorario ? (
+            <span
+              title={
+                aceptaHonorariosAdministracion(propiedad)
+                  ? undefined
+                  : "Honorario configurado; aplica cuando el inmueble esté en alquiler"
+              }
+              className={`rounded-full px-2.5 py-1 text-[12px] font-bold tabular-nums ${
+                aceptaHonorariosAdministracion(propiedad)
+                  ? "bg-primary-soft text-primary"
+                  : "bg-bg-page text-text-secondary"
+              }`}
+            >
+              {formatPorcentaje(propiedad.porcentajeAdministracion)}
+            </span>
+          ) : aceptaHonorariosAdministracion(propiedad) ? (
+            <span className="rounded-full bg-bg-page px-2 py-0.5 text-[10px] font-medium text-text-secondary">
+              {formatPorcentaje(honorarioCliente)}
+            </span>
           ) : (
             <span className="max-w-[88px] text-right text-[10px] font-medium leading-snug text-text-secondary">
               Sin honorarios
@@ -302,7 +311,7 @@ export function ClienteInmobiliariaPropiedadesSection({
     [propiedades],
   );
   const honorariosPorCliente = modoHonorarios === "por_cliente";
-  const honorariosActivos = honorariosPanelActivo(filtro, conteosCartera, propiedadesConHonorarios);
+  const honorariosActivos = honorariosPanelActivo(propiedadSeleccionada, propiedadesConHonorarios);
 
   function handleSelectPropiedad(propietarioId: number) {
     setSelectedPropietarioId(propietarioId);

@@ -13,11 +13,27 @@ import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 import {
   activePlanActualizacionDeposito,
   cuotaDepositoSaldoPendiente,
+  movimientoDepositoDiferencia,
+  movimientoDepositoMontoAnterior,
+  movimientoDepositoTipoLabel,
+  movimientosDepositoOrdenados,
   planEstadoLabel,
   totalSaldoPlanDeposito,
 } from "@/lib/mappers/deposito-plan";
 
-type DepositoPanel = "cuotas" | "planes";
+type DepositoPanel = "historial" | "cuotas" | "planes";
+
+function movimientoTipoVariant(tipo: string): "success" | "warning" | "danger" {
+  switch (tipo) {
+    case "constituted":
+    case "returned":
+      return "success";
+    case "applied_to_debt":
+      return "danger";
+    default:
+      return "warning";
+  }
+}
 
 function cuotaEstadoVariant(estadoCode: string): "success" | "warning" | "danger" {
   switch (estadoCode) {
@@ -59,13 +75,18 @@ export function ContractDepositoPlanSection({
   onCreatePlan: (values: PlanActualizacionDepositoFormValues) => Promise<void>;
 }) {
   const [modalOpen, setModalOpen] = useState(false);
-  const [activePanel, setActivePanel] = useState<DepositoPanel>("cuotas");
+  const movimientos = contrato.deposito?.movimientos ?? [];
+  const [activePanel, setActivePanel] = useState<DepositoPanel>(
+    movimientos.length > 0 ? "historial" : "cuotas",
+  );
 
   const activePlan = activePlanActualizacionDeposito(planes);
   const moneda = contrato.codigoMoneda.trim();
-  const depositoGarantia = contrato.deposito.monto
+  const depositoGarantia = contrato.deposito?.monto
     ? formatMoney(contrato.deposito.monto, contrato.deposito.codigoMoneda ?? moneda)
-    : "—";
+    : contrato.montoDeposito
+      ? formatMoney(contrato.montoDeposito, contrato.codigoMonedaDeposito ?? moneda)
+      : "—";
   const saldoPlan = totalSaldoPlanDeposito(activePlan);
   const cuotasConSaldo = activePlan
     ? activePlan.cuotas.filter((cuota) => cuotaDepositoSaldoPendiente(cuota) > 0).length
@@ -75,8 +96,10 @@ export function ContractDepositoPlanSection({
     () => [...planes].sort((a, b) => b.creadoEn.localeCompare(a.creadoEn)),
     [planes],
   );
+  const movimientosOrdenados = useMemo(() => movimientosDepositoOrdenados(movimientos), [movimientos]);
 
   const subTabs: { id: DepositoPanel; label: string; count: number }[] = [
+    { id: "historial", label: "Historial del depósito", count: movimientos.length },
     { id: "cuotas", label: "Cuotas del plan", count: activePlan?.cuotas.length ?? 0 },
     { id: "planes", label: "Historial de planes", count: planes.length },
   ];
@@ -85,7 +108,8 @@ export function ContractDepositoPlanSection({
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <p className="text-[13px] text-text-secondary">
-          Planes de cuotas para incrementar el depósito en garantía. Las cuotas se pueden cobrar junto al alquiler.
+          Monto vigente del depósito, historial de constitución y actualizaciones, y planes de cuotas para cobrar
+          diferencias junto al alquiler.
         </p>
         {canManage && !activePlan ? (
           <ButtonOutline type="button" onClick={() => setModalOpen(true)} disabled={loading || submitting}>
@@ -140,7 +164,69 @@ export function ContractDepositoPlanSection({
         ))}
       </div>
 
-      {activePanel === "cuotas" ? (
+      {activePanel === "historial" ? (
+        <div className="flex flex-col gap-3">
+          <p className="text-[13px] text-text-secondary">
+            Constitución del depósito y cada actualización registrada (por ejemplo, al ajustar el alquiler).
+          </p>
+
+          {loading ? (
+            <p className="text-[13px] text-text-secondary">Cargando historial…</p>
+          ) : movimientosOrdenados.length === 0 ? (
+            <div className="rounded-md border border-dashed border-border px-4 py-5 text-center text-[13px] text-text-secondary">
+              Sin movimientos de depósito registrados.
+            </div>
+          ) : (
+            <div
+              className="max-h-[min(28rem,55vh)] overflow-auto rounded-md border border-border"
+              data-testid="deposito-movimientos-table"
+            >
+              <table className="min-w-full text-left text-[13px]">
+                <thead className="sticky top-0 z-10 border-b border-border bg-bg-page text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
+                  <tr>
+                    <th className="px-4 py-3">Fecha</th>
+                    <th className="px-4 py-3">Tipo</th>
+                    <th className="px-4 py-3 text-right">Depósito anterior</th>
+                    <th className="px-4 py-3 text-right">Depósito nuevo</th>
+                    <th className="px-4 py-3 text-right">Diferencia</th>
+                    <th className="px-4 py-3">Motivo</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {movimientosOrdenados.map((movimiento) => {
+                    const monedaMov = movimiento.codigoMoneda.trim() || moneda;
+                    const diferencia = movimientoDepositoDiferencia(movimiento.reason);
+                    const montoAnterior = movimientoDepositoMontoAnterior(movimiento, movimientos);
+                    return (
+                      <tr key={movimiento.id} className="bg-bg-card">
+                        <td className="px-4 py-3 text-text-secondary">
+                          {formatDateDisplay(movimiento.ocurridoEn.slice(0, 10))}
+                        </td>
+                        <td className="px-4 py-3">
+                          <StatusBadge
+                            label={movimientoDepositoTipoLabel(movimiento.tipoMovimiento)}
+                            variant={movimientoTipoVariant(movimiento.tipoMovimiento)}
+                          />
+                        </td>
+                        <td className={`px-4 py-3 text-right ${moneyClassName}`}>
+                          {montoAnterior ? formatMoney(montoAnterior, monedaMov) : "—"}
+                        </td>
+                        <td className={`px-4 py-3 text-right font-medium ${moneyClassName}`}>
+                          {formatMoney(movimiento.monto, monedaMov)}
+                        </td>
+                        <td className={`px-4 py-3 text-right ${moneyClassName}`}>
+                          {diferencia ? formatMoney(diferencia, monedaMov) : "—"}
+                        </td>
+                        <td className="max-w-xs px-4 py-3 text-text-secondary">{movimiento.reason ?? "—"}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      ) : activePanel === "cuotas" ? (
         <div className="flex flex-col gap-3">
           <p className="text-[13px] text-text-secondary">
             {activePlan

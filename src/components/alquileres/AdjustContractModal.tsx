@@ -31,6 +31,7 @@ import {
 } from "@/lib/alquileres/deposito-plan";
 import {
   ADJUSTMENT_INDICES,
+  adjustmentDateForSelectedMonth,
   adjustmentIndexLabel,
   contractualAdjustmentEnd,
   addMonthsToMonthYear,
@@ -255,7 +256,10 @@ export function AdjustContractModal({
     setCantidadCuotasDeposito(String(DEFAULT_DEPOSITO_PLAN_CUOTAS));
   }, [contrato, open, ultimoAjusteEn]);
 
-  const fechaAjuste = fechaAjusteMonth ? toIsoMonthDate(fechaAjusteMonth) : null;
+  const fechaAjuste =
+    fechaAjusteMonth && contrato
+      ? adjustmentDateForSelectedMonth(contrato, fechaAjusteMonth, ultimoAjusteEn)
+      : null;
   const requiresManualMonto = contrato ? isAgreedAdjustmentContrato(contrato) : false;
   const montoNuevoParsed = parseAmountInput(montoNuevoInput);
   const montoNuevoAcordado =

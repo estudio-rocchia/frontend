@@ -215,18 +215,18 @@ export function CatalogInmuebleFichaView() {
     }
   }, [inmuebleId, token, logout, fromTab]);
 
-  const esGalpon = supportsDualModalidad(ficha?.tipoInmueble?.code);
+  const dobleModalidad = supportsDualModalidad(ficha?.tipoInmueble?.code);
 
   useEffect(() => {
-    const tab = tabFromQuery(searchParams.get("tab"), esGalpon);
+    const tab = tabFromQuery(searchParams.get("tab"), dobleModalidad);
     if (tab) {
       setActiveTab(tab);
       return;
     }
-    if (searchParams.get("tab") === "comercializacion" && !esGalpon) {
+    if (searchParams.get("tab") === "comercializacion" && !dobleModalidad) {
       setActiveTab("resumen");
     }
-  }, [searchParams, esGalpon]);
+  }, [searchParams, dobleModalidad]);
 
   useEffect(() => {
     if (inmuebleId === null) {
@@ -359,6 +359,32 @@ export function CatalogInmuebleFichaView() {
     if (actionsRef.current) actionsRef.current.open = false;
   }
 
+  /** Inmueble vinculado en administración sin oferta publicada (p. ej. desde cartera del cliente). */
+  function administracionSinOfertaActions() {
+    if (!enContextoAlquileres || inmuebleId === null) return null;
+    return (
+      <div className="flex w-full flex-wrap justify-end gap-2 sm:w-auto">
+        <Link
+          href={nuevoContratoHref(inmuebleId)}
+          className={`rocchia-action inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-[13px] font-semibold text-text-on-primary hover:bg-primary-dark ${interactiveFocusClass}`}
+        >
+          <Plus className="h-4 w-4" aria-hidden />
+          Crear contrato
+        </Link>
+        {canEditDetalle ? (
+          <ButtonOutline
+            type="button"
+            className="gap-2"
+            onClick={() => setEditModalOpen(true)}
+          >
+            <Pencil className="h-4 w-4" aria-hidden />
+            Editar
+          </ButtonOutline>
+        ) : null}
+      </div>
+    );
+  }
+
   const clienteReturn = parseClienteFichaReturn(searchParams);
 
   function volverAlListado() {
@@ -436,7 +462,7 @@ export function CatalogInmuebleFichaView() {
             <h1 className="text-[26px] font-bold text-primary">{inmuebleHeading}</h1>
             {metaLine ? <p className="text-sm text-text-secondary">{metaLine}</p> : null}
             <div className="flex flex-wrap items-center gap-2">
-              {esGalpon ? (
+              {dobleModalidad ? (
                 <>
                   {oferta ? (
                     <StatusBadge
@@ -457,7 +483,7 @@ export function CatalogInmuebleFichaView() {
                   variant={ofertaEstadoVariant(estadoCode)}
                 />
               )}
-              {!esGalpon && isOffMarket && motivo !== VENTA_EMPTY_FIELD ? (
+              {!dobleModalidad && isOffMarket && motivo !== VENTA_EMPTY_FIELD ? (
                 <span className="rounded-full bg-bg-page px-2.5 py-1 text-[11px] font-semibold text-text-secondary">
                   {motivo}
                 </span>
@@ -477,7 +503,7 @@ export function CatalogInmuebleFichaView() {
             </div>
           </div>
         </div>
-        {!esGalpon ? (
+        {!dobleModalidad ? (
         <div className="flex flex-col items-start gap-3 sm:items-end">
           <div className="flex flex-col gap-1 sm:text-right">
             <span className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
@@ -644,25 +670,13 @@ export function CatalogInmuebleFichaView() {
                 </div>
               </details>
             </div>
-          ) : enContextoAlquileres && inmuebleId !== null ? (
-            <Link
-              href={nuevoContratoHref(inmuebleId)}
-              className={`rocchia-action inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-[13px] font-semibold text-text-on-primary hover:bg-primary-dark ${interactiveFocusClass}`}
-            >
-              <Plus className="h-4 w-4" aria-hidden />
-              Crear contrato
-            </Link>
-          ) : null}
+          ) : (
+            administracionSinOfertaActions()
+          )}
         </div>
-        ) : enContextoAlquileres && inmuebleId !== null ? (
-          <Link
-            href={nuevoContratoHref(inmuebleId)}
-            className={`rocchia-action inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-[13px] font-semibold text-text-on-primary hover:bg-primary-dark ${interactiveFocusClass}`}
-          >
-            <Plus className="h-4 w-4" aria-hidden />
-            Crear contrato
-          </Link>
-        ) : null}
+        ) : (
+          administracionSinOfertaActions()
+        )}
       </header>
 
       <section className="glass-card">
@@ -670,7 +684,7 @@ export function CatalogInmuebleFichaView() {
           active={activeTab}
           onChange={selectTab}
           historialCount={historial.length + historialAlquiler.length}
-          showComercializacion={esGalpon}
+          showComercializacion={dobleModalidad}
         />
 
         <div
@@ -770,7 +784,7 @@ export function CatalogInmuebleFichaView() {
             </div>
           ) : null}
 
-          {activeTab === "comercializacion" && esGalpon ? (
+          {activeTab === "comercializacion" && dobleModalidad ? (
             <GalponComercializacionPanel
               ofertaVenta={oferta}
               ofertaAlquiler={ofertaAlquiler}
@@ -860,7 +874,7 @@ export function CatalogInmuebleFichaView() {
           if (estadoModalModalidad === "alquiler") {
             setSuccess(
               estadoModalMode === "available"
-                ? "Galpón puesto en alquiler."
+                ? "Inmueble puesto en alquiler."
                 : "Oferta de alquiler fuera de mercado.",
             );
             void load();
@@ -876,7 +890,7 @@ export function CatalogInmuebleFichaView() {
         }}
       />
 
-      {esGalpon && tipoAlquilerId && estadoIds.available ? (
+      {dobleModalidad && tipoAlquilerId && estadoIds.available ? (
         <PublicarEnAlquilerModal
           open={publicarAlquilerOpen}
           onClose={() => setPublicarAlquilerOpen(false)}
@@ -886,7 +900,7 @@ export function CatalogInmuebleFichaView() {
           estadoAvailableId={estadoIds.available}
           onPublished={() => {
             setPublicarAlquilerOpen(false);
-            setSuccess("Galpón publicado en alquiler.");
+            setSuccess("Inmueble publicado en alquiler.");
             void load();
           }}
         />

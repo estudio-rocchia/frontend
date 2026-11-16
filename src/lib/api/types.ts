@@ -255,6 +255,8 @@ export interface InmuebleVacanteConPropietarios {
   origen: InmuebleVacanteOrigen;
   enAdministracion: boolean;
   ofertaAlquilerId: number | null;
+  ofertaAlquilerMontoPrecio: string | null;
+  ofertaAlquilerCodigoMoneda: string | null;
   estadoRedesId: number | null;
   estadoRedesCode: string | null;
 }

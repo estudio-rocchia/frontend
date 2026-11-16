@@ -79,7 +79,7 @@ export function PublicarEnAlquilerModal({
       open={open}
       onClose={onClose}
       title="Publicar en alquiler"
-      subtitle="Crea la oferta de alquiler para este galpón."
+      subtitle="Crea la oferta de alquiler para este inmueble."
       footer={
         <>
           <ButtonOutline type="button" onClick={onClose} disabled={saving}>

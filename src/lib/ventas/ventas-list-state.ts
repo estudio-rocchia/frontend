@@ -19,8 +19,8 @@ export function appendVentasListStateParams(
   filters: VentasCharacteristicFilters,
   search: string,
 ): void {
-  const q = search.trim();
-  if (q) params.set("q", q);
+  // Preservar espacios intermedios (p. ej. "lote barrio"); solo omitir si está vacío.
+  if (search.trim()) params.set("q", search);
 
   if (filters.tipoInmuebleCode) params.set("ltipo", filters.tipoInmuebleCode);
   if (filters.bedroomsMin !== null) params.set("ldorm", String(filters.bedroomsMin));
@@ -77,7 +77,7 @@ export function parseVentasListStateFromSearchParams(searchParams: {
 
   return {
     filters: sanitizeCharacteristicFiltersForTipo(filters),
-    search: searchParams.get("q")?.trim() ?? "",
+    search: searchParams.get("q") ?? "",
     soldYear: parseSoldYear(searchParams),
   };
 }

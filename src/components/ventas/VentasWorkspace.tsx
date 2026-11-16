@@ -81,6 +81,8 @@ function matchesSearch(text: string, q: string): boolean {
   return text.toLowerCase().includes(needle);
 }
 
+const FILTER_DEBOUNCE_MS = 450;
+
 export function VentasWorkspace() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -101,6 +103,8 @@ export function VentasWorkspace() {
   const [tiposInmueble, setTiposInmueble] = useState<CatalogoItem[]>([]);
   const [characteristicFilters, setCharacteristicFilters] =
     useState<VentasCharacteristicFilters>(EMPTY_CHARACTERISTIC_FILTERS);
+  const [debouncedCharacteristicFilters, setDebouncedCharacteristicFilters] =
+    useState<VentasCharacteristicFilters>(EMPTY_CHARACTERISTIC_FILTERS);
   const [tipoVentaId, setTipoVentaId] = useState<number | undefined>();
   const [estadoRedesByCode, setEstadoRedesByCode] = useState<Map<string, number>>(new Map());
   const [savingRedesOfertaId, setSavingRedesOfertaId] = useState<number | null>(null);
@@ -109,8 +113,8 @@ export function VentasWorkspace() {
   const [newVentaInmuebleId, setNewVentaInmuebleId] = useState<number | null>(null);
   const [soldYear, setSoldYear] = useState<number | null>(null);
   const [soldYears, setSoldYears] = useState<number[]>([]);
-  const characteristicFiltersRef = useRef(characteristicFilters);
-  characteristicFiltersRef.current = characteristicFilters;
+  const characteristicFiltersRef = useRef(debouncedCharacteristicFilters);
+  characteristicFiltersRef.current = debouncedCharacteristicFilters;
   const soldYearRef = useRef(soldYear);
   soldYearRef.current = soldYear;
   const skipFilterReloadRef = useRef(true);
@@ -128,7 +132,8 @@ export function VentasWorkspace() {
     }
     const { filters, search: q, soldYear: anio } = parseVentasListStateFromSearchParams(searchParams);
     setCharacteristicFilters(filters);
-    setSearchQuery(q);
+    setDebouncedCharacteristicFilters(filters);
+    setSearchQuery((current) => (current === q || current.startsWith(q) ? current : q));
     setDebouncedSearch(q);
     setSoldYear(anio);
     setUrlTabReady(true);
@@ -143,6 +148,14 @@ export function VentasWorkspace() {
     const timer = window.setTimeout(() => setDebouncedSearch(searchQuery), 280);
     return () => window.clearTimeout(timer);
   }, [searchQuery]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(
+      () => setDebouncedCharacteristicFilters(characteristicFilters),
+      FILTER_DEBOUNCE_MS,
+    );
+    return () => window.clearTimeout(timer);
+  }, [characteristicFilters]);
 
   const syncListUrl = useCallback(
     (
@@ -161,8 +174,8 @@ export function VentasWorkspace() {
 
   useEffect(() => {
     if (skipListUrlSyncRef.current) return;
-    syncListUrl(tab, characteristicFilters, debouncedSearch, soldYear);
-  }, [debouncedSearch, tab, characteristicFilters, soldYear, syncListUrl]);
+    syncListUrl(tab, debouncedCharacteristicFilters, debouncedSearch, soldYear);
+  }, [debouncedSearch, debouncedCharacteristicFilters, tab, soldYear, syncListUrl]);
 
   useEffect(() => {
     if (!token) return;
@@ -309,11 +322,8 @@ export function VentasWorkspace() {
       skipFilterReloadRef.current = false;
       return;
     }
-    const timer = window.setTimeout(() => {
-      void load();
-    }, 350);
-    return () => window.clearTimeout(timer);
-  }, [characteristicFilters, load, tab, estadoIds, tipoVentaId]);
+    void load();
+  }, [debouncedCharacteristicFilters, load, tab, estadoIds, tipoVentaId]);
 
   useEffect(() => {
     if (tab !== "vendidos") return;
@@ -439,7 +449,7 @@ export function VentasWorkspace() {
     setSearchQuery("");
     skipFilterReloadRef.current = true;
     setSoldYear(null);
-    router.replace(buildVentasListHref(next, characteristicFilters, "", null), { scroll: false });
+    router.replace(buildVentasListHref(next, debouncedCharacteristicFilters, "", null), { scroll: false });
   }
 
   async function handleOpenRow(row: VentasTableRow) {
@@ -525,15 +535,20 @@ export function VentasWorkspace() {
           <VentasCatalogFiltersPanel
             filters={characteristicFilters}
             tiposInmueble={tiposInmueble}
-            onChange={(next) => {
-              setCharacteristicFilters(next);
-              syncListUrl(tab, next, searchQuery, soldYear);
-            }}
+            onChange={setCharacteristicFilters}
             onClear={() => {
               setCharacteristicFilters(EMPTY_CHARACTERISTIC_FILTERS);
+              setDebouncedCharacteristicFilters(EMPTY_CHARACTERISTIC_FILTERS);
               setSearchQuery("");
+              setDebouncedSearch("");
               setSoldYear(null);
-              syncListUrl(tab, EMPTY_CHARACTERISTIC_FILTERS, "", null);
+              skipListUrlSyncRef.current = true;
+              router.replace(buildVentasListHref(tab, EMPTY_CHARACTERISTIC_FILTERS, "", null), {
+                scroll: false,
+              });
+              window.requestAnimationFrame(() => {
+                skipListUrlSyncRef.current = false;
+              });
             }}
           />
         </>

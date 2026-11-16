@@ -1737,6 +1737,18 @@ html[data-theme="dark"] .balance-shell .balance-hero-usd {
   }
 }
 
+/* Sin flechas de subir/bajar en inputs numéricos (filtro de precio, medidas, etc.) */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 @layer components {
   .glass-card {
     border-radius: var(--radius-xl);

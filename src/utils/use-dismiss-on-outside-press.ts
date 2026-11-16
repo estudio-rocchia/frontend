@@ -3,6 +3,31 @@
 import { useEffect, useRef } from "react";
 import type { RefObject } from "react";
 
+/** Portalized overlay panels (popover surfaces) for nested-dismiss rules. */
+export const ROCCHIA_OVERLAY_KIND_ATTR = "data-rocchia-overlay";
+
+export type RocchiaOverlayKind = "calendar" | "menu";
+
+export function rocchiaOverlayKind(kind: RocchiaOverlayKind) {
+  return { [ROCCHIA_OVERLAY_KIND_ATTR]: kind } as const;
+}
+
+export function closestRocchiaOverlayKind(target: Node): RocchiaOverlayKind | null {
+  if (!(target instanceof Element)) return null;
+  const el = target.closest(`[${ROCCHIA_OVERLAY_KIND_ATTR}]`);
+  if (!el) return null;
+  const kind = el.getAttribute(ROCCHIA_OVERLAY_KIND_ATTR);
+  return kind === "calendar" || kind === "menu" ? kind : null;
+}
+
+export type DismissOnOutsidePressOptions = {
+  /**
+   * Extra nodes that should not count as “outside” (p. ej. menús portaleados
+   * que cuelgan de un overlay padre, como mes/año dentro del calendario).
+   */
+  ignoreIf?: (target: Node) => boolean;
+};
+
 /**
  * React Aria's `Popover` couples "non-modal" with "not dismissable on
  * outside interaction" — `isNonModal` (which we set to avoid the scroll
@@ -15,19 +40,23 @@ export function useDismissOnOutsidePress(
   isOpen: boolean,
   onDismiss: () => void,
   refs: RefObject<HTMLElement | null>[],
+  options?: DismissOnOutsidePressOptions,
 ) {
+  const ignoreIf = options?.ignoreIf;
+
   useEffect(() => {
     if (!isOpen) return;
 
     const handlePointerDown = (event: PointerEvent) => {
       const target = event.target as Node;
       if (refs.some((ref) => ref.current?.contains(target))) return;
+      if (ignoreIf?.(target)) return;
       onDismiss();
     };
 
     document.addEventListener("pointerdown", handlePointerDown, true);
     return () => document.removeEventListener("pointerdown", handlePointerDown, true);
-  }, [isOpen, onDismiss, refs]);
+  }, [isOpen, onDismiss, refs, ignoreIf]);
 }
 
 /**

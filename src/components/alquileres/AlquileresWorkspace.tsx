@@ -120,7 +120,7 @@ export function AlquileresWorkspace() {
   const searchParams = useSearchParams();
   const breakUi = useBreakUiMode();
   const { token, logout, user } = useAuth();
-  const { prefetch: prefetchContrato } = useContratoPrefetch(token);
+  const { prefetch: prefetchContrato, invalidate: invalidateContratoPrefetch } = useContratoPrefetch(token);
   const {
     rows,
     loading,
@@ -457,6 +457,7 @@ export function AlquileresWorkspace() {
         );
       }
 
+      invalidateContratoPrefetch(selectedContrato.id);
       setAdjustModalOpen(false);
       const inmuebleCode = selectedContrato.inmueble?.code ?? "inmueble";
       showToast(
@@ -545,6 +546,8 @@ export function AlquileresWorkspace() {
   async function handleNewContract(form: NewContractForm) {
     if (!token) return;
     setSubmitting(true);
+    const startedAt = Date.now();
+    const minCreatingMs = 3000;
     try {
       const [indices, moras, inmueblesRes, contratosRes] = await Promise.all([
         fetchCatalog(token, "/catalogos/tipos-indice"),
@@ -746,6 +749,11 @@ export function AlquileresWorkspace() {
             message: "No se pudo reservar un código de contrato. Reintentá.",
           },
         });
+      }
+
+      const creatingElapsed = Date.now() - startedAt;
+      if (creatingElapsed < minCreatingMs) {
+        await new Promise((resolve) => window.setTimeout(resolve, minCreatingMs - creatingElapsed));
       }
 
       setNewModalOpen(false);

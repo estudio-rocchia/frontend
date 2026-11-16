@@ -29,6 +29,8 @@ export interface InmuebleSinAlquiler {
   origen: "cartel" | "administracion";
   enAdministracion: boolean;
   ofertaAlquilerId: number | null;
+  ofertaAlquilerMontoPrecio: string | null;
+  ofertaAlquilerCodigoMoneda: string | null;
   estadoRedesId: number | null;
   estadoRedesCode: string | null;
 }
@@ -108,6 +110,8 @@ export async function loadInmueblesSinAlquiler(
       origen: inmueble.origen,
       enAdministracion: inmueble.enAdministracion,
       ofertaAlquilerId: inmueble.ofertaAlquilerId,
+      ofertaAlquilerMontoPrecio: inmueble.ofertaAlquilerMontoPrecio,
+      ofertaAlquilerCodigoMoneda: inmueble.ofertaAlquilerCodigoMoneda,
       estadoRedesId: inmueble.estadoRedesId,
       estadoRedesCode: inmueble.estadoRedesCode,
     };
