@@ -82,7 +82,7 @@ export function DatePicker({
   const ownTriggerRef = useRef<HTMLButtonElement>(null);
   const triggerRef = externalTriggerRef ?? ownTriggerRef;
   const isExternal = externalTriggerRef !== undefined;
-  const popoverRef = useRef<HTMLElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
   const overlayPortal = useOverlayPortalContainer();
   const inModal = overlayPortal != null;
 

@@ -1146,6 +1146,7 @@ export interface UpdateOfertaInput {
   formaPagoId?: number | null;
   condicionesFinanciacion?: string | null;
   notasPrecio?: string | null;
+  estadoRedesId?: number | null;
 }
 
 export interface UpdateInmuebleInput {

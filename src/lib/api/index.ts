@@ -585,6 +585,13 @@ export function updateInmueble(
   });
 }
 
+export function archiveInmueble(token: string, inmuebleId: number) {
+  return apiRequest<import("./types").InmuebleCatalogRecord>(`/inmuebles/${inmuebleId}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
 export function removeInmueblePropietario(
   token: string,
   inmuebleId: number,
@@ -986,6 +993,18 @@ export function fetchVentas(token: string, params?: FetchVentasParams) {
 
 export function fetchVenta(token: string, id: number) {
   return apiRequest<VentaDetail>(`/ventas/${id}`, { token });
+}
+
+export type VentasResumenPestanas = {
+  en_operacion: number;
+  a_la_venta: number;
+  fuera_mercado: number;
+  vendidos: number;
+};
+
+export function fetchVentasResumenPestanas(token: string, tipoOperacionId: number) {
+  const query = new URLSearchParams({ tipoOperacionId: String(tipoOperacionId) });
+  return apiRequest<VentasResumenPestanas>(`/ventas/resumen-pestanas?${query}`, { token });
 }
 
 export function fetchVentaCuotas(token: string, ventaId: number) {

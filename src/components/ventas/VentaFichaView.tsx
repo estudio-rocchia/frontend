@@ -135,9 +135,8 @@ export function VentaFichaView() {
   const params = useParams();
   const searchParams = useSearchParams();
   const ventaId = parseRouteId(params.id);
-  const fromTab: VentasTabId = isVentasTabId(searchParams.get("from"))
-    ? searchParams.get("from")!
-    : "en_operacion";
+  const fromParam = searchParams.get("from");
+  const fromTab: VentasTabId = isVentasTabId(fromParam) ? fromParam : "en_operacion";
   const listReturnState = useMemo(
     () => parseVentasListStateFromSearchParams(searchParams),
     [searchParams],

@@ -13,6 +13,7 @@ import {
   ExternalLink,
   MoreHorizontal,
   Plus,
+  Trash2,
 } from "lucide-react";
 
 import {
@@ -30,12 +31,14 @@ import { EditarCatalogInmuebleModal } from "@/components/ventas/EditarCatalogInm
 import { CatalogInmuebleResumenSection } from "@/components/ventas/CatalogInmuebleResumenSection";
 import { NewVentaModal } from "@/components/ventas/NewVentaModal";
 import { PrecioHistorialSection } from "@/components/ventas/PrecioHistorialSection";
-import { ButtonOutline, ButtonPrimary, buttonOutlineClass } from "@/components/ui/Button";
+import { ButtonDanger, ButtonOutline, ButtonPrimary, buttonOutlineClass } from "@/components/ui/Button";
+import { Modal } from "@/components/ui/Modal";
 import { PageHeaderSkeleton, Skeleton } from "@/components/ui/Skeleton";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useAuth } from "@/context/auth-context";
 import {
   ApiError,
+  archiveInmueble,
   fetchEstadosOferta,
   fetchInmuebleFicha,
   fetchOfertaHistorialPrecio,
@@ -119,7 +122,8 @@ export function CatalogInmuebleFichaView() {
   const searchParams = useSearchParams();
   const enContextoAlquileres = pathname.startsWith("/alquileres/inmueble/");
   const inmuebleId = parseRouteId(params.id);
-  const fromTab = isVentasTabId(searchParams.get("from")) ? searchParams.get("from")! : "a_la_venta";
+  const fromParam = searchParams.get("from");
+  const fromTab: VentasTabId = isVentasTabId(fromParam) ? fromParam : "a_la_venta";
 
   const { token, user, logout } = useAuth();
   const canEditDetalle = Boolean(user?.roles.some((role) => role === "admin" || role === "staff"));
@@ -148,6 +152,8 @@ export function CatalogInmuebleFichaView() {
   const [requisitosAlquilerOpen, setRequisitosAlquilerOpen] = useState(false);
   const [newVentaOpen, setNewVentaOpen] = useState(false);
   const [ventaVinculada, setVentaVinculada] = useState<VentaDetail | null>(null);
+  const [confirmarArchivo, setConfirmarArchivo] = useState(false);
+  const [archiving, setArchiving] = useState(false);
   const actionsRef = useRef<HTMLDetailsElement>(null);
 
   const load = useCallback(async () => {
@@ -359,6 +365,42 @@ export function CatalogInmuebleFichaView() {
     if (actionsRef.current) actionsRef.current.open = false;
   }
 
+  async function handleArchivarInmueble() {
+    if (!token || inmuebleId === null || archiving) return;
+    setArchiving(true);
+    setError(null);
+    try {
+      await archiveInmueble(token, inmuebleId);
+      setConfirmarArchivo(false);
+      volverAlListado();
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        logout();
+        return;
+      }
+      setError(err instanceof ApiError ? err.message : "No se pudo archivar el inmueble");
+    } finally {
+      setArchiving(false);
+    }
+  }
+
+  function renderArchivarMenuItem() {
+    if (!canEditDetalle) return null;
+    return (
+      <button
+        type="button"
+        className={`flex items-center gap-2 rounded-sm px-3 py-2 text-left text-[13px] font-medium text-danger hover:bg-danger-bg ${interactiveFocusClass}`}
+        onClick={() => {
+          closeActions();
+          setConfirmarArchivo(true);
+        }}
+      >
+        <Trash2 className="h-4 w-4" aria-hidden />
+        Archivar inmueble
+      </button>
+    );
+  }
+
   /** Inmueble vinculado en administración sin oferta publicada (p. ej. desde cartera del cliente). */
   function administracionSinOfertaActions() {
     if (!enContextoAlquileres || inmuebleId === null) return null;
@@ -372,14 +414,28 @@ export function CatalogInmuebleFichaView() {
           Crear contrato
         </Link>
         {canEditDetalle ? (
-          <ButtonOutline
-            type="button"
-            className="gap-2"
-            onClick={() => setEditModalOpen(true)}
-          >
-            <Pencil className="h-4 w-4" aria-hidden />
-            Editar
-          </ButtonOutline>
+          <details ref={actionsRef} className="relative z-30">
+            <summary
+              className={`${buttonOutlineClass} gap-2 cursor-pointer list-none [&::-webkit-details-marker]:hidden ${interactiveFocusClass}`}
+            >
+              <MoreHorizontal className="h-4 w-4" aria-hidden />
+              Más acciones
+            </summary>
+            <div className="absolute right-0 z-50 mt-1 flex min-w-52 flex-col rounded-md border border-border bg-bg-card p-1 shadow-[var(--shadow-card)]">
+              <button
+                type="button"
+                className={`flex items-center gap-2 rounded-sm px-3 py-2 text-left text-[13px] font-medium text-text-primary hover:bg-bg-page ${interactiveFocusClass}`}
+                onClick={() => {
+                  closeActions();
+                  setEditModalOpen(true);
+                }}
+              >
+                <Pencil className="h-4 w-4" aria-hidden />
+                Editar
+              </button>
+              {renderArchivarMenuItem()}
+            </div>
+          </details>
         ) : null}
       </div>
     );
@@ -551,7 +607,7 @@ export function CatalogInmuebleFichaView() {
                   Registrar precio de venta
                 </ButtonPrimary>
               ) : null}
-              {!isSold ? (
+              {canEditDetalle || !isSold ? (
                 <details ref={actionsRef} className="relative z-30">
                   <summary
                     className={`${buttonOutlineClass} gap-2 cursor-pointer list-none [&::-webkit-details-marker]:hidden ${interactiveFocusClass}`}
@@ -573,18 +629,20 @@ export function CatalogInmuebleFichaView() {
                         Editar
                       </button>
                     ) : null}
-                    <button
-                      type="button"
-                      className={`flex items-center gap-2 rounded-sm px-3 py-2 text-left text-[13px] font-medium text-text-primary hover:bg-bg-page ${interactiveFocusClass}`}
-                      onClick={() => {
-                        closeActions();
-                        if (oferta) openPriceModal(oferta, "venta");
-                      }}
-                    >
-                      <CircleDollarSign className="h-4 w-4" aria-hidden />
-                      Actualizar precio
-                    </button>
-                    {isAvailable ? (
+                    {!isSold ? (
+                      <button
+                        type="button"
+                        className={`flex items-center gap-2 rounded-sm px-3 py-2 text-left text-[13px] font-medium text-text-primary hover:bg-bg-page ${interactiveFocusClass}`}
+                        onClick={() => {
+                          closeActions();
+                          if (oferta) openPriceModal(oferta, "venta");
+                        }}
+                      >
+                        <CircleDollarSign className="h-4 w-4" aria-hidden />
+                        Actualizar precio
+                      </button>
+                    ) : null}
+                    {!isSold && isAvailable ? (
                       <button
                         type="button"
                         className={`flex items-center gap-2 rounded-sm px-3 py-2 text-left text-[13px] font-medium text-danger hover:bg-danger-bg ${interactiveFocusClass}`}
@@ -597,6 +655,7 @@ export function CatalogInmuebleFichaView() {
                         Sacar de venta
                       </button>
                     ) : null}
+                    {renderArchivarMenuItem()}
                   </div>
                 </details>
               ) : null}
@@ -667,6 +726,7 @@ export function CatalogInmuebleFichaView() {
                       Sacar de alquiler
                     </button>
                   ) : null}
+                  {renderArchivarMenuItem()}
                 </div>
               </details>
             </div>
@@ -675,7 +735,31 @@ export function CatalogInmuebleFichaView() {
           )}
         </div>
         ) : (
-          administracionSinOfertaActions()
+          administracionSinOfertaActions() ??
+          (canEditDetalle ? (
+            <details ref={actionsRef} className="relative z-30">
+              <summary
+                className={`${buttonOutlineClass} gap-2 cursor-pointer list-none [&::-webkit-details-marker]:hidden ${interactiveFocusClass}`}
+              >
+                <MoreHorizontal className="h-4 w-4" aria-hidden />
+                Más acciones
+              </summary>
+              <div className="absolute right-0 z-50 mt-1 flex min-w-52 flex-col rounded-md border border-border bg-bg-card p-1 shadow-[var(--shadow-card)]">
+                <button
+                  type="button"
+                  className={`flex items-center gap-2 rounded-sm px-3 py-2 text-left text-[13px] font-medium text-text-primary hover:bg-bg-page ${interactiveFocusClass}`}
+                  onClick={() => {
+                    closeActions();
+                    setEditModalOpen(true);
+                  }}
+                >
+                  <Pencil className="h-4 w-4" aria-hidden />
+                  Editar
+                </button>
+                {renderArchivarMenuItem()}
+              </div>
+            </details>
+          ) : null)
         )}
       </header>
 
@@ -922,6 +1006,40 @@ export function CatalogInmuebleFichaView() {
           router.push(`/ventas/${ventaId}`);
         }}
       />
+
+      <Modal
+        open={confirmarArchivo}
+        onClose={() => {
+          if (!archiving) setConfirmarArchivo(false);
+        }}
+        title="¿Archivar este inmueble?"
+        titleId="confirmar-archivar-inmueble-titulo"
+        maxWidthClass="max-w-md"
+        footer={
+          <>
+            <ButtonOutline type="button" disabled={archiving} onClick={() => setConfirmarArchivo(false)}>
+              Cancelar
+            </ButtonOutline>
+            <ButtonDanger
+              type="button"
+              className="gap-2"
+              disabled={archiving}
+              onClick={() => void handleArchivarInmueble()}
+            >
+              {archiving ? null : <Trash2 className="h-4 w-4" aria-hidden />}
+              {archiving ? "Archivando…" : "Archivar inmueble"}
+            </ButtonDanger>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-3 text-sm">
+          <p className="leading-relaxed text-text-secondary">
+            <span className="font-semibold text-text-primary">{inmuebleCode}</span> dejará de aparecer en
+            ventas, alquileres y búsquedas. Los contratos y ventas históricos quedan en el sistema.
+          </p>
+          <p className="text-[13px] text-text-secondary">Esta acción no se puede deshacer desde la app.</p>
+        </div>
+      </Modal>
     </div>
   );
 }

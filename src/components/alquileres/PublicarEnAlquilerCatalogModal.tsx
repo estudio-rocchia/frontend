@@ -280,6 +280,7 @@ export function PublicarEnAlquilerCatalogModal({
             tiposInmueble={tiposInmueble}
             existingCodes={existingCodes}
             loadingTipos={loadingTipos}
+            onLoadTipos={() => void loadTiposInmueble(true)}
             intro="Datos del inmueble que el propietario quiere ofrecer en alquiler. Quedará disponible para crear contrato."
           />
         ) : null}

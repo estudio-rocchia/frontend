@@ -301,6 +301,7 @@ export function PublicarEnVentaModal({
               tiposInmueble={tiposInmueble}
               existingCodes={existingCodes}
               loadingTipos={loadingTipos}
+              onLoadTipos={() => void loadTiposInmueble(true)}
               intro="Completá los datos de la propiedad que vas a publicar a la venta."
             />
             <FormSection title="Condiciones de permuta">

@@ -1,10 +1,9 @@
 import {
-  fetchInmuebles,
   fetchInmueblesVacantesConPropietarios,
   fetchPropiedadesAdministradasPorPersona,
   fetchPropietarioPersonaIds,
 } from "@/lib/api";
-import type { InmuebleRecord, PersonaRecord, PropiedadAdministradaRecord } from "@/lib/api/types";
+import type { PersonaRecord, PropiedadAdministradaRecord } from "@/lib/api/types";
 import { buildCarteraEstadoBadges, carteraOperacionDetalle } from "@/lib/clientes/cartera-propiedad";
 import { formatMoney, personaDisplayName } from "@/lib/format";
 
@@ -37,34 +36,12 @@ export interface InmuebleSinAlquiler {
 
 export type PropiedadAdministrada = PropiedadAdministradaRecord;
 
-export interface PropiedadesPersonaResult {
-  propiedades: PropiedadAdministrada[];
-  linkedInmuebleIds: Set<number>;
-  inmuebles: InmuebleRecord[];
-}
-
 export async function loadPropiedadesAdministradas(
   token: string,
   personaId: number,
-  options?: { includeInmueblesCatalog?: boolean },
-): Promise<PropiedadesPersonaResult> {
+): Promise<PropiedadAdministrada[]> {
   const propiedadesRes = await fetchPropiedadesAdministradasPorPersona(token, personaId);
-  const propiedades = propiedadesRes.items;
-
-  const inmueblesRes = options?.includeInmueblesCatalog
-    ? await fetchInmuebles(token, { limit: 200 })
-    : { items: [] as InmuebleRecord[] };
-
-  return {
-    propiedades,
-    linkedInmuebleIds: new Set(propiedades.map((propiedad) => propiedad.inmuebleId)),
-    inmuebles: inmueblesRes.items,
-  };
-}
-
-export async function loadInmueblesCatalog(token: string): Promise<InmuebleRecord[]> {
-  const inmueblesRes = await fetchInmuebles(token, { limit: 200 });
-  return inmueblesRes.items;
+  return propiedadesRes.items;
 }
 
 export { vacanteComercializacionLabel as vacanteElegibilidadLabel } from "@/lib/alquileres/inmuebles-vacantes";

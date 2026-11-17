@@ -37,6 +37,7 @@ import {
 import { altaInmuebleCatalogo } from "@/lib/inmuebles/alta-inmueble";
 import type { InmuebleRecord } from "@/lib/api/types";
 import { invalidateDashboardAlerts } from "@/lib/dashboard-alerts-events";
+import { parseAmountInput } from "@/lib/format";
 import { createAutoPlanActualizacionDeposito } from "@/lib/alquileres/deposito-plan";
 import {
   ownerPorcentajeAdministracion,
@@ -598,8 +599,8 @@ export function AlquileresWorkspace() {
         });
       }
 
-      const amount = Number(form.amount.replace(/\D/g, ""));
-      if (!Number.isFinite(amount) || amount <= 0) {
+      const amount = parseAmountInput(form.amount);
+      if (amount === null || amount <= 0) {
         throw new ApiError(400, {
           error: {
             code: "VALIDATION_ERROR",
@@ -608,8 +609,8 @@ export function AlquileresWorkspace() {
         });
       }
 
-      const depositAmount = Number(form.depositAmount.replace(/\D/g, ""));
-      if (!Number.isFinite(depositAmount) || depositAmount <= 0) {
+      const depositAmount = parseAmountInput(form.depositAmount);
+      if (depositAmount === null || depositAmount <= 0) {
         throw new ApiError(400, {
           error: {
             code: "VALIDATION_ERROR",

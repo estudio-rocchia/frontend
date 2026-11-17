@@ -108,7 +108,6 @@ export function ClienteFichaView() {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [contratosInquilino, setContratosInquilino] = useState<ContratoListItem[]>([]);
   const [propiedades, setPropiedades] = useState<PropiedadAdministrada[]>([]);
-  const [linkedInmuebleIds, setLinkedInmuebleIds] = useState<Set<number>>(new Set());
   const [pctEdits, setPctEdits] = useState<Record<number, string>>({});
   const [savingPropietarioId, setSavingPropietarioId] = useState<number | null>(null);
   const [clientePctEdit, setClientePctEdit] = useState("6");
@@ -142,12 +141,11 @@ export function ClienteFichaView() {
     [router, personaId],
   );
 
-  const applyPropiedades = useCallback((propiedadesData: Awaited<ReturnType<typeof loadPropiedadesAdministradas>>) => {
-    setPropiedades(propiedadesData.propiedades);
-    setLinkedInmuebleIds(propiedadesData.linkedInmuebleIds);
+  const applyPropiedades = useCallback((propiedadesData: PropiedadAdministrada[]) => {
+    setPropiedades(propiedadesData);
     setPctEdits(
       Object.fromEntries(
-        propiedadesData.propiedades.map((propiedad) => [
+        propiedadesData.map((propiedad) => [
           propiedad.propietarioId,
           String(Number(propiedad.porcentajeAdministracion) || 6),
         ]),
@@ -347,19 +345,6 @@ export function ClienteFichaView() {
     }
   }
 
-  async function handleInmuebleLinked() {
-    setSuccess("Inmueble vinculado al propietario.");
-    setError(null);
-    setLoadingDetail(true);
-    try {
-      await loadInmobiliariaDetails();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo actualizar la ficha");
-    } finally {
-      setLoadingDetail(false);
-    }
-  }
-
   return (
     <div className={`flex flex-col gap-6 ${pagePaddingClass}`}>
       <button
@@ -474,15 +459,12 @@ export function ClienteFichaView() {
             onSaveClientePct={() => void handleSaveClienteHonorarios()}
             propiedades={propiedades}
             contratosInquilino={contratosInquilino}
-            linkedInmuebleIds={linkedInmuebleIds}
             pctEdits={pctEdits}
             savingPropietarioId={savingPropietarioId}
             onPctChange={(propietarioId, value) =>
               setPctEdits((current) => ({ ...current, [propietarioId]: value }))
             }
             onSavePropiedad={(propiedad) => void handleSavePropiedadAdministracion(propiedad)}
-            onInmuebleLinked={() => void handleInmuebleLinked()}
-            onError={setError}
           />
           )
         ) : null}

@@ -146,15 +146,15 @@ export function EditarCatalogInmuebleModal({
     Boolean(tipoCode && code.trim()) && !codeMatchesTipoPrefix(code, tipoCode);
 
   useEffect(() => {
-    if (!open || !tipoCode || codeTouched.current) return;
+    if (!open || !inmueble || !tipoCode || codeTouched.current) return;
     setCode((current) => {
       const suggested = suggestInmuebleCodeForTipo(tipoCode, current || inmueble.code, existingCodes);
       return suggested.toUpperCase() !== current.trim().toUpperCase() ? suggested : current;
     });
-  }, [open, tipoCode, tipoInmuebleId, existingCodes, inmueble.code]);
+  }, [open, inmueble, tipoCode, tipoInmuebleId, existingCodes]);
 
   function applySuggestedCode() {
-    if (!tipoCode) return;
+    if (!tipoCode || !inmueble) return;
     const suggested = suggestInmuebleCodeForTipo(tipoCode, inmueble.code, existingCodes);
     setCode(suggested);
     codeTouched.current = false;

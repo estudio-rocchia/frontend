@@ -348,8 +348,7 @@ export function ClienteInmobiliariaPropiedadesSection({
             <div>
               <p className="text-base font-semibold text-text-primary">Sin propiedades en administración</p>
               <p className="mt-1 max-w-sm text-[13px] text-text-secondary">
-                Usá el botón <span className="font-semibold text-text-primary">Agregar inmueble</span> arriba
-                para vincular el primero.
+                Las propiedades del propietario aparecerán aquí cuando estén en administración.
               </p>
             </div>
           </div>

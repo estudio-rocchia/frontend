@@ -7,6 +7,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Modal } from "@/components/ui/Modal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
 import { ChipToggle, FormField, FormSection } from "@/components/ui/FormLayout";
+import { MoneyAmountField } from "@/components/ui/MoneyAmountField";
 import { WizardStepIndicator } from "@/components/ui/WizardStepIndicator";
 import { ContractAdjustmentFields } from "@/components/alquileres/ContractAdjustmentFields";
 import {
@@ -39,7 +40,7 @@ import {
 } from "@/lib/alquileres/inmuebles-vacantes";
 import type { InmuebleSinAlquiler } from "@/lib/mappers/propietario-inmuebles";
 import { defaultOperationalContractDates } from "@/lib/alquileres/contract-dates";
-import { personaDisplayName } from "@/lib/format";
+import { formatAmountTyping, parseAmountInput, personaDisplayName } from "@/lib/format";
 import { formInputClass } from "@/lib/ui/interactive-focus";
 
 export type PropertyFieldValue =
@@ -121,8 +122,18 @@ function isPropertyValid(property: PropertyFieldValue): boolean {
 }
 
 function isAmountValid(value: string): boolean {
-  const parsed = Number.parseFloat(value.replace(",", "."));
-  return Number.isFinite(parsed) && parsed > 0;
+  const parsed = parseAmountInput(value);
+  return parsed !== null && parsed > 0;
+}
+
+function economiaDefaultsFormatted(inmueble: InmuebleSinAlquiler): Partial<NewContractForm> | null {
+  const economia = economiaDefaultsFromVacante(inmueble);
+  if (!economia) return null;
+  return {
+    amount: formatAmountTyping(economia.amount),
+    depositAmount: formatAmountTyping(economia.depositAmount),
+    currency: economia.currency,
+  };
 }
 
 function ownerFromInmueble(
@@ -197,12 +208,11 @@ export function NewContractModal({
       const vacante =
         initialInmuebleId && inmueblesSinAlquiler.find((item) => item.inmuebleId === initialInmuebleId);
       if (vacante) {
-        const economia = economiaDefaultsFromVacante(vacante);
         setForm({
           ...base,
           property: { mode: "existente", inmuebleId: vacante.inmuebleId },
           owner: ownerFromInmueble(vacante, personas) ?? emptyOwner,
-          ...(economia ?? {}),
+          ...(economiaDefaultsFormatted(vacante) ?? {}),
         });
         return;
       }
@@ -365,12 +375,11 @@ export function NewContractModal({
 
   function selectVacante(inmueble: InmuebleSinAlquiler) {
     const owner = ownerFromInmueble(inmueble, personas);
-    const economia = economiaDefaultsFromVacante(inmueble);
     setVacanteSearchQuery("");
     patch({
       property: { mode: "existente", inmuebleId: inmueble.inmuebleId },
       owner: owner ?? emptyOwner,
-      ...(economia ?? { amount: "", depositAmount: "", currency: "ARS" as const }),
+      ...(economiaDefaultsFormatted(inmueble) ?? { amount: "", depositAmount: "", currency: "ARS" as const }),
     });
   }
 
@@ -381,13 +390,7 @@ export function NewContractModal({
       open={open}
       onClose={handleClose}
       title="Crear contrato"
-      subtitle={
-        submitting ? (
-          <p className="text-[13px] text-text-secondary">Guardando el nuevo contrato…</p>
-        ) : (
-          <WizardStepIndicator steps={STEP_TITLES} currentStep={step} />
-        )
-      }
+      subtitle={submitting ? undefined : <WizardStepIndicator steps={STEP_TITLES} currentStep={step} />}
       maxWidthClass="max-w-2xl"
       contentScrollKey={submitting ? "creating" : step}
       footer={
@@ -802,17 +805,17 @@ export function NewContractModal({
                 </p>
               ) : null}
               <div className="grid gap-4 sm:grid-cols-2">
-                <FormField
+                <MoneyAmountField
                   label="Monto mensual"
                   value={form.amount}
                   onChange={(v) => patch({ amount: v })}
-                  placeholder="485000 o 1200"
+                  placeholder="485.000"
                 />
-                <FormField
+                <MoneyAmountField
                   label="Depósito de garantía"
                   value={form.depositAmount}
                   onChange={(v) => patch({ depositAmount: v })}
-                  placeholder="Ej. 970000"
+                  placeholder="970.000"
                 />
                 <div className="flex flex-col gap-1.5">
                   <span className="text-[11px] font-semibold text-text-secondary">Moneda</span>

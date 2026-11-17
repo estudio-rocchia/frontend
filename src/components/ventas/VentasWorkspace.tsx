@@ -17,7 +17,13 @@ const PublicarEnVentaModal = dynamic(
     })),
   { ssr: false },
 );
-import { VentasCatalogFiltersPanel } from "@/components/ventas/VentasCatalogFiltersPanel";
+const VentasCatalogFiltersPanel = dynamic(
+  () =>
+    import("@/components/ventas/VentasCatalogFiltersPanel").then((mod) => ({
+      default: mod.VentasCatalogFiltersPanel,
+    })),
+  { ssr: false, loading: () => null },
+);
 import { VentasSoldYearFilter } from "@/components/ventas/VentasSoldYearFilter";
 import { VentasCreateActions } from "@/components/ventas/VentasCreateActions";
 import {
@@ -37,9 +43,6 @@ import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 import { useAuth } from "@/context/auth-context";
 import {
   ApiError,
-  fetchCatalog,
-  fetchEstadosOferta,
-  fetchTiposOperacion,
   fetchVendidoAnios,
   fetchVentas,
   searchCatalogo,
@@ -49,6 +52,7 @@ import { buyerSearchText } from "@/lib/ventas/partes";
 import { ventaInmobiliariaLabel } from "@/lib/ventas/status-labels";
 import { fetchVentasEnOperacion } from "@/lib/ventas/en-operacion-load";
 import { invalidateVentasCaches } from "@/lib/ventas/invalidate-caches";
+import { fetchVentasCatalogMeta } from "@/lib/ventas/catalog-meta";
 import { fetchVentasTabCounts } from "@/lib/ventas/tab-counts";
 import type { CatalogSearchItem, CatalogoItem, VentaDetail } from "@/lib/api/types";
 import { pagePaddingClass } from "@/lib/layout";
@@ -179,28 +183,17 @@ export function VentasWorkspace() {
 
   useEffect(() => {
     if (!token) return;
-    void (async () => {
-      try {
-        const [estados, tipos, tiposInmueble, estadosRedes] = await Promise.all([
-          fetchEstadosOferta(token),
-          fetchTiposOperacion(token),
-          fetchCatalog<CatalogoItem>(token, "/catalogos/tipos-inmueble"),
-          fetchCatalog<CatalogoItem>(token, "/catalogos/estados-redes"),
-        ]);
-        const map: Record<string, number> = {};
-        for (const item of estados.items) map[item.code] = item.id;
-        setEstadoIds(map);
-        setEstadoRedesByCode(new Map(estadosRedes.items.map((item) => [item.code, item.id])));
-        const tipoMap: Record<string, number> = {};
-        for (const item of tiposInmueble.items) tipoMap[item.code] = item.id;
-        setTipoInmuebleIds(tipoMap);
-        setTiposInmueble(tiposInmueble.items);
-        const ventaTipoId = tipos.items.find((t) => t.code === "venta")?.id;
-        setTipoVentaId(ventaTipoId);
-      } catch {
+    void fetchVentasCatalogMeta(token)
+      .then((meta) => {
+        setEstadoIds(meta.estadoIds);
+        setEstadoRedesByCode(meta.estadoRedesByCode);
+        setTipoInmuebleIds(meta.tipoInmuebleIds);
+        setTiposInmueble(meta.tiposInmueble);
+        setTipoVentaId(meta.tipoVentaId);
+      })
+      .catch(() => {
         // list still works without catalog preload
-      }
-    })();
+      });
   }, [token]);
 
   const loadTabCounts = useCallback(async () => {
@@ -214,8 +207,20 @@ export function VentasWorkspace() {
   }, [token, tipoVentaId, estadoIds]);
 
   useEffect(() => {
-    void loadTabCounts();
-  }, [loadTabCounts]);
+    if (!token || !tipoVentaId) return;
+    const run = () => void loadTabCounts();
+    const idleId =
+      typeof window.requestIdleCallback === "function"
+        ? window.requestIdleCallback(run, { timeout: 2_500 })
+        : null;
+    const timeoutId = idleId == null ? window.setTimeout(run, 400) : null;
+    return () => {
+      if (idleId != null && typeof window.cancelIdleCallback === "function") {
+        window.cancelIdleCallback(idleId);
+      }
+      if (timeoutId != null) window.clearTimeout(timeoutId);
+    };
+  }, [loadTabCounts, token, tipoVentaId]);
 
   useEffect(() => {
     if (!token || !tipoVentaId) return;

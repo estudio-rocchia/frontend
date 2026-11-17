@@ -40,6 +40,7 @@ import type {
   CuotaDetail,
   PagoListItem,
   CreatePeriodoInput,
+  InmuebleFichaPropietario,
   PeriodoServicioRecord,
   PlanActualizacionDepositoDetail,
   SecheepImportInput,
@@ -51,6 +52,15 @@ import { resolveMoraPunitoriaPayload } from "@/lib/mora-punitoria";
 import { mapContratoDetailToFicha } from "@/lib/mappers/rentals";
 import { useBreakUiMode } from "@/lib/alquileres/break-ui-mode";
 import { useContratoPrefetch } from "@/lib/use-contrato-prefetch";
+
+function normalizeFichaPropietarios(
+  propietarios: Array<Omit<InmuebleFichaPropietario, "id"> & { id?: number }>,
+): InmuebleFichaPropietario[] {
+  return propietarios.map((p) => ({
+    ...p,
+    id: p.id ?? p.personaId,
+  }));
+}
 
 function withRecovery(message: string): string {
   if (/\b(intentá|actualizá|ingresá|cobrá|usá|volvé|ejecutá|restaurá)\b/i.test(message)) return message;
@@ -161,12 +171,12 @@ export function useContractFicha({ contratoId, validId, token, logout }: UseCont
     const detailRes = cached?.detail ?? await fetchContrato(token, contratoId);
     setContrato(detailRes);
 
-    let propietarios = cached?.propietarios ?? [];
+    let propietarios = normalizeFichaPropietarios(cached?.propietarios ?? []);
     let inmuebleContext = cached?.inmuebleContext ?? null;
     if (!cached && detailRes.inmueble?.id) {
       try {
         const ficha = await fetchInmuebleFicha(token, detailRes.inmueble.id);
-        propietarios = ficha.propietarios;
+        propietarios = normalizeFichaPropietarios(ficha.propietarios);
         inmuebleContext = {
           localidad: ficha.localidad ?? null,
           tipoName: ficha.tipoInmueble?.name ?? null,
