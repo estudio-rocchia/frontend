@@ -17,7 +17,14 @@ const PublicarEnVentaModal = dynamic(
     })),
   { ssr: false },
 );
-import { VentasCatalogFiltersPanel } from "@/components/ventas/VentasCatalogFiltersPanel";
+const VentasCatalogFiltersPanel = dynamic(
+  () =>
+    import("@/components/ventas/VentasCatalogFiltersPanel").then((mod) => ({
+      default: mod.VentasCatalogFiltersPanel,
+    })),
+  { ssr: false, loading: () => null },
+);
+import { VentasSoldYearFilter } from "@/components/ventas/VentasSoldYearFilter";
 import { VentasCreateActions } from "@/components/ventas/VentasCreateActions";
 import {
   VENTAS_MAIN_PANEL_ID,
@@ -36,15 +43,16 @@ import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 import { useAuth } from "@/context/auth-context";
 import {
   ApiError,
-  fetchCatalog,
-  fetchEstadosOferta,
-  fetchTiposOperacion,
+  fetchVendidoAnios,
   fetchVentas,
   searchCatalogo,
+  updateOferta,
 } from "@/lib/api";
 import { buyerSearchText } from "@/lib/ventas/partes";
+import { ventaInmobiliariaLabel } from "@/lib/ventas/status-labels";
 import { fetchVentasEnOperacion } from "@/lib/ventas/en-operacion-load";
 import { invalidateVentasCaches } from "@/lib/ventas/invalidate-caches";
+import { fetchVentasCatalogMeta } from "@/lib/ventas/catalog-meta";
 import { fetchVentasTabCounts } from "@/lib/ventas/tab-counts";
 import type { CatalogSearchItem, CatalogoItem, VentaDetail } from "@/lib/api/types";
 import { pagePaddingClass } from "@/lib/layout";
@@ -53,8 +61,14 @@ import {
   EMPTY_CHARACTERISTIC_FILTERS,
   type VentasCharacteristicFilters,
 } from "@/lib/ventas/characteristic-filters";
-import { catalogItemSearchText } from "@/lib/ventas/catalog-helpers";
+import { catalogItemSearchText, saleOferta } from "@/lib/ventas/catalog-helpers";
 import { VENTAS_TAB_COPY, ventasEmptyHint } from "@/lib/ventas/workspace-copy";
+import {
+  buildVentasInmuebleHref,
+  buildVentasListHref,
+  buildVentasVentaHref,
+  parseVentasListStateFromSearchParams,
+} from "@/lib/ventas/ventas-list-state";
 
 function isVentasTabId(value: string | null): value is VentasTabId {
   return (
@@ -71,6 +85,8 @@ function matchesSearch(text: string, q: string): boolean {
   return text.toLowerCase().includes(needle);
 }
 
+const FILTER_DEBOUNCE_MS = 450;
+
 export function VentasWorkspace() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -78,7 +94,8 @@ export function VentasWorkspace() {
   const { refreshing, listTransitionKey, isInitialLoad, start, finish } = useListRefreshTransition();
   const [tab, setTab] = useState<VentasTabId>("en_operacion");
   const [urlTabReady, setUrlTabReady] = useState(false);
-  const [search, setSearch] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [ventaRows, setVentaRows] = useState<VentaDetail[]>([]);
@@ -90,13 +107,22 @@ export function VentasWorkspace() {
   const [tiposInmueble, setTiposInmueble] = useState<CatalogoItem[]>([]);
   const [characteristicFilters, setCharacteristicFilters] =
     useState<VentasCharacteristicFilters>(EMPTY_CHARACTERISTIC_FILTERS);
+  const [debouncedCharacteristicFilters, setDebouncedCharacteristicFilters] =
+    useState<VentasCharacteristicFilters>(EMPTY_CHARACTERISTIC_FILTERS);
   const [tipoVentaId, setTipoVentaId] = useState<number | undefined>();
+  const [estadoRedesByCode, setEstadoRedesByCode] = useState<Map<string, number>>(new Map());
+  const [savingRedesOfertaId, setSavingRedesOfertaId] = useState<number | null>(null);
   const [newVentaOpen, setNewVentaOpen] = useState(false);
   const [publicarOpen, setPublicarOpen] = useState(false);
   const [newVentaInmuebleId, setNewVentaInmuebleId] = useState<number | null>(null);
-  const characteristicFiltersRef = useRef(characteristicFilters);
-  characteristicFiltersRef.current = characteristicFilters;
+  const [soldYear, setSoldYear] = useState<number | null>(null);
+  const [soldYears, setSoldYears] = useState<number[]>([]);
+  const characteristicFiltersRef = useRef(debouncedCharacteristicFilters);
+  characteristicFiltersRef.current = debouncedCharacteristicFilters;
+  const soldYearRef = useRef(soldYear);
+  soldYearRef.current = soldYear;
   const skipFilterReloadRef = useRef(true);
+  const skipListUrlSyncRef = useRef(true);
   const loadGenerationRef = useRef(0);
 
   useEffect(() => {
@@ -108,31 +134,66 @@ export function VentasWorkspace() {
     if (isVentasTabId(tabParam)) {
       setTab(tabParam);
     }
+    const { filters, search: q, soldYear: anio } = parseVentasListStateFromSearchParams(searchParams);
+    setCharacteristicFilters(filters);
+    setDebouncedCharacteristicFilters(filters);
+    setSearchQuery((current) => (current === q || current.startsWith(q) ? current : q));
+    setDebouncedSearch(q);
+    setSoldYear(anio);
     setUrlTabReady(true);
+    skipListUrlSyncRef.current = true;
+    const frame = window.requestAnimationFrame(() => {
+      skipListUrlSyncRef.current = false;
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, [searchParams]);
 
   useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(searchQuery), 280);
+    return () => window.clearTimeout(timer);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(
+      () => setDebouncedCharacteristicFilters(characteristicFilters),
+      FILTER_DEBOUNCE_MS,
+    );
+    return () => window.clearTimeout(timer);
+  }, [characteristicFilters]);
+
+  const syncListUrl = useCallback(
+    (
+      nextTab: VentasTabId,
+      nextFilters: VentasCharacteristicFilters,
+      nextSearch: string,
+      nextSoldYear?: number | null,
+    ) => {
+      if (skipListUrlSyncRef.current) return;
+      router.replace(buildVentasListHref(nextTab, nextFilters, nextSearch, nextSoldYear), {
+        scroll: false,
+      });
+    },
+    [router],
+  );
+
+  useEffect(() => {
+    if (skipListUrlSyncRef.current) return;
+    syncListUrl(tab, debouncedCharacteristicFilters, debouncedSearch, soldYear);
+  }, [debouncedSearch, debouncedCharacteristicFilters, tab, soldYear, syncListUrl]);
+
+  useEffect(() => {
     if (!token) return;
-    void (async () => {
-      try {
-        const [estados, tipos, tiposInmueble] = await Promise.all([
-          fetchEstadosOferta(token),
-          fetchTiposOperacion(token),
-          fetchCatalog<CatalogoItem>(token, "/catalogos/tipos-inmueble"),
-        ]);
-        const map: Record<string, number> = {};
-        for (const item of estados.items) map[item.code] = item.id;
-        setEstadoIds(map);
-        const tipoMap: Record<string, number> = {};
-        for (const item of tiposInmueble.items) tipoMap[item.code] = item.id;
-        setTipoInmuebleIds(tipoMap);
-        setTiposInmueble(tiposInmueble.items);
-        const ventaTipoId = tipos.items.find((t) => t.code === "venta")?.id;
-        setTipoVentaId(ventaTipoId);
-      } catch {
+    void fetchVentasCatalogMeta(token)
+      .then((meta) => {
+        setEstadoIds(meta.estadoIds);
+        setEstadoRedesByCode(meta.estadoRedesByCode);
+        setTipoInmuebleIds(meta.tipoInmuebleIds);
+        setTiposInmueble(meta.tiposInmueble);
+        setTipoVentaId(meta.tipoVentaId);
+      })
+      .catch(() => {
         // list still works without catalog preload
-      }
-    })();
+      });
   }, [token]);
 
   const loadTabCounts = useCallback(async () => {
@@ -146,18 +207,43 @@ export function VentasWorkspace() {
   }, [token, tipoVentaId, estadoIds]);
 
   useEffect(() => {
-    void loadTabCounts();
-  }, [loadTabCounts]);
+    if (!token || !tipoVentaId) return;
+    const run = () => void loadTabCounts();
+    const idleId =
+      typeof window.requestIdleCallback === "function"
+        ? window.requestIdleCallback(run, { timeout: 2_500 })
+        : null;
+    const timeoutId = idleId == null ? window.setTimeout(run, 400) : null;
+    return () => {
+      if (idleId != null && typeof window.cancelIdleCallback === "function") {
+        window.cancelIdleCallback(idleId);
+      }
+      if (timeoutId != null) window.clearTimeout(timeoutId);
+    };
+  }, [loadTabCounts, token, tipoVentaId]);
+
+  useEffect(() => {
+    if (!token || !tipoVentaId) return;
+    void (async () => {
+      try {
+        const res = await fetchVendidoAnios(token, tipoVentaId);
+        setSoldYears(res.items);
+      } catch {
+        setSoldYears([]);
+      }
+    })();
+  }, [token, tipoVentaId]);
 
   const load = useCallback(async (options?: { silent?: boolean }) => {
     if (!token) return;
+    if (tab !== "en_operacion" && !tipoVentaId) return;
     const generation = ++loadGenerationRef.current;
     const stillCurrent = () => generation === loadGenerationRef.current;
     const silent = options?.silent ?? false;
     const listKey =
       tab === "en_operacion"
         ? tab
-        : `${tab}-${JSON.stringify(characteristicFiltersRef.current)}`;
+        : `${tab}-${JSON.stringify(characteristicFiltersRef.current)}-${soldYearRef.current ?? "all"}`;
     const { startedAt, isInitial } = start(silent);
     if (!silent && isInitial) {
       setLoading(true);
@@ -183,7 +269,9 @@ export function VentasWorkspace() {
           return;
         }
         const filters = characteristicFiltersSearchParams(characteristicFiltersRef.current, tipoInmuebleIds);
-        const catalogCacheKey = `ventas-catalog:${token}:${tab}:${JSON.stringify(filters)}`;
+        const vendidoAnio =
+          tab === "vendidos" && soldYearRef.current != null ? soldYearRef.current : undefined;
+        const catalogCacheKey = `ventas-catalog:${token}:${tab}:${JSON.stringify(filters)}:${vendidoAnio ?? "all"}`;
         const res = await withCache(
           catalogCacheKey,
           () =>
@@ -191,6 +279,7 @@ export function VentasWorkspace() {
               estadoOfertaId,
               tipoOperacionId: tipoVentaId,
               ...filters,
+              vendidoAnio,
               limit: 200,
             }),
           { ttlMs: 25_000 },
@@ -227,36 +316,47 @@ export function VentasWorkspace() {
 
   useEffect(() => {
     if (!urlTabReady) return;
-    if (tab !== "en_operacion" && Object.keys(estadoIds).length === 0) return;
+    if (tab !== "en_operacion" && (Object.keys(estadoIds).length === 0 || !tipoVentaId)) return;
     void load();
-  }, [load, tab, estadoIds, urlTabReady]);
+  }, [load, tab, estadoIds, tipoVentaId, urlTabReady]);
 
   useEffect(() => {
     if (tab === "en_operacion") return;
-    if (Object.keys(estadoIds).length === 0) return;
+    if (Object.keys(estadoIds).length === 0 || !tipoVentaId) return;
+    if (skipFilterReloadRef.current) {
+      skipFilterReloadRef.current = false;
+      return;
+    }
+    void load();
+  }, [debouncedCharacteristicFilters, load, tab, estadoIds, tipoVentaId]);
+
+  useEffect(() => {
+    if (tab !== "vendidos") return;
+    if (Object.keys(estadoIds).length === 0 || !tipoVentaId) return;
     if (skipFilterReloadRef.current) {
       skipFilterReloadRef.current = false;
       return;
     }
     const timer = window.setTimeout(() => {
       void load();
-    }, 350);
+    }, 150);
     return () => window.clearTimeout(timer);
-  }, [characteristicFilters, load, tab, estadoIds]);
+  }, [soldYear, load, tab, estadoIds, tipoVentaId]);
 
   const tableRows: VentasTableRow[] = useMemo(() => {
     if (tab === "en_operacion") {
       return ventaRows
         .filter((venta) => {
-          const label = `${venta.inmueble?.code ?? ""} ${venta.inmueble?.title ?? ""} ${buyerSearchText(venta, parteNombres)}`;
-          return matchesSearch(label, search);
+          const label = `${venta.inmueble?.code ?? ""} ${venta.inmueble?.title ?? ""} ${buyerSearchText(venta, parteNombres)} ${ventaInmobiliariaLabel(venta.estadoInmobiliaria)}`;
+          return matchesSearch(label, debouncedSearch);
         })
         .map((venta) => ({ kind: "venta", venta }));
     }
     return catalogRows
-      .filter((item) => matchesSearch(catalogItemSearchText(item), search))
+      .filter((item) => item.ofertasActivas.some((oferta) => oferta.tipoOperacionCode === "venta"))
+      .filter((item) => matchesSearch(catalogItemSearchText(item), debouncedSearch))
       .map((item) => ({ kind: "catalog", item }));
-  }, [tab, ventaRows, catalogRows, search, parteNombres]);
+  }, [tab, ventaRows, catalogRows, debouncedSearch, parteNombres]);
 
   const emptyHint = useMemo(() => ventasEmptyHint(tab), [tab]);
 
@@ -264,6 +364,57 @@ export function VentasWorkspace() {
     setNewVentaInmuebleId(inmuebleId ?? null);
     setNewVentaOpen(true);
   }
+
+  const changeEstadoRedes = useCallback(
+    async (item: CatalogSearchItem, nextCode: string) => {
+      const oferta = saleOferta(item);
+      const ofertaId = oferta?.id;
+      if (!token || !ofertaId) return;
+      const estadoRedesId = estadoRedesByCode.get(nextCode);
+      if (!estadoRedesId) {
+        setError("No se pudo resolver el estado de redes.");
+        return;
+      }
+      setSavingRedesOfertaId(ofertaId);
+      const prevCode = oferta.estadoRedesCode;
+      const prevId = oferta.estadoRedesId;
+      const inmuebleId = item.inmueble.id;
+      setCatalogRows((current) =>
+        current.map((row) => {
+          if (row.inmueble.id !== inmuebleId) return row;
+          return {
+            ...row,
+            ofertasActivas: row.ofertasActivas.map((o) =>
+              o.id === ofertaId ? { ...o, estadoRedesCode: nextCode, estadoRedesId } : o,
+            ),
+          };
+        }),
+      );
+      try {
+        await updateOferta(token, ofertaId, { estadoRedesId });
+      } catch (err) {
+        setCatalogRows((current) =>
+          current.map((row) => {
+            if (row.inmueble.id !== inmuebleId) return row;
+            return {
+              ...row,
+              ofertasActivas: row.ofertasActivas.map((o) =>
+                o.id === ofertaId ? { ...o, estadoRedesCode: prevCode, estadoRedesId: prevId } : o,
+              ),
+            };
+          }),
+        );
+        if (err instanceof ApiError && err.status === 401) {
+          logout();
+          return;
+        }
+        setError(err instanceof ApiError ? err.message : "No se pudo actualizar redes sociales.");
+      } finally {
+        setSavingRedesOfertaId((current) => (current === ofertaId ? null : current));
+      }
+    },
+    [token, estadoRedesByCode, logout],
+  );
 
   const kpis = useMemo(() => {
     if (tab === "en_operacion") {
@@ -300,15 +451,19 @@ export function VentasWorkspace() {
 
   function changeTab(next: VentasTabId) {
     setTab(next);
-    setSearch("");
-    router.replace(`/ventas?tab=${next}`, { scroll: false });
+    setSearchQuery("");
+    skipFilterReloadRef.current = true;
+    setSoldYear(null);
+    router.replace(buildVentasListHref(next, debouncedCharacteristicFilters, "", null), { scroll: false });
   }
 
   async function handleOpenRow(row: VentasTableRow) {
     if (row.kind === "venta") {
       const id = row.venta.id;
       if (!Number.isInteger(id) || id <= 0) return;
-      router.push(`/ventas/${id}`);
+      router.push(
+        buildVentasVentaHref(id, tab, characteristicFiltersRef.current, searchQuery, soldYearRef.current),
+      );
       return;
     }
     const inmuebleId = row.item.inmueble.id;
@@ -322,7 +477,15 @@ export function VentasWorkspace() {
           res.items.find((v) => v.estado !== "cancelled") ??
           res.items[0];
         if (venta) {
-          router.push(`/ventas/${venta.id}`);
+          router.push(
+            buildVentasVentaHref(
+              venta.id,
+              tab,
+              characteristicFiltersRef.current,
+              searchQuery,
+              soldYearRef.current,
+            ),
+          );
           return;
         }
       } catch {
@@ -331,7 +494,15 @@ export function VentasWorkspace() {
     }
 
     if (tab === "fuera_mercado" || tab === "a_la_venta" || tab === "vendidos") {
-      router.push(`/ventas/inmueble/${inmuebleId}?from=${tab}`);
+      router.push(
+        buildVentasInmuebleHref(
+          inmuebleId,
+          tab,
+          characteristicFiltersRef.current,
+          searchQuery,
+          soldYearRef.current,
+        ),
+      );
     }
   }
 
@@ -354,17 +525,38 @@ export function VentasWorkspace() {
       <VentasFilterChips active={tab} onChange={changeTab} counts={tabCounts} />
 
       {tab !== "en_operacion" ? (
-        <VentasCatalogFiltersPanel
-          filters={characteristicFilters}
-          tiposInmueble={tiposInmueble}
-          onChange={(next) => {
-            setCharacteristicFilters(next);
-          }}
-          onClear={() => {
-            setCharacteristicFilters(EMPTY_CHARACTERISTIC_FILTERS);
-            setSearch("");
-          }}
-        />
+        <>
+          {tab === "vendidos" ? (
+            <VentasSoldYearFilter
+              value={soldYear}
+              years={soldYears}
+              loading={loading && isInitialLoad}
+              onChange={(next) => {
+                setSoldYear(next);
+                syncListUrl(tab, characteristicFilters, searchQuery, next);
+              }}
+            />
+          ) : null}
+          <VentasCatalogFiltersPanel
+            filters={characteristicFilters}
+            tiposInmueble={tiposInmueble}
+            onChange={setCharacteristicFilters}
+            onClear={() => {
+              setCharacteristicFilters(EMPTY_CHARACTERISTIC_FILTERS);
+              setDebouncedCharacteristicFilters(EMPTY_CHARACTERISTIC_FILTERS);
+              setSearchQuery("");
+              setDebouncedSearch("");
+              setSoldYear(null);
+              skipListUrlSyncRef.current = true;
+              router.replace(buildVentasListHref(tab, EMPTY_CHARACTERISTIC_FILTERS, "", null), {
+                scroll: false,
+              });
+              window.requestAnimationFrame(() => {
+                skipListUrlSyncRef.current = false;
+              });
+            }}
+          />
+        </>
       ) : null}
 
       <div
@@ -398,12 +590,19 @@ export function VentasWorkspace() {
               refreshing={refreshing}
               listTransitionKey={listTransitionKey}
               isInitialLoad={isInitialLoad}
-              search={search}
+              search={searchQuery}
               searchPlaceholder={tabCopy.searchPlaceholder}
               emptyHint={emptyHint}
               parteNombres={parteNombres}
-              onSearchChange={setSearch}
+              onSearchChange={(next) => {
+                setSearchQuery(next);
+                syncListUrl(tab, characteristicFilters, next, soldYear);
+              }}
               onOpenRow={handleOpenRow}
+              savingRedesOfertaId={savingRedesOfertaId}
+              onChangeEstadoRedes={
+                tab === "a_la_venta" ? (item, next) => void changeEstadoRedes(item, next) : undefined
+              }
               embedded
             />
           </Card>

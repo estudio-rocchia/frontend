@@ -212,7 +212,7 @@ export function BalanceSectionNav({
               key={item.id}
               href={`#${item.id}`}
               aria-current={active ? "location" : undefined}
-              className={`balance-section-nav-link rocchia-action rounded-lg px-3 py-1.5 text-[12px] font-medium transition-colors duration-150 ${interactiveFocusClass} ${
+              className={`balance-section-nav-link rocchia-action rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors duration-150 ${interactiveFocusClass} ${
                 active
                   ? "balance-section-nav-link--active bg-primary text-text-on-primary shadow-[0_2px_8px_rgba(16,112,119,0.25)]"
                   : "bg-bg-page text-text-secondary ring-1 ring-border hover:text-text-primary"

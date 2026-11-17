@@ -197,6 +197,13 @@ export interface LiquidacionLineaRecord {
   pagoId: number | null;
 }
 
+export interface PropiedadAdministradaOfertaSummary {
+  id: number;
+  estadoCode: string;
+  montoPrecio: string | null;
+  codigoMoneda: string | null;
+}
+
 export interface PropiedadAdministradaRecord {
   inmuebleId: number;
   propietarioId: number;
@@ -210,6 +217,9 @@ export interface PropiedadAdministradaRecord {
     montoAlquiler: string;
     codigoMoneda: string;
   } | null;
+  ofertaAlquiler: PropiedadAdministradaOfertaSummary | null;
+  ofertaVenta: PropiedadAdministradaOfertaSummary | null;
+  honorariosAplicables: boolean;
 }
 
 export interface PropietarioRecord {
@@ -229,13 +239,26 @@ export interface InmuebleVacantePropietarioResumen {
   porcentajeAdministracion: string;
 }
 
+export type InmuebleVacanteOrigen = "cartel" | "administracion";
+
 export interface InmuebleVacanteConPropietarios {
   inmuebleId: number;
   code: string;
   title: string;
   displayLabel?: string;
+  tipoName?: string | null;
+  localidadName?: string | null;
   direccion: string | null;
   propietarios: InmuebleVacantePropietarioResumen[];
+  tieneOfertaAlquiler: boolean;
+  estadoOfertaAlquiler: string | null;
+  origen: InmuebleVacanteOrigen;
+  enAdministracion: boolean;
+  ofertaAlquilerId: number | null;
+  ofertaAlquilerMontoPrecio: string | null;
+  ofertaAlquilerCodigoMoneda: string | null;
+  estadoRedesId: number | null;
+  estadoRedesCode: string | null;
 }
 
 export interface LiquidacionRecord {
@@ -328,6 +351,7 @@ export interface ContratoRecord {
   inquilinoId: number;
   fechaInicio: string;
   fechaFin: string;
+  cobranzaDesde?: string | null;
   montoAlquiler: string;
   codigoMoneda: string;
   diaVencimientoPago: number;
@@ -900,7 +924,7 @@ export interface DashboardResumen {
 }
 
 export interface InmuebleFichaPropietario {
-  id?: number;
+  id: number;
   personaId: number;
   nombre?: string | null;
   apellido?: string | null;
@@ -921,9 +945,16 @@ export interface InmuebleCatalogRecord {
   referencia: string | null;
   description: string | null;
   direccion: string | null;
+  localidadId?: number | null;
+  superficieTotalM2?: string | null;
+  frenteM?: string | null;
+  fondoM?: string | null;
   notas: string | null;
   aceptaFinanciacion: boolean;
   aceptaPermuta: boolean;
+  aceptaVehiculo?: boolean;
+  acceptsInmueble?: boolean;
+  tieneEscritura?: boolean | null;
 }
 
 export interface OfertaRecord {
@@ -1012,6 +1043,8 @@ export interface InmuebleFicha {
 
 export type VentaEstado = "boleto" | "deeds_pending" | "completed" | "cancelled";
 
+export type VentaAgencyStatus = "sold_by_agency" | "sold_privately" | "off_market";
+
 export interface VentaRecord {
   id: number;
   inmuebleId: number;
@@ -1025,6 +1058,7 @@ export interface VentaRecord {
   nombreEscribano: string | null;
   tieneBoleto: boolean;
   tieneEscritura: boolean;
+  estadoInmobiliaria: VentaAgencyStatus;
   estado: VentaEstado;
   notas: string | null;
   cancelacionDocumentoId?: number | null;
@@ -1077,6 +1111,7 @@ export interface CreateVentaInput {
   nombreEscribano?: string | null;
   tieneBoleto?: boolean;
   tieneEscritura?: boolean;
+  estadoInmobiliaria?: VentaAgencyStatus;
   estado?: VentaEstado;
   notas?: string | null;
 }
@@ -1091,6 +1126,7 @@ export interface UpdateVentaInput {
   nombreEscribano?: string | null;
   tieneBoleto?: boolean;
   tieneEscritura?: boolean;
+  estadoInmobiliaria?: VentaAgencyStatus;
   estado?: VentaEstado;
   notas?: string | null;
 }
@@ -1110,6 +1146,28 @@ export interface UpdateOfertaInput {
   formaPagoId?: number | null;
   condicionesFinanciacion?: string | null;
   notasPrecio?: string | null;
+  estadoRedesId?: number | null;
+}
+
+export interface UpdateInmuebleInput {
+  tipoInmuebleId?: number;
+  code?: string;
+  title?: string | null;
+  calle?: string | null;
+  numero?: string | null;
+  referencia?: string | null;
+  description?: string | null;
+  localidadId?: number | null;
+  superficieTotalM2?: number | string | null;
+  frenteM?: number | string | null;
+  fondoM?: number | string | null;
+  tieneEscritura?: boolean | null;
+  aceptaPermuta?: boolean;
+  aceptaFinanciacion?: boolean;
+  aceptaVehiculo?: boolean;
+  acceptsInmueble?: boolean;
+  notas?: string | null;
+  enAdministracion?: boolean;
 }
 
 export interface CreateOfertaInput {
@@ -1134,13 +1192,14 @@ export interface PublishEnVentaPersonaInput {
 
 export interface PublishEnVentaInmuebleInput {
   code: string;
-  tipoInmuebleId: number;
-  localidadId: number;
-  calle: string;
+ tipoInmuebleId: number;
+ localidadId?: number | null;
+  calle?: string | null;
   numero?: string | null;
   referencia?: string | null;
   title?: string | null;
   description?: string | null;
+  superficieTotalM2?: number | string | null;
   aceptaPermuta?: boolean;
   aceptaFinanciacion?: boolean;
   aceptaVehiculo?: boolean;
@@ -1152,8 +1211,8 @@ export interface PublishEnVentaOfertaInput {
   tipoOperacionId?: number;
   estadoId?: number;
   estadoRedesId?: number | null;
-  montoPrecio: number;
-  codigoMoneda: string;
+  montoPrecio?: number | null;
+  codigoMoneda?: string | null;
   formaPagoId?: number | null;
   condicionesFinanciacion?: string | null;
   notasPrecio?: string | null;
@@ -1163,6 +1222,7 @@ export interface PublishEnVentaOfertaInput {
 export interface PublishEnVentaInput {
   inmueble: PublishEnVentaInmuebleInput;
   propietario: PublishEnVentaPersonaInput;
+  propietariosAdicionales?: PublishEnVentaPersonaInput[];
   oferta: PublishEnVentaOfertaInput;
 }
 

@@ -17,6 +17,45 @@ export const FRECUENCIAS_AJUSTE = [3, 4, 6, 12] as const;
 
 export type MonthYear = { mes: number; anio: number };
 
+function lastDayOfMonth(year: number, month: number): number {
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
+/** Same calendar rule as backend `wholeMonthsBetween` (day-aware month count). */
+export function addMonthsToIsoDate(iso: string, months: number): string {
+  const year = Number(iso.slice(0, 4));
+  const month = Number(iso.slice(5, 7));
+  const day = Number(iso.slice(8, 10));
+  const date = new Date(year, month - 1, day);
+  date.setMonth(date.getMonth() + months);
+  const outYear = date.getFullYear();
+  const outMonth = date.getMonth() + 1;
+  const outDay = date.getDate();
+  return `${outYear}-${String(outMonth).padStart(2, "0")}-${String(outDay).padStart(2, "0")}`;
+}
+
+export function adjustmentFechaBase(
+  contrato: ContratoDetail,
+  ultimoAjusteEn?: string | null,
+): string {
+  return ultimoAjusteEn ?? contrato.fechaInicio;
+}
+
+/**
+ * ISO date for an adjustment in the month chosen in the UI.
+ * Uses the same day-of-month as the rent base (e.g. contract start on the 11th → adjust on the 11th).
+ */
+export function adjustmentDateForSelectedMonth(
+  contrato: ContratoDetail,
+  month: MonthYear,
+  ultimoAjusteEn?: string | null,
+): string {
+  const fechaBase = adjustmentFechaBase(contrato, ultimoAjusteEn);
+  const baseDay = Number(fechaBase.slice(8, 10));
+  const day = Math.min(baseDay, lastDayOfMonth(month.anio, month.mes));
+  return `${month.anio}-${String(month.mes).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
 function toIsoMonthStart(date: Date): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -85,9 +124,7 @@ export function contractualAdjustmentEnd(
   contrato: ContratoDetail,
   ultimoAjusteEn?: string | null,
 ): MonthYear {
-  const desde = rentVigenteDesde(contrato, ultimoAjusteEn);
-  const freq = contrato.frecuenciaAjusteMeses ?? 12;
-  return addMonthsToMonthYear(desde, freq);
+  return fromIsoMonthDate(adjustmentRecordDate(contrato, ultimoAjusteEn));
 }
 
 export function contractualAdjustmentEndForDesde(
@@ -145,7 +182,9 @@ export function adjustmentRecordDate(
   contrato: ContratoDetail,
   ultimoAjusteEn?: string | null,
 ): string {
-  return toIsoMonthDate(contractualAdjustmentEnd(contrato, ultimoAjusteEn));
+  const fechaBase = adjustmentFechaBase(contrato, ultimoAjusteEn);
+  const freq = contrato.frecuenciaAjusteMeses ?? 12;
+  return addMonthsToIsoDate(fechaBase, freq);
 }
 
 /**

@@ -1,4 +1,5 @@
 import type { ContratoDetail, CuotaDetail, ImputacionInput } from "@/lib/api/types";
+import { billingPeriodStartIso } from "@/lib/alquileres/contract-dates";
 import { formatMonthYear } from "@/lib/format";
 
 export type CuotaCobranzasRow = CuotaDetail & { projected?: boolean };
@@ -105,25 +106,65 @@ function createProjectedCuota(
   };
 }
 
-/**
- * Cuotas registradas + períodos del contrato sin cuota generada (hasta el mes actual si está activo).
- */
-export function buildCuotasCobranzasView(
+/** Misma lógica que `listCurrentCycleBillingPeriods` en el backend. */
+function listCurrentCyclePeriods(
+  contrato: ContratoDetail,
+  cuotas: CuotaDetail[],
+): Array<{ anioPeriodo: number; mesPeriodo: number }> {
+  const freq = contrato.frecuenciaAjusteMeses;
+  if (freq == null || freq < 1) {
+    return [];
+  }
+
+  const sorted = [...cuotas].sort(comparePeriod);
+  if (sorted.length === 0) {
+    const start = periodFromIsoDate(billingPeriodStartIso(contrato));
+    let cursor = start;
+    const periods: Array<{ anioPeriodo: number; mesPeriodo: number }> = [];
+    for (let index = 0; index < freq; index += 1) {
+      if (
+        resolveCuotaDueDateForContrato(cursor.anioPeriodo, cursor.mesPeriodo, contrato) === null
+      ) {
+        break;
+      }
+      periods.push(cursor);
+      cursor = addMonth(cursor.anioPeriodo, cursor.mesPeriodo);
+    }
+    return periods;
+  }
+
+  const remainder = sorted.length % freq;
+  if (remainder === 0) {
+    return sorted.map((cuota) => ({
+      anioPeriodo: cuota.anioPeriodo,
+      mesPeriodo: cuota.mesPeriodo,
+    }));
+  }
+
+  const batchStart = sorted[sorted.length - remainder];
+  let cursor = { anioPeriodo: batchStart.anioPeriodo, mesPeriodo: batchStart.mesPeriodo };
+  const periods: Array<{ anioPeriodo: number; mesPeriodo: number }> = [];
+  for (let index = 0; index < freq; index += 1) {
+    if (resolveCuotaDueDateForContrato(cursor.anioPeriodo, cursor.mesPeriodo, contrato) === null) {
+      break;
+    }
+    periods.push(cursor);
+    cursor = addMonth(cursor.anioPeriodo, cursor.mesPeriodo);
+  }
+  return periods;
+}
+
+function buildLegacyProjectedRows(
   cuotas: CuotaDetail[],
   contrato: ContratoDetail,
-  asOf = new Date(),
+  asOf: Date,
+  asOfIso: string,
 ): CuotaCobranzasRow[] {
-  const asOfIso = asOf.toISOString().slice(0, 10);
   const cuotaByPeriod = new Map(cuotas.map((c) => [periodKey(c.anioPeriodo, c.mesPeriodo), c]));
-
   const contractEndPeriod = periodFromIsoDate(contrato.fechaFin);
-  const capPeriod =
-    contrato.estado === "active"
-      ? minPeriod(currentBillingPeriod(asOf), contractEndPeriod)
-      : contractEndPeriod;
-
+  const capPeriod = minPeriod(currentBillingPeriod(asOf), contractEndPeriod);
   const rows: CuotaCobranzasRow[] = [];
-  let cursor = periodFromIsoDate(contrato.fechaInicio);
+  let cursor = periodFromIsoDate(billingPeriodStartIso(contrato));
 
   for (let guard = 0; guard < 600 && comparePeriod(cursor, capPeriod) <= 0; guard += 1) {
     const fechaVencimiento = resolveCuotaDueDateForContrato(
@@ -131,7 +172,6 @@ export function buildCuotasCobranzasView(
       cursor.mesPeriodo,
       contrato,
     );
-
     if (fechaVencimiento) {
       const existing = cuotaByPeriod.get(periodKey(cursor.anioPeriodo, cursor.mesPeriodo));
       rows.push(
@@ -140,18 +180,71 @@ export function buildCuotasCobranzasView(
           : createProjectedCuota(contrato, cursor.anioPeriodo, cursor.mesPeriodo, fechaVencimiento, asOfIso),
       );
     }
-
     cursor = addMonth(cursor.anioPeriodo, cursor.mesPeriodo);
   }
+  return rows;
+}
 
-  for (const cuota of cuotas) {
-    const key = periodKey(cuota.anioPeriodo, cuota.mesPeriodo);
-    if (!rows.some((row) => periodKey(row.anioPeriodo, row.mesPeriodo) === key)) {
-      rows.push({ ...cuota, projected: false });
+/**
+ * Cuotas registradas + períodos del ciclo vigente sin cuota generada (hasta el mes actual).
+ */
+export function buildCuotasCobranzasView(
+  cuotas: CuotaDetail[],
+  contrato: ContratoDetail,
+  asOf = new Date(),
+): CuotaCobranzasRow[] {
+  const asOfIso = asOf.toISOString().slice(0, 10);
+  const cuotaByPeriod = new Map(cuotas.map((c) => [periodKey(c.anioPeriodo, c.mesPeriodo), c]));
+  const contractEndPeriod = periodFromIsoDate(contrato.fechaFin);
+  const capPeriod =
+    contrato.estado === "active"
+      ? minPeriod(currentBillingPeriod(asOf), contractEndPeriod)
+      : contractEndPeriod;
+
+  const rows: CuotaCobranzasRow[] = cuotas.map((cuota) => ({ ...cuota, projected: false }));
+
+  if (contrato.estado === "active") {
+    const freq = contrato.frecuenciaAjusteMeses;
+    if (freq != null && freq >= 1) {
+      for (const period of listCurrentCyclePeriods(contrato, cuotas)) {
+        if (comparePeriod(period, capPeriod) > 0) {
+          continue;
+        }
+        const key = periodKey(period.anioPeriodo, period.mesPeriodo);
+        if (cuotaByPeriod.has(key)) {
+          continue;
+        }
+        const fechaVencimiento = resolveCuotaDueDateForContrato(
+          period.anioPeriodo,
+          period.mesPeriodo,
+          contrato,
+        );
+        if (fechaVencimiento) {
+          rows.push(
+            createProjectedCuota(
+              contrato,
+              period.anioPeriodo,
+              period.mesPeriodo,
+              fechaVencimiento,
+              asOfIso,
+            ),
+          );
+        }
+      }
+    } else {
+      rows.push(...buildLegacyProjectedRows(cuotas, contrato, asOf, asOfIso));
     }
   }
 
-  return sortCuotasDesc(rows);
+  const byKey = new Map<string, CuotaCobranzasRow>();
+  for (const row of rows) {
+    const key = periodKey(row.anioPeriodo, row.mesPeriodo);
+    const existing = byKey.get(key);
+    if (!existing || existing.projected) {
+      byKey.set(key, row);
+    }
+  }
+  return sortCuotasDesc([...byKey.values()]);
 }
 
 export function currentBillingPeriod(asOf = new Date()): { anioPeriodo: number; mesPeriodo: number } {

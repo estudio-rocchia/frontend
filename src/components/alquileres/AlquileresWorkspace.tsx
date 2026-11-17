@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { useSyncScope } from "@/lib/sync/use-sync-scope";
 
@@ -21,7 +21,9 @@ import { type RentalRow } from "@/data/alquileres-rentals";
 import {
   ApiError,
   addInmueblePropietario,
+  fetchEstadosOferta,
   fetchInmueblePropietarios,
+  fetchTiposOperacion,
   applyContratoAjuste,
   changeContratoEstado,
   createContrato,
@@ -35,7 +37,8 @@ import {
 import { altaInmuebleCatalogo } from "@/lib/inmuebles/alta-inmueble";
 import type { InmuebleRecord } from "@/lib/api/types";
 import { invalidateDashboardAlerts } from "@/lib/dashboard-alerts-events";
-import { addYears, createAutoPlanActualizacionDeposito } from "@/lib/alquileres/deposito-plan";
+import { parseAmountInput } from "@/lib/format";
+import { createAutoPlanActualizacionDeposito } from "@/lib/alquileres/deposito-plan";
 import {
   ownerPorcentajeAdministracion,
   resolveOwnerPersona,
@@ -91,6 +94,13 @@ const NewContractModal = dynamic(
     })),
   { ssr: false },
 );
+const PublicarEnAlquilerCatalogModal = dynamic(
+  () =>
+    import("@/components/alquileres/PublicarEnAlquilerCatalogModal").then((mod) => ({
+      default: mod.PublicarEnAlquilerCatalogModal,
+    })),
+  { ssr: false },
+);
 const FinalizarContratoModal = dynamic(
   () =>
     import("@/components/alquileres/FinalizarContratoModal").then((mod) => ({
@@ -110,8 +120,8 @@ export function AlquileresWorkspace() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const breakUi = useBreakUiMode();
-  const { token, logout } = useAuth();
-  const { prefetch: prefetchContrato } = useContratoPrefetch(token);
+  const { token, logout, user } = useAuth();
+  const { prefetch: prefetchContrato, invalidate: invalidateContratoPrefetch } = useContratoPrefetch(token);
   const {
     rows,
     loading,
@@ -139,6 +149,12 @@ export function AlquileresWorkspace() {
   useSyncScope("contratos", () => void loadRows({ silent: true }), Boolean(token));
 
   const [newModalOpen, setNewModalOpen] = useState(false);
+  const [newContractInitialInmuebleId, setNewContractInitialInmuebleId] = useState<number | null>(null);
+  const [publicarAlquilerOpen, setPublicarAlquilerOpen] = useState(false);
+  const [catalogAlquilerIds, setCatalogAlquilerIds] = useState<{
+    estadoAvailableId: number | null;
+    tipoOperacionRentId: number | null;
+  }>({ estadoAvailableId: null, tipoOperacionRentId: null });
   const [renewModalOpen, setRenewModalOpen] = useState(false);
   const [finishTarget, setFinishTarget] = useState<{ id: number; subtitle: string } | null>(null);
   const [adjustModalOpen, setAdjustModalOpen] = useState(false);
@@ -442,6 +458,7 @@ export function AlquileresWorkspace() {
         );
       }
 
+      invalidateContratoPrefetch(selectedContrato.id);
       setAdjustModalOpen(false);
       const inmuebleCode = selectedContrato.inmueble?.code ?? "inmueble";
       showToast(
@@ -460,32 +477,78 @@ export function AlquileresWorkspace() {
     }
   }
 
-  async function openNewContractModal() {
+  async function openPublicarAlquilerModal() {
     if (!token) return;
+    if (breakUi.active) {
+      showToast("Publicación simulada (modo break-ui).");
+      return;
+    }
     try {
-      const [tiposInmueble, inmueblesRes, contratosRes, personasRes] = await Promise.all([
-        fetchCatalog(token, "/catalogos/tipos-inmueble"),
-        fetchInmuebles(token, { limit: 200 }),
-        fetchContratos(token, { limit: 200 }),
-        fetchPersonas(token, { limit: 200 }),
+      const [estadosRes, tiposRes] = await Promise.all([
+        fetchEstadosOferta(token),
+        fetchTiposOperacion(token),
       ]);
-      const inmueblesSinAlquiler = await loadInmueblesSinAlquiler(token, personasRes.items);
-      setCodeContext({
-        tiposInmueble: tiposInmueble.items,
-        inmuebleCodes: inmueblesRes.items.map((item) => item.code),
-        contratoCodes: contratosRes.items.map((item) => item.contratoCode),
-        personas: personasRes.items,
-        inmueblesSinAlquiler,
-      });
-      setNewModalOpen(true);
+      const estadoAvailableId =
+        estadosRes.items.find((item) => item.code === "available")?.id ?? null;
+      const tipoOperacionRentId =
+        tiposRes.items.find((item) => item.code === "rent")?.id ?? null;
+      setCatalogAlquilerIds({ estadoAvailableId, tipoOperacionRentId });
+      setPublicarAlquilerOpen(true);
     } catch (err) {
-      showToast(err instanceof ApiError ? err.message : "No se pudieron cargar los códigos");
+      showToast(err instanceof ApiError ? err.message : "No se pudo abrir el asistente de publicación.");
     }
   }
+
+  const openNewContractModal = useCallback(
+    async (preselectedInmuebleId?: number | null) => {
+      if (!token) return;
+      try {
+        const [tiposInmueble, inmueblesRes, contratosRes, personasRes] = await Promise.all([
+          fetchCatalog(token, "/catalogos/tipos-inmueble"),
+          fetchInmuebles(token, { limit: 200 }),
+          fetchContratos(token, { limit: 200 }),
+          fetchPersonas(token, { limit: 200 }),
+        ]);
+        const inmueblesSinAlquiler = await loadInmueblesSinAlquiler(token, personasRes.items);
+        setCodeContext({
+          tiposInmueble: tiposInmueble.items,
+          inmuebleCodes: inmueblesRes.items.map((item) => item.code),
+          contratoCodes: contratosRes.items.map((item) => item.contratoCode),
+          personas: personasRes.items,
+          inmueblesSinAlquiler,
+        });
+        const validPreselect =
+          preselectedInmuebleId &&
+          inmueblesSinAlquiler.some((item) => item.inmuebleId === preselectedInmuebleId)
+            ? preselectedInmuebleId
+            : null;
+        setNewContractInitialInmuebleId(validPreselect);
+        setNewModalOpen(true);
+      } catch (err) {
+        showToast(err instanceof ApiError ? err.message : "No se pudieron cargar los códigos");
+      }
+    },
+    [token, showToast],
+  );
+
+  useEffect(() => {
+    if (!token || searchParams.get("nuevoContrato") !== "1") return;
+    const raw = searchParams.get("inmuebleId");
+    const parsed = raw ? Number.parseInt(raw, 10) : Number.NaN;
+    const inmuebleId = Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+    void openNewContractModal(inmuebleId);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("nuevoContrato");
+    params.delete("inmuebleId");
+    const nextQuery = params.toString();
+    router.replace(nextQuery ? `/alquileres?${nextQuery}` : "/alquileres", { scroll: false });
+  }, [token, searchParams, openNewContractModal, router]);
 
   async function handleNewContract(form: NewContractForm) {
     if (!token) return;
     setSubmitting(true);
+    const startedAt = Date.now();
+    const minCreatingMs = 3000;
     try {
       const [indices, moras, inmueblesRes, contratosRes] = await Promise.all([
         fetchCatalog(token, "/catalogos/tipos-indice"),
@@ -527,9 +590,17 @@ export function AlquileresWorkspace() {
         });
       }
 
-      const today = new Date().toISOString().slice(0, 10);
-      const amount = Number(form.amount.replace(/\D/g, ""));
-      if (!Number.isFinite(amount) || amount <= 0) {
+      if (!form.fechaInicio || !form.fechaFin || form.fechaFin <= form.fechaInicio) {
+        throw new ApiError(400, {
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Revisá las fechas del contrato: el fin debe ser posterior al inicio.",
+          },
+        });
+      }
+
+      const amount = parseAmountInput(form.amount);
+      if (amount === null || amount <= 0) {
         throw new ApiError(400, {
           error: {
             code: "VALIDATION_ERROR",
@@ -538,8 +609,8 @@ export function AlquileresWorkspace() {
         });
       }
 
-      const depositAmount = Number(form.depositAmount.replace(/\D/g, ""));
-      if (!Number.isFinite(depositAmount) || depositAmount <= 0) {
+      const depositAmount = parseAmountInput(form.depositAmount);
+      if (depositAmount === null || depositAmount <= 0) {
         throw new ApiError(400, {
           error: {
             code: "VALIDATION_ERROR",
@@ -568,7 +639,7 @@ export function AlquileresWorkspace() {
           throw new ApiError(400, {
             error: {
               code: "VALIDATION_ERROR",
-              message: "Seleccioná un inmueble sin alquiler activo",
+              message: "Seleccioná un inmueble para alquilar",
             },
           });
         }
@@ -646,8 +717,8 @@ export function AlquileresWorkspace() {
             contratoCode,
             inmuebleId: inmueble.id,
             inquilinoId: inquilino.id,
-            fechaInicio: today,
-            fechaFin: addYears(today, 5),
+            fechaInicio: form.fechaInicio,
+            fechaFin: form.fechaFin,
             montoAlquiler: amount,
             codigoMoneda: form.currency,
             diaVencimientoPago: moraPayload.diaVencimientoPago,
@@ -679,6 +750,11 @@ export function AlquileresWorkspace() {
             message: "No se pudo reservar un código de contrato. Reintentá.",
           },
         });
+      }
+
+      const creatingElapsed = Date.now() - startedAt;
+      if (creatingElapsed < minCreatingMs) {
+        await new Promise((resolve) => window.setTimeout(resolve, minCreatingMs - creatingElapsed));
       }
 
       setNewModalOpen(false);
@@ -716,7 +792,8 @@ export function AlquileresWorkspace() {
           }
           actions={
             <AlquileresPageActions
-              onNewContract={() => void openNewContractModal()}
+              onNewContract={() => void openNewContractModal(null)}
+              onPublicarAlquiler={() => void openPublicarAlquilerModal()}
               onLiquidacion={() => setLiquidacionModalOpen(true)}
               disabled={submitting}
             />
@@ -846,10 +923,27 @@ export function AlquileresWorkspace() {
         />
       ) : null}
 
+      {publicarAlquilerOpen && token ? (
+        <PublicarEnAlquilerCatalogModal
+          open={publicarAlquilerOpen}
+          onClose={() => setPublicarAlquilerOpen(false)}
+          token={token}
+          estadoOfertaAvailableId={catalogAlquilerIds.estadoAvailableId}
+          tipoOperacionAlquilerId={catalogAlquilerIds.tipoOperacionRentId}
+          onPublished={() => {
+            setPublicarAlquilerOpen(false);
+            showToast("Inmueble publicado en alquiler. Podés crear el contrato desde Alquileres disponibles.");
+          }}
+        />
+      ) : null}
+
       {newModalOpen ? (
         <NewContractModal
         open={newModalOpen}
-        onClose={() => setNewModalOpen(false)}
+        onClose={() => {
+          setNewModalOpen(false);
+          setNewContractInitialInmuebleId(null);
+        }}
         onSubmit={(form) => void handleNewContract(form)}
         submitting={submitting}
         tiposInmueble={codeContext?.tiposInmueble ?? []}
@@ -857,6 +951,7 @@ export function AlquileresWorkspace() {
         personas={codeContext?.personas ?? []}
         token={token ?? undefined}
         inmueblesSinAlquiler={codeContext?.inmueblesSinAlquiler ?? []}
+        initialInmuebleId={newContractInitialInmuebleId}
         />
       ) : null}
 

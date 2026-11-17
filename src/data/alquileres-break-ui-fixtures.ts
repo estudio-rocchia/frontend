@@ -437,6 +437,7 @@ function buildRichFichaBundle9001(): BreakUiFichaBundle {
     contrato,
     propietarios: [
       {
+        id: 6001,
         personaId: 6001,
         nombre: "Christopher Alexander",
         apellido: "Montgomery III",
@@ -555,6 +556,7 @@ function buildFichaBundleFromTableItem(item: ContratoTableItem): BreakUiFichaBun
     contrato,
     propietarios: [
       {
+        id: 6000 + item.id,
         personaId: 6000 + item.id,
         nombre: propietarioName.split(" ")[0] ?? propietarioName,
         apellido: propietarioName.includes(" ") ? propietarioName.split(" ").slice(1).join(" ") : null,

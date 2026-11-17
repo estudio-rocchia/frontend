@@ -3,28 +3,25 @@
 import { Building2, KeyRound, Percent } from "lucide-react";
 
 import { formatPorcentaje, type ModoHonorariosAdministracion } from "@/lib/honorarios-admin";
+import type { CarteraFiltro } from "@/lib/clientes/cartera-propiedad";
 
 export function InmobiliariaStatsBar({
-  propiedades,
-  alquiladas,
+  conteosCartera,
   contratosInquilino,
   modoHonorarios,
   porcentajeCliente,
 }: {
-  propiedades: number;
-  alquiladas: number;
+  conteosCartera: Record<CarteraFiltro, number>;
   contratosInquilino: number;
   modoHonorarios: ModoHonorariosAdministracion;
   porcentajeCliente: string;
 }) {
-  const sinAlquiler = propiedades - alquiladas;
-
   const items = [
     {
       icon: Building2,
       label: "Propiedades",
-      value: String(propiedades),
-      sub: `${alquiladas} alquiladas · ${sinAlquiler} libres`,
+      value: String(conteosCartera.todas),
+      sub: `${conteosCartera.alquiladas} alquiladas · ${conteosCartera.en_venta} en venta · ${conteosCartera.alquiler_y_venta} con ambos`,
     },
     {
       icon: KeyRound,

@@ -19,10 +19,7 @@ export async function altaInmuebleCatalogo(
     throw new Error("Seleccioná una localidad válida.");
   }
 
-  const calle = input.calle.trim();
-  if (!calle) {
-    throw new Error("Completá al menos la calle de la propiedad.");
-  }
+  const calle = input.calle.trim() || null;
 
   const tipos =
     input.tiposInmueble ??
@@ -49,7 +46,7 @@ export async function altaInmuebleCatalogo(
         code,
         tipoInmuebleId: tipoInmueble.id,
         localidadId: input.localidadId,
-        calle,
+        calle: calle ?? "",
         numero: input.numero?.trim() || null,
         referencia: input.referencia?.trim() || null,
         title: alias,

@@ -41,6 +41,14 @@ export function getLoginErrorPresentation(error: unknown): LoginErrorPresentatio
       };
     }
 
+    if (error.status === 429 || error.code === "RATE_LIMITED") {
+      return {
+        title: "Demasiados intentos",
+        description:
+          "Esperá unos minutos antes de volver a intentar iniciar sesión.",
+      };
+    }
+
     if (error.status >= 500) {
       return {
         title: "Error temporal del sistema",

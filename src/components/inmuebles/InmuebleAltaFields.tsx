@@ -11,7 +11,8 @@ import { FormField } from "@/components/ui/FormLayout";
 import { EnumSelect } from "@/components/ui/EnumSelect";
 import { fetchLocalidades } from "@/lib/api";
 import type { CatalogoItem } from "@/lib/api/types";
-import { isInmuebleDireccionValid } from "@/lib/inmuebles/direccion";
+import { isCampoDireccionValid, isInmuebleDireccionValid } from "@/lib/inmuebles/direccion";
+import { showsHectareasMedidas } from "@/lib/ventas/hectareas";
 import { formatInmuebleDisplayLabel } from "@/lib/inmuebles/display-label";
 import { nextInmuebleCode, prefixForTipoInmueble } from "@/lib/codes";
 
@@ -30,6 +31,9 @@ export function emptyInmuebleAlta(): InmuebleAltaValue {
 }
 
 export function isInmuebleAltaValid(value: InmuebleAltaValue): boolean {
+  if (showsHectareasMedidas(value.tipoInmuebleCode)) {
+    return isCampoDireccionValid(value.direccion);
+  }
   return isInmuebleDireccionValid(value.direccion);
 }
 
@@ -42,7 +46,11 @@ export function InmuebleAltaFields({
   loadingTipos,
   onLoadTipos,
   showCodePreview = true,
+  showLabelPreview = true,
   showAlias = true,
+  aliasLabel = "Alias para publicación (opcional)",
+  aliasPlaceholder = "Ej. Casa con quincho en barrio Centro",
+  aliasMode = "optional-collapsed",
   intro,
 }: {
   token: string;
@@ -53,7 +61,12 @@ export function InmuebleAltaFields({
   loadingTipos?: boolean;
   onLoadTipos?: () => void;
   showCodePreview?: boolean;
+  showLabelPreview?: boolean;
   showAlias?: boolean;
+  aliasLabel?: string;
+  aliasPlaceholder?: string;
+  /** `visible`: campo siempre visible (ventas). `optional-collapsed`: link "Agregar alias" (alquileres). */
+  aliasMode?: "optional-collapsed" | "visible";
   intro?: string;
 }) {
   const [localidades, setLocalidades] = useState<
@@ -80,6 +93,9 @@ export function InmuebleAltaFields({
   }, [token]);
 
   useEffect(() => {
+    if (showsHectareasMedidas(value.tipoInmuebleCode)) {
+      return;
+    }
     if (localidadInicializada.current || (!value.direccion.localidadId && localidades.length === 0)) {
       return;
     }
@@ -128,11 +144,25 @@ export function InmuebleAltaFields({
     <div className="flex flex-col gap-4">
       {intro ? <p className="text-[12px] leading-snug text-text-secondary">{intro}</p> : null}
 
-      <div onFocusCapture={onLoadTipos}>
+      <div
+        onFocusCapture={() => {
+          if (onLoadTipos && tiposInmueble.length <= 1) onLoadTipos();
+        }}
+      >
         <EnumSelect
           label="Tipo de inmueble"
           value={value.tipoInmuebleCode}
-          onChange={(code) => code && onChange({ ...value, tipoInmuebleCode: code })}
+          onChange={(code) => {
+            if (!code) return;
+            const esCampo = showsHectareasMedidas(code);
+            onChange({
+              ...value,
+              tipoInmuebleCode: code,
+              direccion: esCampo
+                ? { ...value.direccion, calle: "", numero: "" }
+                : value.direccion,
+            });
+          }}
           disabled={loadingTipos}
           options={tipos.map((tipo) => ({ value: tipo.code, label: tipo.name }))}
         />
@@ -152,9 +182,10 @@ export function InmuebleAltaFields({
         onLocalidadesChange={setLocalidades}
         token={token}
         loadingLocalidades={loadingLocalidades}
+        variant={showsHectareasMedidas(value.tipoInmuebleCode) ? "campo" : "urbano"}
       />
 
-      {isInmuebleAltaValid(value) ? (
+      {showLabelPreview && isInmuebleAltaValid(value) ? (
         <div className="rounded-sm border border-border bg-bg-page px-3 py-2">
           <p className="text-[11px] font-semibold text-text-secondary">Se identificará como</p>
           <p className="mt-1 text-[13px] font-medium text-text-primary">{labelPreview}</p>
@@ -163,7 +194,14 @@ export function InmuebleAltaFields({
 
       {showAlias ? (
         <div className="flex flex-col gap-2">
-          {!aliasOpen ? (
+          {aliasMode === "visible" ? (
+            <FormField
+              label={aliasLabel}
+              value={value.alias}
+              onChange={(alias) => onChange({ ...value, alias })}
+              placeholder={aliasPlaceholder}
+            />
+          ) : !aliasOpen ? (
             <button
               type="button"
               onClick={() => setAliasOpen(true)}
@@ -174,10 +212,10 @@ export function InmuebleAltaFields({
           ) : (
             <>
               <FormField
-                label="Alias para publicación (opcional)"
+                label={aliasLabel}
                 value={value.alias}
                 onChange={(alias) => onChange({ ...value, alias })}
-                placeholder="Ej. Casa con quincho en barrio Centro"
+                placeholder={aliasPlaceholder}
               />
               <button
                 type="button"

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 import { RocchiaDateField } from "@/components/ui/RocchiaDateField";
-import { formInputClass, interactiveFocusClass } from "@/lib/ui/interactive-focus";
+import { formInputClass, formTextareaClass, interactiveFocusClass } from "@/lib/ui/interactive-focus";
 import { VENTA_EMPTY_FIELD } from "@/lib/ventas/empty-field";
 
 export function FormSection({
@@ -58,6 +58,7 @@ export function FormField({
   onChange,
   placeholder,
   type = "text",
+  rows = 4,
   id,
   invalid = false,
   error,
@@ -67,11 +68,35 @@ export function FormField({
   onChange: (value: string) => void;
   placeholder?: string;
   type?: string;
+  rows?: number;
   id?: string;
   invalid?: boolean;
   error?: string;
 }) {
   const errorId = id && invalid && error ? `${id}-error` : undefined;
+
+  if (type === "textarea") {
+    return (
+      <label className="flex flex-col gap-1.5">
+        <span className="text-[11px] font-semibold text-text-secondary">{label}</span>
+        <textarea
+          id={id}
+          value={value}
+          rows={rows}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={placeholder}
+          aria-invalid={invalid || undefined}
+          aria-describedby={errorId}
+          className={formTextareaClass}
+        />
+        {errorId ? (
+          <span id={errorId} className="text-sm text-danger">
+            {error}
+          </span>
+        ) : null}
+      </label>
+    );
+  }
 
   if (type === "date") {
     return (

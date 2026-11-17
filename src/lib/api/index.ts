@@ -10,7 +10,7 @@ import type {
   RamaExpediente,
   TramiteRpi,
 } from "../juridico/model";
-import { withCache } from "./cache";
+import { invalidateCache, withCache } from "./cache";
 import { apiBlob, apiBlobWithFilename, apiRequest, apiUploadFile } from "./client";
 import type {
   CatalogoItem,
@@ -573,6 +573,36 @@ export function fetchInmuebleFicha(token: string, inmuebleId: number) {
   return apiRequest<InmuebleFicha>(`/inmuebles/${inmuebleId}/ficha`, { token });
 }
 
+export function updateInmueble(
+  token: string,
+  inmuebleId: number,
+  body: import("./types").UpdateInmuebleInput,
+) {
+  return apiRequest<import("./types").InmuebleCatalogRecord>(`/inmuebles/${inmuebleId}`, {
+    method: "PATCH",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function archiveInmueble(token: string, inmuebleId: number) {
+  return apiRequest<import("./types").InmuebleCatalogRecord>(`/inmuebles/${inmuebleId}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
+export function removeInmueblePropietario(
+  token: string,
+  inmuebleId: number,
+  propietarioId: number,
+) {
+  return apiRequest<void>(`/inmuebles/${inmuebleId}/propietarios/${propietarioId}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
 export function upsertInmuebleDetalle(
   token: string,
   inmuebleId: number,
@@ -604,14 +634,17 @@ export function fetchCatalog<T extends CatalogoItem>(token: string, path: string
  );
 }
 
-export function fetchLocalidades(token: string) {
+export async function fetchLocalidades(token: string) {
+ const res = await apiRequest<{
+   items: Array<{ id: number; name: string; province: string; country: string }>;
+ }>("/localidades", { token });
+ if (res.items.length === 0) {
+   invalidateCache("localidades");
+   return res;
+ }
  return withCache(
    "localidades",
-   () =>
-     apiRequest<{ items: Array<{ id: number; name: string; province: string; country: string }> }>(
-       "/localidades",
-       { token },
-     ),
+   async () => res,
    { ttlMs: CATALOG_CACHE_TTL_MS },
  );
 }
@@ -694,7 +727,11 @@ export function createLocalidad(token: string, body: { name: string; province: s
   return apiRequest<{ id: number; name: string; province: string; country: string }>("/localidades", {
     method: "POST",
     token,
-    body: JSON.stringify({ country: "Argentina", ...body }),
+    body: JSON.stringify({
+      country: body.country?.trim() || "Argentina",
+      name: body.name,
+      province: body.province,
+    }),
   });
 }
 
@@ -958,6 +995,18 @@ export function fetchVenta(token: string, id: number) {
   return apiRequest<VentaDetail>(`/ventas/${id}`, { token });
 }
 
+export type VentasResumenPestanas = {
+  en_operacion: number;
+  a_la_venta: number;
+  fuera_mercado: number;
+  vendidos: number;
+};
+
+export function fetchVentasResumenPestanas(token: string, tipoOperacionId: number) {
+  const query = new URLSearchParams({ tipoOperacionId: String(tipoOperacionId) });
+  return apiRequest<VentasResumenPestanas>(`/ventas/resumen-pestanas?${query}`, { token });
+}
+
 export function fetchVentaCuotas(token: string, ventaId: number) {
   return apiRequest<{ items: CuotaFinanciacionRecord[] }>(
     `/ventas/${ventaId}/financiacion/cuotas`,
@@ -987,6 +1036,8 @@ export function searchCatalogo(
     fondoMin?: number;
     tieneEscritura?: boolean;
     tieneConstruccion?: boolean;
+    disponibleAlquiler?: boolean;
+    vendidoAnio?: number;
     limit?: number;
     offset?: number;
   },
@@ -1021,9 +1072,23 @@ export function searchCatalogo(
   if (params?.tieneConstruccion !== undefined) {
     query.set("tieneConstruccion", String(params.tieneConstruccion));
   }
+  if (params?.disponibleAlquiler !== undefined) {
+    query.set("disponibleAlquiler", String(params.disponibleAlquiler));
+  }
+  if (params?.vendidoAnio !== undefined) query.set("vendidoAnio", String(params.vendidoAnio));
   query.set("limit", String(params?.limit ?? 100));
   if (params?.offset) query.set("offset", String(params.offset));
   return apiRequest<{ items: CatalogSearchItem[] }>(`/catalogo/buscar?${query}`, { token });
+}
+
+export function fetchVendidoAnios(token: string, tipoOperacionId?: number) {
+  const query = new URLSearchParams();
+  if (tipoOperacionId) query.set("tipoOperacionId", String(tipoOperacionId));
+  const qs = query.toString();
+  return apiRequest<{ items: number[] }>(
+    `/catalogo/vendidos-anios${qs ? `?${qs}` : ""}`,
+    { token },
+  );
 }
 
 export function fetchEstadosOferta(token: string) {
@@ -1036,6 +1101,13 @@ export function fetchTiposOperacion(token: string) {
 
 export function fetchFormasPago(token: string) {
   return fetchCatalog<CatalogoItem>(token, "/catalogos/formas-pago");
+}
+
+export function fetchTiposInmueble(token: string, options?: { refresh?: boolean }) {
+  if (options?.refresh) {
+    invalidateCache("catalog:/catalogos/tipos-inmueble");
+  }
+  return fetchCatalog<CatalogoItem>(token, "/catalogos/tipos-inmueble");
 }
 
 export function fetchOfertaHistorialPrecio(token: string, ofertaId: number) {
@@ -1155,6 +1227,14 @@ export function createOferta(
 
 export function publishEnVenta(token: string, body: import("./types").PublishEnVentaInput) {
   return apiRequest<import("./types").PublishEnVentaResult>("/inmuebles/en-venta", {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export function publishEnAlquiler(token: string, body: import("./types").PublishEnVentaInput) {
+  return apiRequest<import("./types").PublishEnVentaResult>("/inmuebles/en-alquiler", {
     method: "POST",
     token,
     body: JSON.stringify(body),

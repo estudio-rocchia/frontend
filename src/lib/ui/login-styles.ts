@@ -8,7 +8,7 @@ export function loginInputClass(
   { leadingIcon = false, trailingAction = false }: { leadingIcon?: boolean; trailingAction?: boolean } = {},
 ) {
   return [
-    "w-full rounded-lg border bg-white py-3 text-[15px] text-text-primary outline-none transition-colors",
+    "w-full rounded-lg border bg-bg-page py-3 text-[15px] text-text-primary caret-text-primary outline-none transition-colors",
     leadingIcon ? "pl-11" : "pl-4",
     trailingAction ? "pr-11" : "pr-4",
     "placeholder:text-text-secondary/70 focus:border-login-accent",
@@ -24,6 +24,6 @@ export const loginInputIconClass =
 export const loginSubmitClass = `inline-flex w-full items-center justify-center gap-2 rounded-lg bg-login-accent py-3.5 text-[15px] font-semibold text-white transition-[background-color,transform] duration-150 hover:bg-login-accent-hover enabled:active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-50 ${loginFocusClass}`;
 
 export const loginCardClass =
-  "rounded-2xl bg-bg-card px-6 pt-16 pb-7 shadow-[var(--login-shadow-card)] sm:px-8 sm:pb-8";
+  "login-card rounded-2xl bg-bg-card px-6 pt-16 pb-7 shadow-[var(--login-shadow-card)] sm:px-8 sm:pb-8";
 
 export const loginTagline = "Acceso exclusivo para el equipo de Rocchia";

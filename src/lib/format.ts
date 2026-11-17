@@ -36,6 +36,72 @@ function isCurrencyCode(raw: string): boolean {
   return code === "ARS" || code === "USD";
 }
 
+/** Quita ceros decimales insignificantes (625.00 → 625; 12.50 → 12,5 en pantalla). */
+export function formatMeasurementDisplay(value: string | null | undefined): string | null {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+  const parsed = Number.parseFloat(trimmed.replace(",", "."));
+  if (!Number.isFinite(parsed)) return trimmed;
+  return parsed.toLocaleString("es-AR", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
+}
+
+/** Valor sin ceros de más para inputs `type="number"` (usa punto decimal). */
+export function formatMeasurementInput(value: string | null | undefined): string {
+  const trimmed = value?.trim();
+  if (!trimmed) return "";
+  const parsed = Number.parseFloat(trimmed.replace(",", "."));
+  if (!Number.isFinite(parsed)) return trimmed;
+  if (Number.isInteger(parsed)) return String(parsed);
+  return String(parsed);
+}
+
+export function parseOptionalMeasurement(value: string): number | string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const parsed = Number.parseFloat(trimmed.replace(",", "."));
+  return Number.isFinite(parsed) ? trimmed.replace(",", ".") : null;
+}
+
+/** Agrupa miles con punto mientras se escribe. La coma queda para los centavos (es-AR). */
+export function formatAmountTyping(raw: string): string {
+  const cleaned = raw.replace(/[^\d,]/g, "");
+  if (!cleaned) return "";
+  const comma = cleaned.indexOf(",");
+  const wholeDigits = (comma === -1 ? cleaned : cleaned.slice(0, comma)).replace(/\D/g, "");
+  const whole = wholeDigits.replace(/^0+(?=\d)/, "");
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  if (comma === -1) return grouped;
+  const frac = cleaned.slice(comma + 1).replace(/\D/g, "").slice(0, 2);
+  return `${grouped || "0"},${frac}`;
+}
+
+export function caretAfterSignificant(formatted: string, significantCount: number): number {
+  if (significantCount <= 0) return 0;
+  let seen = 0;
+  for (let index = 0; index < formatted.length; index += 1) {
+    if (/\d|,/.test(formatted[index] ?? "")) {
+      seen += 1;
+      if (seen === significantCount) return index + 1;
+    }
+  }
+  return formatted.length;
+}
+
+/** Acepta 150000, 150.000 y 150.000,50. */
+export function parseAmountInput(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const [wholeRaw, fracRaw] = trimmed.replace(/[^\d.,]/g, "").split(",");
+  const whole = (wholeRaw ?? "").replace(/\D/g, "");
+  if (!whole) return null;
+  const frac = (fracRaw ?? "").replace(/\D/g, "").slice(0, 2);
+  const value = Number(frac ? `${whole}.${frac}` : whole);
+  return Number.isFinite(value) ? value : null;
+}
+
 export function formatMoney(amount: string, currency: string | null | undefined = "ARS"): string {
   let moneyRaw = amount;
   let currencyRaw = currency ?? "ARS";

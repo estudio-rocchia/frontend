@@ -9,6 +9,7 @@ import type {
 } from "@/lib/api/types";
 import { nextInmuebleCode, prefixForTipoInmueble } from "@/lib/codes";
 import { normalizePhoneToE164 } from "@/lib/format";
+import { hectareasAresToM2, showsHectareasMedidas } from "@/lib/ventas/hectareas";
 
 export function buildPropietarioInput(
   field: PersonaFieldValue,
@@ -45,8 +46,9 @@ export function buildPublishEnVentaPayload(params: {
   aceptaFinanciacion: boolean;
   aceptaVehiculo: boolean;
   propietario: PublishEnVentaPersonaInput;
-  montoPrecio: number;
-  codigoMoneda: string;
+  propietariosAdicionales?: PublishEnVentaPersonaInput[];
+  montoPrecio: number | null;
+  codigoMoneda: string | null;
   formaPagoId: number | null;
   condicionesFinanciacion: string;
   notasPrecio: string;
@@ -55,25 +57,39 @@ export function buildPublishEnVentaPayload(params: {
 }): Omit<PublishEnVentaInput, "inmueble"> & {
   inmueble: Omit<PublishEnVentaInput["inmueble"], "code">;
 } {
-  const localidadId = Number(params.propiedad.direccion.localidadId);
+  const localidadIdRaw = Number(params.propiedad.direccion.localidadId);
+  const localidadId =
+    Number.isInteger(localidadIdRaw) && localidadIdRaw > 0 ? localidadIdRaw : null;
+  const esCampo = showsHectareasMedidas(params.propiedad.tipoInmuebleCode);
+  const campoDescription = params.propiedad.campoDescription.trim();
+  const superficieTotalM2 = esCampo
+    ? hectareasAresToM2(params.propiedad.hectareas, params.propiedad.ares)
+    : null;
+
   return {
     inmueble: {
       tipoInmuebleId: params.tipoInmuebleId,
-      localidadId,
-      calle: params.propiedad.direccion.calle.trim(),
+      ...(localidadId != null ? { localidadId } : {}),
+      calle: params.propiedad.direccion.calle.trim() || null,
       numero: params.propiedad.direccion.numero.trim() || null,
       referencia: params.propiedad.direccion.referencia.trim() || null,
       title: params.propiedad.alias.trim() || null,
+      ...(campoDescription ? { description: campoDescription } : {}),
+      ...(superficieTotalM2 != null ? { superficieTotalM2 } : {}),
       aceptaPermuta: params.aceptaPermuta,
       aceptaFinanciacion: params.aceptaFinanciacion,
       aceptaVehiculo: params.aceptaVehiculo,
     },
     propietario: params.propietario,
+    ...(params.propietariosAdicionales?.length
+      ? { propietariosAdicionales: params.propietariosAdicionales }
+      : {}),
     oferta: {
       tipoOperacionId: params.tipoOperacionVentaId,
       estadoId: params.estadoOfertaId,
-      montoPrecio: params.montoPrecio,
-      codigoMoneda: params.codigoMoneda,
+      ...(params.montoPrecio !== null && params.codigoMoneda
+        ? { montoPrecio: params.montoPrecio, codigoMoneda: params.codigoMoneda }
+        : { montoPrecio: null, codigoMoneda: null }),
       formaPagoId: params.formaPagoId,
       condicionesFinanciacion: params.condicionesFinanciacion.trim() || null,
       notasPrecio: params.notasPrecio.trim() || null,

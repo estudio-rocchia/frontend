@@ -89,7 +89,7 @@ const FILTER_PANEL_COPY: Record<string, FilterPanelCopy> = {
     detailSectionTitle: null,
     detailSectionDescription: null,
     terrainSectionTitle: "Extensión del campo",
-    terrainSectionDescription: "Cantidad de hectáreas (1 ha = 10.000 m² en la ficha).",
+    terrainSectionDescription: "Hectáreas y áreas (ej. 5 ha 94 a), como en la planilla de ventas.",
   },
   house: {
     collapsedHint: "Precio y características de la casa",
@@ -108,14 +108,21 @@ const FILTER_PANEL_COPY: Record<string, FilterPanelCopy> = {
   duplex: {
     collapsedHint: "Precio y características del dúplex",
     detailSectionTitle: "Dúplex",
-    detailSectionDescription: "Distribución y equipamiento de la unidad.",
+    detailSectionDescription: "Distribución por piso, superficies e instalaciones del dúplex.",
     terrainSectionTitle: null,
     terrainSectionDescription: null,
   },
   commercial: {
-    collapsedHint: "Precio y espacio comercial",
+    collapsedHint: "Precio del local a la calle",
     detailSectionTitle: "Local comercial",
-    detailSectionDescription: "Baños y distribución del local.",
+    detailSectionDescription: "Rubro permitido, baños y distribución del local.",
+    terrainSectionTitle: null,
+    terrainSectionDescription: null,
+  },
+  salon: {
+    collapsedHint: "Precio del salón (eventos o alquiler amplio)",
+    detailSectionTitle: "Salón",
+    detailSectionDescription: "Superficie, cocina, baños y depósito. No es un local comercial.",
     terrainSectionTitle: null,
     terrainSectionDescription: null,
   },
@@ -130,6 +137,13 @@ const FILTER_PANEL_COPY: Record<string, FilterPanelCopy> = {
     collapsedHint: "Precio y unidad en torre",
     detailSectionTitle: "Unidad en torre",
     detailSectionDescription: "Dormitorios, baños y cochera.",
+    terrainSectionTitle: null,
+    terrainSectionDescription: null,
+  },
+  cabin: {
+    collapsedHint: "Precio y características de la cabaña",
+    detailSectionTitle: "Cabaña",
+    detailSectionDescription: "Ambientes, equipamiento y servicios de la unidad.",
     terrainSectionTitle: null,
     terrainSectionDescription: null,
   },
@@ -165,7 +179,6 @@ const RESIDENTIAL_PROFILE: TipoDetalleProfile = {
     "lugaresCochera",
     "tienePileta",
     "tieneParrilla",
-    "observacion",
   ],
   summaryFields: [
     "bedrooms",
@@ -178,20 +191,112 @@ const RESIDENTIAL_PROFILE: TipoDetalleProfile = {
   ],
 };
 
+const APARTMENT_PROFILE: TipoDetalleProfile = {
+  sectionTitle: "Detalle edilicio",
+  sectionHint: "Superficie total, ambientes, amenities de la unidad y del edificio.",
+  filterFields: ["bedroomsMin", "bathroomsMin", "tieneCochera", "tienePileta"],
+  terrainFilterFields: [],
+  editorFields: [
+    "bedrooms",
+    "bathrooms",
+    "rooms",
+    "superficieCubiertaM2",
+    "tieneCochera",
+    "lugaresCochera",
+    "tienePileta",
+    "tieneParrilla",
+    "tieneDeposito",
+  ],
+  summaryFields: [
+    "bedrooms",
+    "bathrooms",
+    "superficieCubiertaM2",
+    "tieneCochera",
+    "lugaresCochera",
+    "tienePileta",
+    "tieneParrilla",
+    "tieneDeposito",
+  ],
+};
+
+const DUPLEX_PROFILE: TipoDetalleProfile = {
+  sectionTitle: "Detalle edilicio",
+  sectionHint: "Superficies, distribución por piso (dormitorios y baños) e instalaciones.",
+  filterFields: ["bedroomsMin", "bathroomsMin", "tieneCochera"],
+  terrainFilterFields: [],
+  editorFields: [
+    "bedrooms",
+    "bathrooms",
+    "rooms",
+    "superficieCubiertaM2",
+    "tieneCochera",
+    "lugaresCochera",
+    "tieneParrilla",
+  ],
+  summaryFields: [
+    "bedrooms",
+    "bathrooms",
+    "rooms",
+    "superficieCubiertaM2",
+    "tieneCochera",
+    "lugaresCochera",
+    "tieneParrilla",
+  ],
+};
+
+const HOUSE_PROFILE: TipoDetalleProfile = {
+  sectionTitle: "Detalle edilicio",
+  sectionHint: "Medidas del lote, vivienda y equipamiento habitual en casas.",
+  filterFields: ["bedroomsMin", "bathroomsMin", "tieneCochera", "tienePileta"],
+  terrainFilterFields: [],
+  editorFields: [
+    "bedrooms",
+    "bathrooms",
+    "rooms",
+    "superficieCubiertaM2",
+    "tieneCochera",
+    "lugaresCochera",
+    "tienePileta",
+    "tieneParrilla",
+    "tieneDeposito",
+  ],
+  summaryFields: [
+    "bedrooms",
+    "bathrooms",
+    "superficieCubiertaM2",
+    "tieneCochera",
+    "lugaresCochera",
+    "tienePileta",
+    "tieneParrilla",
+    "tieneDeposito",
+  ],
+};
+
 const TERRAIN_PROFILE: TipoDetalleProfile = {
   sectionTitle: "Detalle del terreno",
-  sectionHint: "Superficie total, frente y fondo se cargan en los datos generales del inmueble.",
+  sectionHint:
+    "Superficie, escritura, descripción. m² cubiertos solo si hay construcción en el lote.",
   filterFields: [],
   terrainFilterFields: LOT_TERRAIN_FILTERS,
-  editorFields: ["superficieCubiertaM2", "observacion"],
-  summaryFields: ["superficieCubiertaM2"],
+  editorFields: [],
+  summaryFields: [],
 };
 
 const COMMERCIAL_PROFILE: TipoDetalleProfile = {
-  sectionTitle: "Detalle comercial",
+  sectionTitle: "Detalle del local comercial",
   filterFields: ["bathroomsMin"],
   terrainFilterFields: [],
-  editorFields: ["rooms", "bathrooms", "superficieCubiertaM2", "tieneDeposito", "observacion"],
+  editorFields: ["rooms", "bathrooms", "superficieCubiertaM2", "tieneDeposito"],
+  summaryFields: ["rooms", "bathrooms", "superficieCubiertaM2", "tieneDeposito"],
+};
+
+const SALON_PROFILE: TipoDetalleProfile = {
+  sectionTitle: "Detalle edilicio",
+  sectionHint:
+    "Superficie total, frente y fondo del salón; ambientes, baños y depósito si corresponde.",
+  filterFields: ["bathroomsMin"],
+  terrainFilterFields: [],
+  editorFields: ["rooms", "bathrooms", "superficieCubiertaM2", "tieneDeposito"],
   summaryFields: ["rooms", "bathrooms", "superficieCubiertaM2", "tieneDeposito"],
 };
 
@@ -199,12 +304,13 @@ const WAREHOUSE_PROFILE: TipoDetalleProfile = {
   sectionTitle: "Detalle del galpón",
   filterFields: [],
   terrainFilterFields: [],
-  editorFields: ["superficieCubiertaM2", "tieneDeposito", "observacion"],
+  editorFields: ["superficieCubiertaM2", "tieneDeposito"],
   summaryFields: ["superficieCubiertaM2", "tieneDeposito"],
 };
 
 const TOWER_PROFILE: TipoDetalleProfile = {
   sectionTitle: "Detalle de unidad",
+  sectionHint: "Ambientes y amenities de la unidad en torre.",
   filterFields: ["bedroomsMin", "bathroomsMin", "tieneCochera"],
   terrainFilterFields: [],
   editorFields: [
@@ -213,9 +319,16 @@ const TOWER_PROFILE: TipoDetalleProfile = {
     "superficieCubiertaM2",
     "tieneCochera",
     "lugaresCochera",
-    "observacion",
+    "tieneDeposito",
   ],
-  summaryFields: ["bedrooms", "bathrooms", "superficieCubiertaM2", "tieneCochera", "lugaresCochera"],
+  summaryFields: [
+    "bedrooms",
+    "bathrooms",
+    "superficieCubiertaM2",
+    "tieneCochera",
+    "lugaresCochera",
+    "tieneDeposito",
+  ],
 };
 
 const PROFILES: Record<string, TipoDetalleProfile> = {
@@ -223,15 +336,18 @@ const PROFILES: Record<string, TipoDetalleProfile> = {
   hectares: {
     ...TERRAIN_PROFILE,
     sectionTitle: "Detalle del campo",
-    sectionHint: "La superficie del campo se carga en m² en los datos generales (1 ha = 10.000 m²).",
+    sectionHint:
+      "Hectáreas y áreas (como en la planilla), título de publicación y descripción del predio.",
     terrainFilterFields: HECTARES_TERRAIN_FILTERS,
   },
-  house: RESIDENTIAL_PROFILE,
-  apartment: RESIDENTIAL_PROFILE,
-  duplex: RESIDENTIAL_PROFILE,
+  house: HOUSE_PROFILE,
+  apartment: APARTMENT_PROFILE,
+  duplex: DUPLEX_PROFILE,
   commercial: COMMERCIAL_PROFILE,
+  salon: SALON_PROFILE,
   warehouse: WAREHOUSE_PROFILE,
   tower: TOWER_PROFILE,
+  cabin: HOUSE_PROFILE,
 };
 
 export function getTipoDetalleProfile(tipoInmuebleCode: string | null | undefined): TipoDetalleProfile {

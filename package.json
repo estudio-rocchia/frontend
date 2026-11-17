@@ -8,6 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test:e2e": "playwright test",
+    "test:e2e:ventas": "playwright test e2e/ventas",
+    "test:e2e:alquileres": "E2E_RUN_COBRAR_SEED=1 playwright test e2e/alquileres",
     "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { RefreshCw } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 import { Card } from "@/components/ui/Card";
 import { KpiCard } from "@/components/ui/KpiCard";
@@ -35,6 +36,28 @@ const INDEX_LABELS: Record<IndiceCode, string> = {
   IPC: "Índice de Precios al Consumidor",
   CAC: "Cámara Argentina de la Construcción",
 };
+
+const contentEase = [0.23, 1, 0.32, 1] as const;
+
+function IndexDescription({ indice }: { indice: IndiceCode }) {
+  const reduceMotion = useReducedMotion();
+  const text = `${INDEX_LABELS[indice]}${indice === "CAC" ? " CAMARCO puede tardar unos minutos." : ""}`;
+
+  return (
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.span
+        key={indice}
+        initial={reduceMotion ? false : { opacity: 0, y: 5 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={reduceMotion ? undefined : { opacity: 0, y: -5 }}
+        transition={{ duration: reduceMotion ? 0 : 0.22, ease: contentEase }}
+        className="block"
+      >
+        {text}
+      </motion.span>
+    </AnimatePresence>
+  );
+}
 
 function defaultDateRange() {
   const hasta = new Date();
@@ -77,23 +100,35 @@ function IndexSelector({
   onChange: (code: IndiceCode) => void;
   disabled?: boolean;
 }) {
+  const reduceMotion = useReducedMotion();
+
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="relative flex flex-wrap gap-1" role="group" aria-label="Índice de ajuste">
       {ADJUSTMENT_INDICES.map((code) => {
         const selected = value === code;
         return (
           <button
             key={code}
             type="button"
+            aria-pressed={selected}
             onClick={() => onChange(code)}
             disabled={disabled}
-            className={`rocchia-action rounded-lg border px-3 py-1.5 text-[13px] disabled:opacity-60 ${
-              selected
-                ? "border-primary bg-bg-card font-medium text-text-primary"
-                : "border-transparent font-medium text-text-secondary hover:text-text-primary"
+            className={`rocchia-action relative z-10 rounded-lg px-3 py-1.5 text-[13px] font-medium disabled:opacity-60 ${interactiveFocusClass} ${
+              selected ? "text-text-primary" : "text-text-secondary hover:text-text-primary"
             }`}
           >
-            {code}
+            {selected ? (
+              <motion.span
+                layoutId="indices-segment-pill"
+                className="absolute inset-0 rounded-lg border border-primary bg-bg-card shadow-[0_1px_3px_rgba(1,4,0,0.08)]"
+                transition={
+                  reduceMotion
+                    ? { duration: 0 }
+                    : { type: "spring", stiffness: 420, damping: 34, mass: 0.85 }
+                }
+              />
+            ) : null}
+            <span className="relative">{code}</span>
           </button>
         );
       })}
@@ -103,6 +138,7 @@ function IndexSelector({
 
 export function IndicesView() {
   const { token, logout } = useAuth();
+  const reduceMotion = useReducedMotion();
   const { refreshing, listTransitionKey, isInitialLoad, start, finish } = useListRefreshTransition();
   const defaults = useMemo(() => defaultDateRange(), []);
   const [indice, setIndice] = useState<IndiceCode>("ICL");
@@ -202,10 +238,7 @@ export function IndicesView() {
 
   return (
     <div className={`flex flex-col gap-6 sm:gap-8 ${pagePaddingClass}`}>
-      <PageHeader
-        title="Índices de ajuste"
-        description={`${INDEX_LABELS[indice]}${indice === "CAC" ? " CAMARCO puede tardar unos minutos." : ""}`}
-      />
+      <PageHeader title="Índices de ajuste" description={<IndexDescription indice={indice} />} />
 
       <section className="flex flex-col gap-3">
         <div className="flex w-fit max-w-full flex-wrap items-center gap-2">
@@ -229,34 +262,43 @@ export function IndicesView() {
         ) : null}
       </section>
 
-      {!loading && !refreshing && !error && rows.length > 0 ? (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <KpiCard
-            label={`Último valor · ${indice}`}
-            value={latest ? formatIndexValue(latest.valor) : "—"}
-            hint={latest ? formatPeriodoIndice(latest.periodo) : "Sin datos"}
-            tone={0}
-          />
-          <KpiCard
-            label="Variación mensual"
-            value={latestVariations.mensual ?? "—"}
-            hint="Respecto al mes anterior"
-            tone={1}
-          />
-          <KpiCard
-            label="Variación interanual"
-            value={latestVariations.interanual ?? "—"}
-            hint="Respecto al mismo mes del año anterior"
-            tone={3}
-          />
-          <KpiCard
-            label="Variación acumulada"
-            value={latestVariations.acumulada ?? "—"}
-            hint="Desde diciembre del año anterior (criterio INDEC)"
-            tone={4}
-          />
-        </div>
-      ) : null}
+      <AnimatePresence mode="wait" initial={false}>
+        {!loading && !refreshing && !error && rows.length > 0 ? (
+          <motion.div
+            key={listTransitionKey}
+            initial={reduceMotion ? false : { opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={reduceMotion ? undefined : { opacity: 0, y: -6 }}
+            transition={{ duration: reduceMotion ? 0 : 0.26, ease: contentEase }}
+            className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4"
+          >
+            <KpiCard
+              label={`Último valor · ${indice}`}
+              value={latest ? formatIndexValue(latest.valor) : "—"}
+              hint={latest ? formatPeriodoIndice(latest.periodo) : "Sin datos"}
+              tone={0}
+            />
+            <KpiCard
+              label="Variación mensual"
+              value={latestVariations.mensual ?? "—"}
+              hint="Respecto al mes anterior"
+              tone={1}
+            />
+            <KpiCard
+              label="Variación interanual"
+              value={latestVariations.interanual ?? "—"}
+              hint="Respecto al mismo mes del año anterior"
+              tone={3}
+            />
+            <KpiCard
+              label="Variación acumulada"
+              value={latestVariations.acumulada ?? "—"}
+              hint="Desde diciembre del año anterior (criterio INDEC)"
+              tone={4}
+            />
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
 
       <Card accent className="rocchia-panel--flat relative flex min-h-[360px] flex-1 flex-col overflow-hidden p-0">
         <ListProgressBar active={refreshing} />

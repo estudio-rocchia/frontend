@@ -1,10 +1,10 @@
 import {
-  fetchInmuebles,
   fetchInmueblesVacantesConPropietarios,
   fetchPropiedadesAdministradasPorPersona,
   fetchPropietarioPersonaIds,
 } from "@/lib/api";
-import type { InmuebleRecord, PersonaRecord, PropiedadAdministradaRecord } from "@/lib/api/types";
+import type { PersonaRecord, PropiedadAdministradaRecord } from "@/lib/api/types";
+import { buildCarteraEstadoBadges, carteraOperacionDetalle } from "@/lib/clientes/cartera-propiedad";
 import { formatMoney, personaDisplayName } from "@/lib/format";
 
 export interface InmueblePropietarioResumen {
@@ -17,43 +17,34 @@ export interface InmuebleSinAlquiler {
   inmuebleId: number;
   code: string;
   title: string;
+  tipoName: string | null;
+  localidadName: string | null;
   direccion: string | null;
   propietarioIds: number[];
   propietarios: InmueblePropietarioResumen[];
   propietarioLabel: string;
+  tieneOfertaAlquiler: boolean;
+  estadoOfertaAlquiler: string | null;
+  origen: "cartel" | "administracion";
+  enAdministracion: boolean;
+  ofertaAlquilerId: number | null;
+  ofertaAlquilerMontoPrecio: string | null;
+  ofertaAlquilerCodigoMoneda: string | null;
+  estadoRedesId: number | null;
+  estadoRedesCode: string | null;
 }
 
 export type PropiedadAdministrada = PropiedadAdministradaRecord;
 
-export interface PropiedadesPersonaResult {
-  propiedades: PropiedadAdministrada[];
-  linkedInmuebleIds: Set<number>;
-  inmuebles: InmuebleRecord[];
-}
-
 export async function loadPropiedadesAdministradas(
   token: string,
   personaId: number,
-  options?: { includeInmueblesCatalog?: boolean },
-): Promise<PropiedadesPersonaResult> {
+): Promise<PropiedadAdministrada[]> {
   const propiedadesRes = await fetchPropiedadesAdministradasPorPersona(token, personaId);
-  const propiedades = propiedadesRes.items;
-
-  const inmueblesRes = options?.includeInmueblesCatalog
-    ? await fetchInmuebles(token, { limit: 200 })
-    : { items: [] as InmuebleRecord[] };
-
-  return {
-    propiedades,
-    linkedInmuebleIds: new Set(propiedades.map((propiedad) => propiedad.inmuebleId)),
-    inmuebles: inmueblesRes.items,
-  };
+  return propiedadesRes.items;
 }
 
-export async function loadInmueblesCatalog(token: string): Promise<InmuebleRecord[]> {
-  const inmueblesRes = await fetchInmuebles(token, { limit: 200 });
-  return inmueblesRes.items;
-}
+export { vacanteComercializacionLabel as vacanteElegibilidadLabel } from "@/lib/alquileres/inmuebles-vacantes";
 
 export async function loadInmueblesSinAlquiler(
   token: string,
@@ -85,10 +76,21 @@ export async function loadInmueblesSinAlquiler(
       inmuebleId: inmueble.inmuebleId,
       code: inmueble.code,
       title: inmueble.displayLabel ?? inmueble.title ?? inmueble.code,
+      tipoName: inmueble.tipoName ?? null,
+      localidadName: inmueble.localidadName ?? null,
       direccion: inmueble.direccion,
       propietarioIds,
       propietarios: links,
       propietarioLabel: propietarioLabel || "Sin propietario asignado",
+      tieneOfertaAlquiler: inmueble.tieneOfertaAlquiler,
+      estadoOfertaAlquiler: inmueble.estadoOfertaAlquiler,
+      origen: inmueble.origen,
+      enAdministracion: inmueble.enAdministracion,
+      ofertaAlquilerId: inmueble.ofertaAlquilerId,
+      ofertaAlquilerMontoPrecio: inmueble.ofertaAlquilerMontoPrecio,
+      ofertaAlquilerCodigoMoneda: inmueble.ofertaAlquilerCodigoMoneda,
+      estadoRedesId: inmueble.estadoRedesId,
+      estadoRedesCode: inmueble.estadoRedesCode,
     };
   });
 
@@ -115,9 +117,14 @@ export function propiedadAdministradaLabel(propiedad: PropiedadAdministrada): {
   }
 
   const direccion = propiedad.direccion?.trim();
+  const operacion = carteraOperacionDetalle(propiedad);
+  const estados = buildCarteraEstadoBadges(propiedad)
+    .map((badge) => badge.label)
+    .join(" · ");
+  const detalleParts = [direccion, operacion, estados].filter(Boolean);
   return {
     titulo: `${propiedad.title} (${propiedad.code})`,
-    detalle: direccion ? `${direccion} · Sin alquiler activo` : "En administración · Sin alquiler activo",
-    etiqueta: "En administración",
+    detalle: detalleParts.length > 0 ? detalleParts.join(" · ") : "Sin operación activa",
+    etiqueta: estados,
   };
 }

@@ -41,12 +41,15 @@ export function ResumenField({
   numeric = false,
   span = 1,
   statusVariant,
+  longText = false,
 }: {
   label: string;
   value: string;
   numeric?: boolean;
   span?: 1 | 2;
   statusVariant?: "success" | "warning" | "danger";
+  /** Varias líneas con saltos preservados (observaciones, descripciones). */
+  longText?: boolean;
 }) {
   const empty = value === VENTA_EMPTY_FIELD || value === "—";
   return (
@@ -60,7 +63,9 @@ export function ResumenField({
         ) : (
           <p
             className={`min-w-0 break-words text-[13px] ${
-              empty ? "text-text-secondary" : "font-medium text-text-primary"
+              longText ? "whitespace-pre-wrap font-normal leading-relaxed" : ""
+            } ${
+              empty ? "text-text-secondary" : longText ? "text-text-primary" : "font-medium text-text-primary"
             } ${numeric ? "tabular-nums" : ""}`}
           >
             {value}

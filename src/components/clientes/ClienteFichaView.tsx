@@ -1,8 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 
 const ClienteInmobiliariaTab = dynamic(
@@ -66,9 +66,15 @@ import {
   normalizeModoHonorariosAdministracion,
   type ModoHonorariosAdministracion,
 } from "@/lib/honorarios-admin";
+import { aceptaHonorariosAdministracion } from "@/lib/clientes/cartera-propiedad";
 import { loadPropiedadesAdministradas, type PropiedadAdministrada } from "@/lib/mappers/propietario-inmuebles";
+import {
+  buildClienteFichaHref,
+  isClienteFichaTabId,
+  type ClienteFichaTabId,
+} from "@/lib/clientes/cliente-ficha-state";
 
-type FichaTab = "resumen" | "inmobiliaria" | "juridico" | "visas" | "historial";
+type FichaTab = ClienteFichaTabId;
 
 const tabs: { id: FichaTab; label: string }[] = [
   { id: "resumen", label: "Resumen" },
@@ -86,12 +92,14 @@ function SectionTitle({ children }: { children: string }) {
 
 export function ClienteFichaView() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const params = useParams();
   const personaId = Number(params.id);
   const validId = Number.isInteger(personaId) && personaId > 0;
 
   const { token, user, logout } = useAuth();
   const { consume: consumePrefetchedCliente } = useClientePrefetch(token);
+  const skipTabUrlSyncRef = useRef(true);
   const [activeTab, setActiveTab] = useState<FichaTab>("resumen");
   const [persona, setPersona] = useState<PersonaRecord | null>(null);
   const [clienteRow, setClienteRow] = useState<ClienteRow | null>(null);
@@ -100,7 +108,6 @@ export function ClienteFichaView() {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [contratosInquilino, setContratosInquilino] = useState<ContratoListItem[]>([]);
   const [propiedades, setPropiedades] = useState<PropiedadAdministrada[]>([]);
-  const [linkedInmuebleIds, setLinkedInmuebleIds] = useState<Set<number>>(new Set());
   const [pctEdits, setPctEdits] = useState<Record<number, string>>({});
   const [savingPropietarioId, setSavingPropietarioId] = useState<number | null>(null);
   const [clientePctEdit, setClientePctEdit] = useState("6");
@@ -113,12 +120,32 @@ export function ClienteFichaView() {
   const modoHonorarios = normalizeModoHonorariosAdministracion(persona?.modoHonorariosAdministracion);
   const porcentajeCliente = persona?.porcentajeAdministracion ?? "6";
 
-  const applyPropiedades = useCallback((propiedadesData: Awaited<ReturnType<typeof loadPropiedadesAdministradas>>) => {
-    setPropiedades(propiedadesData.propiedades);
-    setLinkedInmuebleIds(propiedadesData.linkedInmuebleIds);
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (isClienteFichaTabId(tabParam)) {
+      setActiveTab(tabParam);
+    }
+    skipTabUrlSyncRef.current = true;
+    const frame = window.requestAnimationFrame(() => {
+      skipTabUrlSyncRef.current = false;
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [searchParams]);
+
+  const changeTab = useCallback(
+    (next: FichaTab) => {
+      setActiveTab(next);
+      if (skipTabUrlSyncRef.current) return;
+      router.replace(buildClienteFichaHref(personaId, next), { scroll: false });
+    },
+    [router, personaId],
+  );
+
+  const applyPropiedades = useCallback((propiedadesData: PropiedadAdministrada[]) => {
+    setPropiedades(propiedadesData);
     setPctEdits(
       Object.fromEntries(
-        propiedadesData.propiedades.map((propiedad) => [
+        propiedadesData.map((propiedad) => [
           propiedad.propietarioId,
           String(Number(propiedad.porcentajeAdministracion) || 6),
         ]),
@@ -172,7 +199,6 @@ export function ClienteFichaView() {
 
     setLoading(true);
     setError(null);
-    setActiveTab("resumen");
 
     void loadCore()
       .then(() => {
@@ -254,8 +280,8 @@ export function ClienteFichaView() {
   async function handleSaveClienteHonorarios() {
     if (!token || !persona) return;
     const numeric = Number(clientePctEdit);
-    if (!Number.isFinite(numeric) || numeric <= 0 || numeric > 100) {
-      setError("El porcentaje debe estar entre 0 y 100.");
+   if (!Number.isFinite(numeric) || numeric < 0 || numeric > 100) {
+     setError("El porcentaje debe estar entre 0 y 100.");
       return;
     }
 
@@ -282,9 +308,13 @@ export function ClienteFichaView() {
 
   async function handleSavePropiedadAdministracion(propiedad: PropiedadAdministrada) {
     if (!token) return;
+    if (!aceptaHonorariosAdministracion(propiedad)) {
+      setError("El porcentaje de honorarios solo aplica a inmuebles en alquiler.");
+      return;
+    }
     const numeric = Number(pctEdits[propiedad.propietarioId]);
-    if (!Number.isFinite(numeric) || numeric <= 0 || numeric > 100) {
-      setError("El porcentaje debe estar entre 0 y 100.");
+   if (!Number.isFinite(numeric) || numeric < 0 || numeric > 100) {
+     setError("El porcentaje debe estar entre 0 y 100.");
       return;
     }
 
@@ -312,19 +342,6 @@ export function ClienteFichaView() {
       setError(err instanceof ApiError ? err.message : "No se pudo guardar el porcentaje");
     } finally {
       setSavingPropietarioId(null);
-    }
-  }
-
-  async function handleInmuebleLinked() {
-    setSuccess("Inmueble vinculado al propietario.");
-    setError(null);
-    setLoadingDetail(true);
-    try {
-      await loadInmobiliariaDetails();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo actualizar la ficha");
-    } finally {
-      setLoadingDetail(false);
     }
   }
 
@@ -390,7 +407,7 @@ export function ClienteFichaView() {
             <button
               key={tab.id}
               type="button"
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => changeTab(tab.id)}
               className={`rounded-t-sm px-3 py-2 text-sm font-medium transition-colors ${
                 activeTab === tab.id
                   ? "border-b-2 border-primary text-primary"
@@ -431,6 +448,7 @@ export function ClienteFichaView() {
           ) : (
           <ClienteInmobiliariaTab
             personaId={persona.id}
+            clienteFichaTab={activeTab}
             modoHonorarios={modoHonorarios}
             porcentajeCliente={porcentajeCliente}
             clientePctEdit={clientePctEdit}
@@ -441,15 +459,12 @@ export function ClienteFichaView() {
             onSaveClientePct={() => void handleSaveClienteHonorarios()}
             propiedades={propiedades}
             contratosInquilino={contratosInquilino}
-            linkedInmuebleIds={linkedInmuebleIds}
             pctEdits={pctEdits}
             savingPropietarioId={savingPropietarioId}
             onPctChange={(propietarioId, value) =>
               setPctEdits((current) => ({ ...current, [propietarioId]: value }))
             }
             onSavePropiedad={(propiedad) => void handleSavePropiedadAdministracion(propiedad)}
-            onInmuebleLinked={() => void handleInmuebleLinked()}
-            onError={setError}
           />
           )
         ) : null}

@@ -30,7 +30,7 @@ function visibleItems(items: NavItem[], canAdmin: boolean, canReportes: boolean)
   });
 }
 
-function useAlquileresMoraCount(token: string | null) {
+function useAlquileresMoraCount(token: string | null, pathname: string) {
   const [count, setCount] = useState<number | null>(null);
 
   useEffect(() => {
@@ -57,11 +57,20 @@ function useAlquileresMoraCount(token: string | null) {
 
     load(false);
     const unsubscribe = subscribeDashboardAlertsInvalidate(() => load(true));
+
+    function onVisible() {
+      if (document.visibilityState === "visible") load(true);
+    }
+
+    window.addEventListener("focus", onVisible);
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       cancelled = true;
       unsubscribe();
+      window.removeEventListener("focus", onVisible);
+      document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [token]);
+  }, [token, pathname]);
 
   return count;
 }
@@ -71,7 +80,7 @@ const SidebarNav = memo(function SidebarNav({ onNavigate }: { onNavigate?: () =>
   const { user, token } = useAuth();
   const canAdmin = canManageUsers(user);
   const canReportes = canViewReportes(user);
-  const moraCount = useAlquileresMoraCount(token);
+  const moraCount = useAlquileresMoraCount(token, pathname);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">

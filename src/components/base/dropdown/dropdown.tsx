@@ -16,7 +16,11 @@ import {
 } from "@/components/base/dropdown/menu-styles";
 import { useOverlayPortalContainer } from "@/lib/ui/overlay-portal";
 import { cx } from "@/utils/cx";
-import { useDismissOnOutsidePress, useTriggerToggle } from "@/utils/use-dismiss-on-outside-press";
+import {
+  rocchiaOverlayKind,
+  useDismissOnOutsidePress,
+  useTriggerToggle,
+} from "@/utils/use-dismiss-on-outside-press";
 
 /**
  * Dropdown — the BoardUI popover-menu recipe as composable primitives, built
@@ -145,6 +149,8 @@ export function DropdownPopover({
       isNonModal
       placement={placement}
       offset={offset}
+      shouldFlip
+      containerPadding={16}
       crossOffset={crossOffset}
       UNSTABLE_portalContainer={overlayPortal}
       className={cx(
@@ -152,6 +158,7 @@ export function DropdownPopover({
         MENU_POPOVER_SURFACE,
         className,
       )}
+      {...rocchiaOverlayKind("menu")}
     >
       {/* gap-1 keeps bare DropdownItems 4px apart, the same rhythm as the
           Select listbox; DropdownDivider's margins are sized to absorb it. */}

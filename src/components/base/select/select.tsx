@@ -26,7 +26,11 @@ import { Label } from "@/components/base/input/label";
 import { ChevronDownSmall } from "@/components/foundations/icons/chevrons";
 import { useOverlayPortalContainer } from "@/lib/ui/overlay-portal";
 import { cx } from "@/utils/cx";
-import { useDismissOnOutsidePress, useTriggerToggle } from "@/utils/use-dismiss-on-outside-press";
+import {
+  rocchiaOverlayKind,
+  useDismissOnOutsidePress,
+  useTriggerToggle,
+} from "@/utils/use-dismiss-on-outside-press";
 
 /**
  * Figma source: Board UI → dashboard 1 dropdown triggers ("All prices" filter
@@ -147,7 +151,9 @@ export function Select<T extends object>({
           <AriaPopover
             ref={popoverRef}
             isNonModal
-            offset={4}
+            offset={8}
+            shouldFlip
+            containerPadding={16}
             UNSTABLE_portalContainer={overlayPortal}
             className={cx(
               MENU_POPOVER_WIDTH,
@@ -157,6 +163,7 @@ export function Select<T extends object>({
               "p-2",
               popoverClassName,
             )}
+            {...rocchiaOverlayKind("menu")}
           >
             <AriaListBox
               items={items}

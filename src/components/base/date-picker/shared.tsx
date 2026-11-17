@@ -14,6 +14,7 @@ import {
 } from "react-aria-components";
 import type { CalendarCellRenderProps } from "react-aria-components";
 import { CalendarDate, endOfWeek, getLocalTimeZone, isSameDay, startOfWeek } from "@internationalized/date";
+import { CalendarMonthYearControls } from "@/components/ui/CalendarMonthYearControls";
 import { cx } from "@/utils/cx";
 
 /**
@@ -112,8 +113,11 @@ export function DayCell(props: CalendarCellRenderProps & { isRange: boolean; sho
   // in-between state), but transitioning the property means it eases toward
   // square in sync with the fade instead of snapping to square immediately
   // while the color is still visible.
+  const cellCursor =
+    isDisabled || isUnavailable ? "cursor-not-allowed" : "cursor-pointer";
+
   return (
-    <div className="relative size-8">
+    <div className={cx("relative size-8 select-none", cellCursor)}>
       <span
         aria-hidden
         className={cx(
@@ -145,7 +149,7 @@ export function DayCell(props: CalendarCellRenderProps & { isRange: boolean; sho
         />
         <span
           className={cx(
-            "relative text-body-medium text-text-primary",
+            "relative select-none text-body-medium text-text-primary",
             (isDisabled || isUnavailable) && "text-text-tertiary",
             // Unavailable days (isDateUnavailable) can be focused but not
             // picked, so they read as struck out rather than just faded.
@@ -198,6 +202,8 @@ export function MonthPanel({
   const state = rangeState ?? singleState;
   const isRange = rangeState != null;
   const panelDate = state ? state.visibleRange.start.add({ months: offset }) : null;
+  const minYear = state?.minValue?.year;
+  const maxYear = state?.maxValue?.year;
   const title = panelDate
     ? new Intl.DateTimeFormat(locale, { month: "long", year: "numeric" }).format(panelDate.toDate(getLocalTimeZone()))
     : "";
@@ -210,7 +216,7 @@ export function MonthPanel({
 
   return (
     <div className={bare ? "w-[296px] shrink-0" : "w-[326px] shrink-0 rounded-2xl bg-background-primary-default p-[15px] shadow-xs"}>
-      <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-5 overflow-visible pb-1">
         {!hideHeader && (
           <div className="flex items-center justify-between">
             {showPrev ? (
@@ -223,7 +229,20 @@ export function MonthPanel({
             ) : (
               <span className="size-4" aria-hidden />
             )}
-            <span className="flex-1 text-center text-body-medium text-text-primary">{title}</span>
+            {panelDate && state ? (
+              <CalendarMonthYearControls
+                className="flex-1"
+                month={panelDate.month}
+                year={panelDate.year}
+                minYear={minYear}
+                maxYear={maxYear}
+                onChange={(nextYear, nextMonth) => {
+                  state.setFocusedDate(new CalendarDate(nextYear, nextMonth, 1));
+                }}
+              />
+            ) : (
+              <span className="flex-1 text-center text-body-medium text-text-primary">{title}</span>
+            )}
             {showNext ? (
               <RACButton
                 slot="next"
@@ -239,7 +258,7 @@ export function MonthPanel({
         <CalendarGrid
           offset={{ months: offset }}
           weekdayStyle={latinWeekdays ? "short" : "narrow"}
-          className="-m-3 self-start border-separate outline-none"
+          className="-mx-3 -mt-3 self-start border-separate outline-none"
           style={{ borderSpacing: "12px 12px" }}
         >
           <CalendarGridHeader>
@@ -251,7 +270,10 @@ export function MonthPanel({
           </CalendarGridHeader>
           <CalendarGridBody>
             {(date) => (
-              <CalendarCell date={date} className="p-0 outline-none">
+              <CalendarCell
+                date={date}
+                className="cursor-pointer select-none p-0 outline-none data-[disabled]:cursor-not-allowed"
+              >
                 {(cellProps) => <DayCell {...cellProps} isRange={isRange} showToday={showToday} />}
               </CalendarCell>
             )}
@@ -322,8 +344,9 @@ export const triggerButtonClassName = cx(
  *  "Calendar component" surface) for both pickers. */
 export const popoverClassName = cx(
   // Above the modal layer (z-100), like the menu surfaces.
-  "z-110 origin-top rounded-3xl bg-background-secondary-default shadow-dropdown",
-  "transition duration-150 ease-out",
+  // React Aria impone max-height al espacio visible; desactivarlo evita cortar la última fila.
+  "z-110 [max-height:unset!important] overflow-visible rounded-3xl bg-background-secondary-default shadow-dropdown",
+  "origin-[--trigger-anchor-origin] transition duration-150 ease-out",
   "data-[entering]:opacity-0 data-[entering]:scale-95 data-[entering]:blur-[2px]",
   "data-[exiting]:opacity-0 data-[exiting]:scale-95 data-[exiting]:blur-[2px]",
 );

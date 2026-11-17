@@ -2,7 +2,7 @@
 
 import type { ChipColor } from "@/components/base/badges/chip";
 import type { StatusDotColor } from "@/components/base/badges/status-dot";
-import type { VentaEstado } from "@/lib/api/types";
+import type { VentaAgencyStatus, VentaEstado } from "@/lib/api/types";
 import type { EstadoExpediente } from "@/lib/juridico/model";
 
 export type StatusTone = "mora" | "ajuste" | "ok" | "neutral";
@@ -52,6 +52,12 @@ export function ventaEstadoTone(estado: VentaEstado): StatusTone {
   if (estado === "completed") return "ok";
   if (estado === "cancelled") return "mora";
   return "ajuste";
+}
+
+export function ventaInmobiliariaTone(status: VentaAgencyStatus | null | undefined): StatusTone {
+  if (status === "sold_privately") return "ajuste";
+  if (status === "off_market") return "mora";
+  return "ok";
 }
 
 export function ofertaEstadoTone(code: string): StatusTone {

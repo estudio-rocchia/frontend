@@ -74,6 +74,9 @@ export async function apiRequest<T>(
       const body = (await response.json()) as ApiErrorBody;
       throw new ApiError(response.status, body);
     }
+  if (response.status >= 500 || response.status === 502 || response.status === 503) {
+      throw new NetworkError(url);
+    }
     throw new Error(`API error ${response.status}`);
   }
 

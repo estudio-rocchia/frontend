@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, type KeyboardEvent } from "react";
+import { memo, useRef, type KeyboardEvent } from "react";
 
 import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 import { VENTAS_TAB_COPY } from "@/lib/ventas/workspace-copy";
@@ -16,7 +16,7 @@ export function ventasTabDomId(tabId: VentasTabId): string {
 /** Single dynamic panel shared by all tabs (content swaps on selection). */
 export const VENTAS_MAIN_PANEL_ID = "ventas-main-panel";
 
-export function VentasFilterChips({
+export const VentasFilterChips = memo(function VentasFilterChips({
   active,
   onChange,
   counts,
@@ -101,4 +101,4 @@ export function VentasFilterChips({
       })}
     </div>
   );
-}
+});

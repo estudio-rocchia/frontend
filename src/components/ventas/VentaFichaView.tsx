@@ -2,8 +2,8 @@
 
 import dynamic from "next/dynamic";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Banknote, Ban, Pencil, ScrollText, Wallet } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowLeft, Banknote, Ban, MoreHorizontal, Pencil, ScrollText, Wallet } from "lucide-react";
 
 import {
   VENTA_FICHA_PANEL_ID,
@@ -16,7 +16,7 @@ import type { CobrarVentaMode } from "@/components/ventas/CobrarVentaModal";
 import { VentaFinanciacionSection } from "@/components/ventas/VentaFinanciacionSection";
 import { VentaCobranzasSection } from "@/components/ventas/VentaCobranzasSection";
 import { VentaResumenSection } from "@/components/ventas/VentaResumenSection";
-import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
+import { ButtonOutline, ButtonPrimary, buttonOutlineClass } from "@/components/ui/Button";
 import { PageHeaderSkeleton, Skeleton } from "@/components/ui/Skeleton";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useAuth } from "@/context/auth-context";
@@ -47,13 +47,24 @@ import {
   ventaNecesitaFinanciacion,
   ventaPuedeCobrar,
 } from "@/lib/ventas/cobranza";
-import { ventaEstadoLabel, ventaEstadoVariant } from "@/lib/ventas/status-labels";
+import {
+  ventaEstadoLabel,
+  ventaEstadoVariant,
+  ventaInmobiliariaLabel,
+  ventaInmobiliariaVariant,
+} from "@/lib/ventas/status-labels";
 import { downloadBlob, formatMoney, moneyClassName } from "@/lib/format";
 import { pagePaddingClass } from "@/lib/layout";
 import { parseRouteId } from "@/lib/parse-route-id";
 import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 import { VENTA_EMPTY_FIELD } from "@/lib/ventas/empty-field";
 import { parteNombre } from "@/lib/ventas/partes";
+import type { VentasTabId } from "@/components/ventas/VentasFilterChips";
+import {
+  buildVentasInmuebleHref,
+  buildVentasListHref,
+  parseVentasListStateFromSearchParams,
+} from "@/lib/ventas/ventas-list-state";
 
 const CobrarVentaModal = dynamic(
   () =>
@@ -110,11 +121,26 @@ function tabFromQuery(value: string | null): VentaFichaTabId | null {
   return null;
 }
 
+function isVentasTabId(value: string | null): value is VentasTabId {
+  return (
+    value === "en_operacion" ||
+    value === "a_la_venta" ||
+    value === "fuera_mercado" ||
+    value === "vendidos"
+  );
+}
+
 export function VentaFichaView() {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
   const ventaId = parseRouteId(params.id);
+  const fromParam = searchParams.get("from");
+  const fromTab: VentasTabId = isVentasTabId(fromParam) ? fromParam : "en_operacion";
+  const listReturnState = useMemo(
+    () => parseVentasListStateFromSearchParams(searchParams),
+    [searchParams],
+  );
 
   const { token, logout, user } = useAuth();
   const [activeTab, setActiveTab] = useState<VentaFichaTabId>("resumen");
@@ -140,6 +166,11 @@ export function VentaFichaView() {
   const [cobrarOpen, setCobrarOpen] = useState(false);
   const [cobrarMode, setCobrarMode] = useState<CobrarVentaMode>("auto");
   const [cobrarCuotaId, setCobrarCuotaId] = useState<number | undefined>();
+  const headerActionsRef = useRef<HTMLDetailsElement>(null);
+
+  function closeHeaderActions() {
+    if (headerActionsRef.current) headerActionsRef.current.open = false;
+  }
   const [cancelarVentaOpen, setCancelarVentaOpen] = useState(false);
   const [emitReciboOpen, setEmitReciboOpen] = useState(false);
   const [emitReciboPagoId, setEmitReciboPagoId] = useState<number | null>(null);
@@ -262,7 +293,10 @@ export function VentaFichaView() {
     setSuccess(null);
     setActiveTab(tab);
     if (ventaId !== null) {
-      router.replace(`/ventas/${ventaId}?tab=${tab}`, { scroll: false });
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("from", fromTab);
+      params.set("tab", tab);
+      router.replace(`/ventas/${ventaId}?${params.toString()}`, { scroll: false });
     }
   }
 
@@ -321,7 +355,20 @@ export function VentaFichaView() {
         <p className="rounded-sm border border-danger bg-danger-bg px-3 py-2 text-sm text-danger">
           {error ?? "Venta no encontrada."}
         </p>
-        <ButtonOutline onClick={() => router.push("/ventas")}>Volver al listado</ButtonOutline>
+        <ButtonOutline
+          onClick={() =>
+            router.push(
+              buildVentasListHref(
+                fromTab,
+                listReturnState.filters,
+                listReturnState.search,
+                listReturnState.soldYear,
+              ),
+            )
+          }
+        >
+          Volver al listado
+        </ButtonOutline>
       </div>
     );
   }
@@ -350,7 +397,16 @@ export function VentaFichaView() {
       <div className="flex flex-wrap items-center gap-3">
         <button
           type="button"
-          onClick={() => router.push("/ventas?tab=en_operacion")}
+          onClick={() =>
+            router.push(
+              buildVentasListHref(
+                fromTab,
+                listReturnState.filters,
+                listReturnState.search,
+                listReturnState.soldYear,
+              ),
+            )
+          }
           className={`flex w-fit items-center gap-2 text-sm font-medium text-text-secondary transition-colors hover:text-primary ${interactiveFocusClass}`}
         >
           <ArrowLeft className="h-4 w-4" aria-hidden />
@@ -359,7 +415,17 @@ export function VentaFichaView() {
         {venta.inmueble?.id ? (
           <button
             type="button"
-            onClick={() => router.push(`/ventas/inmueble/${venta.inmueble!.id}?from=en_operacion`)}
+            onClick={() =>
+              router.push(
+                buildVentasInmuebleHref(
+                  venta.inmueble!.id,
+                  fromTab,
+                  listReturnState.filters,
+                  listReturnState.search,
+                  listReturnState.soldYear,
+                ),
+              )
+            }
             className={`text-sm font-medium text-primary hover:underline ${interactiveFocusClass}`}
           >
             Ver inmueble en catálogo
@@ -367,7 +433,7 @@ export function VentaFichaView() {
         ) : null}
       </div>
 
-      <header className="flex flex-col gap-4 glass-card p-5 sm:flex-row sm:items-start sm:justify-between">
+      <header className="relative z-20 flex flex-col gap-4 overflow-visible glass-card p-5 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex gap-4">
           <div
             className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary-soft text-lg font-bold text-primary"
@@ -380,6 +446,10 @@ export function VentaFichaView() {
             {metaLine ? <p className="text-sm text-text-secondary">{metaLine}</p> : null}
             <div className="flex flex-wrap items-center gap-2">
               <StatusBadge label={ventaEstadoLabel(venta.estado)} variant={ventaEstadoVariant(venta.estado)} />
+              <StatusBadge
+                label={ventaInmobiliariaLabel(venta.estadoInmobiliaria)}
+                variant={ventaInmobiliariaVariant(venta.estadoInmobiliaria)}
+              />
               {venta.plan ? (
                 <span className="rounded-full bg-bg-page px-2.5 py-1 text-[11px] font-semibold text-text-secondary">
                   {venta.plan.cantidadCuotas} cuotas
@@ -416,16 +486,6 @@ export function VentaFichaView() {
             ) : null}
             {editable ? (
               <>
-                {ventaNecesitaFinanciacion(venta) ? (
-                  <ButtonOutline type="button" className="gap-2" onClick={() => setFinanciacionOpen(true)}>
-                    <Wallet className="h-4 w-4" aria-hidden />
-                    Configurar forma de pago
-                  </ButtonOutline>
-                ) : null}
-                <ButtonOutline type="button" className="gap-2" onClick={() => setEditOpen(true)}>
-                  <Pencil className="h-4 w-4" aria-hidden />
-                  Editar
-                </ButtonOutline>
                 <ButtonOutline
                   type="button"
                   className="gap-2 border-danger/40 text-danger hover:bg-danger-bg"
@@ -434,6 +494,40 @@ export function VentaFichaView() {
                   <Ban className="h-4 w-4" aria-hidden />
                   Cancelar venta
                 </ButtonOutline>
+                <details ref={headerActionsRef} className="relative z-30">
+                  <summary
+                    className={`${buttonOutlineClass} gap-2 cursor-pointer list-none [&::-webkit-details-marker]:hidden ${interactiveFocusClass}`}
+                  >
+                    <MoreHorizontal className="h-4 w-4" aria-hidden />
+                    Más acciones
+                  </summary>
+                  <div className="absolute right-0 z-50 mt-1 flex min-w-52 flex-col rounded-md border border-border bg-bg-card p-1 shadow-[var(--shadow-card)]">
+                    {ventaNecesitaFinanciacion(venta) ? (
+                      <button
+                        type="button"
+                        className={`flex items-center gap-2 rounded-sm px-3 py-2 text-left text-[13px] font-medium text-text-primary hover:bg-bg-page ${interactiveFocusClass}`}
+                        onClick={() => {
+                          closeHeaderActions();
+                          setFinanciacionOpen(true);
+                        }}
+                      >
+                        <Wallet className="h-4 w-4" aria-hidden />
+                        Configurar forma de pago
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      className={`flex items-center gap-2 rounded-sm px-3 py-2 text-left text-[13px] font-medium text-text-primary hover:bg-bg-page ${interactiveFocusClass}`}
+                      onClick={() => {
+                        closeHeaderActions();
+                        setEditOpen(true);
+                      }}
+                    >
+                      <Pencil className="h-4 w-4" aria-hidden />
+                      Editar
+                    </button>
+                  </div>
+                </details>
               </>
             ) : null}
           </div>
@@ -585,7 +679,14 @@ export function VentaFichaView() {
           onClose={() => setCancelarVentaOpen(false)}
           onCancelled={() => {
             setCancelarVentaOpen(false);
-            router.push("/ventas");
+            router.push(
+              buildVentasListHref(
+                fromTab,
+                listReturnState.filters,
+                listReturnState.search,
+                listReturnState.soldYear,
+              ),
+            );
           }}
         />
       ) : null}
