@@ -938,9 +938,7 @@ export async function syncIndices(token: string, code: IndiceCode) {
     body: JSON.stringify({ code }),
     signal: AbortSignal.timeout(timeoutMs),
   });
-  if (result[code]?.upserted > 0) {
-    invalidateIndiceValoresCache(token, code);
-  }
+  invalidateIndiceValoresCache(token, code);
   return result;
 }
 

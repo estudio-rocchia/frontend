@@ -15,7 +15,13 @@ import { useListRefreshTransition } from "@/lib/ui/use-list-refresh-transition";
 import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 import { useAuth } from "@/context/auth-context";
 import { peekCache } from "@/lib/api/cache";
-import { ApiError, fetchIndiceValores, NetworkError, syncIndices } from "@/lib/api";
+import {
+  ApiError,
+  fetchIndiceValores,
+  invalidateIndiceValoresCache,
+  NetworkError,
+  syncIndices,
+} from "@/lib/api";
 import { indiceValoresCacheKey } from "@/lib/indices/indice-valores-cache";
 import type { IndiceCode, SyncIndicesResponse, ValorIndiceRecord } from "@/lib/api/types";
 import { formatIndexValue, formatPeriodoIndice } from "@/lib/format";
@@ -166,7 +172,7 @@ export function IndicesView() {
     async (options?: { bypassCache?: boolean }) => {
       if (!token) return;
       const listKey = `${indice}-${desde}-${hasta}`;
-      if (hydratedFromPickerRef.current === listKey) {
+      if (!options?.bypassCache && hydratedFromPickerRef.current === listKey) {
         hydratedFromPickerRef.current = null;
         return;
       }
@@ -267,22 +273,23 @@ export function IndicesView() {
       const code = indice;
       const result: SyncIndicesResponse = await syncIndices(token, code);
       const stats = result[code];
-      const hadUpdates = stats.upserted > 0;
 
       if (stats.skipped && stats.warning) {
         setError(`No se pudo actualizar ${code}. ${stats.warning}`);
-      } else if (stats.upToDate) {
+        return;
+      }
+
+      if (stats.upToDate) {
         setSyncMessage(`${code} ya está actualizado según la fuente oficial.`);
-      } else if (!hadUpdates) {
+      } else if (stats.upserted === 0) {
         setSyncMessage(`No había cambios nuevos en ${code}.`);
       } else {
         setSyncMessage(`${code} actualizado (${stats.upserted}).`);
       }
 
-      // Solo recargar la grilla si hubo filas nuevas; evita el titileo cuando ya estaba al día.
-      if (hadUpdates) {
-        await load({ bypassCache: true });
-      }
+      delete rowsByIndiceRef.current[code];
+      invalidateIndiceValoresCache(token, code);
+      await load({ bypassCache: true });
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         logout();
