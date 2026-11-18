@@ -20,6 +20,7 @@ import {
   formatMoney,
   formatMonthYear,
   personaDisplayName,
+  propietarioRecordDisplayName,
 } from "@/lib/format";
 import { moraResumenFromContrato } from "@/lib/mora-punitoria";
 import {
@@ -325,7 +326,7 @@ export function mapContratoDetailToFicha(
   const tenant = detail.inquilino ? personaDisplayName(detail.inquilino) : "—";
   const owner =
     propietarios
-      .map((p) => personaDisplayName(p))
+      .map((p) => propietarioRecordDisplayName(p))
       .filter((name) => name !== "—")
       .join(" · ") || "—";
   const indexCode =

@@ -253,6 +253,17 @@ export function personaDisplayName(persona: {
   return [persona.nombre, persona.apellido].filter(Boolean).join(" ").trim() || "—";
 }
 
+/** Propietario en ficha de inmueble/contrato: el API expone el nombre en persona.displayName con inmueble.view_owner. */
+export function propietarioRecordDisplayName(propietario: {
+  nombre?: string | null;
+  apellido?: string | null;
+  razonSocial?: string | null;
+  persona?: { displayName?: string | null } | null;
+}): string {
+  if (propietario.persona?.displayName?.trim()) return propietario.persona.displayName.trim();
+  return personaDisplayName(propietario);
+}
+
 export function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");

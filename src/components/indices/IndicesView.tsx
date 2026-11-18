@@ -15,7 +15,9 @@ import { ButtonPrimary } from "@/components/ui/Button";
 import { useListRefreshTransition } from "@/lib/ui/use-list-refresh-transition";
 import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 import { useAuth } from "@/context/auth-context";
+import { peekCache } from "@/lib/api/cache";
 import { ApiError, fetchIndiceValores, NetworkError, syncIndices } from "@/lib/api";
+import { indiceValoresCacheKey } from "@/lib/indices/indice-valores-cache";
 import type { IndiceCode, SyncIndicesResponse, ValorIndiceRecord } from "@/lib/api/types";
 import { formatIndexValue, formatPeriodoIndice } from "@/lib/format";
 import {
@@ -150,28 +152,44 @@ export function IndicesView() {
   const [error, setError] = useState<string | null>(null);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    if (!token) return;
-    const listKey = `${indice}-${desde}-${hasta}`;
-    const { startedAt, isInitial } = start();
-    if (isInitial) setLoading(true);
-    setError(null);
-    try {
+  const load = useCallback(
+    async (options?: { bypassCache?: boolean }) => {
+      if (!token) return;
+      const listKey = `${indice}-${desde}-${hasta}`;
       const desdeFetch = earlierIsoDate(desde, subtractMonthsFromDate(hasta, 14));
-      const response = await fetchIndiceValores(token, indice, desdeFetch, hasta);
-      setAllRows(sortByPeriodoDesc(response.items));
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 401) {
-        logout();
-        return;
+      const cacheKey = indiceValoresCacheKey(token, indice, desdeFetch, hasta);
+      const cached = options?.bypassCache
+        ? null
+        : peekCache<{ items: ValorIndiceRecord[] }>(cacheKey);
+      const silent = Boolean(cached);
+      const { startedAt, isInitial } = start(silent, indice);
+
+      if (cached) {
+        setAllRows(sortByPeriodoDesc(cached.items));
+        setError(null);
+        setLoading(false);
+      } else if (isInitial) {
+        setLoading(true);
       }
-      setError(err instanceof ApiError ? err.message : "Error al cargar los índices");
-      setAllRows([]);
-    } finally {
-      await finish(listKey, startedAt);
-      setLoading(false);
-    }
-  }, [token, logout, indice, desde, hasta, start, finish]);
+      setError(null);
+
+      try {
+        const response = await fetchIndiceValores(token, indice, desdeFetch, hasta, options);
+        setAllRows(sortByPeriodoDesc(response.items));
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 401) {
+          logout();
+          return;
+        }
+        setError(err instanceof ApiError ? err.message : "Error al cargar los índices");
+        setAllRows([]);
+      } finally {
+        await finish(listKey, startedAt, silent);
+        setLoading(false);
+      }
+    },
+    [token, logout, indice, desde, hasta, start, finish],
+  );
 
   useEffect(() => {
     void load();
@@ -200,7 +218,7 @@ export function IndicesView() {
 
       // Solo recargar la grilla si hubo filas nuevas; evita el titileo cuando ya estaba al día.
       if (hadUpdates) {
-        await load();
+        await load({ bypassCache: true });
       }
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
@@ -323,7 +341,7 @@ export function IndicesView() {
             </p>
             <button
               type="button"
-              onClick={() => void load()}
+              onClick={() => void load({ bypassCache: true })}
               className="mt-3 text-sm font-semibold text-primary"
             >
               Reintentar
@@ -343,7 +361,7 @@ export function IndicesView() {
                 <p className="text-sm text-text-secondary">
                   No hay valores para el rango seleccionado.
                 </p>
-                <ButtonPrimary type="button" onClick={() => void load()}>
+                <ButtonPrimary type="button" onClick={() => void load({ bypassCache: true })}>
                   Volver a intentar
                 </ButtonPrimary>
               </div>

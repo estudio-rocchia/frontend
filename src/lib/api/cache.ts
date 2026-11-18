@@ -42,6 +42,12 @@ export async function withCache<T>(
   return promise;
 }
 
+export function peekCache<T>(key: string): T | null {
+  const cached = memoryCache.get(key);
+  if (!cached || cached.expiresAt <= Date.now()) return null;
+  return cached.data as T;
+}
+
 export function invalidateCache(key?: string) {
   if (key) {
     memoryCache.delete(key);

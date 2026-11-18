@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { memo, useEffect, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { LogOut, X } from "lucide-react";
 
 import rocchiaLogo from "@/assets/rocchia-logo.png";
@@ -14,6 +14,9 @@ import { invalidateCache, withCache } from "@/lib/api/cache";
 import { subscribeDashboardAlertsInvalidate } from "@/lib/dashboard-alerts-events";
 import { prefetchClientesList } from "@/lib/api/clientes-list";
 import { canManageUsers, canViewReportes } from "@/lib/auth/roles";
+import { useSyncScope } from "@/lib/sync/use-sync-scope";
+
+const ALQUILERES_MORA_CACHE_TTL_MS = 15_000;
 
 const navLinkFocus =
   "outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#00C2CB]";
@@ -32,6 +35,8 @@ function visibleItems(items: NavItem[], canAdmin: boolean, canReportes: boolean)
 
 function useAlquileresMoraCount(token: string | null, pathname: string) {
   const [count, setCount] = useState<number | null>(null);
+  const loadRef = useRef<(force: boolean) => void>(() => {});
+  const previousPathRef = useRef(pathname);
 
   useEffect(() => {
     if (!token) {
@@ -44,8 +49,12 @@ function useAlquileresMoraCount(token: string | null, pathname: string) {
     function load(force: boolean) {
       if (force) invalidateCache(cacheKey);
       const request = force
-        ? fetchDashboardResumen(token!, 30)
-        : withCache(cacheKey, () => fetchDashboardResumen(token!, 30), { ttlMs: 45_000 });
+        ? fetchDashboardResumen(token!, 30, { bypassHttpCache: true })
+        : withCache(
+            cacheKey,
+            () => fetchDashboardResumen(token!, 30),
+            { ttlMs: ALQUILERES_MORA_CACHE_TTL_MS },
+          );
       void request
         .then((resumen) => {
           if (!cancelled) setCount(resumen.tarjetas.enMora.count);
@@ -55,7 +64,13 @@ function useAlquileresMoraCount(token: string | null, pathname: string) {
         });
     }
 
-    load(false);
+    loadRef.current = load;
+
+    const enteredAlquileres =
+      pathname.startsWith("/alquileres") && !previousPathRef.current.startsWith("/alquileres");
+    previousPathRef.current = pathname;
+
+    load(enteredAlquileres);
     const unsubscribe = subscribeDashboardAlertsInvalidate(() => load(true));
 
     function onVisible() {
@@ -71,6 +86,8 @@ function useAlquileresMoraCount(token: string | null, pathname: string) {
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [token, pathname]);
+
+  useSyncScope("contratos", () => loadRef.current(true), Boolean(token));
 
   return count;
 }

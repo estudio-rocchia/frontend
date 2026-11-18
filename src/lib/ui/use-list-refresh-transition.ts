@@ -9,12 +9,21 @@ export const LIST_TABLE_PLACEHOLDER_CLASS = "min-h-[min(20rem,42vh)]";
 export function useListRefreshTransition() {
   const [refreshing, setRefreshing] = useState(false);
   const [listTransitionKey, setListTransitionKey] = useState("init");
-  const hasContentRef = useRef(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const scopeRef = useRef<string | null>(null);
+  const contentReadyRef = useRef(false);
 
-  const start = useCallback((silent?: boolean) => {
+  const start = useCallback((silent?: boolean, scopeKey?: string) => {
     const startedAt = Date.now();
     if (silent) return { startedAt, isInitial: false };
-    const isInitial = !hasContentRef.current;
+
+    if (scopeKey !== undefined && scopeKey !== scopeRef.current) {
+      scopeRef.current = scopeKey;
+      contentReadyRef.current = false;
+      setIsInitialLoad(true);
+    }
+
+    const isInitial = !contentReadyRef.current;
     if (!isInitial) setRefreshing(true);
     return { startedAt, isInitial };
   }, []);
@@ -27,14 +36,15 @@ export function useListRefreshTransition() {
       await new Promise((resolve) => window.setTimeout(resolve, wait));
     }
     setListTransitionKey(listKey);
-    hasContentRef.current = true;
+    contentReadyRef.current = true;
+    setIsInitialLoad(false);
     setRefreshing(false);
   }, []);
 
   return {
     refreshing,
     listTransitionKey,
-    isInitialLoad: listTransitionKey === "init",
+    isInitialLoad,
     start,
     finish,
   };

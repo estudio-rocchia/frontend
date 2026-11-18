@@ -18,6 +18,9 @@ import { SYNC_SCOPES, type SyncScope } from "@/lib/sync/types";
 
 const POLL_INTERVAL_MS = 30_000;
 
+/** Scopes cuyo cambio altera `GET /dashboard/resumen` (mora en sidebar, campanita). */
+const DASHBOARD_RESUMEN_SYNC_SCOPES = new Set<SyncScope>(["dashboard", "contratos"]);
+
 type SyncContextValue = {
   bumpLocalScopes: (...scopes: SyncScope[]) => void;
 };
@@ -35,7 +38,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       const previous = versionsRef.current[scope];
       if (previous !== undefined && previous !== version) {
         notifySyncScope(scope, version);
-        if (scope === "dashboard") {
+        if (DASHBOARD_RESUMEN_SYNC_SCOPES.has(scope)) {
           invalidateDashboardAlerts();
         }
       }

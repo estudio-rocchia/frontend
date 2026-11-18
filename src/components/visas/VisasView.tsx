@@ -9,6 +9,7 @@ import { EnlacesOficiales } from "@/components/visas/EnlacesOficiales";
 import { NuevoTramiteModal } from "@/components/visas/NuevoTramiteModal";
 import { PreciosVisaModal } from "@/components/visas/PreciosVisaModal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
+import { TablePaginationFooter } from "@/components/ui/Pagination";
 import { Card } from "@/components/ui/Card";
 import { EnumSelect } from "@/components/ui/EnumSelect";
 import { KpiCard } from "@/components/ui/KpiCard";
@@ -535,28 +536,16 @@ export function VisasView() {
         </div>
         </ListTableContent>
 
-        <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">
-          <p className="text-[12px] text-text-secondary">
-            {sortedItems.length === 0
-              ? "0 trámites"
-              : `Mostrando ${rangeStart}–${rangeEnd} de ${sortedItems.length} trámites`}
-          </p>
-          <div className="flex items-center gap-2">
-            <ButtonOutline type="button" disabled={currentPage <= 1 || loading || refreshing} onClick={() => setPage(currentPage - 1)}>
-              Anterior
-            </ButtonOutline>
-            <span className="min-w-[88px] text-center text-[12px] font-semibold text-text-secondary">
-              Página {currentPage} de {totalPages}
-            </span>
-            <ButtonOutline
-              type="button"
-              disabled={currentPage >= totalPages || loading || refreshing}
-              onClick={() => setPage(currentPage + 1)}
-            >
-              Siguiente
-            </ButtonOutline>
-          </div>
-        </footer>
+        <TablePaginationFooter
+          page={currentPage}
+          total={sortedItems.length}
+          perPage={PAGE_SIZE}
+          resultLabel="trámites"
+          disabled={loading || refreshing}
+          onPageChange={setPage}
+          onPrevious={() => setPage(currentPage - 1)}
+          onNext={() => setPage(currentPage + 1)}
+        />
       </Card>
       )}
 

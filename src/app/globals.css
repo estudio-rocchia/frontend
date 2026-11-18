@@ -1073,6 +1073,14 @@ body {
   padding-inline: 0.75rem;
 }
 
+/* Paginación — flechas compactas */
+.rocchia-pagination-arrow:not(:disabled):not([aria-disabled="true"]):hover {
+  border-color: color-mix(in srgb, var(--primary) 28%, var(--border));
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+}
+
+
 .balance-list-toggle {
   min-height: 2.75rem;
 }

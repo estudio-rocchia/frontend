@@ -46,6 +46,13 @@ export function parseSoldYear(searchParams: {
   return readInt(searchParams.get("anio"));
 }
 
+export function parseCatalogPage(searchParams: {
+  get(name: string): string | null;
+}): number {
+  const page = readInt(searchParams.get("pagina"));
+  return page != null && page > 1 ? page : 1;
+}
+
 function appendVentasSoldYear(params: URLSearchParams, soldYear: number | null | undefined): void {
   if (soldYear != null && Number.isFinite(soldYear)) {
     params.set("anio", String(soldYear));
@@ -54,7 +61,7 @@ function appendVentasSoldYear(params: URLSearchParams, soldYear: number | null |
 
 export function parseVentasListStateFromSearchParams(searchParams: {
   get(name: string): string | null;
-}): { filters: VentasCharacteristicFilters; search: string; soldYear: number | null } {
+}): { filters: VentasCharacteristicFilters; search: string; soldYear: number | null; catalogPage: number } {
   const filters: VentasCharacteristicFilters = {
     ...EMPTY_CHARACTERISTIC_FILTERS,
     tipoInmuebleCode: searchParams.get("ltipo")?.trim() ?? "",
@@ -79,6 +86,7 @@ export function parseVentasListStateFromSearchParams(searchParams: {
     filters: sanitizeCharacteristicFiltersForTipo(filters),
     search: searchParams.get("q") ?? "",
     soldYear: parseSoldYear(searchParams),
+    catalogPage: parseCatalogPage(searchParams),
   };
 }
 
@@ -87,11 +95,13 @@ export function buildVentasListHref(
   filters: VentasCharacteristicFilters,
   search: string,
   soldYear?: number | null,
+  catalogPage?: number,
 ): string {
   const params = new URLSearchParams();
   params.set("tab", tab);
   appendVentasListStateParams(params, sanitizeCharacteristicFiltersForTipo(filters), search);
   if (tab === "vendidos") appendVentasSoldYear(params, soldYear);
+  if (catalogPage != null && catalogPage > 1) params.set("pagina", String(catalogPage));
   const qs = params.toString();
   return qs ? `/ventas?${qs}` : "/ventas";
 }
