@@ -140,6 +140,7 @@ export function VentasWorkspace() {
   const skipListUrlSyncRef = useRef(true);
   const loadGenerationRef = useRef(0);
   const inFlightListKeyRef = useRef<string | null>(null);
+  const prevDebouncedSearchRef = useRef(debouncedSearch);
 
   useEffect(() => {
     skipFilterReloadRef.current = true;
@@ -166,12 +167,18 @@ export function VentasWorkspace() {
       setCharacteristicFilters(filters);
       setDebouncedCharacteristicFilters(filters);
     }
-    setSearchQuery((current) => (current === q || current.startsWith(q) ? current : q));
-    setDebouncedSearch(q);
+    setSearchQuery((current) => {
+      if (current === q) return current;
+      if (q && current.startsWith(q)) return current;
+      return q;
+    });
+    if (q !== debouncedSearchRef.current) {
+      skipSearchReloadRef.current = true;
+      setDebouncedSearch(q);
+    }
     setSoldYear(anio);
     setCatalogPage(pagina);
     skipFilterReloadRef.current = true;
-    skipSearchReloadRef.current = true;
     skipPageReloadRef.current = true;
     setUrlTabReady(true);
     skipListUrlSyncRef.current = true;
@@ -402,9 +409,12 @@ export function VentasWorkspace() {
   useEffect(() => {
     if (tab === "en_operacion") return;
     if (Object.keys(estadoIds).length === 0 || !tipoVentaId) return;
+    const prev = prevDebouncedSearchRef.current;
+    prevDebouncedSearchRef.current = debouncedSearch;
     if (skipSearchReloadRef.current) {
       skipSearchReloadRef.current = false;
-      return;
+      // La URL puede re-marcar skip sin cambiar el término; si cambió (p. ej. borrar búsqueda), recargar.
+      if (prev === debouncedSearch) return;
     }
     setCatalogPage(1);
     catalogPageRef.current = 1;

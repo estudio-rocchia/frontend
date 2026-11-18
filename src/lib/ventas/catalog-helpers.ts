@@ -39,8 +39,11 @@ export type CatalogInmuebleHeadingInput = {
   localidad?: { name: string; province: string } | null;
 };
 
-/** Listado ventas: tipo · calle N° (la localidad va en la línea de ubicación). */
+/** Listado ventas: título editorial si existe; si no, tipo · calle N°. */
 export function catalogInmuebleHeadingFromParts(input: CatalogInmuebleHeadingInput): string {
+  const customTitle = input.inmueble.title?.trim();
+  if (customTitle) return customTitle;
+
   const tipo = input.tipoInmuebleName?.trim() || "Inmueble";
   const calleLine =
     buildInmuebleDireccion({
@@ -79,9 +82,13 @@ export function catalogInmuebleReferencia(
   return referencia || null;
 }
 
-/** Listado ventas: subtítulo con localidad (y provincia), si existe. */
+/** Listado ventas: código, referencia y localidad en la línea secundaria. */
 export function catalogInmuebleUbicacion(item: CatalogSearchItem): string | null {
-  return catalogLocalidadLabel(item.localidad);
+  const code = item.inmueble.code?.trim();
+  const referencia = item.inmueble.referencia?.trim();
+  const localidad = catalogLocalidadLabel(item.localidad);
+  const line = [code, referencia, localidad].filter(Boolean).join(" · ");
+  return line || null;
 }
 
 export function propietarioDisplay(
