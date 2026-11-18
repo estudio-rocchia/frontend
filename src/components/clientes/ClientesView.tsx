@@ -8,6 +8,7 @@ import { Download, UserPlus } from "lucide-react";
 
 import { Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from "@/components/base/table/table";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
+import { TablePaginationFooter } from "@/components/ui/Pagination";
 import { Card } from "@/components/ui/Card";
 import { CrearClienteModal } from "@/components/clientes/CrearClienteModal";
 import { KpiCard } from "@/components/ui/KpiCard";
@@ -498,32 +499,16 @@ export function ClientesView() {
             </ListTableContent>
           </div>
 
-          <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3">
-            <p className="text-[12px] text-text-secondary">
-              {totalPersonas === 0
-                ? "0 clientes"
-                : `Mostrando ${rangeStart}–${rangeEnd} de ${totalPersonas} clientes`}
-            </p>
-            <div className="flex items-center gap-2">
-              <ButtonOutline
-                type="button"
-                disabled={!canGoPrev || loading}
-                onClick={goPrev}
-              >
-                Anterior
-              </ButtonOutline>
-              <span className="min-w-[88px] text-center text-[12px] font-semibold text-text-secondary">
-                Página {currentPage} de {totalPages}
-              </span>
-              <ButtonOutline
-                type="button"
-                disabled={!canGoNext || loading}
-                onClick={goNext}
-              >
-                Siguiente
-              </ButtonOutline>
-            </div>
-          </footer>
+          <TablePaginationFooter
+            page={currentPage}
+            total={totalPersonas}
+            perPage={PAGE_SIZE}
+            resultLabel="clientes"
+            disabled={loading}
+            onPrevious={goPrev}
+            onNext={goNext}
+            className="px-5"
+          />
         </Card>
       </div>
 

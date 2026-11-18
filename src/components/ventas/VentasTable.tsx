@@ -7,7 +7,6 @@ import { RedesSocialesSelect } from "@/components/alquileres/RedesSocialesSelect
 import { VentasEmptyState } from "@/components/ventas/VentasEmptyState";
 import type { VentasTabId } from "@/components/ventas/VentasFilterChips";
 import { ListTableContent } from "@/components/ui/ListTableContent";
-import { SearchField } from "@/components/ui/SearchField";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { StatusChip } from "@/components/ui/StatusChip";
 import { ofertaEstadoTone, ventaEstadoTone, ventaInmobiliariaTone } from "@/lib/ui/status-tones";
@@ -40,12 +39,9 @@ type VentasTableProps = {
   refreshing?: boolean;
   listTransitionKey?: string;
   isInitialLoad?: boolean;
-  search: string;
-  searchPlaceholder?: string;
   emptyHint?: string;
   emptyActions?: ReactNode;
   parteNombres?: Record<number, string>;
-  onSearchChange: (value: string) => void;
   onOpenRow: (row: VentasTableRow) => void;
   savingRedesOfertaId?: number | null;
   onChangeEstadoRedes?: (item: CatalogSearchItem, nextCode: string) => void;
@@ -205,9 +201,6 @@ export const VentasTable = memo(function VentasTable({
   refreshing = false,
   listTransitionKey = "init",
   isInitialLoad = true,
-  search,
-  searchPlaceholder = "Código, calle, alias u observación del detalle…",
-  onSearchChange,
   emptyHint,
   emptyActions,
   parteNombres = {},
@@ -230,21 +223,6 @@ export const VentasTable = memo(function VentasTable({
 
   return (
     <div className={`flex flex-col gap-3 ${shellPadding}`}>
-      <div className="flex flex-col gap-3 border-b border-border pb-5 sm:flex-row sm:items-center sm:justify-between">
-        <SearchField
-          className="max-w-md flex-1"
-          value={search}
-          onChange={(e) => onSearchChange(e.target.value)}
-          placeholder={searchPlaceholder}
-          aria-label="Buscar en ventas"
-        />
-        {!loading && !refreshing ? (
-          <p className="text-[13px] text-text-secondary" aria-live="polite" aria-atomic="true">
-            {rows.length === 1 ? "1 resultado" : `${rows.length} resultados`}
-          </p>
-        ) : null}
-      </div>
-
       <ListTableContent
         isInitialLoad={isInitialLoad}
         loading={loading}

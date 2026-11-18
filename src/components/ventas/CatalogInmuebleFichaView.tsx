@@ -452,8 +452,8 @@ export function CatalogInmuebleFichaView() {
       router.push(enContextoAlquileres ? "/alquileres/para-alquilar" : "/alquileres");
       return;
     }
-    const { filters, search, soldYear } = parseVentasListStateFromSearchParams(searchParams);
-    router.push(buildVentasListHref(fromTab, filters, search, soldYear));
+    const { filters, search, soldYear, soldMoneda } = parseVentasListStateFromSearchParams(searchParams);
+    router.push(buildVentasListHref(fromTab, filters, search, soldYear, undefined, soldMoneda));
   }
 
   if (inmuebleId === null || (error && !ficha && !loading)) {

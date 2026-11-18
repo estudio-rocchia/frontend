@@ -10,8 +10,11 @@ import {
   characteristicFiltersActive,
   EMPTY_CHARACTERISTIC_FILTERS,
   formatActiveFiltersSummary,
+  formatVendidosFiltersSummary,
   sanitizeCharacteristicFiltersForTipo,
+  vendidosFiltersActive,
   type VentasCharacteristicFilters,
+  type VentasSoldMonedaFilter,
 } from "@/lib/ventas/characteristic-filters";
 import {
   hasDetailFilters,
@@ -26,6 +29,112 @@ import { formInputClass, interactiveFocusClass } from "@/lib/ui/interactive-focu
 const fieldClass = `${formInputClass} py-2 text-[13px]`;
 const priceInputClass = `${fieldClass} w-[5.75rem] shrink-0 tabular-nums`;
 const labelClass = "text-[10px] font-semibold uppercase tracking-wide text-text-secondary";
+
+function soldYearChipClass(selected: boolean): string {
+  return `rocchia-action inline-flex min-h-[2.125rem] items-center rounded-lg border px-3 py-1 text-[13px] tabular-nums transition-colors ${interactiveFocusClass} ${
+    selected
+      ? "border-primary bg-primary-soft font-semibold text-primary"
+      : "border-transparent font-normal text-text-secondary hover:bg-bg-page hover:text-text-primary"
+  }`;
+}
+
+function filterChipClass(selected: boolean): string {
+  return soldYearChipClass(selected);
+}
+
+function SoldMonedaFilterRow({
+  value,
+  onChange,
+}: {
+  value: VentasSoldMonedaFilter;
+  onChange: (next: VentasSoldMonedaFilter) => void;
+}) {
+  const options: Array<{ code: VentasSoldMonedaFilter; label: string }> = [
+    { code: null, label: "Todas" },
+    { code: "USD", label: "USD" },
+    { code: "ARS", label: "ARS" },
+  ];
+
+  return (
+    <div className="flex min-w-0 flex-col gap-1">
+      <span className={labelClass}>Moneda</span>
+      <div
+        className="inline-flex max-w-full flex-wrap items-center gap-1 rounded-lg bg-bg-page p-1"
+        role="group"
+        aria-label="Filtrar por moneda"
+      >
+        {options.map((option) => (
+          <button
+            key={option.label}
+            type="button"
+            aria-pressed={value === option.code}
+            onClick={() => onChange(option.code)}
+            className={filterChipClass(value === option.code)}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SoldYearFilterRow({
+  value,
+  years,
+  onChange,
+  loading,
+}: {
+  value: number | null;
+  years: number[];
+  onChange: (year: number | null) => void;
+  loading?: boolean;
+}) {
+  const disabled = loading || years.length === 0;
+  const sortedYears = [...years].sort((a, b) => b - a);
+
+  return (
+    <div className="flex flex-col gap-2 border-t border-border px-3 py-2.5 sm:flex-row sm:items-center sm:gap-4">
+      <div className="shrink-0 sm:w-[7.25rem]">
+        <span className={labelClass}>Año de venta</span>
+        {loading ? (
+          <p className="mt-0.5 text-[11px] text-text-secondary">Cargando…</p>
+        ) : years.length === 0 ? (
+          <p className="mt-0.5 text-[11px] text-text-secondary">Sin años en el archivo</p>
+        ) : null}
+      </div>
+      <div
+        className={`inline-flex max-w-full flex-wrap items-center gap-1 rounded-lg bg-bg-page p-1 ${
+          disabled ? "pointer-events-none opacity-50" : ""
+        }`}
+        role="group"
+        aria-label="Filtrar por año de venta"
+      >
+        <button
+          type="button"
+          aria-pressed={value === null}
+          disabled={disabled}
+          onClick={() => onChange(null)}
+          className={soldYearChipClass(value === null)}
+        >
+          Todos
+        </button>
+        {sortedYears.map((year) => (
+          <button
+            key={year}
+            type="button"
+            aria-pressed={value === year}
+            disabled={disabled}
+            onClick={() => onChange(year)}
+            className={soldYearChipClass(value === year)}
+          >
+            {year}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function MonedaSegment({
   value,
@@ -134,20 +243,50 @@ function Field({
   );
 }
 
+export type VentasSoldYearFilterState = {
+  value: number | null;
+  years: number[];
+  onChange: (year: number | null) => void;
+  loading?: boolean;
+};
+
+export type VentasSoldMonedaFilterState = {
+  value: VentasSoldMonedaFilter;
+  onChange: (next: VentasSoldMonedaFilter) => void;
+};
+
+export type VentasCatalogFiltersVariant = "full" | "vendidos";
+
 export function VentasCatalogFiltersPanel({
   filters,
   tiposInmueble,
   onChange,
   onClear,
+  onTipoChange,
+  soldYear,
+  soldMoneda,
+  variant = "full",
 }: {
   filters: VentasCharacteristicFilters;
   tiposInmueble: CatalogoItem[];
   onChange: (next: VentasCharacteristicFilters) => void;
   onClear: () => void;
+  /** En vendidos: recarga inmediata sin depender del debounce del workspace. */
+  onTipoChange?: (tipoInmuebleCode: string) => void;
+  soldYear?: VentasSoldYearFilterState;
+  soldMoneda?: VentasSoldMonedaFilterState;
+  variant?: VentasCatalogFiltersVariant;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const hasActive = characteristicFiltersActive(filters);
-  const activeSummary = formatActiveFiltersSummary(filters, tiposInmueble);
+  const isVendidos = variant === "vendidos";
+  const hasActive = isVendidos
+    ? vendidosFiltersActive(filters, soldMoneda?.value ?? null)
+    : characteristicFiltersActive(filters);
+  const hasSoldYear = soldYear?.value != null;
+  const showClear = hasActive || hasSoldYear;
+  const activeSummary = isVendidos
+    ? formatVendidosFiltersSummary(filters, tiposInmueble, soldMoneda?.value ?? null)
+    : formatActiveFiltersSummary(filters, tiposInmueble);
   const tipoCode = filters.tipoInmuebleCode;
 
   const showBedrooms = showsDetalleFilterField(tipoCode, "bedroomsMin");
@@ -157,12 +296,27 @@ export function VentasCatalogFiltersPanel({
   const showDetail = hasDetailFilters(tipoCode) && (showBedrooms || showBathrooms || showCochera || showPileta);
   const showTerrain = hasTerrainFilters(tipoCode);
 
-  const filterHint = useMemo(
-    () => activeSummary ?? (tipoCode ? "Precio y filtros del tipo elegido" : "Tipo y precio"),
-    [activeSummary, tipoCode],
-  );
+  const filterHint = useMemo(() => {
+    const base = isVendidos
+      ? (activeSummary ?? "Tipo y moneda")
+      : (activeSummary ?? (tipoCode ? "Precio y filtros del tipo elegido" : "Tipo y precio"));
+    if (hasSoldYear) {
+      return activeSummary
+        ? `Año ${soldYear!.value} · ${activeSummary}`
+        : `Año ${soldYear!.value} · ${base}`;
+    }
+    return base;
+  }, [activeSummary, tipoCode, hasSoldYear, soldYear, isVendidos]);
 
   function handleTipoChange(tipoInmuebleCode: string) {
+    if (isVendidos) {
+      if (onTipoChange) {
+        onTipoChange(tipoInmuebleCode);
+        return;
+      }
+      onChange({ ...EMPTY_CHARACTERISTIC_FILTERS, tipoInmuebleCode });
+      return;
+    }
     onChange(sanitizeCharacteristicFiltersForTipo({ ...filters, tipoInmuebleCode }));
   }
 
@@ -172,23 +326,33 @@ export function VentasCatalogFiltersPanel({
       aria-label="Filtrar catálogo"
     >
       <div className="flex items-center justify-between gap-2 px-3 py-2">
-        <button
-          type="button"
-          onClick={() => setExpanded((value) => !value)}
-          aria-expanded={expanded}
-          className={`flex min-w-0 flex-1 items-center gap-2 text-left ${interactiveFocusClass}`}
-        >
-          <SlidersHorizontal className="h-4 w-4 shrink-0 text-text-secondary" aria-hidden />
-          <div className="min-w-0">
-            <span className="text-[13px] font-semibold text-text-primary">Filtros</span>
-            <p className="truncate text-[11px] text-text-secondary">{filterHint}</p>
+        {isVendidos ? (
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <SlidersHorizontal className="h-4 w-4 shrink-0 text-text-secondary" aria-hidden />
+            <div className="min-w-0">
+              <span className="text-[13px] font-semibold text-text-primary">Filtros</span>
+              <p className="truncate text-[11px] text-text-secondary">{filterHint}</p>
+            </div>
           </div>
-          <ChevronDown
-            className={`ml-auto h-4 w-4 shrink-0 text-text-secondary transition-transform ${expanded ? "rotate-180" : ""}`}
-            aria-hidden
-          />
-        </button>
-        {hasActive ? (
+        ) : (
+          <button
+            type="button"
+            onClick={() => setExpanded((value) => !value)}
+            aria-expanded={expanded}
+            className={`flex min-w-0 flex-1 items-center gap-2 text-left ${interactiveFocusClass}`}
+          >
+            <SlidersHorizontal className="h-4 w-4 shrink-0 text-text-secondary" aria-hidden />
+            <div className="min-w-0">
+              <span className="text-[13px] font-semibold text-text-primary">Filtros</span>
+              <p className="truncate text-[11px] text-text-secondary">{filterHint}</p>
+            </div>
+            <ChevronDown
+              className={`ml-auto h-4 w-4 shrink-0 text-text-secondary transition-transform ${expanded ? "rotate-180" : ""}`}
+              aria-hidden
+            />
+          </button>
+        )}
+        {showClear ? (
           <button
             type="button"
             onClick={onClear}
@@ -199,7 +363,37 @@ export function VentasCatalogFiltersPanel({
         ) : null}
       </div>
 
-      {expanded ? (
+      {soldYear ? (
+        <SoldYearFilterRow
+          value={soldYear.value}
+          years={soldYear.years}
+          loading={soldYear.loading}
+          onChange={soldYear.onChange}
+        />
+      ) : null}
+
+      {isVendidos ? (
+        <div className="flex flex-col gap-2 border-t border-border px-3 pb-2.5 pt-2">
+          <div className="flex flex-wrap items-end gap-3">
+            <Field label="Tipo" className="w-full min-w-[9.5rem] max-w-[11.5rem]">
+              <EnumSelect
+                value={filters.tipoInmuebleCode}
+                onChange={handleTipoChange}
+                allowEmpty
+                emptyLabel="Todos"
+                placeholder="Todos"
+                size="sm"
+                options={tiposInmueble.map((tipo) => ({ value: tipo.code, label: tipo.name }))}
+              />
+            </Field>
+            {soldMoneda ? (
+              <SoldMonedaFilterRow value={soldMoneda.value} onChange={soldMoneda.onChange} />
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
+      {!isVendidos && expanded ? (
         <div className="flex flex-col gap-2 border-t border-border px-3 pb-2.5 pt-2">
           <div className="flex flex-wrap items-end gap-3">
             <Field label="Tipo" className="w-full min-w-[9.5rem] max-w-[11.5rem]">

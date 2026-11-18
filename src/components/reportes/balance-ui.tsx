@@ -7,6 +7,7 @@ import type { MontosMoneda } from "@/lib/api/types";
 import { formatMoney, moneyHeroClass } from "@/lib/format";
 import type { YoYSide } from "@/lib/reportes/yoy";
 import { formatPeriodoLabel } from "@/lib/reportes/period";
+import { TablePaginationFooter } from "@/components/ui/Pagination";
 import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 
 import { BalanceAnimatedCount } from "./BalanceAnimatedCount";
@@ -551,46 +552,17 @@ export function BalanceTablePagination({
   onPageChange: (page: number) => void;
   itemLabel?: string;
 }) {
-  const from = page * pageSize + 1;
-  const to = Math.min((page + 1) * pageSize, total);
-
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 px-4 py-2 sm:px-5">
-      <p className="text-[11px] tabular-nums text-text-secondary">
-        {total === 0 ? (
-          "Sin registros"
-        ) : pageCount <= 1 ? (
-          <>
-            {countFormatter.format(total)} {itemLabel}
-          </>
-        ) : (
-          <>
-            Pág. {page + 1}/{pageCount} · filas {countFormatter.format(from)}–{countFormatter.format(to)} de{" "}
-            {countFormatter.format(total)} {itemLabel}
-          </>
-        )}
-      </p>
-      {pageCount > 1 ? (
-        <div className="flex gap-1">
-          <button
-            type="button"
-            disabled={page === 0}
-            onClick={() => onPageChange(page - 1)}
-            className={`balance-pager-btn rocchia-action rounded-md text-[11px] font-medium text-text-secondary disabled:opacity-40 ${interactiveFocusClass}`}
-          >
-            Anterior
-          </button>
-          <button
-            type="button"
-            disabled={page >= pageCount - 1}
-            onClick={() => onPageChange(page + 1)}
-            className={`balance-pager-btn rocchia-action rounded-md text-[11px] font-medium text-text-secondary disabled:opacity-40 ${interactiveFocusClass}`}
-          >
-            Siguiente
-          </button>
-        </div>
-      ) : null}
-    </div>
+    <TablePaginationFooter
+      page={page + 1}
+      total={total}
+      perPage={pageSize}
+      resultLabel={itemLabel}
+      onPageChange={(next) => onPageChange(next - 1)}
+      onPrevious={() => onPageChange(page - 1)}
+      onNext={() => onPageChange(page + 1)}
+      className="border-border/60 py-2"
+    />
   );
 }
 

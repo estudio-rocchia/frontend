@@ -105,7 +105,7 @@ export function DashboardAlertsProvider({ children }: { children: ReactNode }) {
           invalidateCache(cacheKey);
         }
         const resumen = force
-          ? await fetchDashboardResumen(token, 30)
+          ? await fetchDashboardResumen(token, 30, { bypassHttpCache: true })
           : await withCache(
               cacheKey,
               () => fetchDashboardResumen(token, 30),

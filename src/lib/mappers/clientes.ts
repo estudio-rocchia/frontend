@@ -28,6 +28,12 @@ function buildVinculosFromFlags(flags: PersonaVinculos): ClienteVinculoBadge[] {
   if (flags.moroso) {
     badges.push({ id: "mora", label: "Mora" });
   }
+  if (flags.juridico) {
+    badges.push({ id: "juridico", label: "Jurídico" });
+  }
+  if (flags.visa) {
+    badges.push({ id: "visa", label: "Visa" });
+  }
   return badges;
 }
 
@@ -36,18 +42,22 @@ function buildVinculos(personaId: number, context: ClientesContext): ClienteVinc
     inquilino: context.inquilinoIds.has(personaId),
     propietario: context.propietarioIds.has(personaId),
     moroso: context.morosoIds.has(personaId),
+    juridico: false,
+    visa: false,
   });
 }
 
 function resolveVinculos(persona: PersonaRecord, context?: ClientesContext): PersonaVinculos {
   if (persona.vinculos) return persona.vinculos;
   if (!context) {
-    return { inquilino: false, propietario: false, moroso: false };
+    return { inquilino: false, propietario: false, moroso: false, juridico: false, visa: false };
   }
   return {
     inquilino: context.inquilinoIds.has(persona.id),
     propietario: context.propietarioIds.has(persona.id),
     moroso: context.morosoIds.has(persona.id),
+    juridico: false,
+    visa: false,
   };
 }
 

@@ -16,7 +16,6 @@ export function ListTableContent({
   listTransitionKey,
   initialSkeleton,
   children,
-  placeholderClassName,
 }: {
   isInitialLoad: boolean;
   loading: boolean;
@@ -24,9 +23,14 @@ export function ListTableContent({
   listTransitionKey: string;
   initialSkeleton: ReactNode;
   children: ReactNode;
+  /** @deprecated Recargas mantienen el listado visible; el placeholder ya no se usa. */
   placeholderClassName?: string;
 }) {
   if (loading && isInitialLoad) return initialSkeleton;
-  if (refreshing) return <ListTablePlaceholder className={placeholderClassName} />;
-  return <ListTransitionShell transitionKey={listTransitionKey}>{children}</ListTransitionShell>;
+
+  return (
+    <ListTransitionShell transitionKey={listTransitionKey}>
+      <div aria-busy={refreshing || loading}>{children}</div>
+    </ListTransitionShell>
+  );
 }

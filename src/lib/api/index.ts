@@ -10,7 +10,11 @@ import type {
   RamaExpediente,
   TramiteRpi,
 } from "../juridico/model";
-import { invalidateCache, withCache } from "./cache";
+import {
+  INDICE_VALORES_CACHE_TTL_MS,
+  indiceValoresCacheKey,
+} from "@/lib/indices/indice-valores-cache";
+import { invalidateCache, invalidateCachePrefix, withCache } from "./cache";
 import { apiBlob, apiBlobWithFilename, apiRequest, apiUploadFile } from "./client";
 import type {
   CatalogoItem,
@@ -163,8 +167,15 @@ export function resetUsuarioPassword(token: string, id: number, body: ResetUsuar
   });
 }
 
-export function fetchDashboardResumen(token: string, limit = 20) {
-  return apiRequest<DashboardResumen>(`/dashboard/resumen?limit=${limit}`, { token });
+export function fetchDashboardResumen(
+  token: string,
+  limit = 20,
+  options?: { bypassHttpCache?: boolean },
+) {
+  return apiRequest<DashboardResumen>(`/dashboard/resumen?limit=${limit}`, {
+    token,
+    ...(options?.bypassHttpCache ? { cache: "no-store" as RequestCache } : {}),
+  });
 }
 export function fetchDashboardAlertasLeidas(token: string) {
   return apiRequest<{ alertIds: string[] }>("/dashboard/alertas-leidas", { token });
@@ -476,7 +487,7 @@ export function fetchLiquidaciones(
   if (params?.mesPeriodo) query.set("mesPeriodo", String(params.mesPeriodo));
   if (params?.estado) query.set("estado", params.estado);
   if (params?.limit) query.set("limit", String(params.limit));
-  if (params?.offset) query.set("offset", String(params.offset));
+  if (params?.offset !== undefined) query.set("offset", String(params.offset));
   const suffix = query.toString();
   return apiRequest<{ items: LiquidacionRecord[] }>(
     `/liquidaciones${suffix ? `?${suffix}` : ""}`,
@@ -896,21 +907,41 @@ export function fetchIndiceValores(
   code: IndiceCode,
   desde: string,
   hasta: string,
+  options?: { bypassCache?: boolean },
 ) {
   const query = new URLSearchParams({ desde, hasta });
-  return apiRequest<{ items: ValorIndiceRecord[] }>(`/indices/${code}/valores?${query}`, {
-    token,
-  });
+  const cacheKey = indiceValoresCacheKey(token, code, desde, hasta);
+  if (options?.bypassCache) {
+    invalidateCache(cacheKey);
+  }
+  return withCache(
+    cacheKey,
+    () =>
+      apiRequest<{ items: ValorIndiceRecord[] }>(`/indices/${code}/valores?${query}`, {
+        token,
+      }),
+    { ttlMs: INDICE_VALORES_CACHE_TTL_MS },
+  );
 }
 
-export function syncIndices(token: string, code: IndiceCode) {
+export function invalidateIndiceValoresCache(token: string, code?: IndiceCode) {
+  invalidateCachePrefix(
+    code ? `indice-valores:${token}:${code}:` : `indice-valores:${token}:`,
+  );
+}
+
+export async function syncIndices(token: string, code: IndiceCode) {
   const timeoutMs = code === "CAC" ? 300_000 : 120_000;
-  return apiRequest<SyncIndicesResponse>("/indices/sync", {
+  const result = await apiRequest<SyncIndicesResponse>("/indices/sync", {
     method: "POST",
     token,
     body: JSON.stringify({ code }),
     signal: AbortSignal.timeout(timeoutMs),
   });
+  if (result[code]?.upserted > 0) {
+    invalidateIndiceValoresCache(token, code);
+  }
+  return result;
 }
 
 export function previewAjusteIndice(token: string, body: PreviewAjusteInput) {
@@ -982,7 +1013,7 @@ export function fetchVentas(token: string, params?: FetchVentasParams) {
   if (params?.estado) query.set("estado", params.estado);
   if (params?.inmuebleId) query.set("inmuebleId", String(params.inmuebleId));
   query.set("limit", String(params?.limit ?? 100));
-  if (params?.offset) query.set("offset", String(params.offset));
+  if (params?.offset !== undefined) query.set("offset", String(params.offset));
   if (params?.view) query.set("view", params.view);
   const path = `/ventas?${query}`;
   if (params?.view === "table") {
@@ -1077,8 +1108,10 @@ export function searchCatalogo(
   }
   if (params?.vendidoAnio !== undefined) query.set("vendidoAnio", String(params.vendidoAnio));
   query.set("limit", String(params?.limit ?? 100));
-  if (params?.offset) query.set("offset", String(params.offset));
-  return apiRequest<{ items: CatalogSearchItem[] }>(`/catalogo/buscar?${query}`, { token });
+  if (params?.offset !== undefined) query.set("offset", String(params.offset));
+  return apiRequest<{ items: CatalogSearchItem[]; total: number }>(`/catalogo/buscar?${query}`, {
+    token,
+  });
 }
 
 export function fetchVendidoAnios(token: string, tipoOperacionId?: number) {

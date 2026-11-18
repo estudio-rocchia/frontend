@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
 import { useSyncScope } from "@/lib/sync/use-sync-scope";
 
@@ -24,7 +24,6 @@ const VentasCatalogFiltersPanel = dynamic(
     })),
   { ssr: false, loading: () => null },
 );
-import { VentasSoldYearFilter } from "@/components/ventas/VentasSoldYearFilter";
 import { VentasCreateActions } from "@/components/ventas/VentasCreateActions";
 import {
   VENTAS_MAIN_PANEL_ID,
@@ -38,6 +37,8 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { useListRefreshTransition } from "@/lib/ui/use-list-refresh-transition";
 import { withCache } from "@/lib/api/cache";
 import { VentasKpiStrip } from "@/components/ventas/VentasKpiStrip";
+import { VentasCatalogPagination } from "@/components/ventas/VentasCatalogPagination";
+import { VentasSearchBar } from "@/components/ventas/VentasSearchBar";
 import { VentasTable, type VentasTableRow } from "@/components/ventas/VentasTable";
 import { interactiveFocusClass } from "@/lib/ui/interactive-focus";
 import { useAuth } from "@/context/auth-context";
@@ -59,10 +60,13 @@ import { pagePaddingClass } from "@/lib/layout";
 import {
   characteristicFiltersSearchParams,
   EMPTY_CHARACTERISTIC_FILTERS,
+  vendidosFiltersSearchParams,
   type VentasCharacteristicFilters,
+  type VentasSoldMonedaFilter,
 } from "@/lib/ventas/characteristic-filters";
-import { catalogItemSearchText, saleOferta } from "@/lib/ventas/catalog-helpers";
+import { saleOferta } from "@/lib/ventas/catalog-helpers";
 import { VENTAS_TAB_COPY, ventasEmptyHint } from "@/lib/ventas/workspace-copy";
+import { VENTAS_CATALOG_PAGE_SIZE } from "@/lib/ventas/catalog-page";
 import {
   buildVentasInmuebleHref,
   buildVentasListHref,
@@ -101,6 +105,8 @@ export function VentasWorkspace() {
   const [ventaRows, setVentaRows] = useState<VentaDetail[]>([]);
   const [parteNombres, setParteNombres] = useState<Record<number, string>>({});
   const [catalogRows, setCatalogRows] = useState<CatalogSearchItem[]>([]);
+  const [catalogTotal, setCatalogTotal] = useState(0);
+  const [catalogPage, setCatalogPage] = useState(1);
   const [tabCounts, setTabCounts] = useState<Partial<Record<VentasTabId, number>>>({});
   const [estadoIds, setEstadoIds] = useState<Record<string, number>>({});
   const [tipoInmuebleIds, setTipoInmuebleIds] = useState<Record<string, number>>({});
@@ -117,16 +123,43 @@ export function VentasWorkspace() {
   const [newVentaInmuebleId, setNewVentaInmuebleId] = useState<number | null>(null);
   const [soldYear, setSoldYear] = useState<number | null>(null);
   const [soldYears, setSoldYears] = useState<number[]>([]);
+  const [soldMoneda, setSoldMoneda] = useState<VentasSoldMonedaFilter>(null);
   const characteristicFiltersRef = useRef(debouncedCharacteristicFilters);
   characteristicFiltersRef.current = debouncedCharacteristicFilters;
   const soldYearRef = useRef(soldYear);
   soldYearRef.current = soldYear;
+  const soldMonedaRef = useRef(soldMoneda);
+  soldMonedaRef.current = soldMoneda;
+  const searchQueryRef = useRef(searchQuery);
+  searchQueryRef.current = searchQuery;
+  const debouncedSearchRef = useRef(debouncedSearch);
+  debouncedSearchRef.current = debouncedSearch;
+  const catalogPageRef = useRef(catalogPage);
+  catalogPageRef.current = catalogPage;
+  const skipSearchReloadRef = useRef(true);
+  const skipPageReloadRef = useRef(true);
+  const deferredSearch = useDeferredValue(searchQuery);
   const skipFilterReloadRef = useRef(true);
+  const skipSoldYearReloadRef = useRef(true);
+  const skipSoldMonedaReloadRef = useRef(true);
+  const filtersSignatureRef = useRef("");
   const skipListUrlSyncRef = useRef(true);
   const loadGenerationRef = useRef(0);
+  const inFlightListKeyRef = useRef<string | null>(null);
+  const prevDebouncedSearchRef = useRef(debouncedSearch);
 
   useEffect(() => {
     skipFilterReloadRef.current = true;
+    skipSoldYearReloadRef.current = true;
+    skipSoldMonedaReloadRef.current = true;
+    skipSearchReloadRef.current = true;
+    skipPageReloadRef.current = true;
+    setCatalogRows([]);
+    setCatalogTotal(0);
+    setCatalogPage(1);
+    setVentaRows([]);
+    setParteNombres({});
+    setError(null);
   }, [tab]);
 
   useEffect(() => {
@@ -134,12 +167,39 @@ export function VentasWorkspace() {
     if (isVentasTabId(tabParam)) {
       setTab(tabParam);
     }
-    const { filters, search: q, soldYear: anio } = parseVentasListStateFromSearchParams(searchParams);
-    setCharacteristicFilters(filters);
-    setDebouncedCharacteristicFilters(filters);
-    setSearchQuery((current) => (current === q || current.startsWith(q) ? current : q));
-    setDebouncedSearch(q);
+    const {
+      filters,
+      search: q,
+      soldYear: anio,
+      soldMoneda: moneda,
+      catalogPage: pagina,
+    } = parseVentasListStateFromSearchParams(searchParams);
+    const vendidosTab = tabParam === "vendidos";
+    const listFilters = vendidosTab
+      ? { ...EMPTY_CHARACTERISTIC_FILTERS, tipoInmuebleCode: filters.tipoInmuebleCode }
+      : filters;
+    const filtersSig = JSON.stringify(listFilters);
+    const filtersChanged = filtersSig !== filtersSignatureRef.current;
+    if (filtersChanged) {
+      setCharacteristicFilters(listFilters);
+      setDebouncedCharacteristicFilters(listFilters);
+    }
+    setSearchQuery((current) => {
+      if (current === q) return current;
+      if (q && current.startsWith(q)) return current;
+      return q;
+    });
+    if (q !== debouncedSearchRef.current) {
+      skipSearchReloadRef.current = true;
+      setDebouncedSearch(q);
+    }
+    skipSoldYearReloadRef.current = anio === soldYearRef.current;
+    skipSoldMonedaReloadRef.current = moneda === soldMonedaRef.current;
     setSoldYear(anio);
+    setSoldMoneda(vendidosTab ? moneda : null);
+    setCatalogPage(pagina);
+    skipFilterReloadRef.current = !filtersChanged;
+    skipPageReloadRef.current = true;
     setUrlTabReady(true);
     skipListUrlSyncRef.current = true;
     const frame = window.requestAnimationFrame(() => {
@@ -167,19 +227,24 @@ export function VentasWorkspace() {
       nextFilters: VentasCharacteristicFilters,
       nextSearch: string,
       nextSoldYear?: number | null,
+      nextCatalogPage?: number,
+      nextSoldMoneda?: VentasSoldMonedaFilter,
     ) => {
       if (skipListUrlSyncRef.current) return;
-      router.replace(buildVentasListHref(nextTab, nextFilters, nextSearch, nextSoldYear), {
-        scroll: false,
-      });
+      const page = nextCatalogPage ?? catalogPageRef.current;
+      const moneda = nextTab === "vendidos" ? (nextSoldMoneda ?? soldMonedaRef.current) : null;
+      router.replace(
+        buildVentasListHref(nextTab, nextFilters, nextSearch, nextSoldYear, page, moneda),
+        { scroll: false },
+      );
     },
     [router],
   );
 
   useEffect(() => {
     if (skipListUrlSyncRef.current) return;
-    syncListUrl(tab, debouncedCharacteristicFilters, debouncedSearch, soldYear);
-  }, [debouncedSearch, debouncedCharacteristicFilters, tab, soldYear, syncListUrl]);
+    syncListUrl(tab, debouncedCharacteristicFilters, debouncedSearch, soldYear, catalogPage, soldMoneda);
+  }, [debouncedSearch, debouncedCharacteristicFilters, tab, soldYear, soldMoneda, catalogPage, syncListUrl]);
 
   useEffect(() => {
     if (!token) return;
@@ -237,14 +302,16 @@ export function VentasWorkspace() {
   const load = useCallback(async (options?: { silent?: boolean }) => {
     if (!token) return;
     if (tab !== "en_operacion" && !tipoVentaId) return;
-    const generation = ++loadGenerationRef.current;
-    const stillCurrent = () => generation === loadGenerationRef.current;
     const silent = options?.silent ?? false;
     const listKey =
       tab === "en_operacion"
         ? tab
-        : `${tab}-${JSON.stringify(characteristicFiltersRef.current)}-${soldYearRef.current ?? "all"}`;
-    const { startedAt, isInitial } = start(silent);
+        : `${tab}-${JSON.stringify(characteristicFiltersRef.current)}-${soldYearRef.current ?? "all"}-${soldMonedaRef.current ?? "all"}-${debouncedSearchRef.current}-${catalogPageRef.current}`;
+    if (!silent && inFlightListKeyRef.current === listKey) return;
+    const generation = ++loadGenerationRef.current;
+    const stillCurrent = () => generation === loadGenerationRef.current;
+    inFlightListKeyRef.current = listKey;
+    const { startedAt, isInitial } = start(silent, tab);
     if (!silent && isInitial) {
       setLoading(true);
     }
@@ -268,10 +335,20 @@ export function VentasWorkspace() {
           setError("Catálogo de estados no disponible. Recargá la página.");
           return;
         }
-        const filters = characteristicFiltersSearchParams(characteristicFiltersRef.current, tipoInmuebleIds);
+        const filters =
+          tab === "vendidos"
+            ? vendidosFiltersSearchParams(
+                characteristicFiltersRef.current,
+                tipoInmuebleIds,
+                soldMonedaRef.current,
+              )
+            : characteristicFiltersSearchParams(characteristicFiltersRef.current, tipoInmuebleIds);
         const vendidoAnio =
           tab === "vendidos" && soldYearRef.current != null ? soldYearRef.current : undefined;
-        const catalogCacheKey = `ventas-catalog:${token}:${tab}:${JSON.stringify(filters)}:${vendidoAnio ?? "all"}`;
+        const searchQ = debouncedSearchRef.current.trim();
+        const page = catalogPageRef.current;
+        const offset = (page - 1) * VENTAS_CATALOG_PAGE_SIZE;
+        const catalogCacheKey = `ventas-catalog:${token}:${tab}:${JSON.stringify(filters)}:${vendidoAnio ?? "all"}:${soldMonedaRef.current ?? "all"}:${searchQ}:${page}`;
         const res = await withCache(
           catalogCacheKey,
           () =>
@@ -280,12 +357,15 @@ export function VentasWorkspace() {
               tipoOperacionId: tipoVentaId,
               ...filters,
               vendidoAnio,
-              limit: 200,
+              q: searchQ || undefined,
+              limit: VENTAS_CATALOG_PAGE_SIZE,
+              offset,
             }),
           { ttlMs: 25_000 },
         );
         if (!stillCurrent()) return;
         setCatalogRows(res.items);
+        setCatalogTotal(res.total);
         setVentaRows([]);
       }
     } catch (err) {
@@ -297,13 +377,62 @@ export function VentasWorkspace() {
       setError(err instanceof ApiError ? err.message : "Error al cargar ventas");
       setVentaRows([]);
       setCatalogRows([]);
+      setCatalogTotal(0);
     } finally {
+      if (inFlightListKeyRef.current === listKey) {
+        inFlightListKeyRef.current = null;
+      }
       if (stillCurrent() && !silent) {
         await finish(listKey, startedAt);
         setLoading(false);
       }
     }
   }, [token, tab, estadoIds, tipoInmuebleIds, tipoVentaId, logout, start, finish]);
+
+  const applySoldYearChange = useCallback(
+    (next: number | null) => {
+      soldYearRef.current = next;
+      skipSoldYearReloadRef.current = true;
+      setSoldYear(next);
+      setCatalogPage(1);
+      catalogPageRef.current = 1;
+      skipPageReloadRef.current = true;
+      syncListUrl(tab, debouncedCharacteristicFilters, debouncedSearchRef.current, next, 1, soldMonedaRef.current);
+      void load();
+    },
+    [tab, debouncedCharacteristicFilters, syncListUrl, load],
+  );
+
+  const applySoldMonedaChange = useCallback(
+    (next: VentasSoldMonedaFilter) => {
+      soldMonedaRef.current = next;
+      skipSoldMonedaReloadRef.current = true;
+      setSoldMoneda(next);
+      setCatalogPage(1);
+      catalogPageRef.current = 1;
+      skipPageReloadRef.current = true;
+      syncListUrl(tab, debouncedCharacteristicFilters, debouncedSearchRef.current, soldYearRef.current, 1, next);
+      void load();
+    },
+    [tab, debouncedCharacteristicFilters, syncListUrl, load],
+  );
+
+  const applyVendidosTipoChange = useCallback(
+    (tipoInmuebleCode: string) => {
+      const next = { ...EMPTY_CHARACTERISTIC_FILTERS, tipoInmuebleCode };
+      characteristicFiltersRef.current = next;
+      filtersSignatureRef.current = JSON.stringify(next);
+      skipFilterReloadRef.current = true;
+      setCharacteristicFilters(next);
+      setDebouncedCharacteristicFilters(next);
+      setCatalogPage(1);
+      catalogPageRef.current = 1;
+      skipPageReloadRef.current = true;
+      syncListUrl(tab, next, debouncedSearchRef.current, soldYearRef.current, 1, soldMonedaRef.current);
+      void load();
+    },
+    [tab, syncListUrl, load],
+  );
 
   useSyncScope(
     "ventas",
@@ -327,36 +456,84 @@ export function VentasWorkspace() {
       skipFilterReloadRef.current = false;
       return;
     }
+    const sig = JSON.stringify(debouncedCharacteristicFilters);
+    if (sig === filtersSignatureRef.current) return;
+    filtersSignatureRef.current = sig;
+    setCatalogPage(1);
+    catalogPageRef.current = 1;
+    skipPageReloadRef.current = true;
     void load();
   }, [debouncedCharacteristicFilters, load, tab, estadoIds, tipoVentaId]);
 
   useEffect(() => {
     if (tab !== "vendidos") return;
     if (Object.keys(estadoIds).length === 0 || !tipoVentaId) return;
-    if (skipFilterReloadRef.current) {
-      skipFilterReloadRef.current = false;
+    if (skipSoldYearReloadRef.current) {
+      skipSoldYearReloadRef.current = false;
       return;
     }
-    const timer = window.setTimeout(() => {
-      void load();
-    }, 150);
-    return () => window.clearTimeout(timer);
+    setCatalogPage(1);
+    catalogPageRef.current = 1;
+    skipPageReloadRef.current = true;
+    void load();
   }, [soldYear, load, tab, estadoIds, tipoVentaId]);
+
+  useEffect(() => {
+    if (tab !== "vendidos") return;
+    if (Object.keys(estadoIds).length === 0 || !tipoVentaId) return;
+    if (skipSoldMonedaReloadRef.current) {
+      skipSoldMonedaReloadRef.current = false;
+      return;
+    }
+    setCatalogPage(1);
+    catalogPageRef.current = 1;
+    skipPageReloadRef.current = true;
+    void load();
+  }, [soldMoneda, load, tab, estadoIds, tipoVentaId]);
+
+  useEffect(() => {
+    if (tab === "en_operacion") return;
+    if (Object.keys(estadoIds).length === 0 || !tipoVentaId) return;
+    const prev = prevDebouncedSearchRef.current;
+    prevDebouncedSearchRef.current = debouncedSearch;
+    if (skipSearchReloadRef.current) {
+      skipSearchReloadRef.current = false;
+      // La URL puede re-marcar skip sin cambiar el término; si cambió (p. ej. borrar búsqueda), recargar.
+      if (prev === debouncedSearch) return;
+    }
+    setCatalogPage(1);
+    catalogPageRef.current = 1;
+    skipPageReloadRef.current = true;
+    void load();
+  }, [debouncedSearch, load, tab, estadoIds, tipoVentaId]);
+
+  useEffect(() => {
+    if (tab === "en_operacion") return;
+    if (Object.keys(estadoIds).length === 0 || !tipoVentaId) return;
+    if (skipPageReloadRef.current) {
+      skipPageReloadRef.current = false;
+      return;
+    }
+    void load();
+  }, [catalogPage, load, tab, estadoIds, tipoVentaId]);
 
   const tableRows: VentasTableRow[] = useMemo(() => {
     if (tab === "en_operacion") {
       return ventaRows
         .filter((venta) => {
           const label = `${venta.inmueble?.code ?? ""} ${venta.inmueble?.title ?? ""} ${buyerSearchText(venta, parteNombres)} ${ventaInmobiliariaLabel(venta.estadoInmobiliaria)}`;
-          return matchesSearch(label, debouncedSearch);
+          return matchesSearch(label, deferredSearch);
         })
         .map((venta) => ({ kind: "venta", venta }));
     }
     return catalogRows
       .filter((item) => item.ofertasActivas.some((oferta) => oferta.tipoOperacionCode === "venta"))
-      .filter((item) => matchesSearch(catalogItemSearchText(item), debouncedSearch))
       .map((item) => ({ kind: "catalog", item }));
-  }, [tab, ventaRows, catalogRows, debouncedSearch, parteNombres]);
+  }, [tab, ventaRows, catalogRows, deferredSearch, parteNombres]);
+
+  const handleSearchChange = useCallback((next: string) => {
+    setSearchQuery(next);
+  }, []);
 
   const emptyHint = useMemo(() => ventasEmptyHint(tab), [tab]);
 
@@ -430,7 +607,7 @@ export function VentasWorkspace() {
       ];
     }
 
-    const lotes = catalogRows.filter((item) => item.tipoInmueble.code === "lot").length;
+    const lotesOnPage = catalogRows.filter((item) => item.tipoInmueble.code === "lot").length;
 
     if (tab === "a_la_venta") {
       return [];
@@ -438,73 +615,91 @@ export function VentasWorkspace() {
 
     if (tab === "fuera_mercado") {
       return [
-        { label: "Fuera de mercado", value: String(catalogRows.length), hint: "Sin oferta activa" },
-        { label: "Lotes", value: String(lotes), hint: "Lotes fuera de mercado" },
+        { label: "Fuera de mercado", value: String(catalogTotal), hint: "Sin oferta activa" },
+        { label: "Lotes (pág.)", value: String(lotesOnPage), hint: "Lotes en esta página" },
       ];
     }
 
     return [
-      { label: "Total vendidos", value: String(catalogRows.length), hint: "Archivo de ventas cerradas" },
-      { label: "Lotes", value: String(lotes), hint: "Lotes vendidos" },
+      { label: "Total vendidos", value: String(catalogTotal), hint: "Archivo de ventas cerradas" },
+      { label: "Lotes (pág.)", value: String(lotesOnPage), hint: "Lotes en esta página" },
     ];
-  }, [tab, ventaRows, catalogRows]);
+  }, [tab, ventaRows, catalogRows, catalogTotal]);
 
   function changeTab(next: VentasTabId) {
     setTab(next);
     setSearchQuery("");
+    setDebouncedSearch("");
     skipFilterReloadRef.current = true;
+    skipSearchReloadRef.current = true;
+    skipPageReloadRef.current = true;
+    setCatalogPage(1);
     setSoldYear(null);
+    setSoldMoneda(null);
     router.replace(buildVentasListHref(next, debouncedCharacteristicFilters, "", null), { scroll: false });
   }
 
-  async function handleOpenRow(row: VentasTableRow) {
-    if (row.kind === "venta") {
-      const id = row.venta.id;
-      if (!Number.isInteger(id) || id <= 0) return;
-      router.push(
-        buildVentasVentaHref(id, tab, characteristicFiltersRef.current, searchQuery, soldYearRef.current),
-      );
-      return;
-    }
-    const inmuebleId = row.item.inmueble.id;
-    if (!Number.isInteger(inmuebleId) || inmuebleId <= 0) return;
-
-    if (tab === "vendidos" && token) {
-      try {
-        const res = await fetchVentas(token, { inmuebleId, limit: 20 });
-        const venta =
-          res.items.find((v) => v.estado === "completed") ??
-          res.items.find((v) => v.estado !== "cancelled") ??
-          res.items[0];
-        if (venta) {
-          router.push(
-            buildVentasVentaHref(
-              venta.id,
-              tab,
-              characteristicFiltersRef.current,
-              searchQuery,
-              soldYearRef.current,
-            ),
-          );
-          return;
-        }
-      } catch {
-        // sin operación registrada: ficha de catálogo
+  const handleOpenRow = useCallback(
+    async (row: VentasTableRow) => {
+      const q = searchQueryRef.current;
+      if (row.kind === "venta") {
+        const id = row.venta.id;
+        if (!Number.isInteger(id) || id <= 0) return;
+        router.push(
+          buildVentasVentaHref(
+            id,
+            tab,
+            characteristicFiltersRef.current,
+            q,
+            soldYearRef.current,
+            soldMonedaRef.current,
+          ),
+        );
+        return;
       }
-    }
+      const inmuebleId = row.item.inmueble.id;
+      if (!Number.isInteger(inmuebleId) || inmuebleId <= 0) return;
 
-    if (tab === "fuera_mercado" || tab === "a_la_venta" || tab === "vendidos") {
-      router.push(
-        buildVentasInmuebleHref(
-          inmuebleId,
-          tab,
-          characteristicFiltersRef.current,
-          searchQuery,
-          soldYearRef.current,
-        ),
-      );
-    }
-  }
+      if (tab === "vendidos" && token) {
+        try {
+          const res = await fetchVentas(token, { inmuebleId, limit: 20 });
+          const venta =
+            res.items.find((v) => v.estado === "completed") ??
+            res.items.find((v) => v.estado !== "cancelled") ??
+            res.items[0];
+          if (venta) {
+            router.push(
+              buildVentasVentaHref(
+                venta.id,
+                tab,
+                characteristicFiltersRef.current,
+                q,
+                soldYearRef.current,
+                soldMonedaRef.current,
+              ),
+            );
+            return;
+          }
+        } catch {
+          // sin operación registrada: ficha de catálogo
+        }
+      }
+
+      if (tab === "fuera_mercado" || tab === "a_la_venta" || tab === "vendidos") {
+        router.push(
+          buildVentasInmuebleHref(
+            inmuebleId,
+            tab,
+            characteristicFiltersRef.current,
+            q,
+            soldYearRef.current,
+            soldMonedaRef.current,
+          ),
+        );
+      }
+    },
+    [router, tab, token],
+  );
 
   const tabCopy = VENTAS_TAB_COPY[tab];
 
@@ -525,38 +720,58 @@ export function VentasWorkspace() {
       <VentasFilterChips active={tab} onChange={changeTab} counts={tabCounts} />
 
       {tab !== "en_operacion" ? (
-        <>
-          {tab === "vendidos" ? (
-            <VentasSoldYearFilter
-              value={soldYear}
-              years={soldYears}
-              loading={loading && isInitialLoad}
-              onChange={(next) => {
-                setSoldYear(next);
-                syncListUrl(tab, characteristicFilters, searchQuery, next);
-              }}
-            />
-          ) : null}
-          <VentasCatalogFiltersPanel
-            filters={characteristicFilters}
-            tiposInmueble={tiposInmueble}
-            onChange={setCharacteristicFilters}
-            onClear={() => {
-              setCharacteristicFilters(EMPTY_CHARACTERISTIC_FILTERS);
-              setDebouncedCharacteristicFilters(EMPTY_CHARACTERISTIC_FILTERS);
-              setSearchQuery("");
-              setDebouncedSearch("");
-              setSoldYear(null);
-              skipListUrlSyncRef.current = true;
-              router.replace(buildVentasListHref(tab, EMPTY_CHARACTERISTIC_FILTERS, "", null), {
-                scroll: false,
-              });
-              window.requestAnimationFrame(() => {
-                skipListUrlSyncRef.current = false;
-              });
-            }}
-          />
-        </>
+        <VentasCatalogFiltersPanel
+          variant={tab === "vendidos" ? "vendidos" : "full"}
+          filters={characteristicFilters}
+          tiposInmueble={tiposInmueble}
+          onChange={setCharacteristicFilters}
+          onTipoChange={tab === "vendidos" ? applyVendidosTipoChange : undefined}
+          soldYear={
+            tab === "vendidos"
+              ? {
+                  value: soldYear,
+                  years: soldYears,
+                  loading: loading && isInitialLoad,
+                  onChange: applySoldYearChange,
+                }
+              : undefined
+          }
+          soldMoneda={
+            tab === "vendidos"
+              ? {
+                  value: soldMoneda,
+                  onChange: applySoldMonedaChange,
+                }
+              : undefined
+          }
+          onClear={() => {
+            const clearedFilters = EMPTY_CHARACTERISTIC_FILTERS;
+            characteristicFiltersRef.current = clearedFilters;
+            filtersSignatureRef.current = JSON.stringify(clearedFilters);
+            skipFilterReloadRef.current = true;
+            setCharacteristicFilters(clearedFilters);
+            setDebouncedCharacteristicFilters(clearedFilters);
+            setSearchQuery("");
+            setDebouncedSearch("");
+            soldYearRef.current = null;
+            soldMonedaRef.current = null;
+            skipSoldYearReloadRef.current = true;
+            skipSoldMonedaReloadRef.current = true;
+            setSoldYear(null);
+            setSoldMoneda(null);
+            setCatalogPage(1);
+            catalogPageRef.current = 1;
+            skipPageReloadRef.current = true;
+            skipListUrlSyncRef.current = true;
+            router.replace(buildVentasListHref(tab, EMPTY_CHARACTERISTIC_FILTERS, "", null, 1, null), {
+              scroll: false,
+            });
+            window.requestAnimationFrame(() => {
+              skipListUrlSyncRef.current = false;
+            });
+            void load();
+          }}
+        />
       ) : null}
 
       <div
@@ -583,6 +798,13 @@ export function VentasWorkspace() {
         ) : (
           <Card accent className="rocchia-panel--flat relative overflow-hidden">
             <ListProgressBar active={refreshing} />
+            <VentasSearchBar
+              value={searchQuery}
+              onChange={handleSearchChange}
+              placeholder={tabCopy.searchPlaceholder}
+              resultCount={tab === "en_operacion" ? tableRows.length : catalogTotal}
+              showResultCount={!loading && !refreshing}
+            />
             <VentasTable
               tab={tab}
               rows={tableRows}
@@ -590,14 +812,8 @@ export function VentasWorkspace() {
               refreshing={refreshing}
               listTransitionKey={listTransitionKey}
               isInitialLoad={isInitialLoad}
-              search={searchQuery}
-              searchPlaceholder={tabCopy.searchPlaceholder}
               emptyHint={emptyHint}
               parteNombres={parteNombres}
-              onSearchChange={(next) => {
-                setSearchQuery(next);
-                syncListUrl(tab, characteristicFilters, next, soldYear);
-              }}
               onOpenRow={handleOpenRow}
               savingRedesOfertaId={savingRedesOfertaId}
               onChangeEstadoRedes={
@@ -605,6 +821,19 @@ export function VentasWorkspace() {
               }
               embedded
             />
+            {tab !== "en_operacion" ? (
+              <VentasCatalogPagination
+                page={catalogPage}
+                total={catalogTotal}
+                loading={loading || refreshing}
+                onPageChange={(next) => {
+                  catalogPageRef.current = next;
+                  setCatalogPage(next);
+                  skipPageReloadRef.current = false;
+                  syncListUrl(tab, debouncedCharacteristicFilters, debouncedSearch, soldYear, next, soldMoneda);
+                }}
+              />
+            ) : null}
           </Card>
         )}
       </div>

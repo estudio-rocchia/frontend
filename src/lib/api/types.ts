@@ -283,6 +283,8 @@ export interface PersonaVinculos {
   inquilino: boolean;
   propietario: boolean;
   moroso: boolean;
+  juridico: boolean;
+  visa: boolean;
 }
 
 export type ClienteHistorialModulo = "cliente" | "alquiler" | "venta" | "juridico" | "visa";

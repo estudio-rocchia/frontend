@@ -5,6 +5,7 @@ import { Loader2, Search, X } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { RentalFilterChips } from "@/components/alquileres/RentalFilterChips";
 import { ButtonOutline } from "@/components/ui/Button";
+import { TablePaginationFooter } from "@/components/ui/Pagination";
 import { ListTablePlaceholder } from "@/components/ui/ListTableContent";
 import { ListTransitionShell } from "@/components/ui/ListTransitionShell";
 import { Chip } from "@/components/base/badges/chip";
@@ -645,32 +646,24 @@ export function RentalsTable({
           </table>
         </div>
 
-        <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3 sm:px-5">
-          <p className="text-[12px] text-text-secondary">
-            {filteredTotal === 0
-              ? "0 contratos"
-              : `Mostrando ${rangeStart}–${rangeEnd} de ${filteredTotal} contratos`}
-          </p>
-          <div className="flex items-center gap-2">
-            <ButtonOutline
-              type="button"
-              disabled={(useCursorPagination ? !canGoPrev : currentPage <= 1) || listBusy}
-              onClick={() => (useCursorPagination ? onGoPrev?.() : onPageChange?.(currentPage - 1))}
-            >
-              Anterior
-            </ButtonOutline>
-            <span className="min-w-[88px] text-center text-[12px] font-semibold text-text-secondary">
-              Página {currentPage} de {totalPages}
-            </span>
-            <ButtonOutline
-              type="button"
-              disabled={(useCursorPagination ? !canGoNext : currentPage >= totalPages) || listBusy}
-              onClick={() => (useCursorPagination ? onGoNext?.() : onPageChange?.(currentPage + 1))}
-            >
-              Siguiente
-            </ButtonOutline>
-          </div>
-        </footer>
+        <TablePaginationFooter
+          page={currentPage}
+          total={filteredTotal}
+          perPage={pageSize}
+          resultLabel="contratos"
+          disabled={listBusy}
+          onPrevious={() =>
+            useCursorPagination ? onGoPrev?.() : onPageChange?.(currentPage - 1)
+          }
+          onNext={() =>
+            useCursorPagination ? onGoNext?.() : onPageChange?.(currentPage + 1)
+          }
+          onPageChange={
+            useCursorPagination
+              ? undefined
+              : (next) => onPageChange?.(next)
+          }
+        />
     </section>
   );
 }

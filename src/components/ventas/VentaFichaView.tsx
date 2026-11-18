@@ -363,6 +363,8 @@ export function VentaFichaView() {
                 listReturnState.filters,
                 listReturnState.search,
                 listReturnState.soldYear,
+                undefined,
+                listReturnState.soldMoneda,
               ),
             )
           }
@@ -404,6 +406,8 @@ export function VentaFichaView() {
                 listReturnState.filters,
                 listReturnState.search,
                 listReturnState.soldYear,
+                undefined,
+                listReturnState.soldMoneda,
               ),
             )
           }
@@ -423,6 +427,7 @@ export function VentaFichaView() {
                   listReturnState.filters,
                   listReturnState.search,
                   listReturnState.soldYear,
+                  listReturnState.soldMoneda,
                 ),
               )
             }
@@ -685,6 +690,8 @@ export function VentaFichaView() {
                 listReturnState.filters,
                 listReturnState.search,
                 listReturnState.soldYear,
+                undefined,
+                listReturnState.soldMoneda,
               ),
             );
           }}

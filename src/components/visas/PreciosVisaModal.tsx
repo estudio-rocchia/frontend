@@ -397,32 +397,6 @@ export function PreciosVisaModal({
                 onRemove={() => setExtras((current) => current.filter((extra) => extra.id !== item.id))}
               />
             ))}
-          {adding === "honorario" ? (
-            <NuevoPrecio
-              categoria="honorario"
-              nombre={addNombre}
-              montoUsd={addMontoUsd}
-              montoArs={addMontoArs}
-              moneda={addMoneda}
-              alcance={addAlcance}
-              destino={addDestino}
-              disabled={busy}
-              onNombre={setAddNombre}
-              onMontoUsd={setAddMontoUsd}
-              onMontoArs={setAddMontoArs}
-              onMoneda={setAddMoneda}
-              onAlcance={setAddAlcance}
-              onDestino={setAddDestino}
-              onConfirm={confirmarExtra}
-              onCancel={() => setAdding(null)}
-            />
-          ) : (
-            <AddRow
-              label="Agregar honorario"
-              disabled={!puedeAgregar}
-              onClick={() => empezar("honorario")}
-            />
-          )}
         </TariffSection>
 
         <TariffSection id="precios-otros" title="Otros importes" note="Se suman aparte del honorario.">

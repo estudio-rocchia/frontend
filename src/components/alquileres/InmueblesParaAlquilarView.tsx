@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { TablePaginationFooter } from "@/components/ui/Pagination";
 import type { KeyboardEvent } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, KeyRound, Plus, Search } from "lucide-react";
@@ -498,29 +499,17 @@ export function InmueblesParaAlquilarView() {
         </table>
       </div>
 
-      {totalPages > 1 ? (
-        <div className="flex items-center justify-between gap-2">
-          <button
-            type="button"
-            disabled={pageClamped <= 0 || loading}
-            onClick={() => setPage((current) => Math.max(0, current - 1))}
-            className="rounded-sm border border-border px-3 py-1.5 text-[12px] font-medium text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Anterior
-          </button>
-          <span className="text-[12px] text-text-secondary">
-            {pageClamped + 1} / {totalPages}
-          </span>
-          <button
-            type="button"
-            disabled={pageClamped >= totalPages - 1 || loading}
-            onClick={() => setPage((current) => Math.min(totalPages - 1, current + 1))}
-            className="rounded-sm border border-border px-3 py-1.5 text-[12px] font-medium text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Siguiente
-          </button>
-        </div>
-      ) : null}
+      <TablePaginationFooter
+        page={pageClamped + 1}
+        total={filtered.length}
+        perPage={VACANTES_LIST_PAGE_SIZE}
+        resultLabel="inmuebles"
+        disabled={loading}
+        onPageChange={(next) => setPage(next - 1)}
+        onPrevious={() => setPage((current) => Math.max(0, current - 1))}
+        onNext={() => setPage((current) => Math.min(totalPages - 1, current + 1))}
+        className="border-t-0 px-0 pt-3"
+      />
 
       {publicarAlquilerOpen && token ? (
         <PublicarEnAlquilerCatalogModal

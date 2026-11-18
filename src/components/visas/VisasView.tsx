@@ -9,6 +9,7 @@ import { EnlacesOficiales } from "@/components/visas/EnlacesOficiales";
 import { NuevoTramiteModal } from "@/components/visas/NuevoTramiteModal";
 import { PreciosVisaModal } from "@/components/visas/PreciosVisaModal";
 import { ButtonOutline, ButtonPrimary } from "@/components/ui/Button";
+import { TablePaginationFooter } from "@/components/ui/Pagination";
 import { Card } from "@/components/ui/Card";
 import { EnumSelect } from "@/components/ui/EnumSelect";
 import { KpiCard } from "@/components/ui/KpiCard";
@@ -296,24 +297,7 @@ export function VisasView() {
 
   return (
     <div className={`flex flex-col gap-6 ${pagePaddingClass}`}>
-      <PageHeader
-        title="Visas"
-        description={<EnlacesOficiales compact />}
-        actions={
-          canEdit ? (
-            <>
-              <ButtonOutline onClick={() => setPreciosOpen(true)}>
-                <CircleDollarSign className="mr-1.5 h-4 w-4" aria-hidden />
-                Actualizar precios
-              </ButtonOutline>
-              <ButtonPrimary onClick={() => setCreateOpen(true)}>
-                <Plus className="mr-1.5 h-4 w-4" aria-hidden />
-                Crear trámite
-              </ButtonPrimary>
-            </>
-          ) : undefined
-        }
-      />
+      <PageHeader title="Visas" description={<EnlacesOficiales compact />} />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
@@ -343,7 +327,7 @@ export function VisasView() {
         />
       </div>
 
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+      <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end">
         <SearchField
           className="min-w-0 flex-1 lg:max-w-md"
           value={search}
@@ -372,6 +356,18 @@ export function VisasView() {
             label: ESTADO_VISA_LABEL[value],
           }))}
         />
+        {canEdit ? (
+          <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto lg:ml-auto">
+            <ButtonOutline onClick={() => setPreciosOpen(true)}>
+              <CircleDollarSign className="mr-1.5 h-4 w-4" aria-hidden />
+              Actualizar precios
+            </ButtonOutline>
+            <ButtonPrimary onClick={() => setCreateOpen(true)}>
+              <Plus className="mr-1.5 h-4 w-4" aria-hidden />
+              Crear trámite
+            </ButtonPrimary>
+          </div>
+        ) : null}
       </div>
 
       {error ? (
@@ -392,22 +388,20 @@ export function VisasView() {
       ) : null}
 
       {!loading && !refreshing && items.length === 0 ? (
-        <div className="flex flex-col items-start gap-3 rounded-md border border-dashed border-border bg-bg-card px-6 py-10">
-          <p className="text-sm font-semibold text-text-primary">
-            {estado || debouncedSearch.trim() ? "Ningún trámite coincide con el filtro." : "Todavía no hay trámites de visa."}
-          </p>
-          <p className="max-w-md text-sm text-text-secondary">
-            {estado || debouncedSearch.trim()
-              ? "Probá con otro nombre, otro estado o todos los años."
-              : "Abrí el primero con el solicitante titular. Si viajan juntos, después sumás al resto en el mismo grupo."}
-          </p>
-          {canEdit && !estado && !debouncedSearch.trim() ? (
-            <ButtonPrimary onClick={() => setCreateOpen(true)}>
-              <Plus className="mr-1.5 h-4 w-4" aria-hidden />
-              Crear trámite
-            </ButtonPrimary>
-          ) : null}
-        </div>
+        <Card accent className="rocchia-panel--flat overflow-hidden">
+          <div className="flex flex-col items-start gap-3 px-6 py-10">
+            <p className="text-sm font-semibold text-text-primary">
+              {estado || debouncedSearch.trim()
+                ? "Ningún trámite coincide con el filtro."
+                : "Todavía no hay trámites de visa."}
+            </p>
+            <p className="max-w-md text-sm text-text-secondary">
+              {estado || debouncedSearch.trim()
+                ? "Probá con otro nombre, otro estado o todos los años."
+                : "Abrí el primero con el solicitante titular. Si viajan juntos, después sumás al resto en el mismo grupo."}
+            </p>
+          </div>
+        </Card>
       ) : (
       <Card accent className="rocchia-panel--flat relative overflow-hidden">
         <ListProgressBar active={refreshing} />
@@ -535,28 +529,16 @@ export function VisasView() {
         </div>
         </ListTableContent>
 
-        <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">
-          <p className="text-[12px] text-text-secondary">
-            {sortedItems.length === 0
-              ? "0 trámites"
-              : `Mostrando ${rangeStart}–${rangeEnd} de ${sortedItems.length} trámites`}
-          </p>
-          <div className="flex items-center gap-2">
-            <ButtonOutline type="button" disabled={currentPage <= 1 || loading || refreshing} onClick={() => setPage(currentPage - 1)}>
-              Anterior
-            </ButtonOutline>
-            <span className="min-w-[88px] text-center text-[12px] font-semibold text-text-secondary">
-              Página {currentPage} de {totalPages}
-            </span>
-            <ButtonOutline
-              type="button"
-              disabled={currentPage >= totalPages || loading || refreshing}
-              onClick={() => setPage(currentPage + 1)}
-            >
-              Siguiente
-            </ButtonOutline>
-          </div>
-        </footer>
+        <TablePaginationFooter
+          page={currentPage}
+          total={sortedItems.length}
+          perPage={PAGE_SIZE}
+          resultLabel="trámites"
+          disabled={loading || refreshing}
+          onPageChange={setPage}
+          onPrevious={() => setPage(currentPage - 1)}
+          onNext={() => setPage(currentPage + 1)}
+        />
       </Card>
       )}
 
