@@ -272,14 +272,14 @@ export function VentasWorkspace() {
   const load = useCallback(async (options?: { silent?: boolean }) => {
     if (!token) return;
     if (tab !== "en_operacion" && !tipoVentaId) return;
-    const generation = ++loadGenerationRef.current;
-    const stillCurrent = () => generation === loadGenerationRef.current;
     const silent = options?.silent ?? false;
     const listKey =
       tab === "en_operacion"
         ? tab
         : `${tab}-${JSON.stringify(characteristicFiltersRef.current)}-${soldYearRef.current ?? "all"}-${debouncedSearchRef.current}-${catalogPageRef.current}`;
     if (!silent && inFlightListKeyRef.current === listKey) return;
+    const generation = ++loadGenerationRef.current;
+    const stillCurrent = () => generation === loadGenerationRef.current;
     inFlightListKeyRef.current = listKey;
     const { startedAt, isInitial } = start(silent, tab);
     if (!silent && isInitial) {
@@ -342,12 +342,12 @@ export function VentasWorkspace() {
       setCatalogRows([]);
       setCatalogTotal(0);
     } finally {
+      if (inFlightListKeyRef.current === listKey) {
+        inFlightListKeyRef.current = null;
+      }
       if (stillCurrent() && !silent) {
         await finish(listKey, startedAt);
         setLoading(false);
-        if (inFlightListKeyRef.current === listKey) {
-          inFlightListKeyRef.current = null;
-        }
       }
     }
   }, [token, tab, estadoIds, tipoInmuebleIds, tipoVentaId, logout, start, finish]);

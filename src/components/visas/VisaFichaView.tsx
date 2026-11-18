@@ -396,11 +396,11 @@ export function VisaFichaView() {
           aria-labelledby="visa-tab-tramite"
           className="grid items-start gap-4 outline-none md:gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]"
         >
-          <ExpedienteCardSkeleton />
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
-            <CotizacionCardSkeleton />
+          <div className="flex flex-col gap-4 md:gap-6">
+            <ExpedienteCardSkeleton />
             <GrupoCardSkeleton />
           </div>
+          <CotizacionCardSkeleton />
         </div>
       ) : null}
 
@@ -413,98 +413,80 @@ export function VisaFichaView() {
           aria-labelledby="visa-tab-tramite"
           className="grid items-start gap-4 outline-none md:gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]"
         >
-          <ExpedienteCard
-            canEdit={canEdit}
-            estado={estado}
-            numeroDs160={numeroDs160}
-            emailAis={emailAis}
-            notas={notas}
-            abiertoEn={abiertoEn}
-            decisionEn={decisionEn}
-            turnoEn={turnoEn}
-            turnoAsignadoPor={turnoAsignadoPor}
-            entrevistaEn={entrevistaEn}
-            dirty={expedienteDirty}
-            saving={saving}
-            copied={copied}
-            confirmDelete={confirmDelete}
-            savedMessage={expedienteAviso}
-            errorMessage={expedienteError}
-            onEstado={(value) => {
-              setEstado(value);
-              setExpedienteError(null);
-            }}
-            onNumeroDs160={(value) => {
-              setNumeroDs160(value);
-              setExpedienteError(null);
-            }}
-            onEmailAis={(value) => {
-              setEmailAis(value);
-              setExpedienteError(null);
-            }}
-            onNotas={(value) => {
-              setNotas(value);
-              setExpedienteError(null);
-            }}
-            onAbiertoEn={(value) => {
-              setAbiertoEn(value);
-              setExpedienteError(null);
-            }}
-            onDecisionEn={(value) => {
-              setDecisionEn(value);
-              setExpedienteError(null);
-            }}
-            onTurnoEn={(value) => {
-              setTurnoEn(value);
-              if (!value) setTurnoAsignadoPor("");
-              setExpedienteError(null);
-            }}
-            onTurnoAsignadoPor={(value) => {
-              setTurnoAsignadoPor(value);
-              setExpedienteError(null);
-            }}
-            onEntrevistaEn={(value) => {
-              setEntrevistaEn(value);
-              setExpedienteError(null);
-            }}
-            onCopy={() => void copyDs160()}
-            onSave={() => void saveTramite()}
-            onDiscard={() => {
-              setEstado(detail.estado);
-              setNumeroDs160(detail.numeroDs160 ?? "");
-              setEmailAis(detail.emailAis ?? "");
-              setNotas(detail.notas ?? "");
-              setAbiertoEn(detail.abiertoEn);
-              setDecisionEn(detail.decisionEn ?? "");
-              setTurnoEn(detail.turnoEn ?? "");
-              setTurnoAsignadoPor(detail.turnoAsignadoPor ?? "");
-              setEntrevistaEn(detail.entrevistaEn ?? "");
-              setConfirmDelete(false);
-              setExpedienteError(null);
-              setExpedienteAviso(null);
-            }}
-            onAskDelete={() => setConfirmDelete(true)}
-            onCancelDelete={() => setConfirmDelete(false)}
-            onConfirmDelete={() => void anular()}
-          />
-
-          <div className="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-1">
-            <CotizacionCard
-              cotizacion={cotizacion}
-              preview={cambiosTurno !== String(detail.grupo.cambiosTurno)}
+          <div className="flex flex-col gap-4 md:gap-6">
+            <ExpedienteCard
               canEdit={canEdit}
+              estado={estado}
+              numeroDs160={numeroDs160}
+              emailAis={emailAis}
+              notas={notas}
               abiertoEn={abiertoEn}
-              honorarioPagadoEn={honorarioPagadoEn || null}
-              arancelPagadoEn={arancelPagadoEn || null}
-              integrantes={detail.integrantes}
-              tramiteId={detail.id}
-              recibos={detail.recibos ?? []}
-              saving={savingCobro || savingOpcional}
-              errorMessage={cobroError}
-              onCobrar={cobrar}
-              onVerRecibo={verRecibo}
-              onAnularRecibo={anularRecibo}
-              onAplicarHonorarios={(ids) => void aplicarHonorarios(ids)}
+              decisionEn={decisionEn}
+              turnoEn={turnoEn}
+              turnoAsignadoPor={turnoAsignadoPor}
+              entrevistaEn={entrevistaEn}
+              dirty={expedienteDirty}
+              saving={saving}
+              copied={copied}
+              confirmDelete={confirmDelete}
+              savedMessage={expedienteAviso}
+              errorMessage={expedienteError}
+              onEstado={(value) => {
+                setEstado(value);
+                setExpedienteError(null);
+              }}
+              onNumeroDs160={(value) => {
+                setNumeroDs160(value);
+                setExpedienteError(null);
+              }}
+              onEmailAis={(value) => {
+                setEmailAis(value);
+                setExpedienteError(null);
+              }}
+              onNotas={(value) => {
+                setNotas(value);
+                setExpedienteError(null);
+              }}
+              onAbiertoEn={(value) => {
+                setAbiertoEn(value);
+                setExpedienteError(null);
+              }}
+              onDecisionEn={(value) => {
+                setDecisionEn(value);
+                setExpedienteError(null);
+              }}
+              onTurnoEn={(value) => {
+                setTurnoEn(value);
+                if (!value) setTurnoAsignadoPor("");
+                setExpedienteError(null);
+              }}
+              onTurnoAsignadoPor={(value) => {
+                setTurnoAsignadoPor(value);
+                setExpedienteError(null);
+              }}
+              onEntrevistaEn={(value) => {
+                setEntrevistaEn(value);
+                setExpedienteError(null);
+              }}
+              onCopy={() => void copyDs160()}
+              onSave={() => void saveTramite()}
+              onDiscard={() => {
+                setEstado(detail.estado);
+                setNumeroDs160(detail.numeroDs160 ?? "");
+                setEmailAis(detail.emailAis ?? "");
+                setNotas(detail.notas ?? "");
+                setAbiertoEn(detail.abiertoEn);
+                setDecisionEn(detail.decisionEn ?? "");
+                setTurnoEn(detail.turnoEn ?? "");
+                setTurnoAsignadoPor(detail.turnoAsignadoPor ?? "");
+                setEntrevistaEn(detail.entrevistaEn ?? "");
+                setConfirmDelete(false);
+                setExpedienteError(null);
+                setExpedienteAviso(null);
+              }}
+              onAskDelete={() => setConfirmDelete(true)}
+              onCancelDelete={() => setConfirmDelete(false)}
+              onConfirmDelete={() => void anular()}
             />
             <GrupoCard
               integrantes={detail.integrantes}
@@ -535,6 +517,24 @@ export function VisaFichaView() {
               onAdd={() => setAddOpen(true)}
             />
           </div>
+
+          <CotizacionCard
+            cotizacion={cotizacion}
+            preview={cambiosTurno !== String(detail.grupo.cambiosTurno)}
+            canEdit={canEdit}
+            abiertoEn={abiertoEn}
+            honorarioPagadoEn={honorarioPagadoEn || null}
+            arancelPagadoEn={arancelPagadoEn || null}
+            integrantes={detail.integrantes}
+            tramiteId={detail.id}
+            recibos={detail.recibos ?? []}
+            saving={savingCobro || savingOpcional}
+            errorMessage={cobroError}
+            onCobrar={cobrar}
+            onVerRecibo={verRecibo}
+            onAnularRecibo={anularRecibo}
+            onAplicarHonorarios={(ids) => void aplicarHonorarios(ids)}
+          />
         </div>
       ) : null}
 

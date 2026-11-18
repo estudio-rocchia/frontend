@@ -1,8 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 import { Card } from "@/components/ui/Card";
 import { KpiCard } from "@/components/ui/KpiCard";
@@ -39,26 +38,8 @@ const INDEX_LABELS: Record<IndiceCode, string> = {
   CAC: "Cámara Argentina de la Construcción",
 };
 
-const contentEase = [0.23, 1, 0.32, 1] as const;
-
-function IndexDescription({ indice }: { indice: IndiceCode }) {
-  const reduceMotion = useReducedMotion();
-  const text = `${INDEX_LABELS[indice]}${indice === "CAC" ? " CAMARCO puede tardar unos minutos." : ""}`;
-
-  return (
-    <AnimatePresence mode="wait" initial={false}>
-      <motion.span
-        key={indice}
-        initial={reduceMotion ? false : { opacity: 0, y: 5 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={reduceMotion ? undefined : { opacity: 0, y: -5 }}
-        transition={{ duration: reduceMotion ? 0 : 0.22, ease: contentEase }}
-        className="block"
-      >
-        {text}
-      </motion.span>
-    </AnimatePresence>
-  );
+function indexDescriptionText(indice: IndiceCode): string {
+  return `${INDEX_LABELS[indice]}${indice === "CAC" ? " CAMARCO puede tardar unos minutos." : ""}`;
 }
 
 function defaultDateRange() {
@@ -102,8 +83,6 @@ function IndexSelector({
   onChange: (code: IndiceCode) => void;
   disabled?: boolean;
 }) {
-  const reduceMotion = useReducedMotion();
-
   return (
     <div className="relative flex flex-wrap gap-1" role="group" aria-label="Índice de ajuste">
       {ADJUSTMENT_INDICES.map((code) => {
@@ -120,14 +99,9 @@ function IndexSelector({
             }`}
           >
             {selected ? (
-              <motion.span
-                layoutId="indices-segment-pill"
-                className="absolute inset-0 rounded-lg border border-primary bg-bg-card shadow-[0_1px_3px_rgba(1,4,0,0.08)]"
-                transition={
-                  reduceMotion
-                    ? { duration: 0 }
-                    : { type: "spring", stiffness: 420, damping: 34, mass: 0.85 }
-                }
+              <span
+                className="absolute inset-0 rounded-lg border border-primary bg-bg-card shadow-[0_1px_3px_rgba(1,4,0,0.08)] transition-colors duration-150"
+                aria-hidden
               />
             ) : null}
             <span className="relative">{code}</span>
@@ -140,7 +114,6 @@ function IndexSelector({
 
 export function IndicesView() {
   const { token, logout } = useAuth();
-  const reduceMotion = useReducedMotion();
   const { refreshing, listTransitionKey, isInitialLoad, start, finish } = useListRefreshTransition();
   const defaults = useMemo(() => defaultDateRange(), []);
   const [indice, setIndice] = useState<IndiceCode>("ICL");
@@ -151,31 +124,79 @@ export function IndicesView() {
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const dateRangeRef = useRef({ desde, hasta });
+  dateRangeRef.current = { desde, hasta };
+  const rowsByIndiceRef = useRef<Partial<Record<IndiceCode, ValorIndiceRecord[]>>>({});
+  const hydratedFromPickerRef = useRef<string | null>(null);
+
+  const resolveFetchRange = useCallback(
+    (rangeDesde: string, rangeHasta: string) => {
+      const desdeFetch = earlierIsoDate(rangeDesde, subtractMonthsFromDate(rangeHasta, 14));
+      return { desdeFetch, hasta: rangeHasta };
+    },
+    [],
+  );
+
+  const readCachedRows = useCallback(
+    (code: IndiceCode, rangeDesde: string, rangeHasta: string): ValorIndiceRecord[] | null => {
+      if (!token) return null;
+      const memory = rowsByIndiceRef.current[code];
+      if (memory) return memory;
+      const { desdeFetch, hasta: h } = resolveFetchRange(rangeDesde, rangeHasta);
+      const cached = peekCache<{ items: ValorIndiceRecord[] }>(
+        indiceValoresCacheKey(token, code, desdeFetch, h),
+      );
+      if (!cached) return null;
+      const sorted = sortByPeriodoDesc(cached.items);
+      rowsByIndiceRef.current[code] = sorted;
+      return sorted;
+    },
+    [token, resolveFetchRange],
+  );
+
+  const applyRows = useCallback((code: IndiceCode, items: ValorIndiceRecord[]) => {
+    const sorted = sortByPeriodoDesc(items);
+    rowsByIndiceRef.current[code] = sorted;
+    setAllRows(sorted);
+    setError(null);
+    setLoading(false);
+  }, []);
 
   const load = useCallback(
     async (options?: { bypassCache?: boolean }) => {
       if (!token) return;
       const listKey = `${indice}-${desde}-${hasta}`;
-      const desdeFetch = earlierIsoDate(desde, subtractMonthsFromDate(hasta, 14));
-      const cacheKey = indiceValoresCacheKey(token, indice, desdeFetch, hasta);
-      const cached = options?.bypassCache
+      if (hydratedFromPickerRef.current === listKey) {
+        hydratedFromPickerRef.current = null;
+        return;
+      }
+      const { desdeFetch, hasta: fetchHasta } = resolveFetchRange(desde, hasta);
+      const cacheKey = indiceValoresCacheKey(token, indice, desdeFetch, fetchHasta);
+      const cachedRows = options?.bypassCache
         ? null
-        : peekCache<{ items: ValorIndiceRecord[] }>(cacheKey);
-      const silent = Boolean(cached);
-      const { startedAt, isInitial } = start(silent, indice);
+        : (rowsByIndiceRef.current[indice] ??
+          peekCache<{ items: ValorIndiceRecord[] }>(cacheKey)?.items ??
+          null);
+      const silent = Boolean(cachedRows);
+      const { startedAt, isInitial } = start(silent);
 
-      if (cached) {
-        setAllRows(sortByPeriodoDesc(cached.items));
-        setError(null);
-        setLoading(false);
+      if (cachedRows) {
+        applyRows(indice, cachedRows);
       } else if (isInitial) {
         setLoading(true);
+      } else {
+        setAllRows([]);
       }
       setError(null);
 
+      if (cachedRows && !options?.bypassCache) {
+        await finish(listKey, startedAt, true);
+        return;
+      }
+
       try {
-        const response = await fetchIndiceValores(token, indice, desdeFetch, hasta, options);
-        setAllRows(sortByPeriodoDesc(response.items));
+        const response = await fetchIndiceValores(token, indice, desdeFetch, fetchHasta, options);
+        applyRows(indice, response.items);
       } catch (err) {
         if (err instanceof ApiError && err.status === 401) {
           logout();
@@ -183,17 +204,59 @@ export function IndicesView() {
         }
         setError(err instanceof ApiError ? err.message : "Error al cargar los índices");
         setAllRows([]);
+        delete rowsByIndiceRef.current[indice];
       } finally {
         await finish(listKey, startedAt, silent);
         setLoading(false);
       }
     },
-    [token, logout, indice, desde, hasta, start, finish],
+    [token, logout, indice, desde, hasta, start, finish, resolveFetchRange, applyRows],
+  );
+
+  const selectIndice = useCallback(
+    (code: IndiceCode) => {
+      if (code === indice) return;
+      setSyncMessage(null);
+      const cached = readCachedRows(code, desde, hasta);
+      if (cached) {
+        hydratedFromPickerRef.current = `${code}-${desde}-${hasta}`;
+        setIndice(code);
+        setAllRows(cached);
+        setLoading(false);
+        setError(null);
+        return;
+      }
+      setIndice(code);
+    },
+    [indice, desde, hasta, readCachedRows],
   );
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!token) return;
+
+    const prefetchOthers = () => {
+      const { desde: d, hasta: h } = dateRangeRef.current;
+      const { desdeFetch, hasta: fetchHasta } = resolveFetchRange(d, h);
+      for (const code of ADJUSTMENT_INDICES) {
+        if (rowsByIndiceRef.current[code]) continue;
+        const cacheKey = indiceValoresCacheKey(token, code, desdeFetch, fetchHasta);
+        if (peekCache<{ items: ValorIndiceRecord[] }>(cacheKey)) continue;
+        void fetchIndiceValores(token, code, desdeFetch, fetchHasta)
+          .then((response) => {
+            rowsByIndiceRef.current[code] = sortByPeriodoDesc(response.items);
+          })
+          .catch(() => {
+            // prefetch opcional
+          });
+      }
+    };
+
+    prefetchOthers();
+  }, [token, desde, hasta, resolveFetchRange]);
 
   const handleSync = useCallback(async () => {
     if (!token || syncing) return;
@@ -243,8 +306,8 @@ export function IndicesView() {
 
   const rows = useMemo(() => {
     const inRange = allRows.filter((row) => periodoInUserRange(row.periodo, desde, hasta));
-    return indice === "ICL" ? latestPointPerMonth(inRange) : inRange;
-  }, [allRows, desde, hasta, indice]);
+    return latestPointPerMonth(inRange);
+  }, [allRows, desde, hasta]);
 
   const valorMap = useMemo(() => buildValorMap(allRows), [allRows]);
 
@@ -254,14 +317,22 @@ export function IndicesView() {
     [latest, valorMap],
   );
 
+  const rowVariations = useMemo(() => {
+    const map = new Map<string, ReturnType<typeof computeIndexVariations>>();
+    for (const row of rows) {
+      map.set(row.periodo, computeIndexVariations(valorMap, row.periodo));
+    }
+    return map;
+  }, [rows, valorMap]);
+
   return (
     <div className={`flex flex-col gap-6 sm:gap-8 ${pagePaddingClass}`}>
-      <PageHeader title="Índices de ajuste" description={<IndexDescription indice={indice} />} />
+      <PageHeader title="Índices de ajuste" description={indexDescriptionText(indice)} />
 
       <section className="flex flex-col gap-3">
         <div className="flex w-fit max-w-full flex-wrap items-center gap-2">
           <div className="inline-flex rounded-xl border border-border bg-bg-page p-1">
-            <IndexSelector value={indice} onChange={setIndice} disabled={syncing} />
+            <IndexSelector value={indice} onChange={selectIndice} disabled={syncing} />
           </div>
           <button
             type="button"
@@ -280,43 +351,34 @@ export function IndicesView() {
         ) : null}
       </section>
 
-      <AnimatePresence mode="wait" initial={false}>
-        {!loading && !refreshing && !error && rows.length > 0 ? (
-          <motion.div
-            key={listTransitionKey}
-            initial={reduceMotion ? false : { opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={reduceMotion ? undefined : { opacity: 0, y: -6 }}
-            transition={{ duration: reduceMotion ? 0 : 0.26, ease: contentEase }}
-            className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4"
-          >
-            <KpiCard
-              label={`Último valor · ${indice}`}
-              value={latest ? formatIndexValue(latest.valor) : "—"}
-              hint={latest ? formatPeriodoIndice(latest.periodo) : "Sin datos"}
-              tone={0}
-            />
-            <KpiCard
-              label="Variación mensual"
-              value={latestVariations.mensual ?? "—"}
-              hint="Respecto al mes anterior"
-              tone={1}
-            />
-            <KpiCard
-              label="Variación interanual"
-              value={latestVariations.interanual ?? "—"}
-              hint="Respecto al mismo mes del año anterior"
-              tone={3}
-            />
-            <KpiCard
-              label="Variación acumulada"
-              value={latestVariations.acumulada ?? "—"}
-              hint="Desde diciembre del año anterior (criterio INDEC)"
-              tone={4}
-            />
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
+      {!loading && !error && rows.length > 0 ? (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <KpiCard
+            label={`Último valor · ${indice}`}
+            value={latest ? formatIndexValue(latest.valor) : "—"}
+            hint={latest ? formatPeriodoIndice(latest.periodo) : "Sin datos"}
+            tone={0}
+          />
+          <KpiCard
+            label="Variación mensual"
+            value={latestVariations.mensual ?? "—"}
+            hint="Respecto al mes anterior"
+            tone={1}
+          />
+          <KpiCard
+            label="Variación interanual"
+            value={latestVariations.interanual ?? "—"}
+            hint="Respecto al mismo mes del año anterior"
+            tone={3}
+          />
+          <KpiCard
+            label="Variación acumulada"
+            value={latestVariations.acumulada ?? "—"}
+            hint="Desde diciembre del año anterior (criterio INDEC)"
+            tone={4}
+          />
+        </div>
+      ) : null}
 
       <Card accent className="rocchia-panel--flat relative flex min-h-[360px] flex-1 flex-col overflow-hidden p-0">
         <ListProgressBar active={refreshing} />
@@ -379,7 +441,9 @@ export function IndicesView() {
                   </thead>
                   <tbody>
                     {rows.map((row, index) => {
-                      const variations = computeIndexVariations(valorMap, row.periodo);
+                      const variations =
+                        rowVariations.get(row.periodo) ??
+                        computeIndexVariations(valorMap, row.periodo);
                       return (
                         <tr
                           key={row.periodo}
