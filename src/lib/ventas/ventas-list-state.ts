@@ -3,6 +3,7 @@ import {
   EMPTY_CHARACTERISTIC_FILTERS,
   sanitizeCharacteristicFiltersForTipo,
   type VentasCharacteristicFilters,
+  type VentasSoldMonedaFilter,
 } from "@/lib/ventas/characteristic-filters";
 
 const BOOL_TRUE = "1";
@@ -59,9 +60,34 @@ function appendVentasSoldYear(params: URLSearchParams, soldYear: number | null |
   }
 }
 
+function appendVendidosListStateParams(
+  params: URLSearchParams,
+  filters: VentasCharacteristicFilters,
+  search: string,
+  soldMoneda: VentasSoldMonedaFilter,
+): void {
+  if (search.trim()) params.set("q", search);
+  if (filters.tipoInmuebleCode) params.set("ltipo", filters.tipoInmuebleCode);
+  if (soldMoneda) params.set("lmon", soldMoneda);
+}
+
+export function parseSoldMoneda(searchParams: {
+  get(name: string): string | null;
+}): VentasSoldMonedaFilter {
+  const lmon = searchParams.get("lmon")?.trim().toUpperCase();
+  if (lmon === "USD" || lmon === "ARS") return lmon;
+  return null;
+}
+
 export function parseVentasListStateFromSearchParams(searchParams: {
   get(name: string): string | null;
-}): { filters: VentasCharacteristicFilters; search: string; soldYear: number | null; catalogPage: number } {
+}): {
+  filters: VentasCharacteristicFilters;
+  search: string;
+  soldYear: number | null;
+  soldMoneda: VentasSoldMonedaFilter;
+  catalogPage: number;
+} {
   const filters: VentasCharacteristicFilters = {
     ...EMPTY_CHARACTERISTIC_FILTERS,
     tipoInmuebleCode: searchParams.get("ltipo")?.trim() ?? "",
@@ -82,10 +108,14 @@ export function parseVentasListStateFromSearchParams(searchParams: {
     precioMax: searchParams.get("lpmax")?.trim() ?? "",
   };
 
+  const fromVendidos =
+    searchParams.get("tab") === "vendidos" || searchParams.get("from") === "vendidos";
+
   return {
     filters: sanitizeCharacteristicFiltersForTipo(filters),
     search: searchParams.get("q") ?? "",
     soldYear: parseSoldYear(searchParams),
+    soldMoneda: fromVendidos ? parseSoldMoneda(searchParams) : null,
     catalogPage: parseCatalogPage(searchParams),
   };
 }
@@ -96,11 +126,17 @@ export function buildVentasListHref(
   search: string,
   soldYear?: number | null,
   catalogPage?: number,
+  soldMoneda?: VentasSoldMonedaFilter,
 ): string {
   const params = new URLSearchParams();
   params.set("tab", tab);
-  appendVentasListStateParams(params, sanitizeCharacteristicFiltersForTipo(filters), search);
-  if (tab === "vendidos") appendVentasSoldYear(params, soldYear);
+  const sanitized = sanitizeCharacteristicFiltersForTipo(filters);
+  if (tab === "vendidos") {
+    appendVendidosListStateParams(params, sanitized, search, soldMoneda ?? null);
+    appendVentasSoldYear(params, soldYear);
+  } else {
+    appendVentasListStateParams(params, sanitized, search);
+  }
   if (catalogPage != null && catalogPage > 1) params.set("pagina", String(catalogPage));
   const qs = params.toString();
   return qs ? `/ventas?${qs}` : "/ventas";
@@ -112,11 +148,17 @@ export function buildVentasInmuebleHref(
   filters: VentasCharacteristicFilters,
   search: string,
   soldYear?: number | null,
+  soldMoneda?: VentasSoldMonedaFilter,
 ): string {
   const params = new URLSearchParams();
   params.set("from", fromTab);
-  appendVentasListStateParams(params, sanitizeCharacteristicFiltersForTipo(filters), search);
-  if (fromTab === "vendidos") appendVentasSoldYear(params, soldYear);
+  const sanitized = sanitizeCharacteristicFiltersForTipo(filters);
+  if (fromTab === "vendidos") {
+    appendVendidosListStateParams(params, sanitized, search, soldMoneda ?? null);
+    appendVentasSoldYear(params, soldYear);
+  } else {
+    appendVentasListStateParams(params, sanitized, search);
+  }
   return `/ventas/inmueble/${inmuebleId}?${params.toString()}`;
 }
 
@@ -126,10 +168,16 @@ export function buildVentasVentaHref(
   filters: VentasCharacteristicFilters,
   search: string,
   soldYear?: number | null,
+  soldMoneda?: VentasSoldMonedaFilter,
 ): string {
   const params = new URLSearchParams();
   params.set("from", fromTab);
-  appendVentasListStateParams(params, sanitizeCharacteristicFiltersForTipo(filters), search);
-  if (fromTab === "vendidos") appendVentasSoldYear(params, soldYear);
+  const sanitized = sanitizeCharacteristicFiltersForTipo(filters);
+  if (fromTab === "vendidos") {
+    appendVendidosListStateParams(params, sanitized, search, soldMoneda ?? null);
+    appendVentasSoldYear(params, soldYear);
+  } else {
+    appendVentasListStateParams(params, sanitized, search);
+  }
   return `/ventas/${ventaId}?${params.toString()}`;
 }

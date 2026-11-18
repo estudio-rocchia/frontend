@@ -89,6 +89,43 @@ function terrainFiltersActive(filters: VentasCharacteristicFilters): boolean {
   );
 }
 
+export type VentasSoldMonedaFilter = "USD" | "ARS" | null;
+
+export function vendidosFiltersSearchParams(
+  filters: VentasCharacteristicFilters,
+  tipoInmuebleIds: Record<string, number>,
+  soldMoneda: VentasSoldMonedaFilter,
+): CharacteristicFiltersSearchParams {
+  const params: CharacteristicFiltersSearchParams = {};
+  if (filters.tipoInmuebleCode) {
+    const id = tipoInmuebleIds[filters.tipoInmuebleCode];
+    if (id) params.tipoInmuebleId = id;
+  }
+  if (soldMoneda) params.codigoMoneda = soldMoneda;
+  return params;
+}
+
+export function vendidosFiltersActive(
+  filters: VentasCharacteristicFilters,
+  soldMoneda: VentasSoldMonedaFilter,
+): boolean {
+  return filters.tipoInmuebleCode !== "" || soldMoneda !== null;
+}
+
+export function formatVendidosFiltersSummary(
+  filters: VentasCharacteristicFilters,
+  tiposInmueble: Array<{ code: string; name: string }>,
+  soldMoneda: VentasSoldMonedaFilter,
+): string | null {
+  const parts: string[] = [];
+  if (filters.tipoInmuebleCode) {
+    const tipo = tiposInmueble.find((item) => item.code === filters.tipoInmuebleCode);
+    parts.push(tipo?.name ?? filters.tipoInmuebleCode);
+  }
+  if (soldMoneda) parts.push(soldMoneda);
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
 export function characteristicFiltersActive(filters: VentasCharacteristicFilters): boolean {
   const sanitized = sanitizeCharacteristicFiltersForTipo(filters);
   return (
