@@ -42,6 +42,8 @@ function buildVinculos(personaId: number, context: ClientesContext): ClienteVinc
     inquilino: context.inquilinoIds.has(personaId),
     propietario: context.propietarioIds.has(personaId),
     moroso: context.morosoIds.has(personaId),
+    juridico: false,
+    visa: false,
   });
 }
 
