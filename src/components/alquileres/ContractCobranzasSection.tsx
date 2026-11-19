@@ -62,12 +62,16 @@ export function ContractCobranzasSection({
         <FichaSummaryCard
           label="Total por cobrar"
           value={formatMoney(String(saldoPendiente.total), monedaResumen)}
-          hint={cuotasConDeuda > 0 ? `${cuotasConDeuda} período${cuotasConDeuda === 1 ? "" : "s"} con saldo` : "Al día"}
+          hint={
+            cuotasConDeuda > 0
+              ? `${cuotasConDeuda} cuota${cuotasConDeuda === 1 ? "" : "s"} de alquiler con saldo`
+              : "Al día"
+          }
         />
         <FichaSummaryCard
-          label="Períodos en el contrato"
+          label="Cuotas de alquiler"
           value={String(cuotasOrdenadas.length)}
-          hint="Meses listados según vigencia"
+          hint="Por mes según vigencia del contrato"
         />
         <FichaSummaryCard
           label="Pagos registrados"
@@ -118,7 +122,7 @@ export function ContractCobranzasSection({
               <table className="min-w-full text-left text-[13px]">
                 <thead className="sticky top-0 z-10 border-b border-border bg-bg-page text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
                   <tr>
-                    <th className="px-4 py-3">Período</th>
+                    <th className="px-4 py-3">Mes</th>
                     <th className="px-4 py-3">Vencimiento</th>
                     <th className="px-4 py-3 text-right">Alquiler actual</th>
                     <th className="px-4 py-3 text-right">Pagado</th>

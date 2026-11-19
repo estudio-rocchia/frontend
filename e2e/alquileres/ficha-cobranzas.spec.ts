@@ -12,7 +12,7 @@ test.describe("Alquileres — ficha Cobranzas", () => {
 
     const cuotasTable = authedPage.getByTestId("cobranzas-cuotas-table");
     await expect(cuotasTable).toBeVisible();
-    await expect(cuotasTable.getByRole("columnheader", { name: "Período" })).toBeVisible();
+    await expect(cuotasTable.getByRole("columnheader", { name: "Mes" })).toBeVisible();
     await expect(cuotasTable.getByRole("columnheader", { name: "Vencimiento" })).toBeVisible();
     await expect(cuotasTable.getByRole("columnheader", { name: "Alquiler actual" })).toBeVisible();
     await expect(cuotasTable.getByRole("columnheader", { name: "Pagado" })).toBeVisible();
